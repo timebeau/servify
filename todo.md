@@ -23,6 +23,7 @@
   - 进度：`/api/tickets/bulk` + Tickets 页批量修改 UI 已完成；会话转接已接入 WebSocket“转人工”触发 + 管理后台会话转接页（等待队列/取消/历史/手动转接）
 - [x] 权限：细粒度 RBAC（admin/agent 之外的资源级权限）
 - [x] 自定义字段/动态表单：字段配置（校验、条件展示）与查询/导出联动
+- [x] 班次管理 UI：排班列表/筛选 + 创建/编辑/删除 + 统计卡片（对接 `/api/shifts`）
 
 ## P2（产品能力对标：Competitive Roadmap）
 参考成熟客服产品（Zendesk、Freshdesk、ServiceNow）的能力差距清单（需评估数据模型、API 与前端交互后排期）。

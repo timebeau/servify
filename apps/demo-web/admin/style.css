@@ -14,8 +14,8 @@ main { padding: 16px; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; }
 .tab { display: none; }
 .tab.active { display: block; }
-#tbl_tickets, #tbl_customers, #tbl_agents, #tbl_macros, #tbl_automations, #tbl_csat_surveys, #tbl_waiting_records, #tbl_transfer_history, #tbl_custom_fields { width: 100%; border-collapse: collapse; }
-#tbl_tickets th, #tbl_tickets td, #tbl_customers th, #tbl_customers td, #tbl_agents th, #tbl_agents td, #tbl_macros th, #tbl_macros td, #tbl_automations th, #tbl_automations td, #tbl_csat_surveys th, #tbl_csat_surveys td, #tbl_waiting_records th, #tbl_waiting_records td, #tbl_transfer_history th, #tbl_transfer_history td, #tbl_custom_fields th, #tbl_custom_fields td { border-bottom: 1px solid #eee; padding: 8px; text-align: left; }
+#tbl_tickets, #tbl_customers, #tbl_agents, #tbl_macros, #tbl_automations, #tbl_csat_surveys, #tbl_waiting_records, #tbl_transfer_history, #tbl_custom_fields, #tbl_shifts { width: 100%; border-collapse: collapse; }
+#tbl_tickets th, #tbl_tickets td, #tbl_customers th, #tbl_customers td, #tbl_agents th, #tbl_agents td, #tbl_macros th, #tbl_macros td, #tbl_automations th, #tbl_automations td, #tbl_csat_surveys th, #tbl_csat_surveys td, #tbl_waiting_records th, #tbl_waiting_records td, #tbl_transfer_history th, #tbl_transfer_history td, #tbl_custom_fields th, #tbl_custom_fields td, #tbl_shifts th, #tbl_shifts td { border-bottom: 1px solid #eee; padding: 8px; text-align: left; }
 .json { background: #fafafa; border: 1px solid #eee; padding: 8px; overflow: auto; max-height: 320px; }
 .row { display: flex; gap: 8px; }
 input, select, textarea { padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; }
@@ -550,3 +550,15 @@ footer { text-align: center; color: #777; font-size: 12px; padding: 10px 0 20px;
 .integration-actions button {
   margin-right: 6px;
 }
+
+.shift-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.shift-status.scheduled { background: #ebf8ff; color: #2b6cb0; }
+.shift-status.active { background: #c6f6d5; color: #276749; }
+.shift-status.completed { background: #edf2f7; color: #4a5568; }
+.shift-status.cancelled { background: #fed7d7; color: #c53030; }

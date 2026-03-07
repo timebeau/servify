@@ -21,6 +21,7 @@
       <button data-tab="macros">宏与模板</button>
       <button data-tab="automations">自动化</button>
       <button data-tab="integrations">应用市场</button>
+      <button data-tab="shifts">班次管理</button>
       <button data-tab="ai">AI 状态</button>
     </nav>
     <div class="auth-controls">
@@ -780,6 +781,127 @@
             </div>
           </form>
         </div>
+      </div>
+    </section>
+
+    <section id="shifts" class="tab">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>班次统计</h3>
+          <div class="controls">
+            <button id="btn_shift_stats" type="button">刷新统计</button>
+          </div>
+        </div>
+        <div class="stats-cards">
+          <div class="stat-card">
+            <h4>总班次</h4>
+            <div id="shift_stat_total">-</div>
+          </div>
+          <div class="stat-card">
+            <h4>未来班次</h4>
+            <div id="shift_stat_upcoming">-</div>
+          </div>
+          <div class="stat-card">
+            <h4>今日覆盖</h4>
+            <div id="shift_stat_today_active">-</div>
+          </div>
+          <div class="stat-card">
+            <h4>已排班</h4>
+            <div id="shift_stat_scheduled">-</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h3>班次列表</h3>
+          <div class="controls">
+            <select id="shift_filter_agent">
+              <option value="">全部客服</option>
+            </select>
+            <select id="shift_filter_status">
+              <option value="">全部状态</option>
+              <option value="scheduled">scheduled</option>
+              <option value="active">active</option>
+              <option value="completed">completed</option>
+              <option value="cancelled">cancelled</option>
+            </select>
+            <input type="date" id="shift_filter_date_from" />
+            <input type="date" id="shift_filter_date_to" />
+            <button id="btn_shift_filter" type="button">筛选</button>
+            <button id="btn_shift_refresh" type="button">刷新</button>
+          </div>
+        </div>
+        <table id="tbl_shifts">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>客服</th>
+              <th>类型</th>
+              <th>开始</th>
+              <th>结束</th>
+              <th>状态</th>
+              <th>创建时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <div class="pagination" id="shift_pagination">
+          <button id="btn_shift_prev" disabled>上一页</button>
+          <span id="shift_page_info">第1页 / 共1页</span>
+          <button id="btn_shift_next" disabled>下一页</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h3 id="shift_form_title">新建班次</h3>
+          <div class="controls">
+            <button id="btn_shift_cancel_edit" type="button" style="display: none;">取消编辑</button>
+          </div>
+        </div>
+        <form id="form_shift">
+          <input type="hidden" id="shift_edit_id" />
+          <div class="row">
+            <div class="form-group" style="flex:1;">
+              <label>客服 *</label>
+              <select id="shift_agent_id" name="agent_id" required>
+                <option value="">请选择客服</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex:1;">
+              <label>班次类型 *</label>
+              <select id="shift_type" name="shift_type" required>
+                <option value="morning">morning</option>
+                <option value="afternoon">afternoon</option>
+                <option value="evening">evening</option>
+                <option value="night">night</option>
+                <option value="regular">regular</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="form-group" style="flex:1;">
+              <label>开始时间 *</label>
+              <input id="shift_start_time" name="start_time" type="datetime-local" required />
+            </div>
+            <div class="form-group" style="flex:1;">
+              <label>结束时间 *</label>
+              <input id="shift_end_time" name="end_time" type="datetime-local" required />
+            </div>
+            <div class="form-group" style="flex:1;">
+              <label>状态</label>
+              <select id="shift_status" name="status">
+                <option value="scheduled" selected>scheduled</option>
+                <option value="active">active</option>
+                <option value="completed">completed</option>
+                <option value="cancelled">cancelled</option>
+              </select>
+            </div>
+          </div>
+          <button id="btn_shift_submit" type="submit">创建班次</button>
+        </form>
       </div>
     </section>
 

@@ -108,7 +108,7 @@ curl -s http://localhost:8080/api/v1/webrtc/connections | jq
   - 首次使用请配置数据库并执行迁移（见上文 migrate）
  - 权限提示：
    - staff（admin/agent）：customers、agents、tickets、session-transfer、satisfaction、knowledge（知识库只读）
-   - admin-only：statistics（/api/statistics/...）、sla（/api/sla/...）
+   - admin-only：statistics（/api/statistics/...）、sla（/api/sla/...）、shift（/api/shifts/...）
 
 ### 知识库（Public Portal，MVP）
 - 打开: http://localhost:8080/kb.html

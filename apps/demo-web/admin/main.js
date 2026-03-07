@@ -74,6 +74,19 @@
     return r.json();
   }
   const formatDateTime = (value) => value ? new Date(value).toLocaleString() : '-';
+  const toDateTimeLocal = (value) => {
+    if (!value) return '';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    const offset = d.getTimezoneOffset() * 60000;
+    return new Date(d.getTime() - offset).toISOString().slice(0, 16);
+  };
+  const fromDateTimeLocal = (value) => {
+    if (!value) return '';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toISOString();
+  };
   const buildCSATLink = (token) => token ? `${window.location.origin}/satisfaction.html?token=${token}` : '';
 
   function formatDateYMD(d) {
@@ -184,13 +197,13 @@
 	      const v = String($('#auth_token')?.value || '').trim();
 	      setStoredToken(v);
 	      refreshStatus();
-	      await Promise.allSettled([loadDashboard(), loadTickets(), loadCustomFields(), loadCustomers(), loadAgents(), loadAI(), loadAgentsForBulkControls(), loadSessionTransferWaiting()]);
+	      await Promise.allSettled([loadDashboard(), loadTickets(), loadCustomFields(), loadCustomers(), loadAgents(), loadAI(), loadAgentsForBulkControls(), loadSessionTransferWaiting(), loadShiftModule()]);
 	    });
 	    $('#btn_clear_token')?.addEventListener('click', async () => {
 	      setStoredToken('');
 	      if ($('#auth_token')) $('#auth_token').value = '';
 	      refreshStatus();
-	      await Promise.allSettled([loadDashboard(), loadTickets(), loadCustomFields(), loadCustomers(), loadAgents(), loadAI(), loadAgentsForBulkControls(), loadSessionTransferWaiting()]);
+	      await Promise.allSettled([loadDashboard(), loadTickets(), loadCustomFields(), loadCustomers(), loadAgents(), loadAI(), loadAgentsForBulkControls(), loadSessionTransferWaiting(), loadShiftModule()]);
 	    });
 	  }
 
@@ -1277,6 +1290,153 @@
     }
   }
 
+  // 班次管理
+  let shiftCurrentPage = 1;
+  const shiftPageSize = 20;
+  let shiftCurrentFilters = {};
+  let shiftAgentOptions = [];
+  let shiftRowMap = new Map();
+
+  function renderShiftAgentOptions() {
+    const options = shiftAgentOptions.map(a => ({
+      id: a.id,
+      label: a.user?.name || a.name || a.user?.username || `Agent #${a.id}`,
+    }));
+
+    const filter = $('#shift_filter_agent');
+    if (filter) {
+      const old = filter.value;
+      filter.innerHTML = '<option value="">全部客服</option>' + options.map(o => `<option value="${o.id}">${o.label}</option>`).join('');
+      filter.value = old;
+    }
+
+    const create = $('#shift_agent_id');
+    if (create) {
+      const old = create.value;
+      create.innerHTML = '<option value="">请选择客服</option>' + options.map(o => `<option value="${o.id}">${o.label}</option>`).join('');
+      create.value = old;
+    }
+  }
+
+  async function loadShiftAgentOptions() {
+    try {
+      const res = await jget(`${API}/agents`);
+      shiftAgentOptions = res.data || res || [];
+      renderShiftAgentOptions();
+    } catch {
+      // ignore
+    }
+  }
+
+  function setShiftFormMode(isEdit) {
+    $('#shift_form_title').textContent = isEdit ? '编辑班次' : '新建班次';
+    $('#btn_shift_submit').textContent = isEdit ? '保存修改' : '创建班次';
+    $('#btn_shift_cancel_edit').style.display = isEdit ? '' : 'none';
+    if ($('#shift_agent_id')) $('#shift_agent_id').disabled = !!isEdit;
+  }
+
+  function resetShiftForm() {
+    $('#form_shift')?.reset();
+    $('#shift_edit_id').value = '';
+    $('#shift_status').value = 'scheduled';
+    setShiftFormMode(false);
+  }
+
+  function fillShiftForm(shift) {
+    if (!shift) return;
+    $('#shift_edit_id').value = shift.id || '';
+    $('#shift_agent_id').value = shift.agent_id || '';
+    $('#shift_type').value = shift.shift_type || 'morning';
+    $('#shift_start_time').value = toDateTimeLocal(shift.start_time);
+    $('#shift_end_time').value = toDateTimeLocal(shift.end_time);
+    $('#shift_status').value = shift.status || 'scheduled';
+    setShiftFormMode(true);
+  }
+
+  function renderShiftRows(list) {
+    const tbody = $('#tbl_shifts tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    shiftRowMap = new Map();
+
+    if (!Array.isArray(list) || list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#718096;">暂无班次数据</td></tr>';
+      return;
+    }
+
+    list.forEach(shift => {
+      shiftRowMap.set(Number(shift.id), shift);
+      const tr = document.createElement('tr');
+      const agentName = shift.agent?.name || shift.agent?.username || `Agent #${shift.agent_id || '-'}`;
+      const status = shift.status || '-';
+      tr.innerHTML = `
+        <td>${shift.id || ''}</td>
+        <td>${agentName}</td>
+        <td>${shift.shift_type || '-'}</td>
+        <td>${formatDateTime(shift.start_time)}</td>
+        <td>${formatDateTime(shift.end_time)}</td>
+        <td><span class="shift-status ${status}">${status}</span></td>
+        <td>${formatDateTime(shift.created_at)}</td>
+        <td>
+          <button class="btn_shift_edit" data-id="${shift.id}" type="button">编辑</button>
+          <button class="btn_shift_delete" data-id="${shift.id}" type="button">删除</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function loadShifts(page = 1, filters = shiftCurrentFilters) {
+    try {
+      const params = {
+        page,
+        page_size: shiftPageSize,
+        sort_by: 'start_time',
+        sort_order: 'asc',
+        agent_id: filters.agent_id || undefined,
+        status: filters.status || undefined,
+        date_from: filters.date_from || undefined,
+        date_to: filters.date_to || undefined,
+      };
+      const res = await jget(`${API}/shifts${buildQuery(params)}`);
+      const list = res.data || [];
+      renderShiftRows(list);
+
+      const total = Number(res.total || 0);
+      const totalPages = Math.max(1, Math.ceil(total / shiftPageSize));
+      $('#shift_page_info').textContent = `第${page}页 / 共${totalPages}页 (${total}条记录)`;
+      $('#btn_shift_prev').disabled = page <= 1;
+      $('#btn_shift_next').disabled = page >= totalPages;
+      shiftCurrentPage = page;
+    } catch (e) {
+      const tbody = $('#tbl_shifts tbody');
+      if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#e53e3e;">加载失败: ${e.message}</td></tr>`;
+      }
+      $('#shift_page_info').textContent = '第1页 / 共1页';
+      $('#btn_shift_prev').disabled = true;
+      $('#btn_shift_next').disabled = true;
+    }
+  }
+
+  async function loadShiftStats() {
+    try {
+      const stats = await jget(`${API}/shifts/stats`);
+      $('#shift_stat_total').textContent = stats.total ?? 0;
+      $('#shift_stat_upcoming').textContent = stats.upcoming ?? 0;
+      $('#shift_stat_today_active').textContent = stats.today_active ?? 0;
+      $('#shift_stat_scheduled').textContent = (stats.by_status || {}).scheduled ?? 0;
+    } catch (e) {
+      ['#shift_stat_total', '#shift_stat_upcoming', '#shift_stat_today_active', '#shift_stat_scheduled'].forEach(sel => {
+        if ($(sel)) $(sel).textContent = '-';
+      });
+    }
+  }
+
+  async function loadShiftModule() {
+    await Promise.allSettled([loadShiftAgentOptions(), loadShifts(shiftCurrentPage || 1), loadShiftStats()]);
+  }
+
   // AI 状态与测试
   async function loadAI(){
     try {
@@ -2199,6 +2359,7 @@
   loadSatisfactionStats();
   loadCSATSurveys();
   loadIntegrations();
+  loadShiftModule();
 
   // 会话转接事件
   $('#btn_st_to_human')?.addEventListener('click', () => sessionTransferToHuman());
@@ -2230,6 +2391,81 @@
       sessionTransferToHuman(sid);
     } else if (action === 'cancel') {
       sessionTransferCancel(sid);
+    }
+  });
+
+  // 班次管理事件
+  $('#btn_shift_refresh')?.addEventListener('click', () => loadShifts(shiftCurrentPage || 1));
+  $('#btn_shift_stats')?.addEventListener('click', () => loadShiftStats());
+  $('#btn_shift_filter')?.addEventListener('click', () => {
+    shiftCurrentFilters = {
+      agent_id: $('#shift_filter_agent')?.value || '',
+      status: $('#shift_filter_status')?.value || '',
+      date_from: $('#shift_filter_date_from')?.value || '',
+      date_to: $('#shift_filter_date_to')?.value || '',
+    };
+    loadShifts(1, shiftCurrentFilters);
+  });
+  $('#btn_shift_prev')?.addEventListener('click', () => {
+    if (shiftCurrentPage > 1) loadShifts(shiftCurrentPage - 1, shiftCurrentFilters);
+  });
+  $('#btn_shift_next')?.addEventListener('click', () => {
+    loadShifts(shiftCurrentPage + 1, shiftCurrentFilters);
+  });
+  $('#btn_shift_cancel_edit')?.addEventListener('click', resetShiftForm);
+  $('#tbl_shifts')?.addEventListener('click', async (ev) => {
+    const t = ev.target;
+    if (!t || !t.dataset?.id) return;
+    const id = Number(t.dataset.id);
+    if (!id) return;
+    if (t.classList.contains('btn_shift_edit')) {
+      fillShiftForm(shiftRowMap.get(id));
+      return;
+    }
+    if (!t.classList.contains('btn_shift_delete')) return;
+    if (!confirm('确定删除该班次？')) return;
+    try {
+      await jdel(`${API}/shifts/${id}`);
+      await loadShifts(shiftCurrentPage, shiftCurrentFilters);
+      await loadShiftStats();
+    } catch (e) {
+      alert('删除失败: ' + e.message);
+    }
+  });
+  $('#form_shift')?.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const editID = Number($('#shift_edit_id').value || 0);
+    const payload = {
+      agent_id: Number($('#shift_agent_id').value || 0),
+      shift_type: $('#shift_type').value,
+      start_time: fromDateTimeLocal($('#shift_start_time').value),
+      end_time: fromDateTimeLocal($('#shift_end_time').value),
+      status: $('#shift_status').value || 'scheduled',
+    };
+    if (!payload.agent_id) {
+      alert('请选择客服');
+      return;
+    }
+    if (!payload.start_time || !payload.end_time || new Date(payload.end_time) <= new Date(payload.start_time)) {
+      alert('结束时间必须晚于开始时间');
+      return;
+    }
+    try {
+      if (editID) {
+        await jput(`${API}/shifts/${editID}`, {
+          shift_type: payload.shift_type,
+          start_time: payload.start_time,
+          end_time: payload.end_time,
+          status: payload.status,
+        });
+      } else {
+        await jpost(`${API}/shifts`, payload);
+      }
+      resetShiftForm();
+      await loadShifts(editID ? shiftCurrentPage : 1, shiftCurrentFilters);
+      await loadShiftStats();
+    } catch (e) {
+      alert('保存失败: ' + e.message);
     }
   });
 
@@ -3004,6 +3240,8 @@
       loadAutomations();
     } else if (tab === 'integrations') {
       loadIntegrations();
+    } else if (tab === 'shifts') {
+      loadShiftModule();
     } else if (tab === 'sla') {
       // 加载SLA数据
       loadSLAConfigs();
