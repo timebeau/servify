@@ -5,6 +5,7 @@
 ## 架构设计
 
 - 当前正式架构文档：`ARCHITECTURE.md`
+- 实施 backlog 索引：`docs/implementation/README.md`
 - WeKnora 专题文档：`docs/WEKNORA_INTEGRATION.md`
 
 ## 快速开始（MVP）

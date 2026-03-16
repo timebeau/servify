@@ -10,6 +10,7 @@ The architecture goals are:
 - isolate business capabilities by bounded context instead of by technical folders
 - make channel protocols pluggable, including future SIP integration
 - make AI, knowledge retrieval, and realtime capabilities replaceable
+- make SDK families extensible beyond web, while only implementing web SDK in the current phase
 - support gradual migration from the current codebase
 
 ## 2. System Goals
@@ -17,6 +18,7 @@ The architecture goals are:
 Servify is designed to support:
 
 - web chat and admin console
+- SDK families for web, backend API clients, and future app/mobile clients
 - AI-assisted customer support
 - knowledge retrieval and document indexing
 - ticketing and customer operations
@@ -58,6 +60,7 @@ External protocols and vendors must sit behind interfaces:
 - channel adapters for web, SIP, Telegram, WeCom, WhatsApp
 - knowledge providers for WeKnora, Dify, RAGFlow, pgvector-backed local retrieval
 - LLM providers for OpenAI and future models
+- SDK transports and SDK bindings for web, backend API, and future app/mobile clients
 
 ### 3.4 Explicit Separation of Write and Read Models
 
@@ -156,6 +159,7 @@ Responsibilities:
 - public endpoints
 - webhook endpoints
 - SIP and other protocol adapters
+- SDK-facing transport contracts
 
 Rules:
 
@@ -210,6 +214,21 @@ Responsibilities:
 - observability
 - file storage
 - external API clients
+
+### 5.5 SDK Layer
+
+Responsibilities:
+
+- expose stable client contracts to different consumers
+- separate transport implementation from framework bindings
+- share core types, events, auth strategy, and retry strategy
+- allow multiple SDK families without duplicating protocol logic
+
+Rules:
+
+- only the web SDK is implemented in the current phase
+- API client SDK and app/mobile SDK are planned and must be reserved in structure and contracts
+- framework bindings must depend on shared core SDK packages, not reimplement protocol logic
 
 ## 6. Bounded Contexts
 
@@ -322,6 +341,22 @@ Owns:
 - execution log
 - asynchronous handlers
 
+### 6.12 SDK
+
+Owns:
+
+- client-facing SDK contracts
+- transport abstraction
+- shared event and message types
+- auth/session bootstrap rules
+- framework bindings
+
+The SDK context exists independently from the current web implementation. The first implementation remains web-only, but the architecture must reserve:
+
+- web sdk
+- server-side api client sdk
+- future app/mobile sdk
+
 ## 7. Channel Adapter Architecture
 
 The core system must not depend on any single protocol. All inbound channel traffic should be normalized into platform events.
@@ -361,7 +396,121 @@ Each adapter is responsible for:
 
 Adapters must not own ticket, routing, or AI logic.
 
-## 8. SIP Support Design
+## 8. SDK Architecture
+
+### 8.1 SDK Families
+
+Servify should not treat the current browser SDK as the only SDK shape.
+
+Planned SDK families:
+
+- `web sdk`
+- `server api sdk`
+- `app/mobile sdk`
+- optional future `desktop sdk`
+
+Current implementation scope:
+
+- only `web sdk`
+
+### 8.2 SDK Layering
+
+The SDK stack should be layered like this:
+
+1. `sdk core`
+   - shared types
+   - transport contracts
+   - auth/session bootstrap
+   - error model
+   - retry and reconnect policies
+
+2. `sdk transport`
+   - websocket transport
+   - http transport
+   - future sip or rtc signaling bindings if needed
+
+3. `sdk bindings`
+   - web vanilla
+   - react
+   - vue
+   - future server api binding
+   - future app/mobile binding
+
+4. `sdk widgets or ui kits`
+   - optional web widget
+   - future native ui kit wrappers
+
+### 8.3 SDK Design Rules
+
+- all framework bindings must depend on `sdk core`
+- web-only behavior must not leak into shared core contracts
+- transport contracts must support both browser and non-browser clients where possible
+- auth/session initialization must be explicit, not hidden inside a specific framework wrapper
+
+### 8.4 Target SDK Structure
+
+```text
+sdk/
+  packages/
+    core/
+      src/
+        contracts/
+        transport/
+        session/
+        events/
+        types/
+        errors/
+    transport-http/
+    transport-websocket/
+    web-vanilla/
+    web-react/
+    web-vue/
+    api-client/
+    app-core/
+```
+
+### 8.5 Current and Planned Scope
+
+Current phase:
+
+- `core`
+- `websocket/http transport` as needed by web sdk
+- `web vanilla`
+- `web react`
+- `web vue`
+
+Reserved but not implemented yet:
+
+- `api-client`
+- `app-core`
+- mobile framework bindings
+
+### 8.6 SDK Contracts
+
+The shared SDK contracts should support:
+
+- session start and resume
+- send message
+- receive events
+- reconnect lifecycle
+- auth token refresh
+- feature capability negotiation
+
+Example capability model:
+
+```go
+type Capability string
+
+const (
+    CapabilityChat          Capability = "chat"
+    CapabilityRealtime      Capability = "realtime"
+    CapabilityKnowledge     Capability = "knowledge"
+    CapabilityVoice         Capability = "voice"
+    CapabilityRemoteAssist  Capability = "remote_assist"
+)
+```
+
+## 9. SIP Support Design
 
 ### 8.1 SIP Support Position
 
@@ -406,7 +555,7 @@ SIP Provider or PBX
 - agent load model must support voice concurrency separately from chat concurrency
 - recording and transcription must be asynchronous
 
-## 9. AI and Knowledge Architecture
+## 10. AI and Knowledge Architecture
 
 ### 9.1 Problem With Vendor-Coupled Design
 
@@ -442,7 +591,7 @@ Planned implementations:
 
 The AI module only depends on the interfaces, not the provider DTOs.
 
-## 10. Events
+## 11. Events
 
 Internal domain events should be explicit.
 
@@ -461,7 +610,7 @@ Examples:
 
 Initial implementation can use an in-process event bus. The event contract should still be formalized to support future extraction.
 
-## 11. Data Model Direction
+## 12. Data Model Direction
 
 The current shared `models.go` approach should be replaced by module-scoped models and repositories.
 
@@ -476,7 +625,7 @@ Example direction:
 
 Cross-module access should happen through repositories or application services, not direct model reach-through.
 
-## 12. Deployment Shape
+## 13. Deployment Shape
 
 ### 12.1 Current Recommended Shape
 
@@ -494,7 +643,7 @@ Cross-module access should happen through repositories or application services, 
 - current scale does not justify distributed coordination cost
 - protocol and provider abstraction gives most of the benefit already
 
-## 13. Target Repository Structure
+## 14. Target Repository Structure
 
 ```text
 apps/server/
@@ -535,9 +684,20 @@ apps/server/
       observability/
       realtime/
       sip/
+
+sdk/
+  packages/
+    core/
+    transport-http/
+    transport-websocket/
+    web-vanilla/
+    web-react/
+    web-vue/
+    api-client/
+    app-core/
 ```
 
-## 14. Migration Strategy
+## 15. Migration Strategy
 
 The migration should be incremental.
 
@@ -546,20 +706,23 @@ The migration should be incremental.
 - extract bootstrap and app wiring from current entrypoints
 - split current large services into command and query services
 - introduce provider interfaces for knowledge and LLM
+- define sdk core contracts without breaking the existing web sdk packages
 
 ### Phase 2
 
 - move ticket, conversation, and routing into module directories
 - replace shared service cross-calls with interfaces and events
 - introduce worker process for async jobs
+- refactor current sdk packages to depend on shared sdk core contracts
 
 ### Phase 3
 
 - introduce voice module and SIP adapter
 - add transcript, recording, and call analytics support
 - normalize all channels under unified event model
+- add reserved api-client sdk and app-core sdk skeleton packages
 
-## 15. Design Decisions
+## 16. Design Decisions
 
 ### Accepted
 
@@ -567,6 +730,7 @@ The migration should be incremental.
 - domain-oriented modules
 - provider abstraction
 - channel adapter pattern
+- sdk family abstraction
 - eventual SIP support via voice module
 
 ### Rejected
@@ -574,9 +738,10 @@ The migration should be incremental.
 - continue expanding handler-service-model structure
 - hard-wire WeKnora as the only knowledge backend
 - place SIP logic inside chat session code
+- treat browser sdk as the only sdk form
 - start with microservices
 
-## 16. Success Criteria
+## 17. Success Criteria
 
 The architecture is considered successfully adopted when:
 
@@ -584,4 +749,6 @@ The architecture is considered successfully adopted when:
 - ticket and conversation logic are split into modules
 - AI uses provider interfaces rather than vendor DTOs
 - a new channel adapter can be added without modifying core ticket logic
+- the sdk core is independent from browser-specific implementation
+- web sdk continues to work while api/app sdk packages can be added without redesign
 - SIP can be added as a voice adapter without redesigning the whole system

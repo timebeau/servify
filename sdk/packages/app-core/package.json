@@ -1,0 +1,7 @@
+{
+  "name": "@servify/app-core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Reserved package for future Servify app and mobile SDK foundations",
+  "type": "module"
+}
