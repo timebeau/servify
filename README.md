@@ -2,6 +2,11 @@
 
 一个基于 WebRTC 的智能客服系统，支持文字交流、AI 智能问答和远程协助功能。
 
+## 架构设计
+
+- 当前正式架构文档：`ARCHITECTURE.md`
+- WeKnora 专题文档：`docs/WEKNORA_INTEGRATION.md`
+
 ## 快速开始（MVP）
 
 - 构建与迁移
@@ -244,87 +249,107 @@ security:
 ## 技术架构
 
 ### 技术栈选择
-- **后端**: Go + Pion (WebRTC) + Gin (HTTP服务)
-- **前端**: TypeScript + 原生 WebRTC API
-- **数据库**: PostgreSQL (pgvector) + Redis
-- **AI**: OpenAI API + WeKnora (企业级知识库)
-- **知识库**: WeKnora (腾讯开源 RAG 框架)
-- **消息队列**: Redis/RabbitMQ
+- **后端**: Go + Gin + Pion WebRTC
+- **前端**: TypeScript SDK + 原生 WebRTC API
+- **数据库**: PostgreSQL + Redis
+- **AI**: OpenAI API 或其他 LLM Provider
+- **知识库**: 可插拔 Knowledge Provider，当前已接入 WeKnora
+- **协议接入**: WebSocket/WebRTC，后续可扩展 SIP 等 Channel Adapter
 
-### 系统架构图（Mermaid，含 OTel/坐席/后台/监控/多租户）
+### 架构说明
+
+- 当前正式架构以 [ARCHITECTURE.md](ARCHITECTURE.md) 为准
+- 服务端目标形态为“模块化单体”，不是继续扩张的 `handlers/services/models` 结构
+- 业务边界按模块划分：conversation、routing、ticket、customer、agent、knowledge、ai、voice、automation、analytics
+- 外部能力通过接口抽象接入：
+  - `KnowledgeProvider`：WeKnora、Dify、RAGFlow、local pgvector
+  - `LLMProvider`：OpenAI 及未来模型
+  - `Channel Adapter`：Web Chat、SIP、Telegram、WeCom 等
+
+### 目标系统架构图
 
 ```mermaid
-flowchart LR
-  subgraph Client[前端/终端]
-    W[[Web 客户端 SDK/Widget]]
-    A[[坐席控制台（Agent Console）]]
-    ADM[[后台管理（Admin UI）]]
-    TP[第三方渠道\nWeChat/Telegram/Feishu/QQ]
-  end
+flowchart TD
+    USER[User]
+    ADMIN[Admin]
+    WEB[Web SDK]
+    API[HTTP WebSocket API]
+    SIP[SIP Gateway]
+    BOT[AI Orchestrator]
 
-  subgraph Edge[接入层]
-    GIN[API Gateway\nGin + CORS + Auth]
-    WS[WebSocket Hub\n会话/广播/AI 注入]
-    SIG[Signaling\nWS 中继 SDP/ICE]
-  end
+    subgraph APP[Application Layer]
+        CONV[Conversation App]
+        ROUTE[Routing App]
+        TICKET[Ticket App]
+        VOICE[Voice App]
+        KNOW[Knowledge App]
+        AUTO[Automation App]
+    end
 
-  subgraph Core[核心服务]
-    MR[消息路由\n多平台统一消息]
-    PION[WebRTC 服务\nPion + DataChannel]
-    AI[AI 服务\n标准/增强(WeKnora)]
-  end
+    subgraph DOMAIN[Domain Layer]
+        D1[Conversation]
+        D2[Agent]
+        D3[Ticket]
+        D4[Voice Call]
+        D5[Knowledge]
+        D6[SLA]
+    end
 
-  subgraph Data[数据与缓存]
-    PG[(PostgreSQL\npgvector)]
-    R[(Redis)]
-    OBJ[(对象存储\nS3/MinIO)]
-  end
+    subgraph INFRA[Infrastructure Layer]
+        DB[(PostgreSQL)]
+        REDIS[(Redis)]
+        VDB[Knowledge Provider]
+        LLM[LLM Provider]
+        OBS[Tracing Metrics Logs]
+        BUS[Event Bus]
+    end
 
-  subgraph Obs[可观测性]
-    OTel[OpenTelemetry SDK\n(Gin/GORM/HTTP/Pion)]
-    COL[OTel Collector]
-    JG[Jaeger\nTraces]
-    PM[Prometheus\nMetrics]
-    LK[Loki/ELK\nLogs]
-  end
+    USER --> WEB
+    WEB --> API
+    ADMIN --> API
+    SIP --> API
 
-  subgraph KB[外部知识库/AI]
-    WKN[WeKnora API\n租户隔离]
-    OAI[OpenAI / LLM]
-  end
+    API --> CONV
+    API --> ROUTE
+    API --> TICKET
+    API --> VOICE
+    API --> KNOW
 
-  subgraph RTC[打洞/中继]
-    STUN[(STUN)]
-    TURN[(TURN\n可选 coturn)]
-  end
+    BOT --> KNOW
+    BOT --> LLM
+    BOT --> CONV
 
-  W -- ws/http --> GIN
-  A -- ws/http --> GIN
-  ADM -- http --> GIN
-  TP -- webhook/polling --> MR
+    CONV --> D1
+    ROUTE --> D2
+    TICKET --> D3
+    VOICE --> D4
+    KNOW --> D5
 
-  GIN -- upgrade ws --> WS
-  WS --> SIG
-  SIG --> PION
-  PION -.-> STUN
-  PION -.-> TURN
+    CONV --> BUS
+    ROUTE --> BUS
+    TICKET --> BUS
+    VOICE --> BUS
+    AUTO --> BUS
 
-  MR <--> AI
-  MR <--> PG
-  MR <--> R
-  AI <--> WKN
-  AI --> OAI
-  AI <--> PG
-  GIN --> MR
+    D1 --> DB
+    D2 --> DB
+    D3 --> DB
+    D4 --> DB
+    D5 --> DB
 
-  GIN ----> W
-  GIN ----> A
-  GIN ----> ADM
-
-  OTel ==> COL ==> JG
-  COL ==> PM
-  COL ==> LK
+    KNOW --> VDB
+    BOT --> LLM
+    API --> REDIS
+    API --> OBS
 ```
+
+### 关键设计点
+
+- **模块化单体**：先保证边界清晰和部署简单，再考虑服务拆分
+- **Channel Adapter**：协议接入与业务内核解耦，便于后续接入 SIP、电话网关、企业 IM
+- **Provider 抽象**：AI 和知识库不绑定单一厂商
+- **事件驱动内核**：模块间通过显式领域事件协作，便于异步任务和后续演进
+- **Voice 预留**：SIP 不作为聊天逻辑的分支处理，而是通过独立 `voice` 模块接入统一会话模型
 
 #### 时序：对话 + AI
 ```mermaid
