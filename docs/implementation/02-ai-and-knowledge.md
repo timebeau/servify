@@ -70,16 +70,27 @@
 
 - 可以替代旧增强 AI 主流程
 
+## A4.1 compatibility bridge
+
+- [x] 新增 legacy `AIServiceInterface` 兼容适配器
+- [x] 让旧接口可调用新 `QueryOrchestrator`
+- [x] 在标准模式入口 wiring 中逐步替换旧 AI service
+- [ ] 在增强模式入口 wiring 中逐步替换旧 AI service
+
+验收：
+
+- 不改现有 handler 对外接口的情况下，可以复用新 AI 模块
+
 ## A5 prompt and retrieval
 
-- [ ] 新增 `prompt_builder.go`
-- [ ] 拆 system prompt
+- [x] 新增 `prompt_builder.go`
+- [x] 拆 system prompt
 - [ ] 拆 context prompt
-- [ ] 拆 knowledge prompt
-- [ ] 新增 `retriever.go`
-- [ ] 支持 topK
-- [ ] 支持 threshold
-- [ ] 支持 strategy
+- [x] 拆 knowledge prompt
+- [x] 新增 `retriever.go`
+- [x] 支持 topK
+- [x] 支持 threshold
+- [x] 支持 strategy
 
 验收：
 
@@ -87,13 +98,13 @@
 
 ## A6 tools
 
-- [ ] 定义 `Tool`
-- [ ] 定义 `ToolRegistry`
-- [ ] 定义 `ToolExecutor`
+- [x] 定义 `Tool`
+- [x] 定义 `ToolRegistry`
+- [x] 定义 `ToolExecutor`
 - [ ] 第一批：
-  - [ ] ticket lookup tool
-  - [ ] customer lookup tool
-  - [ ] handoff tool
+  - [x] ticket lookup tool
+  - [x] customer lookup tool
+  - [x] handoff tool
 
 验收：
 
@@ -101,15 +112,15 @@
 
 ## A7 ai guardrails and metrics
 
-- [ ] 输入长度限制
-- [ ] 敏感内容拦截占位
-- [ ] 输出截断
-- [ ] query_count
-- [ ] success_count
-- [ ] provider_usage_count
-- [ ] token_usage
-- [ ] latency
-- [ ] fallback_count
+- [x] 输入长度限制
+- [x] 敏感内容拦截占位
+- [x] 输出截断
+- [x] query_count
+- [x] success_count
+- [x] provider_usage_count
+- [x] token_usage
+- [x] latency
+- [x] fallback_count
 
 验收：
 
@@ -117,18 +128,18 @@
 
 ## A8 knowledge module
 
-- [ ] 创建 `internal/modules/knowledge/domain`
-- [ ] 创建 `internal/modules/knowledge/application`
-- [ ] 创建 `internal/modules/knowledge/infra`
-- [ ] 创建 `internal/modules/knowledge/delivery`
-- [ ] 定义 `Document`
-- [ ] 定义 `DocumentRepository`
-- [ ] 定义 `IndexJobRepository`
-- [ ] 实现 CreateDocument
-- [ ] 实现 UpdateDocument
-- [ ] 实现 DeleteDocument
-- [ ] 实现 QueueIndexJob
-- [ ] 实现 RunIndexJob
+- [x] 创建 `internal/modules/knowledge/domain`
+- [x] 创建 `internal/modules/knowledge/application`
+- [x] 创建 `internal/modules/knowledge/infra`
+- [x] 创建 `internal/modules/knowledge/delivery`
+- [x] 定义 `Document`
+- [x] 定义 `DocumentRepository`
+- [x] 定义 `IndexJobRepository`
+- [x] 实现 CreateDocument
+- [x] 实现 UpdateDocument
+- [x] 实现 DeleteDocument
+- [x] 实现 QueueIndexJob
+- [x] 实现 RunIndexJob
 
 验收：
 

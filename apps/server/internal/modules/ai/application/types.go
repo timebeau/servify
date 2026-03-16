@@ -52,4 +52,5 @@ type AIResponse struct {
 	TokenUsage   *llm.TokenUsage                  `json:"token_usage,omitempty"`
 	FinishReason string                           `json:"finish_reason,omitempty"`
 	Latency      time.Duration                    `json:"latency"`
+	Truncated    bool                             `json:"truncated,omitempty"`
 }

@@ -78,21 +78,21 @@
 
 ## B4 ticket
 
-- [ ] 创建 `internal/modules/ticket/domain`
-- [ ] 创建 `internal/modules/ticket/application`
-- [ ] 创建 `internal/modules/ticket/infra`
-- [ ] 创建 `internal/modules/ticket/delivery`
-- [ ] 新增 `query_service.go`
-- [ ] 迁移 `ListTickets`
-- [ ] 迁移 `GetTicketByID`
-- [ ] 新增 `command_service.go`
-- [ ] 迁移 `CreateTicket`
-- [ ] 迁移 `UpdateTicket`
-- [ ] 迁移 `AssignTicket`
-- [ ] 迁移 `AddComment`
-- [ ] 迁移 `CloseTicket`
-- [ ] 拆 `StatusTransitionPolicy`
-- [ ] 拆 `CustomFieldValidator`
+- [x] 创建 `internal/modules/ticket/domain`
+- [x] 创建 `internal/modules/ticket/application`
+- [x] 创建 `internal/modules/ticket/infra`
+- [x] 创建 `internal/modules/ticket/delivery`
+- [x] 新增 `query_service.go`
+- [x] 迁移 `ListTickets`
+- [x] 迁移 `GetTicketByID`
+- [x] 新增 `command_service.go`
+- [x] 迁移 `CreateTicket`
+- [x] 迁移 `UpdateTicket`
+- [x] 迁移 `AssignTicket`
+- [x] 迁移 `AddComment`
+- [x] 迁移 `CloseTicket`
+- [x] 拆 `StatusTransitionPolicy`
+- [x] 拆 `CustomFieldValidator`
 - [ ] 拆 `BulkUpdateTickets`
 - [ ] 发布 `ticket.created`
 - [ ] 发布 `ticket.assigned`

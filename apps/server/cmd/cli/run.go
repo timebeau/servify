@@ -22,6 +22,7 @@ import (
 	"servify/apps/server/internal/handlers"
 	"servify/apps/server/internal/middleware"
 	"servify/apps/server/internal/observability"
+	"servify/apps/server/internal/platform/llm/openai"
 	"servify/apps/server/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -74,11 +75,9 @@ func run(cmd *cobra.Command, args []string) {
 	}
 	webrtcService := services.NewWebRTCService(cfg.WebRTC.STUNServer, wsHub)
 	// 使用新的配置结构（cfg.AI.OpenAI.*）
-	aiService := services.NewAIService(cfg.AI.OpenAI.APIKey, cfg.AI.OpenAI.BaseURL)
+	openAIProvider := openai.NewProvider(cfg.AI.OpenAI.APIKey, cfg.AI.OpenAI.BaseURL)
+	aiService := services.NewOrchestratedAIService(openAIProvider, nil)
 	messageRouter := services.NewMessageRouter(aiService, wsHub, db)
-
-	// 初始化知识库
-	aiService.InitializeKnowledgeBase()
 
 	// 将AI服务注入到WebSocket以便直接处理文本消息
 	wsHub.SetAIService(aiService)

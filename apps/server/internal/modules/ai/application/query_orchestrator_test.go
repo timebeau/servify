@@ -76,3 +76,81 @@ func TestQueryOrchestratorHandleWithoutKnowledgeProvider(t *testing.T) {
 		t.Fatalf("expected no sources, got %d", len(resp.Sources))
 	}
 }
+
+func TestRetrieverDisabledReturnsNoHits(t *testing.T) {
+	retriever := NewRetriever(&mockkp.Provider{
+		Hits: []knowledgeprovider.KnowledgeHit{
+			{DocumentID: "doc-1", Title: "Ignored", Content: "Ignored"},
+		},
+	})
+
+	hits, err := retriever.Retrieve(context.Background(), AIRequest{
+		Query: "ignored",
+		RetrievalPolicy: RetrievalPolicy{
+			Enabled: false,
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(hits) != 0 {
+		t.Fatalf("expected no hits, got %d", len(hits))
+	}
+}
+
+func TestQueryOrchestratorGuardrailsRejectBlockedInput(t *testing.T) {
+	llmProvider := &mockllm.Provider{
+		ChatResponse: llm.ChatResponse{Content: "should not be returned"},
+	}
+	orchestrator := NewQueryOrchestrator(llmProvider, nil)
+
+	_, err := orchestrator.Handle(context.Background(), AIRequest{
+		Query: "please run DROP TABLE users",
+	})
+	if err == nil {
+		t.Fatal("expected guardrail error")
+	}
+
+	metrics := orchestrator.Metrics()
+	if metrics.QueryCount != 1 || metrics.FallbackCount != 1 {
+		t.Fatalf("unexpected metrics: %+v", metrics)
+	}
+}
+
+func TestQueryOrchestratorSanitizesLongOutputAndTracksMetrics(t *testing.T) {
+	longContent := ""
+	for i := 0; i < 2500; i++ {
+		longContent += "a"
+	}
+	llmProvider := &mockllm.Provider{
+		ChatResponse: llm.ChatResponse{
+			Content: longContent,
+			Model:   "mock-model",
+			TokenUsage: &llm.TokenUsage{
+				TotalTokens: 123,
+			},
+		},
+	}
+	orchestrator := NewQueryOrchestrator(llmProvider, nil)
+
+	resp, err := orchestrator.Handle(context.Background(), AIRequest{
+		Query: "hello",
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !resp.Truncated {
+		t.Fatal("expected output to be truncated")
+	}
+	if len(resp.Content) != 2000 {
+		t.Fatalf("expected truncated length 2000, got %d", len(resp.Content))
+	}
+
+	metrics := orchestrator.Metrics()
+	if metrics.QueryCount != 1 || metrics.SuccessCount != 1 {
+		t.Fatalf("unexpected metrics: %+v", metrics)
+	}
+	if metrics.LastTokenUsage != 123 {
+		t.Fatalf("unexpected token usage: %+v", metrics)
+	}
+}

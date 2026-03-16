@@ -17,6 +17,7 @@ import (
 	"servify/apps/server/internal/middleware"
 	"servify/apps/server/internal/models"
 	"servify/apps/server/internal/observability"
+	"servify/apps/server/internal/platform/llm/openai"
 	"servify/apps/server/internal/services"
 	"servify/apps/server/pkg/weknora"
 
@@ -134,6 +135,7 @@ func main() {
 	var aiService services.AIServiceInterface
 	baseAI := services.NewAIService(cfg.AI.OpenAI.APIKey, cfg.AI.OpenAI.BaseURL)
 	baseAI.InitializeKnowledgeBase()
+	openAIProvider := openai.NewProvider(cfg.AI.OpenAI.APIKey, cfg.AI.OpenAI.BaseURL)
 
 	var weKnoraClient weknora.WeKnoraInterface
 	if cfg.WeKnora.Enabled {
@@ -147,7 +149,7 @@ func main() {
 		weKnoraClient = weknora.NewClient(wkCfg, appLogger)
 		aiService = services.NewEnhancedAIService(baseAI, weKnoraClient, cfg.WeKnora.KnowledgeBaseID, appLogger)
 	} else {
-		aiService = baseAI
+		aiService = services.NewOrchestratedAIService(openAIProvider, nil)
 	}
 
 	// 初始化实时与路由服务（对齐 CLI 端点）
