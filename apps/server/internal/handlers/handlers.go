@@ -4,14 +4,15 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"net/http"
+	"servify/apps/server/internal/platform/realtime"
 	"servify/apps/server/internal/services"
 )
 
 type WebSocketHandler struct {
-	wsHub *services.WebSocketHub
+	wsHub realtime.RealtimeGateway
 }
 
-func NewWebSocketHandler(wsHub *services.WebSocketHub) *WebSocketHandler {
+func NewWebSocketHandler(wsHub realtime.RealtimeGateway) *WebSocketHandler {
 	return &WebSocketHandler{
 		wsHub: wsHub,
 	}
@@ -23,7 +24,7 @@ func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
 
 func (h *WebSocketHandler) GetStats(c *gin.Context) {
 	stats := map[string]interface{}{
-		"connected_clients": h.wsHub.GetClientCount(),
+		"connected_clients": h.wsHub.ClientCount(),
 		"status":            "running",
 	}
 
@@ -34,10 +35,10 @@ func (h *WebSocketHandler) GetStats(c *gin.Context) {
 }
 
 type WebRTCHandler struct {
-	webrtcService *services.WebRTCService
+	webrtcService realtime.RTCGateway
 }
 
-func NewWebRTCHandler(webrtcService *services.WebRTCService) *WebRTCHandler {
+func NewWebRTCHandler(webrtcService realtime.RTCGateway) *WebRTCHandler {
 	return &WebRTCHandler{
 		webrtcService: webrtcService,
 	}
@@ -53,7 +54,7 @@ func (h *WebRTCHandler) GetStats(c *gin.Context) {
 		return
 	}
 
-	stats, err := h.webrtcService.GetConnectionStats(sessionID)
+	stats, err := h.webrtcService.ConnectionStats(sessionID)
 	if err != nil {
 		logrus.Errorf("Failed to get WebRTC stats: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -70,7 +71,7 @@ func (h *WebRTCHandler) GetStats(c *gin.Context) {
 }
 
 func (h *WebRTCHandler) GetConnections(c *gin.Context) {
-	count := h.webrtcService.GetConnectionCount()
+	count := h.webrtcService.ConnectionCount()
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,

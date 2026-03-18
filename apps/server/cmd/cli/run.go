@@ -8,20 +8,15 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
-	gormtracing "gorm.io/plugin/opentelemetry/tracing"
+	appbootstrap "servify/apps/server/internal/app/bootstrap"
+	appserver "servify/apps/server/internal/app/server"
 	"servify/apps/server/internal/config"
 	"servify/apps/server/internal/handlers"
 	"servify/apps/server/internal/middleware"
-	"servify/apps/server/internal/observability"
 	"servify/apps/server/internal/platform/llm/openai"
 	"servify/apps/server/internal/services"
 
@@ -42,51 +37,28 @@ func init() {
 }
 
 func run(cmd *cobra.Command, args []string) {
-	// 加载配置
-	cfg := config.Load()
-
-	// 初始化日志系统
-	if err := config.InitLogger(cfg); err != nil {
+	cfg, err := appbootstrap.LoadConfig("")
+	if err != nil {
+		logrus.Fatalf("Failed to load config: %v", err)
+	}
+	app := appbootstrap.BuildApp(cfg)
+	if app.Logger, err = appbootstrap.InitLogging(cfg); err != nil {
 		logrus.Fatalf("Failed to initialize logger: %v", err)
 	}
-
-	// OpenTelemetry 初始化（可选）
-	if shutdown, err := observability.SetupTracing(context.Background(), cfg); err == nil {
-		defer func() { _ = shutdown(context.Background()) }()
-	} else {
+	if err := appbootstrap.SetupObservability(context.Background(), cfg, app); err != nil {
 		logrus.Warnf("init tracing: %v", err)
 	}
 
-	// 初始化数据库
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable TimeZone=UTC", cfg.Database.Host, cfg.Database.User, cfg.Database.Password, cfg.Database.Name, cfg.Database.Port)
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Warn)})
+	db, err := appbootstrap.OpenDatabase(cfg, appbootstrap.DatabaseOptions{})
 	if err != nil {
 		logrus.Warnf("DB connect failed, message persistence disabled: %v", err)
 	}
-	// GORM OTel 插件
-	if db != nil && cfg.Monitoring.Tracing.Enabled {
-		_ = db.Use(gormtracing.NewPlugin())
-	}
+	app.DB = db
 
-	// 初始化服务
-	wsHub := services.NewWebSocketHub()
-	if db != nil {
-		wsHub.SetDB(db)
-	}
-	webrtcService := services.NewWebRTCService(cfg.WebRTC.STUNServer, wsHub)
-	// 使用新的配置结构（cfg.AI.OpenAI.*）
 	openAIProvider := openai.NewProvider(cfg.AI.OpenAI.APIKey, cfg.AI.OpenAI.BaseURL)
 	aiService := services.NewOrchestratedAIService(openAIProvider, nil)
-	messageRouter := services.NewMessageRouter(aiService, wsHub, db)
-
-	// 将AI服务注入到WebSocket以便直接处理文本消息
-	wsHub.SetAIService(aiService)
-
-	// 启动服务
-	go wsHub.Run()
-
-	// 启动消息路由
-	if err := messageRouter.Start(); err != nil {
+	runtime := appserver.BuildRealtimeRuntime(cfg, app.Logger, db, aiService)
+	if err := runtime.Start(); err != nil {
 		logrus.Fatalf("Failed to start message router: %v", err)
 	}
 
@@ -96,35 +68,19 @@ func run(cmd *cobra.Command, args []string) {
 	}
 
 	// 创建路由
-	router := setupRouter(cfg, wsHub, webrtcService, messageRouter)
+	router := setupRouter(cfg, runtime)
 
-	// 创建服务器
-	server := &http.Server{
-		Addr:    fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
-		Handler: router,
-	}
-
-	// 启动服务器
-	go func() {
-		logrus.Infof("Starting server on %s:%d", cfg.Server.Host, cfg.Server.Port)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logrus.Fatalf("Server failed to start: %v", err)
-		}
-	}()
-
-	// 等待中断信号
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	server := appbootstrap.NewHTTPServer(cfg, router, appbootstrap.HTTPServerOptions{})
+	appbootstrap.StartHTTPServer(server, logrus.StandardLogger(), fmt.Sprintf("Starting server on %s", server.Addr))
+	appbootstrap.WaitForShutdownSignal()
 
 	logrus.Info("Shutting down server...")
 
-	// 优雅关闭
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := appbootstrap.ShutdownContext(30 * time.Second)
 	defer cancel()
 
 	// 停止消息路由
-	if err := messageRouter.Stop(); err != nil {
+	if err := runtime.Stop(ctx); err != nil {
 		logrus.Errorf("Failed to stop message router: %v", err)
 	}
 
@@ -132,11 +88,14 @@ func run(cmd *cobra.Command, args []string) {
 	if err := server.Shutdown(ctx); err != nil {
 		logrus.Errorf("Server forced to shutdown: %v", err)
 	}
+	if err := app.RunShutdownHooks(); err != nil {
+		logrus.Errorf("Failed to run shutdown hooks: %v", err)
+	}
 
 	logrus.Info("Server exited")
 }
 
-func setupRouter(cfg *config.Config, wsHub *services.WebSocketHub, webrtcService *services.WebRTCService, messageRouter *services.MessageRouter) *gin.Engine {
+func setupRouter(cfg *config.Config, runtime *appserver.RealtimeRuntime) *gin.Engine {
 	router := gin.New()
 
 	// 中间件
@@ -144,9 +103,9 @@ func setupRouter(cfg *config.Config, wsHub *services.WebSocketHub, webrtcService
 	router.Use(gin.Recovery())
 	router.Use(corsMiddlewareWithConfig(cfg))
 	router.Use(middleware.RateLimitMiddlewareFromConfig(cfg))
-	// OTel 中间件
-	// 注意：标准 CLI 未持有 cfg，此处仅使用默认服务名
-	router.Use(otelgin.Middleware("servify"))
+	if cfg.Monitoring.Tracing.Enabled {
+		router.Use(otelgin.Middleware(cfg.Monitoring.Tracing.ServiceName))
+	}
 
 	// 健康检查
 	healthHandler := handlers.NewHealthHandler()
@@ -157,17 +116,17 @@ func setupRouter(cfg *config.Config, wsHub *services.WebSocketHub, webrtcService
 	api := router.Group("/api/v1")
 	{
 		// WebSocket 连接
-		wsHandler := handlers.NewWebSocketHandler(wsHub)
+		wsHandler := handlers.NewWebSocketHandler(runtime.RealtimeGateway)
 		api.GET("/ws", wsHandler.HandleWebSocket)
 		api.GET("/ws/stats", wsHandler.GetStats)
 
 		// WebRTC 相关
-		webrtcHandler := handlers.NewWebRTCHandler(webrtcService)
+		webrtcHandler := handlers.NewWebRTCHandler(runtime.RTCGateway)
 		api.GET("/webrtc/stats", webrtcHandler.GetStats)
 		api.GET("/webrtc/connections", webrtcHandler.GetConnections)
 
 		// 消息路由
-		messageHandler := handlers.NewMessageHandler(messageRouter)
+		messageHandler := handlers.NewMessageHandler(runtime.MessageRouter)
 		api.GET("/messages/platforms", messageHandler.GetPlatformStats)
 
 		// 轻量指标上报（可选）

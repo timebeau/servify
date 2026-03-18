@@ -64,19 +64,19 @@
 
 ## B3 agent
 
-- [ ] 创建 `internal/modules/agent/domain`
-- [ ] 创建 `internal/modules/agent/application`
-- [ ] 创建 `internal/modules/agent/infra`
-- [ ] 创建 `internal/modules/agent/delivery`
-- [ ] 定义 `AgentProfile`
-- [ ] 定义 `AgentPresence`
-- [ ] 定义 `AgentLoad`
-- [ ] 增加 chat concurrency
-- [ ] 增加 voice concurrency
-- [ ] 实现 GoOnline
-- [ ] 实现 GoOffline
-- [ ] 实现 MarkBusy
-- [ ] 实现 MarkAway
+- [x] 创建 `internal/modules/agent/domain`
+- [x] 创建 `internal/modules/agent/application`
+- [x] 创建 `internal/modules/agent/infra`
+- [x] 创建 `internal/modules/agent/delivery`
+- [x] 定义 `AgentProfile`
+- [x] 定义 `AgentPresence`
+- [x] 定义 `AgentLoad`
+- [x] 增加 chat concurrency
+- [x] 增加 voice concurrency
+- [x] 实现 GoOnline
+- [x] 实现 GoOffline
+- [x] 实现 MarkBusy
+- [x] 实现 MarkAway
 
 验收：
 
@@ -133,19 +133,19 @@
 
 ## B5 customer
 
-- [ ] 创建 `internal/modules/customer/domain`
-- [ ] 创建 `internal/modules/customer/application`
-- [ ] 创建 `internal/modules/customer/infra`
-- [ ] 创建 `internal/modules/customer/delivery`
-- [ ] 定义 `CustomerProfile`
-- [ ] 定义 `CustomerTag`
-- [ ] 定义 `CustomerNote`
-- [ ] 定义 `CustomerActivity`
-- [ ] 实现 CreateCustomer
-- [ ] 实现 UpdateCustomer
-- [ ] 实现 AddNote
-- [ ] 实现 UpdateTags
-- [ ] 实现 GetCustomerActivity
+- [x] 创建 `internal/modules/customer/domain`
+- [x] 创建 `internal/modules/customer/application`
+- [x] 创建 `internal/modules/customer/infra`
+- [x] 创建 `internal/modules/customer/delivery`
+- [x] 定义 `CustomerProfile`
+- [x] 定义 `CustomerTag`
+- [x] 定义 `CustomerNote`
+- [x] 定义 `CustomerActivity`
+- [x] 实现 CreateCustomer
+- [x] 实现 UpdateCustomer
+- [x] 实现 AddNote
+- [x] 实现 UpdateTags
+- [x] 实现 GetCustomerActivity
 
 验收：
 
@@ -153,18 +153,18 @@
 
 ## B6 automation
 
-- [ ] 创建 `internal/modules/automation/domain`
-- [ ] 创建 `internal/modules/automation/application`
-- [ ] 创建 `internal/modules/automation/infra`
-- [ ] 创建 `internal/modules/automation/delivery`
-- [ ] 定义 `Trigger`
-- [ ] 定义 `Condition`
-- [ ] 定义 `Action`
-- [ ] 定义 `Execution`
-- [ ] 订阅 ticket events
-- [ ] 订阅 conversation events
-- [ ] 订阅 routing events
-- [ ] 迁移 dry-run
+- [x] 创建 `internal/modules/automation/domain`
+- [x] 创建 `internal/modules/automation/application`
+- [x] 创建 `internal/modules/automation/infra`
+- [x] 创建 `internal/modules/automation/delivery`
+- [x] 定义 `Trigger`
+- [x] 定义 `Condition`
+- [x] 定义 `Action`
+- [x] 定义 `Execution`
+- [x] 订阅 ticket events
+- [x] 订阅 conversation events
+- [x] 订阅 routing events
+- [x] 迁移 dry-run
 
 验收：
 
@@ -172,17 +172,17 @@
 
 ## B7 analytics
 
-- [ ] 创建 `internal/modules/analytics/domain`
-- [ ] 创建 `internal/modules/analytics/application`
-- [ ] 创建 `internal/modules/analytics/infra`
-- [ ] 创建 `internal/modules/analytics/delivery`
-- [ ] DashboardReadModel
-- [ ] TicketTrendReadModel
-- [ ] AgentPerformanceReadModel
-- [ ] SatisfactionTrendReadModel
-- [ ] SLATrendReadModel
-- [ ] 先做定时聚合
-- [ ] 再做事件驱动增量聚合
+- [x] 创建 `internal/modules/analytics/domain`
+- [x] 创建 `internal/modules/analytics/application`
+- [x] 创建 `internal/modules/analytics/infra`
+- [x] 创建 `internal/modules/analytics/delivery`
+- [x] DashboardReadModel
+- [x] TicketTrendReadModel
+- [x] AgentPerformanceReadModel
+- [x] SatisfactionTrendReadModel
+- [x] SLATrendReadModel
+- [x] 先做定时聚合
+- [x] 再做事件驱动增量聚合
 
 验收：
 
@@ -190,21 +190,21 @@
 
 ## B8 voice
 
-- [ ] 创建 `internal/modules/voice/domain`
-- [ ] 创建 `internal/modules/voice/application`
-- [ ] 创建 `internal/modules/voice/infra`
-- [ ] 创建 `internal/modules/voice/delivery`
-- [ ] 定义 `CallSession`
-- [ ] 定义 `MediaSession`
-- [ ] 定义 `VoiceParticipant`
-- [ ] 定义 `Recording`
-- [ ] 定义 `Transcript`
-- [ ] 实现 StartCall
-- [ ] 实现 AnswerCall
-- [ ] 实现 EndCall
-- [ ] 实现 TransferCall
-- [ ] 发布 `call.started`
-- [ ] 发布 `call.ended`
+- [x] 创建 `internal/modules/voice/domain`
+- [x] 创建 `internal/modules/voice/application`
+- [x] 创建 `internal/modules/voice/infra`
+- [x] 创建 `internal/modules/voice/delivery`
+- [x] 定义 `CallSession`
+- [x] 定义 `MediaSession`
+- [x] 定义 `VoiceParticipant`
+- [x] 定义 `Recording`
+- [x] 定义 `Transcript`
+- [x] 实现 StartCall
+- [x] 实现 AnswerCall
+- [x] 实现 EndCall
+- [x] 实现 TransferCall
+- [x] 发布 `call.started`
+- [x] 发布 `call.ended`
 
 验收：
 

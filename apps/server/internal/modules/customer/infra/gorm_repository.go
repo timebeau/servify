@@ -1,0 +1,204 @@
+package infra
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"time"
+
+	"gorm.io/gorm"
+
+	"servify/apps/server/internal/models"
+	customerapp "servify/apps/server/internal/modules/customer/application"
+)
+
+type GormRepository struct {
+	db *gorm.DB
+}
+
+func NewGormRepository(db *gorm.DB) *GormRepository {
+	return &GormRepository{db: db}
+}
+
+func (r *GormRepository) CreateCustomer(ctx context.Context, cmd customerapp.CreateCustomerCommand) (*models.User, error) {
+	var existing models.User
+	if err := r.db.WithContext(ctx).Where("username = ? OR email = ?", cmd.Username, cmd.Email).First(&existing).Error; err == nil {
+		return nil, fmt.Errorf("username or email already exists")
+	}
+
+	user := &models.User{
+		Username: cmd.Username,
+		Email:    cmd.Email,
+		Name:     cmd.Name,
+		Phone:    cmd.Phone,
+		Role:     "customer",
+		Status:   "active",
+	}
+	customer := &models.Customer{
+		Company:  cmd.Company,
+		Industry: cmd.Industry,
+		Source:   cmd.Source,
+		Tags:     strings.Join(cmd.Tags, ","),
+		Notes:    cmd.Notes,
+		Priority: cmd.Priority,
+	}
+	if err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(user).Error; err != nil {
+			return fmt.Errorf("failed to create user: %w", err)
+		}
+		customer.UserID = user.ID
+		if err := tx.Create(customer).Error; err != nil {
+			return fmt.Errorf("failed to create customer info: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return r.GetCustomerByID(ctx, user.ID)
+}
+
+func (r *GormRepository) GetCustomerByID(ctx context.Context, customerID uint) (*models.User, error) {
+	var user models.User
+	if err := r.db.WithContext(ctx).Preload("Sessions", func(db *gorm.DB) *gorm.DB {
+		return db.Order("created_at DESC").Limit(10)
+	}).Preload("Tickets", func(db *gorm.DB) *gorm.DB {
+		return db.Order("created_at DESC").Limit(10)
+	}).First(&user, customerID).Error; err != nil {
+		return nil, fmt.Errorf("customer not found: %w", err)
+	}
+	return &user, nil
+}
+
+func (r *GormRepository) UpdateCustomer(ctx context.Context, customerID uint, cmd customerapp.UpdateCustomerCommand) (*models.User, error) {
+	userUpdates := make(map[string]interface{})
+	if cmd.Name != nil {
+		userUpdates["name"] = *cmd.Name
+	}
+	if cmd.Phone != nil {
+		userUpdates["phone"] = *cmd.Phone
+	}
+	if cmd.Status != nil {
+		userUpdates["status"] = *cmd.Status
+	}
+	customerUpdates := make(map[string]interface{})
+	if cmd.Company != nil {
+		customerUpdates["company"] = *cmd.Company
+	}
+	if cmd.Industry != nil {
+		customerUpdates["industry"] = *cmd.Industry
+	}
+	if cmd.Source != nil {
+		customerUpdates["source"] = *cmd.Source
+	}
+	if cmd.Tags != nil {
+		customerUpdates["tags"] = strings.Join(*cmd.Tags, ",")
+	}
+	if cmd.Notes != nil {
+		customerUpdates["notes"] = *cmd.Notes
+	}
+	if cmd.Priority != nil {
+		customerUpdates["priority"] = *cmd.Priority
+	}
+	if err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if len(userUpdates) > 0 {
+			if err := tx.Model(&models.User{}).Where("id = ?", customerID).Updates(userUpdates).Error; err != nil {
+				return fmt.Errorf("failed to update user: %w", err)
+			}
+		}
+		if len(customerUpdates) > 0 {
+			if err := tx.Model(&models.Customer{}).Where("user_id = ?", customerID).Updates(customerUpdates).Error; err != nil {
+				return fmt.Errorf("failed to update customer: %w", err)
+			}
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return r.GetCustomerByID(ctx, customerID)
+}
+
+func (r *GormRepository) ListCustomers(ctx context.Context, query customerapp.ListCustomersQuery) ([]customerapp.CustomerInfoDTO, int64, error) {
+	db := r.db.WithContext(ctx).Table("users").
+		Select("users.*, customers.company, customers.industry, customers.source, customers.tags, customers.notes, customers.priority").
+		Joins("LEFT JOIN customers ON users.id = customers.user_id").
+		Where("users.role = ?", "customer")
+
+	if len(query.Industry) > 0 {
+		db = db.Where("customers.industry IN ?", query.Industry)
+	}
+	if len(query.Source) > 0 {
+		db = db.Where("customers.source IN ?", query.Source)
+	}
+	if len(query.Priority) > 0 {
+		db = db.Where("customers.priority IN ?", query.Priority)
+	}
+	if len(query.Status) > 0 {
+		db = db.Where("users.status IN ?", query.Status)
+	}
+	for _, tag := range query.Tags {
+		db = db.Where("customers.tags ILIKE ?", "%"+tag+"%")
+	}
+	if query.Search != "" {
+		search := "%" + query.Search + "%"
+		db = db.Where("users.name ILIKE ? OR users.email ILIKE ? OR users.username ILIKE ? OR customers.company ILIKE ?", search, search, search, search)
+	}
+
+	var total int64
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, fmt.Errorf("failed to count customers: %w", err)
+	}
+
+	orderBy := fmt.Sprintf("users.%s %s", query.SortBy, query.SortOrder)
+	offset := (query.Page - 1) * query.PageSize
+	db = db.Order(orderBy).Offset(offset).Limit(query.PageSize)
+
+	var items []customerapp.CustomerInfoDTO
+	if err := db.Scan(&items).Error; err != nil {
+		return nil, 0, fmt.Errorf("failed to list customers: %w", err)
+	}
+	return items, total, nil
+}
+
+func (r *GormRepository) GetCustomerActivity(ctx context.Context, customerID uint, limit int) (*customerapp.CustomerActivityDTO, error) {
+	activity := &customerapp.CustomerActivityDTO{CustomerID: customerID}
+	r.db.WithContext(ctx).Where("user_id = ?", customerID).Order("created_at DESC").Limit(limit).Find(&activity.RecentSessions)
+	r.db.WithContext(ctx).Where("customer_id = ?", customerID).Order("created_at DESC").Limit(limit).Find(&activity.RecentTickets)
+	r.db.WithContext(ctx).Joins("JOIN sessions ON messages.session_id = sessions.id").Where("sessions.user_id = ?", customerID).Order("messages.created_at DESC").Limit(limit).Find(&activity.RecentMessages)
+	return activity, nil
+}
+
+func (r *GormRepository) AddNote(ctx context.Context, customerID uint, note customerapp.CustomerNoteDTO) error {
+	var customer models.Customer
+	if err := r.db.WithContext(ctx).Where("user_id = ?", customerID).First(&customer).Error; err != nil {
+		return fmt.Errorf("customer not found: %w", err)
+	}
+	line := fmt.Sprintf("[%s] 用户%d: %s", note.CreatedAt.Format("2006-01-02 15:04:05"), note.AuthorID, note.Content)
+	next := line
+	if customer.Notes != "" {
+		next = customer.Notes + "\n" + line
+	}
+	if err := r.db.WithContext(ctx).Model(&models.Customer{}).Where("user_id = ?", customerID).Update("notes", next).Error; err != nil {
+		return fmt.Errorf("failed to add note: %w", err)
+	}
+	return nil
+}
+
+func (r *GormRepository) UpdateTags(ctx context.Context, customerID uint, tags []string) error {
+	if err := r.db.WithContext(ctx).Model(&models.Customer{}).Where("user_id = ?", customerID).Update("tags", strings.Join(tags, ",")).Error; err != nil {
+		return fmt.Errorf("failed to update tags: %w", err)
+	}
+	return nil
+}
+
+func (r *GormRepository) GetStats(ctx context.Context) (*customerapp.CustomerStatsDTO, error) {
+	stats := &customerapp.CustomerStatsDTO{}
+	r.db.WithContext(ctx).Model(&models.User{}).Where("role = ?", "customer").Count(&stats.Total)
+	thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
+	r.db.WithContext(ctx).Model(&models.User{}).Where("role = ? AND last_login > ?", "customer", thirtyDaysAgo).Count(&stats.Active)
+	sevenDaysAgo := time.Now().AddDate(0, 0, -7)
+	r.db.WithContext(ctx).Model(&models.User{}).Where("role = ? AND created_at > ?", "customer", sevenDaysAgo).Count(&stats.NewThisWeek)
+	r.db.WithContext(ctx).Model(&models.Customer{}).Select("source, COUNT(*) as count").Group("source").Scan(&stats.BySource)
+	r.db.WithContext(ctx).Model(&models.Customer{}).Select("industry, COUNT(*) as count").Group("industry").Having("industry != ''").Scan(&stats.ByIndustry)
+	r.db.WithContext(ctx).Model(&models.Customer{}).Select("priority, COUNT(*) as count").Group("priority").Scan(&stats.ByPriority)
+	return stats, nil
+}

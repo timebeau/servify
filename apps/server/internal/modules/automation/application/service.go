@@ -1,0 +1,236 @@
+package application
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strconv"
+	"strings"
+
+	"servify/apps/server/internal/models"
+)
+
+type Service struct {
+	repo Repository
+}
+
+func NewService(repo Repository) *Service {
+	return &Service{repo: repo}
+}
+
+func (s *Service) HandleEvent(ctx context.Context, evt Event) {
+	triggers, err := s.repo.ListActiveTriggersByEvent(ctx, normalizeEvent(evt.Type))
+	if err != nil || len(triggers) == 0 {
+		return
+	}
+	var ticket *TicketView
+	if evt.TicketID != 0 {
+		ticket, _ = s.repo.GetTicket(ctx, evt.TicketID)
+	}
+	for _, trig := range triggers {
+		_ = s.applyTrigger(ctx, trig, evt, ticket, false)
+	}
+}
+
+func (s *Service) HandleBusEvent(ctx context.Context, eventName string, aggregateID string, payload interface{}) {
+	var ticketID uint
+	if aggregateID != "" {
+		if parsed, err := strconv.ParseUint(aggregateID, 10, 64); err == nil {
+			ticketID = uint(parsed)
+		}
+	}
+	s.HandleEvent(ctx, Event{Type: eventName, TicketID: ticketID, Payload: payload})
+}
+
+func (s *Service) ListTriggers(ctx context.Context) ([]models.AutomationTrigger, error) {
+	return s.repo.ListTriggers(ctx)
+}
+
+func (s *Service) CreateTrigger(ctx context.Context, req TriggerRequest) (*models.AutomationTrigger, error) {
+	if req.Name == "" {
+		return nil, fmt.Errorf("name required")
+	}
+	req.Event = normalizeEvent(req.Event)
+	if !isSupportedEvent(req.Event) {
+		return nil, fmt.Errorf("unsupported event: %s", req.Event)
+	}
+	return s.repo.CreateTrigger(ctx, req)
+}
+
+func (s *Service) DeleteTrigger(ctx context.Context, id uint) error {
+	return s.repo.DeleteTrigger(ctx, id)
+}
+
+func (s *Service) ListRuns(ctx context.Context, query RunListQuery) ([]models.AutomationRun, int64, error) {
+	if query.Page <= 0 {
+		query.Page = 1
+	}
+	if query.PageSize <= 0 {
+		query.PageSize = 20
+	}
+	if query.PageSize > 100 {
+		query.PageSize = 100
+	}
+	return s.repo.ListRuns(ctx, query)
+}
+
+func (s *Service) BatchRun(ctx context.Context, req BatchRunRequest) (*BatchRunResponse, error) {
+	req.Event = normalizeEvent(req.Event)
+	if !isSupportedEvent(req.Event) {
+		return nil, fmt.Errorf("unsupported event: %s", req.Event)
+	}
+	if len(req.TicketIDs) == 0 {
+		return nil, fmt.Errorf("ticket_ids required")
+	}
+	if len(req.TicketIDs) > 500 {
+		return nil, fmt.Errorf("too many ticket_ids (max 500)")
+	}
+	triggers, err := s.repo.ListActiveTriggersByEvent(ctx, req.Event)
+	if err != nil {
+		return nil, err
+	}
+	resp := &BatchRunResponse{Event: req.Event, DryRun: req.DryRun}
+	for _, ticketID := range req.TicketIDs {
+		ticket, err := s.repo.GetTicket(ctx, ticketID)
+		if err != nil {
+			continue
+		}
+		evt := Event{Type: req.Event, TicketID: ticket.ID}
+		var matched []uint
+		for _, trig := range triggers {
+			ok := s.applyTrigger(ctx, trig, evt, ticket, req.DryRun)
+			if ok {
+				matched = append(matched, trig.ID)
+			}
+		}
+		if len(matched) > 0 {
+			resp.Matches += len(matched)
+		}
+		resp.Results = append(resp.Results, BatchRunTicketResult{TicketID: ticket.ID, MatchedTriggerIDs: matched})
+		resp.TicketsProcessed++
+	}
+	return resp, nil
+}
+
+func (s *Service) applyTrigger(ctx context.Context, trig models.AutomationTrigger, evt Event, ticket *TicketView, dryRun bool) bool {
+	conds := []TriggerCondition{}
+	if trig.Conditions != "" {
+		if err := json.Unmarshal([]byte(trig.Conditions), &conds); err != nil {
+			return false
+		}
+	}
+	attrs := map[string]interface{}{}
+	if ticket != nil {
+		attrs["ticket.priority"] = ticket.Priority
+		attrs["ticket.status"] = ticket.Status
+		attrs["ticket.tags"] = ticket.Tags
+	}
+	if violation, ok := evt.Payload.(*models.SLAViolation); ok {
+		attrs["violation.type"] = violation.ViolationType
+	}
+	for _, cond := range conds {
+		if !EvaluateCondition(cond, attrs) {
+			return false
+		}
+	}
+	if dryRun {
+		return true
+	}
+	actions := []TriggerAction{}
+	if trig.Actions != "" {
+		if err := json.Unmarshal([]byte(trig.Actions), &actions); err != nil {
+			return false
+		}
+	}
+	for _, act := range actions {
+		if err := s.executeAction(ctx, act, ticket); err != nil {
+			_ = s.repo.RecordRun(ctx, trig.ID, evt.TicketID, "failed", err.Error())
+			return false
+		}
+	}
+	_ = s.repo.RecordRun(ctx, trig.ID, evt.TicketID, "success", "")
+	return true
+}
+
+func (s *Service) executeAction(ctx context.Context, act TriggerAction, ticket *TicketView) error {
+	switch act.Type {
+	case "set_priority":
+		if ticket == nil {
+			return fmt.Errorf("ticket not loaded")
+		}
+		val, _ := act.Params["priority"].(string)
+		if val == "" {
+			return fmt.Errorf("priority param required")
+		}
+		return s.repo.UpdateTicketPriority(ctx, ticket.ID, val)
+	case "add_tag":
+		if ticket == nil {
+			return fmt.Errorf("ticket not loaded")
+		}
+		val, _ := act.Params["tag"].(string)
+		if val == "" {
+			return fmt.Errorf("tag param required")
+		}
+		tags := ticket.Tags
+		if tags == "" {
+			tags = val
+		} else if !strings.Contains(tags, val) {
+			tags = tags + "," + val
+		}
+		return s.repo.UpdateTicketTags(ctx, ticket.ID, tags)
+	case "add_comment":
+		if ticket == nil {
+			return fmt.Errorf("ticket not loaded")
+		}
+		content, _ := act.Params["content"].(string)
+		if content == "" {
+			return fmt.Errorf("content required")
+		}
+		return s.repo.CreateTicketComment(ctx, ticket.ID, content)
+	case "notify_log":
+		return nil
+	default:
+		return fmt.Errorf("unsupported action type: %s", act.Type)
+	}
+}
+
+func EvaluateCondition(cond TriggerCondition, attrs map[string]interface{}) bool {
+	val, ok := attrs[cond.Field]
+	if !ok {
+		return false
+	}
+	actual := fmt.Sprintf("%v", val)
+	expected := fmt.Sprintf("%v", cond.Value)
+	switch cond.Op {
+	case "eq":
+		return actual == expected
+	case "neq":
+		return actual != expected
+	case "contains":
+		return strings.Contains(actual, expected)
+	default:
+		return false
+	}
+}
+
+func normalizeEvent(event string) string {
+	switch event {
+	case "ticket_created":
+		return "ticket.created"
+	case "ticket_updated":
+		return "ticket.updated"
+	case "sla_violation":
+		return "sla.violation"
+	default:
+		return event
+	}
+}
+
+func isSupportedEvent(event string) bool {
+	switch event {
+	case "ticket.created", "ticket.updated", "ticket.closed", "ticket.assigned", "conversation.created", "conversation.message_received", "routing.agent_assigned", "routing.transfer_completed", "sla.violation":
+		return true
+	default:
+		return false
+	}
+}

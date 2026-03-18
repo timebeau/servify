@@ -12,7 +12,7 @@
 ### 专题文档
 
 - [WeKnora 集成](./WEKNORA_INTEGRATION.md)
-- [CI 自建 Runner](./CI_SELF_HOSTED.md)
+- [CI / GitHub Hosted Runner](./CI_SELF_HOSTED.md)
 
 ## 推荐阅读顺序
 

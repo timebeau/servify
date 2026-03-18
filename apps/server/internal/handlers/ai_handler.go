@@ -15,6 +15,7 @@ import (
 	"gorm.io/gorm"
 	"servify/apps/server/internal/config"
 	svrmetrics "servify/apps/server/internal/metrics"
+	"servify/apps/server/internal/platform/realtime"
 	"servify/apps/server/internal/services"
 	"servify/apps/server/internal/version"
 
@@ -285,8 +286,8 @@ func (h *AIHandler) ResetCircuitBreaker(c *gin.Context) {
 
 // MetricsHandler 指标处理器
 type MetricsHandler struct {
-	wsHub         *services.WebSocketHub
-	webrtcService *services.WebRTCService
+	wsHub         realtime.RealtimeGateway
+	webrtcService realtime.RTCGateway
 	aiService     services.AIServiceInterface
 	messageRouter *services.MessageRouter
 	startedAt     time.Time
@@ -294,7 +295,7 @@ type MetricsHandler struct {
 }
 
 // NewMetricsHandler 创建指标处理器
-func NewMetricsHandler(wsHub *services.WebSocketHub, webrtc *services.WebRTCService, ai services.AIServiceInterface, router *services.MessageRouter, db *gorm.DB) *MetricsHandler {
+func NewMetricsHandler(wsHub realtime.RealtimeGateway, webrtc realtime.RTCGateway, ai services.AIServiceInterface, router *services.MessageRouter, db *gorm.DB) *MetricsHandler {
 	return &MetricsHandler{wsHub: wsHub, webrtcService: webrtc, aiService: ai, messageRouter: router, startedAt: time.Now(), db: db}
 }
 
@@ -307,10 +308,10 @@ func (h *MetricsHandler) GetMetrics(c *gin.Context) {
 	wsClients := 0
 	webrtcConns := 0
 	if h.wsHub != nil {
-		wsClients = h.wsHub.GetClientCount()
+		wsClients = h.wsHub.ClientCount()
 	}
 	if h.webrtcService != nil {
-		webrtcConns = h.webrtcService.GetConnectionCount()
+		webrtcConns = h.webrtcService.ConnectionCount()
 	}
 
 	var aiQueries, aiWeKnora, aiFallback int64

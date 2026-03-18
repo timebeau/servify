@@ -2,60 +2,63 @@ package services
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"sync"
 	"time"
 
 	"servify/apps/server/internal/models"
+	agentapp "servify/apps/server/internal/modules/agent/application"
+	agentinfra "servify/apps/server/internal/modules/agent/infra"
 
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
-// AgentService 人工客服服务
+// AgentService 人工客服服务兼容层。
 type AgentService struct {
 	db           *gorm.DB
 	logger       *logrus.Logger
-	onlineAgents sync.Map // map[uint]*AgentInfo - 在线客服列表
-	agentQueues  sync.Map // map[uint]chan *models.Session - 客服会话队列
+	onlineAgents sync.Map // map[uint]*AgentInfo
+	agentQueues  sync.Map // map[uint]chan *models.Session
+	module       *agentapp.Service
 }
 
-// NewAgentService 创建人工客服服务
+// NewAgentService 创建人工客服服务。
 func NewAgentService(db *gorm.DB, logger *logrus.Logger) *AgentService {
 	if logger == nil {
 		logger = logrus.New()
 	}
 
+	repo := agentinfra.NewGormRepository(db)
+	registry := agentinfra.NewInMemoryRegistry()
 	service := &AgentService{
 		db:     db,
 		logger: logger,
+		module: agentapp.NewService(repo, registry),
 	}
 
-	// 启动后台任务
 	go service.backgroundTasks()
-
 	return service
 }
 
-// AgentInfo 在线客服信息
+// AgentInfo 在线客服信息。
 type AgentInfo struct {
 	UserID          uint                       `json:"user_id"`
 	Username        string                     `json:"username"`
 	Name            string                     `json:"name"`
 	Department      string                     `json:"department"`
 	Skills          []string                   `json:"skills"`
-	Status          string                     `json:"status"` // online, busy, away
+	Status          string                     `json:"status"`
 	MaxConcurrent   int                        `json:"max_concurrent"`
 	CurrentLoad     int                        `json:"current_load"`
 	Rating          float64                    `json:"rating"`
 	AvgResponseTime int                        `json:"avg_response_time"`
 	LastActivity    time.Time                  `json:"last_activity"`
 	ConnectedAt     time.Time                  `json:"connected_at"`
-	Sessions        map[string]*models.Session `json:"-"` // 当前处理的会话
+	Sessions        map[string]*models.Session `json:"-"`
 }
 
-// AgentCreateRequest 创建客服请求
+// AgentCreateRequest 创建客服请求。
 type AgentCreateRequest struct {
 	UserID        uint   `json:"user_id" binding:"required"`
 	Department    string `json:"department"`
@@ -63,7 +66,7 @@ type AgentCreateRequest struct {
 	MaxConcurrent int    `json:"max_concurrent"`
 }
 
-// AgentUpdateRequest 更新客服请求
+// AgentUpdateRequest 更新客服请求。
 type AgentUpdateRequest struct {
 	Department    *string `json:"department"`
 	Skills        *string `json:"skills"`
@@ -71,393 +74,107 @@ type AgentUpdateRequest struct {
 	MaxConcurrent *int    `json:"max_concurrent"`
 }
 
-// CreateAgent 创建客服
 func (s *AgentService) CreateAgent(ctx context.Context, req *AgentCreateRequest) (*models.Agent, error) {
-	// 验证用户是否存在
-	var user models.User
-	if err := s.db.First(&user, req.UserID).Error; err != nil {
-		return nil, fmt.Errorf("user not found: %w", err)
-	}
-
-	// 检查是否已经是客服
-	var existingAgent models.Agent
-	if err := s.db.Where("user_id = ?", req.UserID).First(&existingAgent).Error; err == nil {
-		return nil, fmt.Errorf("user is already an agent")
-	}
-
-	// 创建客服记录
-	agent := &models.Agent{
-		UserID:        req.UserID,
-		Department:    req.Department,
-		Skills:        req.Skills,
-		Status:        "offline",
-		MaxConcurrent: req.MaxConcurrent,
-		CurrentLoad:   0,
-		Rating:        5.0,
-	}
-
-	if agent.MaxConcurrent <= 0 {
-		agent.MaxConcurrent = 5
-	}
-
-	if err := s.db.Create(agent).Error; err != nil {
-		return nil, fmt.Errorf("failed to create agent: %w", err)
-	}
-
-	// 更新用户角色
-	s.db.Model(&models.User{}).Where("id = ?", req.UserID).Update("role", "agent")
-
-	s.logger.Infof("Created agent for user %d", req.UserID)
-
-	// 返回完整的客服信息
-	return s.GetAgentByUserID(ctx, req.UserID)
+	return s.module.CreateAgent(ctx, agentapp.CreateAgentCommand{
+		UserID:             req.UserID,
+		Department:         req.Department,
+		Skills:             s.parseSkills(req.Skills),
+		MaxChatConcurrency: req.MaxConcurrent,
+	})
 }
 
-// GetAgentByUserID 根据用户ID获取客服信息
 func (s *AgentService) GetAgentByUserID(ctx context.Context, userID uint) (*models.Agent, error) {
-	var agent models.Agent
-	err := s.db.Preload("User").
-		Preload("Tickets", func(db *gorm.DB) *gorm.DB {
-			return db.Where("status NOT IN ?", []string{"closed"}).Order("created_at DESC")
-		}).
-		Where("user_id = ?", userID).
-		First(&agent).Error
-
-	if err != nil {
-		return nil, fmt.Errorf("agent not found: %w", err)
-	}
-
-	return &agent, nil
+	return s.module.GetAgentByUserID(ctx, userID)
 }
 
-// ListAgents 获取所有客服（用于管理后台/批量指派下拉）
 func (s *AgentService) ListAgents(ctx context.Context, limit int) ([]models.Agent, error) {
-	if limit <= 0 || limit > 500 {
-		limit = 200
-	}
-	var agents []models.Agent
-	if err := s.db.Preload("User").
-		Order("updated_at DESC").
-		Limit(limit).
-		Find(&agents).Error; err != nil {
-		return nil, fmt.Errorf("failed to list agents: %w", err)
-	}
-	return agents, nil
+	return s.module.ListAgents(ctx, limit)
 }
 
-// AgentGoOnline 客服上线
 func (s *AgentService) AgentGoOnline(ctx context.Context, userID uint) error {
-	// 更新数据库状态
-	if err := s.db.Model(&models.Agent{}).
-		Where("user_id = ?", userID).
-		Update("status", "online").Error; err != nil {
-		return fmt.Errorf("failed to update agent status: %w", err)
-	}
-
-	// 获取客服信息
-	agent, err := s.GetAgentByUserID(ctx, userID)
-	if err != nil {
+	if err := s.module.GoOnline(ctx, userID); err != nil {
 		return err
 	}
-
-	// 添加到在线客服列表
-	agentInfo := &AgentInfo{
-		UserID:          agent.UserID,
-		Username:        agent.User.Username,
-		Name:            agent.User.Name,
-		Department:      agent.Department,
-		Skills:          s.parseSkills(agent.Skills),
-		Status:          "online",
-		MaxConcurrent:   agent.MaxConcurrent,
-		CurrentLoad:     agent.CurrentLoad,
-		Rating:          agent.Rating,
-		AvgResponseTime: agent.AvgResponseTime,
-		LastActivity:    time.Now(),
-		ConnectedAt:     time.Now(),
-		Sessions:        make(map[string]*models.Session),
-	}
-
-	s.onlineAgents.Store(userID, agentInfo)
-
-	// 创建会话队列
-	queue := make(chan *models.Session, agent.MaxConcurrent*2)
-	s.agentQueues.Store(userID, queue)
-
-	s.logger.Infof("Agent %d (%s) went online", userID, agent.User.Username)
-
+	s.syncLegacyRuntime(ctx)
+	s.logger.Infof("Agent %d went online", userID)
 	return nil
 }
 
-// AgentGoOffline 客服下线
 func (s *AgentService) AgentGoOffline(ctx context.Context, userID uint) error {
-	// 更新数据库状态
-	if err := s.db.Model(&models.Agent{}).
-		Where("user_id = ?", userID).
-		Update("status", "offline").Error; err != nil {
-		return fmt.Errorf("failed to update agent status: %w", err)
+	if err := s.module.GoOffline(ctx, userID); err != nil {
+		return err
 	}
-
-	// 从在线列表中移除
-	s.onlineAgents.Delete(userID)
-
-	// 关闭会话队列
+	s.syncLegacyRuntime(ctx)
 	if queue, ok := s.agentQueues.LoadAndDelete(userID); ok {
 		close(queue.(chan *models.Session))
 	}
-
 	s.logger.Infof("Agent %d went offline", userID)
-
 	return nil
 }
 
-// UpdateAgentStatus 更新客服状态
 func (s *AgentService) UpdateAgentStatus(ctx context.Context, userID uint, status string) error {
-	validStatuses := map[string]bool{"online": true, "busy": true, "away": true}
-	if !validStatuses[status] {
-		return fmt.Errorf("invalid status: %s", status)
+	if err := s.module.UpdateStatus(ctx, userID, status); err != nil {
+		return err
 	}
-
-	// 更新数据库
-	if err := s.db.Model(&models.Agent{}).
-		Where("user_id = ?", userID).
-		Update("status", status).Error; err != nil {
-		return fmt.Errorf("failed to update agent status: %w", err)
-	}
-
-	// 更新内存中的状态
-	if agentInfo, ok := s.onlineAgents.Load(userID); ok {
-		info := agentInfo.(*AgentInfo)
-		info.Status = status
-		info.LastActivity = time.Now()
-		s.onlineAgents.Store(userID, info)
-	}
-
+	s.syncLegacyRuntime(ctx)
 	s.logger.Infof("Agent %d status updated to %s", userID, status)
-
 	return nil
 }
 
-// AssignSessionToAgent 将会话分配给客服
 func (s *AgentService) AssignSessionToAgent(ctx context.Context, sessionID string, agentID uint) error {
-	// 获取客服信息
-	agentInfo, ok := s.onlineAgents.Load(agentID)
-	if !ok {
-		return fmt.Errorf("agent %d is not online", agentID)
+	if err := s.module.AssignSession(ctx, sessionID, agentID); err != nil {
+		return err
 	}
-
-	info := agentInfo.(*AgentInfo)
-
-	// 检查客服是否可以接受新会话
-	if info.CurrentLoad >= info.MaxConcurrent {
-		return fmt.Errorf("agent %d is at maximum capacity", agentID)
-	}
-
-	if info.Status == "offline" {
-		return fmt.Errorf("agent %d is offline", agentID)
-	}
-
-	// 获取会话信息
-	var session models.Session
-	if err := s.db.First(&session, "id = ?", sessionID).Error; err != nil {
-		return fmt.Errorf("session not found: %w", err)
-	}
-
-	// 更新会话分配
-	if err := s.db.Model(&models.Session{}).
-		Where("id = ?", sessionID).
-		Updates(map[string]interface{}{
-			"agent_id": agentID,
-			// 会话生命周期：active/ended；是否已分配通过 agent_id 判断
-			"status":   "active",
-			"ended_at": nil,
-		}).Error; err != nil {
-		return fmt.Errorf("failed to assign session: %w", err)
-	}
-
-	// 更新客服负载
-	info.CurrentLoad++
-	info.Sessions[sessionID] = &session
-	info.LastActivity = time.Now()
-	s.onlineAgents.Store(agentID, info)
-
-	// 更新数据库中的负载
-	s.db.Model(&models.Agent{}).
-		Where("user_id = ?", agentID).
-		Update("current_load", info.CurrentLoad)
-
+	s.syncLegacyRuntime(ctx)
 	s.logger.Infof("Assigned session %s to agent %d", sessionID, agentID)
-
 	return nil
 }
 
-// ReleaseSessionFromAgent 从客服释放会话
 func (s *AgentService) ReleaseSessionFromAgent(ctx context.Context, sessionID string, agentID uint) error {
-	// 更新会话状态
-	if err := s.db.Model(&models.Session{}).
-		Where("id = ? AND agent_id = ?", sessionID, agentID).
-		Updates(map[string]interface{}{
-			"status":   "ended",
-			"ended_at": time.Now(),
-		}).Error; err != nil {
-		return fmt.Errorf("failed to release session: %w", err)
+	if err := s.module.ReleaseSession(ctx, sessionID, agentID); err != nil {
+		return err
 	}
-
-	// 更新客服负载
-	if agentInfo, ok := s.onlineAgents.Load(agentID); ok {
-		info := agentInfo.(*AgentInfo)
-		if info.CurrentLoad > 0 {
-			info.CurrentLoad--
-		}
-		delete(info.Sessions, sessionID)
-		info.LastActivity = time.Now()
-		s.onlineAgents.Store(agentID, info)
-
-		// 更新数据库中的负载
-		s.db.Model(&models.Agent{}).
-			Where("user_id = ?", agentID).
-			Update("current_load", info.CurrentLoad)
-	}
-
+	s.syncLegacyRuntime(ctx)
 	s.logger.Infof("Released session %s from agent %d", sessionID, agentID)
-
 	return nil
 }
 
-// FindAvailableAgent 查找可用的客服
 func (s *AgentService) FindAvailableAgent(ctx context.Context, skills []string, priority string) (*AgentInfo, error) {
-	var bestAgent *AgentInfo
-	var bestScore float64 = -1
-
-	s.onlineAgents.Range(func(key, value interface{}) bool {
-		info := value.(*AgentInfo)
-
-		// 检查可用性
-		if info.Status != "online" || info.CurrentLoad >= info.MaxConcurrent {
-			return true
-		}
-
-		// 计算匹配分数
-		score := s.calculateAgentScore(info, skills, priority)
-		if score > bestScore {
-			bestScore = score
-			bestAgent = info
-		}
-
-		return true
-	})
-
-	if bestAgent == nil {
-		return nil, fmt.Errorf("no available agent found")
+	runtime, err := s.module.FindAvailableAgent(ctx, skills, priority)
+	if err != nil {
+		return nil, err
 	}
-
-	return bestAgent, nil
+	return mapRuntimeToLegacy(runtime), nil
 }
 
-// GetOnlineAgents 获取在线客服列表
 func (s *AgentService) GetOnlineAgents(ctx context.Context) []*AgentInfo {
-	var agents []*AgentInfo
-
-	s.onlineAgents.Range(func(key, value interface{}) bool {
-		info := value.(*AgentInfo)
-		agents = append(agents, info)
-		return true
-	})
-
-	return agents
+	runtimes := s.module.GetOnlineAgents(ctx)
+	out := make([]*AgentInfo, 0, len(runtimes))
+	for _, item := range runtimes {
+		copy := item
+		out = append(out, mapRuntimeToLegacy(&copy))
+	}
+	return out
 }
 
-// GetAgentStats 获取客服统计信息
 func (s *AgentService) GetAgentStats(ctx context.Context, agentID *uint) (*AgentStats, error) {
-	stats := &AgentStats{}
-
-	query := s.db.Model(&models.Agent{})
-	if agentID != nil {
-		query = query.Where("user_id = ?", *agentID)
+	stats, err := s.module.GetStats(ctx, agentID)
+	if err != nil {
+		return nil, err
 	}
-
-	// 总客服数
-	query.Count(&stats.Total)
-
-	// 在线客服数
-	onlineCount := 0
-	s.onlineAgents.Range(func(key, value interface{}) bool {
-		onlineCount++
-		return true
-	})
-	stats.Online = int64(onlineCount)
-
-	// 繁忙客服数
-	busyCount := 0
-	s.onlineAgents.Range(func(key, value interface{}) bool {
-		info := value.(*AgentInfo)
-		if info.Status == "busy" || info.CurrentLoad >= info.MaxConcurrent {
-			busyCount++
-		}
-		return true
-	})
-	stats.Busy = int64(busyCount)
-
-	// 平均响应时间
-	var avgResponseTime float64
-	s.db.Model(&models.Agent{}).
-		Select("AVG(avg_response_time)").
-		Row().Scan(&avgResponseTime)
-	stats.AvgResponseTime = int64(avgResponseTime)
-
-	// 平均评分
-	var avgRating float64
-	s.db.Model(&models.Agent{}).
-		Select("AVG(rating)").
-		Row().Scan(&avgRating)
-	stats.AvgRating = avgRating
-
-	return stats, nil
+	return &AgentStats{
+		Total:           stats.Total,
+		Online:          stats.Online,
+		Busy:            stats.Busy,
+		AvgResponseTime: stats.AvgResponseTime,
+		AvgRating:       stats.AvgRating,
+	}, nil
 }
 
-// calculateAgentScore 计算客服匹配分数
-func (s *AgentService) calculateAgentScore(agent *AgentInfo, requiredSkills []string, priority string) float64 {
-	score := 0.0
-
-	// 基础分数：客服评分
-	score += agent.Rating
-
-	// 负载分数：负载越低分数越高
-	loadRatio := float64(agent.CurrentLoad) / float64(agent.MaxConcurrent)
-	score += (1 - loadRatio) * 3
-
-	// 响应时间分数：响应时间越短分数越高
-	if agent.AvgResponseTime > 0 {
-		responseScore := 300.0 / float64(agent.AvgResponseTime) // 300秒作为基准
-		if responseScore > 2 {
-			responseScore = 2
-		}
-		score += responseScore
-	}
-
-	// 技能匹配分数
-	if len(requiredSkills) > 0 {
-		matchedSkills := 0
-		for _, required := range requiredSkills {
-			for _, agentSkill := range agent.Skills {
-				if required == agentSkill {
-					matchedSkills++
-					break
-				}
-			}
-		}
-		skillRatio := float64(matchedSkills) / float64(len(requiredSkills))
-		score += skillRatio * 2
-	}
-
-	return score
-}
-
-// parseSkills 解析技能字符串
 func (s *AgentService) parseSkills(skillsStr string) []string {
 	if skillsStr == "" {
 		return []string{}
 	}
-
 	skills := []string{}
 	for _, skill := range strings.Split(skillsStr, ",") {
 		skill = strings.TrimSpace(skill)
@@ -465,11 +182,9 @@ func (s *AgentService) parseSkills(skillsStr string) []string {
 			skills = append(skills, skill)
 		}
 	}
-
 	return skills
 }
 
-// backgroundTasks 后台任务
 func (s *AgentService) backgroundTasks() {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
@@ -480,50 +195,82 @@ func (s *AgentService) backgroundTasks() {
 	}
 }
 
-// cleanupInactiveAgents 清理不活跃的客服
 func (s *AgentService) cleanupInactiveAgents() {
 	timeout := 5 * time.Minute
+	runtimes := s.module.GetOnlineAgents(context.Background())
+	for _, item := range runtimes {
+		if time.Since(item.LastActivity) > timeout {
+			s.logger.Warnf("Agent %d appears inactive, marking as away", item.UserID)
+			_ = s.module.MarkAway(context.Background(), item.UserID)
+		}
+	}
+	s.syncLegacyRuntime(context.Background())
+}
 
-	s.onlineAgents.Range(func(key, value interface{}) bool {
-		info := value.(*AgentInfo)
-		if time.Since(info.LastActivity) > timeout {
-			s.logger.Warnf("Agent %d appears inactive, marking as away", info.UserID)
-			s.UpdateAgentStatus(context.Background(), info.UserID, "away")
+func (s *AgentService) updateAgentMetrics() {}
+
+func (s *AgentService) ApplySessionTransfer(sessionID string, fromAgentID *uint, toAgentID uint) {
+	ctx := context.Background()
+	if err := s.module.ApplySessionTransfer(ctx, sessionID, fromAgentID, toAgentID); err != nil {
+		s.logger.Warnf("apply session transfer to agent module failed: %v", err)
+	}
+	s.syncLegacyRuntime(ctx)
+}
+
+func (s *AgentService) syncLegacyRuntime(ctx context.Context) {
+	runtimes := s.module.GetOnlineAgents(ctx)
+	active := make(map[uint]struct{}, len(runtimes))
+	for _, runtime := range runtimes {
+		active[runtime.UserID] = struct{}{}
+		s.onlineAgents.Store(runtime.UserID, mapRuntimeToLegacy(&runtime))
+		if _, ok := s.agentQueues.Load(runtime.UserID); !ok {
+			queueSize := runtime.MaxChatConcurrency * 2
+			if queueSize <= 0 {
+				queueSize = 10
+			}
+			s.agentQueues.Store(runtime.UserID, make(chan *models.Session, queueSize))
+		}
+	}
+	var stale []uint
+	s.onlineAgents.Range(func(key, value any) bool {
+		userID, ok := key.(uint)
+		if ok {
+			if _, exists := active[userID]; !exists {
+				stale = append(stale, userID)
+			}
 		}
 		return true
 	})
-}
-
-// updateAgentMetrics 更新客服指标
-func (s *AgentService) updateAgentMetrics() {
-	// 这里可以实现更复杂的指标计算逻辑
-	// 例如：计算平均响应时间、处理工单数等
-}
-
-// ApplySessionTransfer 在内存中应用一次会话转接（不写 DB）
-func (s *AgentService) ApplySessionTransfer(sessionID string, fromAgentID *uint, toAgentID uint) {
-	now := time.Now()
-	if fromAgentID != nil {
-		if v, ok := s.onlineAgents.Load(*fromAgentID); ok {
-			info := v.(*AgentInfo)
-			if info.CurrentLoad > 0 {
-				info.CurrentLoad--
-			}
-			delete(info.Sessions, sessionID)
-			info.LastActivity = now
-			s.onlineAgents.Store(info.UserID, info)
+	for _, userID := range stale {
+		s.onlineAgents.Delete(userID)
+		if queue, ok := s.agentQueues.LoadAndDelete(userID); ok {
+			close(queue.(chan *models.Session))
 		}
 	}
-	if v, ok := s.onlineAgents.Load(toAgentID); ok {
-		info := v.(*AgentInfo)
-		info.CurrentLoad++
-		info.Sessions[sessionID] = &models.Session{ID: sessionID, AgentID: &toAgentID, Status: "active"}
-		info.LastActivity = now
-		s.onlineAgents.Store(info.UserID, info)
+}
+
+func mapRuntimeToLegacy(runtime *agentapp.AgentRuntimeDTO) *AgentInfo {
+	if runtime == nil {
+		return nil
+	}
+	return &AgentInfo{
+		UserID:          runtime.UserID,
+		Username:        runtime.Username,
+		Name:            runtime.Name,
+		Department:      runtime.Department,
+		Skills:          append([]string(nil), runtime.Skills...),
+		Status:          runtime.Status,
+		MaxConcurrent:   runtime.MaxChatConcurrency,
+		CurrentLoad:     runtime.CurrentChatLoad,
+		Rating:          runtime.Rating,
+		AvgResponseTime: runtime.AvgResponseTime,
+		LastActivity:    runtime.LastActivity,
+		ConnectedAt:     runtime.ConnectedAt,
+		Sessions:        make(map[string]*models.Session),
 	}
 }
 
-// AgentStats 客服统计信息
+// AgentStats 客服统计信息。
 type AgentStats struct {
 	Total           int64   `json:"total"`
 	Online          int64   `json:"online"`

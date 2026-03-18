@@ -37,12 +37,12 @@
 
 ## P2 config logging observability
 
-- [ ] 新增 `bootstrap/config.go`
-- [ ] 新增 `bootstrap/logging.go`
-- [ ] 新增 `bootstrap/observability.go`
-- [ ] server 入口切到 bootstrap config/logging
-- [ ] cli 入口切到 bootstrap config/logging
-- [ ] tracing shutdown 统一挂到 `ShutdownHooks`
+- [x] 新增 `bootstrap/config.go`
+- [x] 新增 `bootstrap/logging.go`
+- [x] 新增 `bootstrap/observability.go`
+- [x] server 入口切到 bootstrap config/logging
+- [x] cli 入口切到 bootstrap config/logging
+- [x] tracing shutdown 统一挂到 `ShutdownHooks`
 
 验收：
 
@@ -50,13 +50,13 @@
 
 ## P3 database and migration
 
-- [ ] 新增 `bootstrap/database.go`
-- [ ] 抽 DSN builder
-- [ ] 抽 GORM builder
-- [ ] 抽 GORM tracing plugin 注入
-- [ ] 新增 `bootstrap/migrate.go`
-- [ ] 收口模型迁移列表
-- [ ] 保留 server 自动迁移兼容开关
+- [x] 新增 `bootstrap/database.go`
+- [x] 抽 DSN builder
+- [x] 抽 GORM builder
+- [x] 抽 GORM tracing plugin 注入
+- [x] 新增 `bootstrap/migrate.go`
+- [x] 收口模型迁移列表
+- [x] 保留 server 自动迁移兼容开关
 
 验收：
 
@@ -64,13 +64,13 @@
 
 ## P4 router assembly
 
-- [ ] 新增 `app/server/router.go`
-- [ ] 新增 `app/server/middleware.go`
-- [ ] 新增 `app/server/health.go`
-- [ ] 新增 `app/server/static.go`
-- [ ] 提取 Gin init
-- [ ] 提取 middleware registration
-- [ ] 提取 static root detection
+- [x] 新增 `app/server/router.go`
+- [x] 新增 `app/server/middleware.go`
+- [x] 新增 `app/server/health.go`
+- [x] 新增 `app/server/static.go`
+- [x] 提取 Gin init
+- [x] 提取 middleware registration
+- [x] 提取 static root detection
 
 验收：
 
@@ -78,12 +78,12 @@
 
 ## P5 workers
 
-- [ ] 新增 `app/worker/jobs.go`
-- [ ] 定义 `Worker` 接口
-- [ ] 包装 SLA monitor
-- [ ] 包装 statistics worker
-- [ ] 注册 worker 到 `App`
-- [ ] 增加 worker 启停测试占位
+- [x] 新增 `app/worker/jobs.go`
+- [x] 定义 `Worker` 接口
+- [x] 包装 SLA monitor
+- [x] 包装 statistics worker
+- [x] 注册 worker 到 `App`
+- [x] 增加 worker 启停测试占位
 
 验收：
 
@@ -91,14 +91,14 @@
 
 ## P6 auth extraction
 
-- [ ] 创建 `internal/platform/auth`
-- [ ] 新增 `claims.go`
-- [ ] 新增 `validator.go`
-- [ ] 新增 `permissions.go`
-- [ ] 新增 `resolver.go`
-- [ ] 新增 `gin_middleware.go`
-- [ ] 从 middleware 中迁出 JWT 解析
-- [ ] 从 middleware 中迁出 perms 展开
+- [x] 创建 `internal/platform/auth`
+- [x] 新增 `claims.go`
+- [x] 新增 `validator.go`
+- [x] 新增 `permissions.go`
+- [x] 新增 `resolver.go`
+- [x] 新增 `gin_middleware.go`
+- [x] 从 middleware 中迁出 JWT 解析
+- [x] 从 middleware 中迁出 perms 展开
 
 验收：
 
@@ -120,11 +120,11 @@
 
 ## P8 realtime abstraction
 
-- [ ] 创建 `internal/platform/realtime`
-- [ ] 定义 `RealtimeGateway`
-- [ ] 定义 `RTCGateway`
-- [ ] 包装现有 `WebSocketHub`
-- [ ] 包装现有 `WebRTCService`
+- [x] 创建 `internal/platform/realtime`
+- [x] 定义 `RealtimeGateway`
+- [x] 定义 `RTCGateway`
+- [x] 包装现有 `WebSocketHub`
+- [x] 包装现有 `WebRTCService`
 
 验收：
 

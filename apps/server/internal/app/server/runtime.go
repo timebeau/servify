@@ -1,0 +1,166 @@
+package server
+
+import (
+	"context"
+
+	"servify/apps/server/internal/config"
+	conversationapp "servify/apps/server/internal/modules/conversation/application"
+	conversationdelivery "servify/apps/server/internal/modules/conversation/delivery"
+	conversationinfra "servify/apps/server/internal/modules/conversation/infra"
+	routingapp "servify/apps/server/internal/modules/routing/application"
+	routingdelivery "servify/apps/server/internal/modules/routing/delivery"
+	routinginfra "servify/apps/server/internal/modules/routing/infra"
+	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
+	voiceapp "servify/apps/server/internal/modules/voice/application"
+	voicedelivery "servify/apps/server/internal/modules/voice/delivery"
+	voiceinfra "servify/apps/server/internal/modules/voice/infra"
+	"servify/apps/server/internal/platform/eventbus"
+	realtimeplatform "servify/apps/server/internal/platform/realtime"
+	"servify/apps/server/internal/services"
+
+	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
+)
+
+// Runtime owns the service graph used by the HTTP server.
+type Runtime struct {
+	Config *config.Config
+	Logger *logrus.Logger
+	DB     *gorm.DB
+	Bus    eventbus.Bus
+
+	AIService             services.AIServiceInterface
+	WSHub                 *services.WebSocketHub
+	RealtimeGateway       realtimeplatform.RealtimeGateway
+	RTCGateway            realtimeplatform.RTCGateway
+	MessageRouter         *services.MessageRouter
+	CustomerService       *services.CustomerService
+	AgentService          *services.AgentService
+	TicketHandlerService  *ticketdelivery.HandlerServiceAdapter
+	TicketReaderService   *ticketdelivery.ReaderServiceAdapter
+	TransferService       *services.SessionTransferService
+	SatisfactionService   *services.SatisfactionService
+	WorkspaceService      *services.WorkspaceService
+	MacroService          *services.MacroService
+	AppIntegrationService *services.AppIntegrationService
+	CustomFieldService    *services.CustomFieldService
+	StatisticsService     *services.StatisticsService
+	SLAService            *services.SLAService
+	ShiftService          *services.ShiftService
+	AutomationService     *services.AutomationService
+	KnowledgeDocService   *services.KnowledgeDocService
+	SuggestionService     *services.SuggestionService
+	GamificationService   *services.GamificationService
+}
+
+// BuildRuntime wires the current modular-monolith runtime behind an explicit assembly boundary.
+func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus eventbus.Bus) (*Runtime, error) {
+	rt := &Runtime{
+		Config: cfg,
+		Logger: logger,
+		DB:     db,
+		Bus:    bus,
+	}
+
+	aiAssembly, err := BuildAIAssembly(cfg, logger, AIAssemblyOptions{})
+	if err != nil {
+		return nil, err
+	}
+	rt.AIService = aiAssembly.Service
+
+	rt.WSHub = services.NewWebSocketHub()
+	rt.RealtimeGateway = realtimeplatform.NewWebSocketAdapter(rt.WSHub)
+	rt.WSHub.SetDB(db)
+
+	conversationRepo := conversationinfra.NewGormRepository(db)
+	conversationService := conversationapp.NewService(conversationRepo, bus)
+	rt.WSHub.SetConversationMessageWriter(conversationdelivery.NewWebSocketMessageAdapter(conversationService))
+
+	routingRepo := routinginfra.NewGormRepository(db)
+	routingService := routingapp.NewService(routingRepo, bus)
+
+	webrtcService := services.NewWebRTCService(cfg.WebRTC.STUNServer, rt.WSHub)
+	rt.RTCGateway = realtimeplatform.NewWebRTCAdapter(webrtcService)
+
+	rt.MessageRouter = services.NewMessageRouter(rt.AIService, rt.WSHub, db)
+	rt.WSHub.SetAIService(rt.AIService)
+
+	voiceService := voiceapp.NewService(voiceinfra.NewInMemoryRepository(), bus)
+	webrtcService.SetVoiceLifecycle(voicedelivery.NewWebRTCAdapter(voiceService))
+
+	rt.SLAService = services.NewSLAService(db, logger)
+	rt.AutomationService = services.NewAutomationService(db, logger)
+	rt.AutomationService.SetEventBus(bus)
+	rt.SLAService.SetAutomationService(rt.AutomationService)
+
+	rt.CustomerService = services.NewCustomerService(db, logger)
+	rt.AgentService = services.NewAgentService(db, logger)
+
+	ticketService := services.NewTicketService(db, logger, rt.SLAService)
+	ticketService.SetEventBus(bus)
+	ticketService.SetAutomationService(rt.AutomationService)
+
+	rt.TransferService = services.NewSessionTransferService(db, logger, rt.AIService, rt.AgentService, rt.WSHub)
+	rt.TransferService.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingService))
+
+	rt.StatisticsService = services.NewStatisticsService(db, logger)
+	rt.StatisticsService.SetEventBus(bus)
+
+	rt.SatisfactionService = services.NewSatisfactionService(db, logger)
+	ticketService.SetSatisfactionService(rt.SatisfactionService)
+
+	rt.ShiftService = services.NewShiftService(db, logger)
+	rt.WorkspaceService = services.NewWorkspaceService(db, rt.AgentService)
+	rt.MacroService = services.NewMacroService(db)
+	rt.AppIntegrationService = services.NewAppIntegrationService(db, logger)
+	rt.CustomFieldService = services.NewCustomFieldService(db)
+	rt.KnowledgeDocService = services.NewKnowledgeDocService(db)
+	rt.SuggestionService = services.NewSuggestionService(db)
+	rt.GamificationService = services.NewGamificationService(db)
+	rt.TicketHandlerService = ticketdelivery.NewHandlerServiceAdapter(db, ticketService.ModuleCommandService(), ticketService.Orchestrator())
+	rt.TicketReaderService = ticketdelivery.NewReaderServiceAdapter(db)
+
+	rt.WSHub.SetSessionTransferService(rt.TransferService)
+	return rt, nil
+}
+
+func (rt *Runtime) Start() error {
+	go rt.WSHub.Run()
+	return rt.MessageRouter.Start()
+}
+
+func (rt *Runtime) Stop(context.Context) error {
+	if rt.MessageRouter == nil {
+		return nil
+	}
+	return rt.MessageRouter.Stop()
+}
+
+func (rt *Runtime) RouterDependencies() Dependencies {
+	return Dependencies{
+		Config:                rt.Config,
+		Logger:                rt.Logger,
+		DB:                    rt.DB,
+		AIService:             rt.AIService,
+		RealtimeGateway:       rt.RealtimeGateway,
+		RTCGateway:            rt.RTCGateway,
+		MessageRouter:         rt.MessageRouter,
+		CustomerService:       rt.CustomerService,
+		AgentService:          rt.AgentService,
+		TicketHandlerService:  rt.TicketHandlerService,
+		TicketReaderService:   rt.TicketReaderService,
+		TransferService:       rt.TransferService,
+		SatisfactionService:   rt.SatisfactionService,
+		WorkspaceService:      rt.WorkspaceService,
+		MacroService:          rt.MacroService,
+		AppIntegrationService: rt.AppIntegrationService,
+		CustomFieldService:    rt.CustomFieldService,
+		StatisticsService:     rt.StatisticsService,
+		SLAService:            rt.SLAService,
+		ShiftService:          rt.ShiftService,
+		AutomationService:     rt.AutomationService,
+		KnowledgeDocService:   rt.KnowledgeDocService,
+		SuggestionService:     rt.SuggestionService,
+		GamificationService:   rt.GamificationService,
+	}
+}

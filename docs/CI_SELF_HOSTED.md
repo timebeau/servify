@@ -1,39 +1,79 @@
-Self-Hosted Runner Setup (GitHub Actions)
+# GitHub Hosted CI
 
-1) Provision a host
-- OS: Linux x64 recommended (2 vCPU, 4 GB RAM+)
-- Install: git, curl, Go toolchain, Docker (optional for Docker workflows)
+当前仓库已切换为 GitHub Hosted Runner，不再依赖仓库私有 self-hosted runner。
 
-2) Register a self-hosted runner
-- Repo: Settings → Actions → Runners → New self-hosted runner
-- Choose Linux → x64 → follow commands; example:
-```
-mkdir -p ~/actions-runner && cd ~/actions-runner
-curl -o actions-runner.tar.gz -L https://github.com/actions/runner/releases/download/v2.319.1/actions-runner-linux-x64-2.319.1.tar.gz
-tar xzf actions-runner.tar.gz
-./config.sh --url https://github.com/<org>/<repo> --token <TOKEN>
-./run.sh
-```
-- Optional: install as a service:
-```
-sudo ./svc.sh install
-sudo ./svc.sh start
-```
+## 当前运行环境
 
-3) Labels
-- Default label: `self-hosted`
-- If you add custom labels (e.g. `servify`), edit `.github/workflows/ci.yml` `runs-on` accordingly.
+- Runner: `ubuntu-latest`
+- Workflow: `.github/workflows/ci.yml`
+- 触发条件：
+  - push 到 `main`
+  - 提交到 `main` 的 pull request
 
-4) Required tools on runner
-- Go (reads version from go.mod via actions/setup-go)
-- Permit network to fetch modules
-- If building Docker images, ensure Docker is installed and runner user is in `docker` group
+## 当前 CI 检查项
 
-5) First run
-- Push to `main` or open PR, workflow `.github/workflows/ci.yml` triggers on self-hosted runner
+### Go checks
 
-Troubleshooting
-- Ensure runner is online (green) in repo settings
-- Check runner logs under `~/actions-runner/_diag`
-- If module download is blocked, pre-populate `~/go/pkg/mod` or add a proxy
+- `gofmt` 格式校验
+- `go mod tidy` 漂移检查
+- `go vet`
+- 单元测试与覆盖率门槛检查
+- 标准二进制构建
+- WeKnora tag 构建
 
+### Module checks
+
+- `internal/modules/...` 构建与测试
+- `internal/platform/...` 构建与测试
+- `internal/services/...` 构建与测试
+- `internal/handlers/...` 构建与测试
+
+### SDK checks
+
+- `sdk` 依赖安装
+- SDK lint
+- SDK test
+- SDK build
+- SDK 同步到 demo 后的工作区漂移检查
+
+### Website worker checks
+
+- `apps/website-worker` 依赖安装
+- TypeScript type check
+
+### Integration
+
+- 使用 `docker compose` 拉起 WeKnora 集成环境
+- 健康检查轮询
+- 执行 `scripts/test-weknora-integration.sh`
+- 失败时输出 compose logs
+
+### Deploy jobs
+
+以下任务仅在 `main` 分支运行，且依赖 Cloudflare secrets：
+
+- Cloudflare Workers 部署
+- Cloudflare Pages 部署
+
+## 需要的仓库 Secrets
+
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+
+可选仓库 Variable：
+
+- `CF_PAGES_PROJECT`
+
+## 设计取舍
+
+- 不再要求维护额外 runner 主机，减少运维成本
+- CI 改为显式失败，不再通过 `make test` 中的吞错逻辑掩盖问题
+- 将 Go、SDK、worker、integration 拆成独立 job，便于定位失败点
+- 保留部署 job，但通过 secrets gate 和变更检测避免无效发布
+
+## 后续可继续补的检查
+
+- `golangci-lint`
+- 文档站点实际构建检查（等 VuePress 配置入仓后再加）
+- OpenAPI/contract drift check
+- 更细粒度的 integration matrix

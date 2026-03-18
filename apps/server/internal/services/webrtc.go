@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -10,12 +11,19 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type VoiceLifecycle interface {
+	StartCall(ctx context.Context, sessionID string, connectionID string)
+	AnswerCall(ctx context.Context, connectionID string)
+	EndCall(ctx context.Context, connectionID string)
+}
+
 type WebRTCService struct {
 	api         *webrtc.API
 	connections map[string]*WebRTCConnection
 	mutex       sync.RWMutex
 	stunServer  string
 	wsHub       *WebSocketHub
+	voice       VoiceLifecycle
 }
 
 type WebRTCConnection struct {
@@ -43,6 +51,10 @@ func NewWebRTCService(stunServer string, wsHub *WebSocketHub) *WebRTCService {
 		stunServer:  stunServer,
 		wsHub:       wsHub,
 	}
+}
+
+func (s *WebRTCService) SetVoiceLifecycle(voice VoiceLifecycle) {
+	s.voice = voice
 }
 
 func (s *WebRTCService) CreatePeerConnection(sessionID string) (*WebRTCConnection, error) {
@@ -137,6 +149,9 @@ func (s *WebRTCService) CreatePeerConnection(sessionID string) (*WebRTCConnectio
 	s.mutex.Lock()
 	s.connections[connectionID] = conn
 	s.mutex.Unlock()
+	if s.voice != nil {
+		s.voice.StartCall(context.Background(), sessionID, connectionID)
+	}
 
 	return conn, nil
 }
@@ -182,6 +197,9 @@ func (s *WebRTCService) HandleAnswer(sessionID string, answer webrtc.SessionDesc
 	}
 
 	logrus.Infof("Set WebRTC answer for session %s", sessionID)
+	if s.voice != nil {
+		s.voice.AnswerCall(context.Background(), conn.ID)
+	}
 
 	return nil
 }
@@ -208,6 +226,9 @@ func (s *WebRTCService) CloseConnection(sessionID string) error {
 
 	for id, conn := range s.connections {
 		if conn.SessionID == sessionID {
+			if s.voice != nil {
+				s.voice.EndCall(context.Background(), conn.ID)
+			}
 			err := conn.PeerConnection.Close()
 			if err != nil {
 				logrus.Errorf("Failed to close peer connection %s: %v", id, err)

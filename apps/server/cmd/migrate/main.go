@@ -8,11 +8,9 @@ import (
 	"strconv"
 	"time"
 
-	"servify/apps/server/internal/config"
+	appbootstrap "servify/apps/server/internal/app/bootstrap"
 	"servify/apps/server/internal/models"
 
-	"github.com/spf13/viper"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -35,14 +33,10 @@ func firstNonEmpty(vals ...string) string {
 }
 
 func main() {
-	// 读取配置文件（可选）
-	viper.AddConfigPath(".")
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.AutomaticEnv()
-	_ = viper.ReadInConfig() // 忽略未找到错误
-
-	cfg := config.Load()
+	cfg, err := appbootstrap.LoadConfig("")
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
 
 	// CLI flags / env 覆盖
 	var (
@@ -72,9 +66,9 @@ func main() {
 
 	// 如果指定了 --config，则重新加载配置文件
 	if flagConfig != "" {
-		viper.SetConfigFile(flagConfig)
-		if err := viper.ReadInConfig(); err == nil {
-			cfg = config.Load()
+		cfg, err = appbootstrap.LoadConfig(flagConfig)
+		if err != nil {
+			log.Fatalf("Failed to load config %s: %v", flagConfig, err)
 		}
 	}
 
@@ -101,8 +95,9 @@ func main() {
 	}
 
 	// 连接数据库
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+	db, err := appbootstrap.OpenDatabase(cfg, appbootstrap.DatabaseOptions{
+		DSN:      dsn,
+		LogLevel: logger.Info,
 	})
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
@@ -110,58 +105,17 @@ func main() {
 
 	log.Println("Starting database migration...")
 
-	// 自动迁移所有模型
-	err = db.AutoMigrate(
-		&models.User{},
-		&models.Customer{},
-		&models.Agent{},
-		&models.Session{},
-		&models.Message{},
-		&models.TransferRecord{},
-		&models.WaitingRecord{},
-		&models.Ticket{},
-		&models.TicketComment{},
-		&models.TicketFile{},
-		&models.TicketStatus{},
-		&models.CustomField{},
-		&models.TicketCustomFieldValue{},
-		&models.KnowledgeDoc{},
-		&models.WebRTCConnection{},
-		&models.DailyStats{},
-	)
+	err = appbootstrap.AutoMigrate(db)
 	if err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
 
 	log.Println("Database migration completed successfully!")
 
-	// 创建索引
 	log.Println("Creating additional indexes...")
-
-	// 为消息表创建复合索引
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_messages_session_created ON messages(session_id, created_at)")
-
-	// 为工单表创建复合索引
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_tickets_status_created ON tickets(status, created_at)")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_tickets_agent_status ON tickets(agent_id, status)")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_tickets_customer_created ON tickets(customer_id, created_at)")
-
-	// 为会话表创建索引
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_sessions_user_created ON sessions(user_id, created_at)")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_sessions_agent_status ON sessions(agent_id, status)")
-
-	// 为客户表创建索引
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_customers_priority ON customers(priority)")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_customers_source ON customers(source)")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_customers_industry ON customers(industry)")
-
-	// 为客服表创建索引
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status)")
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_agents_department ON agents(department)")
-
-	// 为统计表创建索引
-	db.Exec("CREATE INDEX IF NOT EXISTS idx_daily_stats_date ON daily_stats(date)")
-
+	if err := appbootstrap.CreateIndexes(db); err != nil {
+		log.Fatalf("Failed to create indexes: %v", err)
+	}
 	log.Println("Additional indexes created successfully!")
 
 	// 插入默认数据
