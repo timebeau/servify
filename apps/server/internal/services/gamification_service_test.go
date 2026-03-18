@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package services
 
 import (
@@ -346,8 +349,8 @@ func TestComputeGamificationScore(t *testing.T) {
 
 func TestApplyBadges(t *testing.T) {
 	tests := []struct {
-		name             string
-		entries          []LeaderboardEntry
+		name              string
+		entries           []LeaderboardEntry
 		wantBadgesInFirst bool
 	}{
 		{
@@ -417,8 +420,8 @@ func TestApplyBadges(t *testing.T) {
 			wantBadgesInFirst: true,
 		},
 		{
-			name:             "empty entries",
-			entries:          []LeaderboardEntry{},
+			name:              "empty entries",
+			entries:           []LeaderboardEntry{},
 			wantBadgesInFirst: false,
 		},
 		{

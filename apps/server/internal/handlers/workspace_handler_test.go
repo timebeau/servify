@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package handlers
 
 import (
@@ -6,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"github.com/sirupsen/logrus"
 	"servify/apps/server/internal/models"
 	"servify/apps/server/internal/services"
 )

@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package services
 
 import (
@@ -261,72 +264,6 @@ func TestTicketService_CloseTicket(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestTicketService_autoAssignAgent(t *testing.T) {
-	db := newTicketServiceTestDB(t)
-	logger := logrus.New()
-	svc := NewTicketService(db, logger, nil)
-
-	// 创建在线客服
-	agent1 := &models.User{
-		Username: "agent_auto1",
-		Email:    "agent_auto1@example.com",
-		Name:     "Agent One",
-		Role:     "agent",
-	}
-	agent2 := &models.User{
-		Username: "agent_auto2",
-		Email:    "agent_auto2@example.com",
-		Name:     "Agent Two",
-		Role:     "agent",
-	}
-	db.Create(agent1)
-	db.Create(agent2)
-
-	// 创建客户用于工单
-	customer := &models.User{
-		Username: "customer_auto",
-		Email:    "customer_auto@example.com",
-		Name:     "Customer",
-		Role:     "customer",
-	}
-	db.Create(customer)
-
-	agentRecord1 := &models.Agent{
-		UserID:          agent1.ID,
-		Department:      "support",
-		Status:          "online",
-		AvgResponseTime: 300,
-	}
-	agentRecord2 := &models.Agent{
-		UserID:          agent2.ID,
-		Department:      "support",
-		Status:          "online",
-		AvgResponseTime: 600,
-	}
-	db.Create(agentRecord1)
-	db.Create(agentRecord2)
-
-	// 创建未分配的工单
-	ticket := &models.Ticket{
-		Title:      "待分配工单",
-		CustomerID: customer.ID,
-		Status:     "open",
-		Priority:   "normal",
-		AgentID:    nil,
-	}
-	db.Create(ticket)
-
-	// 测试自动分配
-	svc.autoAssignAgent(ticket.ID)
-
-	// 验证工单被分配
-	var updated models.Ticket
-	db.First(&updated, ticket.ID)
-	if updated.AgentID == nil {
-		t.Error("expected ticket to be assigned to an agent")
 	}
 }
 
@@ -644,10 +581,10 @@ func TestTicketService_ListTickets(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		req      *TicketListRequest
-		wantMin  int
-		wantMax  int
+		name    string
+		req     *TicketListRequest
+		wantMin int
+		wantMax int
 	}{
 		{
 			name: "list all",

@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package handlers
 
 import (
@@ -56,7 +59,7 @@ func TestShiftHandler_CreateShift_Success(t *testing.T) {
 	endTime := now.Add(9 * time.Hour)
 
 	payload := map[string]interface{}{
-		"agent_id":  1,
+		"agent_id":   1,
 		"start_time": startTime.Format(time.RFC3339),
 		"end_time":   endTime.Format(time.RFC3339),
 		"shift_type": "regular",

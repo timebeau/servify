@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"servify/apps/server/internal/models"
+	routingdelivery "servify/apps/server/internal/modules/routing/delivery"
 
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
@@ -19,6 +20,7 @@ type SessionTransferService struct {
 	aiService    AIServiceInterface
 	agentService *AgentService
 	wsHub        *WebSocketHub
+	routing      *routingdelivery.SessionTransferAdapter
 }
 
 // NewSessionTransferService 创建会话转接服务
@@ -281,19 +283,27 @@ func (s *SessionTransferService) addToWaitingQueue(ctx context.Context, session 
 		return nil, fmt.Errorf("failed to ensure session active: %w", err)
 	}
 
-	// 创建等待记录
-	waitingRecord := &models.WaitingRecord{
-		SessionID:    session.ID,
-		Reason:       req.Reason,
-		TargetSkills: strings.Join(req.TargetSkills, ","),
-		Priority:     req.Priority,
-		Notes:        req.Notes,
-		Status:       "waiting",
-		QueuedAt:     time.Now(),
-	}
+	var waitingRecord *models.WaitingRecord
+	if s.routing != nil {
+		createdRecord, err := s.routing.AddToWaitingQueue(ctx, session.ID, req.Reason, req.TargetSkills, req.Priority, req.Notes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create waiting record: %w", err)
+		}
+		waitingRecord = createdRecord
+	} else {
+		waitingRecord = &models.WaitingRecord{
+			SessionID:    session.ID,
+			Reason:       req.Reason,
+			TargetSkills: strings.Join(req.TargetSkills, ","),
+			Priority:     req.Priority,
+			Notes:        req.Notes,
+			Status:       "waiting",
+			QueuedAt:     time.Now(),
+		}
 
-	if err := s.db.Create(waitingRecord).Error; err != nil {
-		return nil, fmt.Errorf("failed to create waiting record: %w", err)
+		if err := s.db.Create(waitingRecord).Error; err != nil {
+			return nil, fmt.Errorf("failed to create waiting record: %w", err)
+		}
 	}
 
 	// 发送等待消息给用户
@@ -457,6 +467,9 @@ func (s *SessionTransferService) GetTransferHistory(ctx context.Context, session
 
 // ListWaitingRecords 列出等待队列记录（默认 status=waiting）
 func (s *SessionTransferService) ListWaitingRecords(ctx context.Context, status string, limit int) ([]models.WaitingRecord, error) {
+	if s.routing != nil {
+		return s.routing.ListWaitingRecords(ctx, status, limit)
+	}
 	if status == "" {
 		status = "waiting"
 	}
@@ -484,20 +497,29 @@ func (s *SessionTransferService) CancelWaitingRecord(ctx context.Context, sessio
 
 	now := time.Now()
 	return s.db.Transaction(func(tx *gorm.DB) error {
-		var wr models.WaitingRecord
-		if err := tx.Where("session_id = ? AND status = ?", sessionID, "waiting").First(&wr).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				return nil
+		if s.routing != nil {
+			if _, err := s.routing.CancelWaiting(ctx, sessionID, reason); err != nil {
+				if err == gorm.ErrRecordNotFound {
+					return nil
+				}
+				return fmt.Errorf("update waiting record: %w", err)
 			}
-			return fmt.Errorf("load waiting record: %w", err)
-		}
+		} else {
+			var wr models.WaitingRecord
+			if err := tx.Where("session_id = ? AND status = ?", sessionID, "waiting").First(&wr).Error; err != nil {
+				if err == gorm.ErrRecordNotFound {
+					return nil
+				}
+				return fmt.Errorf("load waiting record: %w", err)
+			}
 
-		if err := tx.Model(&models.WaitingRecord{}).
-			Where("id = ?", wr.ID).
-			Updates(map[string]interface{}{
-				"status": "cancelled",
-			}).Error; err != nil {
-			return fmt.Errorf("update waiting record: %w", err)
+			if err := tx.Model(&models.WaitingRecord{}).
+				Where("id = ?", wr.ID).
+				Updates(map[string]interface{}{
+					"status": "cancelled",
+				}).Error; err != nil {
+				return fmt.Errorf("update waiting record: %w", err)
+			}
 		}
 
 		// 记录系统消息（可选，不影响主流程）
@@ -512,6 +534,10 @@ func (s *SessionTransferService) CancelWaitingRecord(ctx context.Context, sessio
 		_ = tx.Create(msg).Error
 		return nil
 	})
+}
+
+func (s *SessionTransferService) SetRoutingAdapter(adapter *routingdelivery.SessionTransferAdapter) {
+	s.routing = adapter
 }
 
 // AutoTransferCheck 自动转接检查

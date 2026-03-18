@@ -19,11 +19,11 @@ func (p StatusTransitionPolicy) Validate(fromStatus, toStatus string) error {
 			return nil
 		}
 	case "assigned":
-		if toStatus == "in_progress" || toStatus == "resolved" || toStatus == "closed" {
+		if toStatus == "open" || toStatus == "in_progress" || toStatus == "resolved" || toStatus == "closed" {
 			return nil
 		}
 	case "in_progress":
-		if toStatus == "resolved" || toStatus == "closed" {
+		if toStatus == "open" || toStatus == "resolved" || toStatus == "closed" {
 			return nil
 		}
 	case "resolved", "closed":

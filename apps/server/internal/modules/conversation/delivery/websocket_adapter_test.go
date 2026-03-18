@@ -1,0 +1,129 @@
+package delivery
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"servify/apps/server/internal/models"
+	conversationapp "servify/apps/server/internal/modules/conversation/application"
+	conversationdomain "servify/apps/server/internal/modules/conversation/domain"
+
+	"gorm.io/gorm"
+)
+
+type stubConversationRepo struct {
+	conversations map[string]*conversationdomain.Conversation
+	messages      map[string][]conversationdomain.ConversationMessage
+}
+
+func (s *stubConversationRepo) CreateConversation(ctx context.Context, conversation *conversationdomain.Conversation) error {
+	if s.conversations == nil {
+		s.conversations = map[string]*conversationdomain.Conversation{}
+	}
+	cp := *conversation
+	s.conversations[conversation.ID] = &cp
+	return nil
+}
+
+func (s *stubConversationRepo) GetConversation(ctx context.Context, conversationID string) (*conversationdomain.Conversation, error) {
+	item, ok := s.conversations[conversationID]
+	if !ok {
+		return nil, gorm.ErrRecordNotFound
+	}
+	cp := *item
+	return &cp, nil
+}
+
+func (s *stubConversationRepo) UpdateConversation(ctx context.Context, conversation *conversationdomain.Conversation) error {
+	cp := *conversation
+	s.conversations[conversation.ID] = &cp
+	return nil
+}
+
+func (s *stubConversationRepo) AppendMessage(ctx context.Context, message *conversationdomain.ConversationMessage) error {
+	if s.messages == nil {
+		s.messages = map[string][]conversationdomain.ConversationMessage{}
+	}
+	s.messages[message.ConversationID] = append(s.messages[message.ConversationID], *message)
+	return nil
+}
+
+func (s *stubConversationRepo) ListRecentMessages(ctx context.Context, conversationID string, limit int) ([]conversationdomain.ConversationMessage, error) {
+	items := s.messages[conversationID]
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	out := make([]conversationdomain.ConversationMessage, 0, len(items))
+	out = append(out, items...)
+	return out, nil
+}
+
+func TestWebSocketMessageAdapterCreatesConversationOnDemand(t *testing.T) {
+	repo := &stubConversationRepo{}
+	adapter := NewWebSocketMessageAdapter(conversationapp.NewService(repo, nil))
+
+	if err := adapter.PersistTextMessage(context.Background(), "sess-1", "hello"); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if _, ok := repo.conversations["sess-1"]; !ok {
+		t.Fatal("expected conversation to be created")
+	}
+	if len(repo.messages["sess-1"]) != 1 || repo.messages["sess-1"][0].Content != "hello" {
+		t.Fatalf("expected one persisted message, got %+v", repo.messages["sess-1"])
+	}
+}
+
+func TestWebSocketMessageAdapterHasActiveHumanAgent(t *testing.T) {
+	agentID := uint(9)
+	repo := &stubConversationRepo{
+		conversations: map[string]*conversationdomain.Conversation{
+			"sess-1": {
+				ID:     "sess-1",
+				Status: conversationdomain.ConversationStatusActive,
+				Participants: []conversationdomain.Participant{
+					{ID: "agent:9", UserID: &agentID, Role: conversationdomain.ParticipantRoleAgent},
+				},
+			},
+		},
+	}
+	adapter := NewWebSocketMessageAdapter(conversationapp.NewService(repo, nil))
+
+	assigned, err := adapter.HasActiveHumanAgent(context.Background(), "sess-1")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !assigned {
+		t.Fatal("expected active human agent to be detected")
+	}
+}
+
+func TestWebSocketMessageAdapterListRecentMessages(t *testing.T) {
+	now := time.Now()
+	repo := &stubConversationRepo{
+		messages: map[string][]conversationdomain.ConversationMessage{
+			"sess-1": {
+				{ID: "1", ConversationID: "sess-1", Sender: conversationdomain.ParticipantRoleCustomer, Kind: conversationdomain.MessageKindText, Content: "hello", CreatedAt: now},
+			},
+		},
+	}
+	adapter := NewWebSocketMessageAdapter(conversationapp.NewService(repo, nil))
+
+	items, err := adapter.ListRecentMessages(context.Background(), "sess-1", 10)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected one message, got %+v", items)
+	}
+	want := models.Message{
+		SessionID: "sess-1",
+		Content:   "hello",
+		Type:      "text",
+		Sender:    "customer",
+		CreatedAt: now,
+	}
+	if items[0].SessionID != want.SessionID || items[0].Content != want.Content || items[0].Type != want.Type || items[0].Sender != want.Sender {
+		t.Fatalf("unexpected mapped history: %+v", items[0])
+	}
+}

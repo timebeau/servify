@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package services
 
 import (
@@ -17,6 +20,40 @@ import (
 
 	"servify/apps/server/internal/models"
 )
+
+type stubConversationWriter struct {
+	calls []struct {
+		sessionID string
+		content   string
+	}
+	assigned bool
+	err      error
+}
+
+func (s *stubConversationWriter) PersistTextMessage(ctx context.Context, sessionID string, content string) error {
+	if s.err != nil {
+		return s.err
+	}
+	s.calls = append(s.calls, struct {
+		sessionID string
+		content   string
+	}{sessionID: sessionID, content: content})
+	return nil
+}
+
+func (s *stubConversationWriter) HasActiveHumanAgent(ctx context.Context, sessionID string) (bool, error) {
+	if s.err != nil {
+		return false, s.err
+	}
+	return s.assigned, nil
+}
+
+func (s *stubConversationWriter) ListRecentMessages(ctx context.Context, sessionID string, limit int) ([]models.Message, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return nil, nil
+}
 
 func TestWebSocketHub_ClientManagement(t *testing.T) {
 	hub := NewWebSocketHub()
@@ -379,7 +416,6 @@ func TestWebSocketHub_SetSessionTransferService(t *testing.T) {
 	// we'll skip this test for now and rely on integration tests
 }
 
-
 func TestWebSocketHub_SetDB(t *testing.T) {
 	hub := NewWebSocketHub()
 
@@ -392,16 +428,74 @@ func TestWebSocketHub_SetDB(t *testing.T) {
 	_ = hub
 }
 
+func TestWebSocketHub_SetConversationMessageWriter(t *testing.T) {
+	hub := NewWebSocketHub()
+	writer := &stubConversationWriter{}
+
+	hub.SetConversationMessageWriter(writer)
+
+	assert.Same(t, writer, hub.conversationWriter)
+}
+
+func TestWebSocketClient_PersistTextMessageUsesConversationWriter(t *testing.T) {
+	hub := NewWebSocketHub()
+	writer := &stubConversationWriter{}
+	hub.SetConversationMessageWriter(writer)
+	client := &WebSocketClient{
+		ID:        "test-client",
+		SessionID: "test-session",
+		Send:      make(chan WebSocketMessage, 10),
+		Hub:       hub,
+	}
+
+	err := client.persistTextMessage(WebSocketMessage{
+		Type:      "text-message",
+		Data:      map[string]interface{}{"content": "hello"},
+		SessionID: "test-session",
+		Timestamp: time.Now(),
+	})
+	assert.NoError(t, err)
+	if assert.Len(t, writer.calls, 1) {
+		assert.Equal(t, "test-session", writer.calls[0].sessionID)
+		assert.Equal(t, "hello", writer.calls[0].content)
+	}
+}
+
+func TestWebSocketClient_ProcessMessageWithAISkipsWhenConversationAssigned(t *testing.T) {
+	hub := NewWebSocketHub()
+	hub.SetConversationMessageWriter(&stubConversationWriter{assigned: true})
+	hub.SetAIService(&stubAI{})
+	client := &WebSocketClient{
+		ID:        "test-client",
+		SessionID: "test-session",
+		Send:      make(chan WebSocketMessage, 10),
+		Hub:       hub,
+	}
+
+	client.processMessageWithAI(WebSocketMessage{
+		Type:      "text-message",
+		Data:      map[string]interface{}{"content": "hello"},
+		SessionID: "test-session",
+		Timestamp: time.Now(),
+	})
+
+	select {
+	case <-client.Send:
+		t.Fatal("expected no AI response when human agent is assigned")
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
 func TestWebSocketHub_handleWebRTCAnswer(t *testing.T) {
 	hub := NewWebSocketHub()
 	hub.SetAIService(&stubAI{})
 
 	// Create a test client
 	client := &WebSocketClient{
-		ID:       "test-client",
+		ID:        "test-client",
 		SessionID: "test-session",
-		Send:     make(chan WebSocketMessage, 10),
-		Hub:      hub,
+		Send:      make(chan WebSocketMessage, 10),
+		Hub:       hub,
 	}
 
 	// Register client
@@ -422,10 +516,10 @@ func TestWebSocketHub_handleWebRTCCandidate(t *testing.T) {
 
 	// Create a test client
 	client := &WebSocketClient{
-		ID:       "test-client",
+		ID:        "test-client",
 		SessionID: "test-session",
-		Send:     make(chan WebSocketMessage, 10),
-		Hub:      hub,
+		Send:      make(chan WebSocketMessage, 10),
+		Hub:       hub,
 	}
 
 	// Register client

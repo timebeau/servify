@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package handlers
 
 import (
@@ -229,4 +232,3 @@ func TestCustomerHandler_GetCustomerStats(t *testing.T) {
 		t.Fatalf("expected status 200, got %d, body: %s", w.Code, w.Body.String())
 	}
 }
-

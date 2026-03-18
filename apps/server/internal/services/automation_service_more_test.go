@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package services
 
 import (
@@ -466,39 +469,39 @@ func TestEvaluateCondition(t *testing.T) {
 		expected bool
 	}{
 		{
-			name: "eq true",
-			cond: TriggerCondition{Field: "status", Op: "eq", Value: "open"},
-			attrs: map[string]interface{}{"status": "open"},
+			name:     "eq true",
+			cond:     TriggerCondition{Field: "status", Op: "eq", Value: "open"},
+			attrs:    map[string]interface{}{"status": "open"},
 			expected: true,
 		},
 		{
-			name: "eq false",
-			cond: TriggerCondition{Field: "status", Op: "eq", Value: "closed"},
-			attrs: map[string]interface{}{"status": "open"},
+			name:     "eq false",
+			cond:     TriggerCondition{Field: "status", Op: "eq", Value: "closed"},
+			attrs:    map[string]interface{}{"status": "open"},
 			expected: false,
 		},
 		{
-			name: "neq true",
-			cond: TriggerCondition{Field: "status", Op: "neq", Value: "closed"},
-			attrs: map[string]interface{}{"status": "open"},
+			name:     "neq true",
+			cond:     TriggerCondition{Field: "status", Op: "neq", Value: "closed"},
+			attrs:    map[string]interface{}{"status": "open"},
 			expected: true,
 		},
 		{
-			name: "contains true",
-			cond: TriggerCondition{Field: "tags", Op: "contains", Value: "urgent"},
-			attrs: map[string]interface{}{"tags": "urgent,important"},
+			name:     "contains true",
+			cond:     TriggerCondition{Field: "tags", Op: "contains", Value: "urgent"},
+			attrs:    map[string]interface{}{"tags": "urgent,important"},
 			expected: true,
 		},
 		{
-			name: "contains false",
-			cond: TriggerCondition{Field: "tags", Op: "contains", Value: "missing"},
-			attrs: map[string]interface{}{"tags": "urgent,important"},
+			name:     "contains false",
+			cond:     TriggerCondition{Field: "tags", Op: "contains", Value: "missing"},
+			attrs:    map[string]interface{}{"tags": "urgent,important"},
 			expected: false,
 		},
 		{
-			name: "unknown field",
-			cond: TriggerCondition{Field: "unknown", Op: "eq", Value: "value"},
-			attrs: map[string]interface{}{"status": "open"},
+			name:     "unknown field",
+			cond:     TriggerCondition{Field: "unknown", Op: "eq", Value: "value"},
+			attrs:    map[string]interface{}{"status": "open"},
 			expected: false,
 		},
 		{

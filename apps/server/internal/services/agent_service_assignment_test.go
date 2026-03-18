@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package services
 
 import (
@@ -25,9 +28,9 @@ func TestAgentService_AssignSessionToAgent_Success(t *testing.T) {
 	db.Create(user)
 
 	agent := &models.Agent{
-		UserID:       user.ID,
-		Status:       "online",
-		CurrentLoad:  0,
+		UserID:        user.ID,
+		Status:        "online",
+		CurrentLoad:   0,
 		MaxConcurrent: 5,
 	}
 	db.Create(agent)
@@ -110,9 +113,9 @@ func TestAgentService_AssignSessionToAgent_AgentAtCapacity(t *testing.T) {
 	db.Create(user)
 
 	agent := &models.Agent{
-		UserID:       user.ID,
-		Status:       "online",
-		CurrentLoad:  5,
+		UserID:        user.ID,
+		Status:        "online",
+		CurrentLoad:   5,
 		MaxConcurrent: 5,
 	}
 	db.Create(agent)
@@ -148,9 +151,9 @@ func TestAgentService_ReleaseSessionFromAgent_Success(t *testing.T) {
 	db.Create(user)
 
 	agent := &models.Agent{
-		UserID:       user.ID,
-		Status:       "online",
-		CurrentLoad:  1,
+		UserID:        user.ID,
+		Status:        "online",
+		CurrentLoad:   1,
 		MaxConcurrent: 5,
 	}
 	db.Create(agent)

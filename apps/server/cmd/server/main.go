@@ -16,7 +16,15 @@ import (
 	"servify/apps/server/internal/handlers"
 	"servify/apps/server/internal/middleware"
 	"servify/apps/server/internal/models"
+	conversationapp "servify/apps/server/internal/modules/conversation/application"
+	conversationdelivery "servify/apps/server/internal/modules/conversation/delivery"
+	conversationinfra "servify/apps/server/internal/modules/conversation/infra"
+	routingapp "servify/apps/server/internal/modules/routing/application"
+	routingdelivery "servify/apps/server/internal/modules/routing/delivery"
+	routinginfra "servify/apps/server/internal/modules/routing/infra"
+	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
 	"servify/apps/server/internal/observability"
+	"servify/apps/server/internal/platform/eventbus"
 	"servify/apps/server/internal/platform/llm/openai"
 	"servify/apps/server/internal/services"
 	"servify/apps/server/pkg/weknora"
@@ -152,9 +160,16 @@ func main() {
 		aiService = services.NewOrchestratedAIService(openAIProvider, nil)
 	}
 
+	bus := eventbus.NewInMemoryBus()
+
 	// 初始化实时与路由服务（对齐 CLI 端点）
 	wsHub := services.NewWebSocketHub()
 	wsHub.SetDB(db)
+	conversationRepo := conversationinfra.NewGormRepository(db)
+	conversationService := conversationapp.NewService(conversationRepo, bus)
+	wsHub.SetConversationMessageWriter(conversationdelivery.NewWebSocketMessageAdapter(conversationService))
+	routingRepo := routinginfra.NewGormRepository(db)
+	routingService := routingapp.NewService(routingRepo, bus)
 	webrtcService := services.NewWebRTCService(cfg.WebRTC.STUNServer, wsHub)
 	messageRouter := services.NewMessageRouter(aiService, wsHub, db)
 	go wsHub.Run()
@@ -171,8 +186,10 @@ func main() {
 	customerService := services.NewCustomerService(db, appLogger)
 	agentService := services.NewAgentService(db, appLogger)
 	ticketService := services.NewTicketService(db, appLogger, slaService)
+	ticketService.SetEventBus(bus)
 	ticketService.SetAutomationService(automationService)
 	sessionTransferService := services.NewSessionTransferService(db, appLogger, aiService, agentService, wsHub)
+	sessionTransferService.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingService))
 	statisticsService := services.NewStatisticsService(db, appLogger)
 	satisfactionService := services.NewSatisfactionService(db, appLogger)
 	ticketService.SetSatisfactionService(satisfactionService)
@@ -184,6 +201,8 @@ func main() {
 	knowledgeDocService := services.NewKnowledgeDocService(db)
 	suggestionService := services.NewSuggestionService(db)
 	gamificationService := services.NewGamificationService(db)
+	ticketAdapter := ticketdelivery.NewHandlerServiceAdapter(db, ticketService.ModuleCommandService(), ticketService.Orchestrator())
+	ticketReader := ticketdelivery.NewReaderServiceAdapter(db)
 
 	// 启动统计服务后台任务
 	go statisticsService.StartDailyStatsWorker()
@@ -236,7 +255,7 @@ func main() {
 
 	ticketsAPI := api.Group("/")
 	ticketsAPI.Use(middleware.RequireResourcePermission("tickets"))
-	handlers.RegisterTicketRoutes(ticketsAPI, ticketHandler(ticketService, appLogger))
+	handlers.RegisterTicketRoutes(ticketsAPI, handlers.NewTicketHandler(ticketAdapter, appLogger))
 
 	sessionTransferAPI := api.Group("/")
 	sessionTransferAPI.Use(middleware.RequireResourcePermission("session_transfer"))
@@ -268,7 +287,7 @@ func main() {
 
 	slaAPI := api.Group("/")
 	slaAPI.Use(middleware.RequireResourcePermission("sla"))
-	handlers.RegisterSLARoutes(slaAPI, slaHandler(slaService, ticketService, appLogger))
+	handlers.RegisterSLARoutes(slaAPI, slaHandler(slaService, ticketReader))
 
 	shiftAPI := api.Group("/")
 	shiftAPI.Use(middleware.RequireResourcePermission("shift"))
@@ -390,9 +409,6 @@ func customerHandler(s *services.CustomerService, l *logrus.Logger) *handlers.Cu
 func agentHandler(s *services.AgentService, l *logrus.Logger) *handlers.AgentHandler {
 	return handlers.NewAgentHandler(s, l)
 }
-func ticketHandler(s *services.TicketService, l *logrus.Logger) *handlers.TicketHandler {
-	return handlers.NewTicketHandler(s, l)
-}
 func transferHandler(s *services.SessionTransferService, l *logrus.Logger) *handlers.SessionTransferHandler {
 	return handlers.NewSessionTransferHandler(s, l)
 }
@@ -402,7 +418,9 @@ func statisticsHandler(s *services.StatisticsService, l *logrus.Logger) *handler
 func satisfactionHandler(s *services.SatisfactionService, l *logrus.Logger) *handlers.SatisfactionHandler {
 	return handlers.NewSatisfactionHandler(s, l)
 }
-func slaHandler(s *services.SLAService, t *services.TicketService, l *logrus.Logger) *handlers.SLAHandler {
+func slaHandler(s *services.SLAService, t interface {
+	GetTicketByID(context.Context, uint) (*models.Ticket, error)
+}) *handlers.SLAHandler {
 	return handlers.NewSLAHandler(s, t)
 }
 func shiftHandler(s *services.ShiftService) *handlers.ShiftHandler {

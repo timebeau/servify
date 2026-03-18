@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package handlers
 
 import (
@@ -108,7 +111,6 @@ func TestStatisticsHandler_GetAgentPerformanceStats_SQLiteError(t *testing.T) {
 		t.Fatalf("expected status 500 (SQLite doesn't support PostgreSQL EXTRACT), got %d, body: %s", w.Code, w.Body.String())
 	}
 }
-
 
 func TestStatisticsHandler_GetTicketCategoryStats(t *testing.T) {
 	gin.SetMode(gin.TestMode)

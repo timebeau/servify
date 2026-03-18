@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package services
 
 import (
@@ -44,15 +47,15 @@ func TestKnowledgeDocService_Create(t *testing.T) {
 			name: "with category and tags",
 			req: &KnowledgeDocCreateRequest{
 				Title:    "Tagged Doc",
-				Content: "Content with tags",
+				Content:  "Content with tags",
 				Category: "Technical",
 				Tags:     []string{"api", "guide"},
 			},
 			wantErr: false,
 		},
 		{
-			name: "nil request",
-			req:  nil,
+			name:    "nil request",
+			req:     nil,
 			wantErr: true,
 		},
 		{
@@ -82,9 +85,9 @@ func TestKnowledgeDocService_Create(t *testing.T) {
 		{
 			name: "tags with empty strings",
 			req: &KnowledgeDocCreateRequest{
-				Title:    "Tags Test",
+				Title:   "Tags Test",
 				Content: "Content",
-				Tags:     []string{"tag1", "", "tag2"},
+				Tags:    []string{"tag1", "", "tag2"},
 			},
 			wantErr: false,
 		},
@@ -164,23 +167,23 @@ func TestKnowledgeDocService_List(t *testing.T) {
 	// Create test docs
 	svc.Create(context.Background(), &KnowledgeDocCreateRequest{
 		Title:    "Doc 1",
-		Content: "Content 1",
+		Content:  "Content 1",
 		Category: "Technical",
 		Tags:     []string{"api"},
 	})
 	svc.Create(context.Background(), &KnowledgeDocCreateRequest{
 		Title:    "Doc 2",
-		Content: "Content 2",
+		Content:  "Content 2",
 		Category: "User Guide",
 		Tags:     []string{"guide"},
 	})
 
 	tests := []struct {
-		name     string
-		req      *KnowledgeDocListRequest
-		wantMin  int
-		wantMax  int
-		wantErr  bool
+		name    string
+		req     *KnowledgeDocListRequest
+		wantMin int
+		wantMax int
+		wantErr bool
 	}{
 		{
 			name: "list all",
@@ -235,9 +238,9 @@ func TestKnowledgeDocService_List(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:     "nil request",
-			req:      nil,
-			wantMin:  2,
+			name:    "nil request",
+			req:     nil,
+			wantMin: 2,
 			wantMax: 2,
 			wantErr: false,
 		},
@@ -269,7 +272,7 @@ func TestKnowledgeDocService_Update(t *testing.T) {
 	// Create test doc
 	doc, _ := svc.Create(context.Background(), &KnowledgeDocCreateRequest{
 		Title:    "Original Title",
-		Content: "Original Content",
+		Content:  "Original Content",
 		Category: "Original Category",
 		Tags:     []string{"original"},
 	})
@@ -329,9 +332,9 @@ func TestKnowledgeDocService_Update(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "nil request",
-			id:   doc.ID,
-			req:  nil,
+			name:    "nil request",
+			id:      doc.ID,
+			req:     nil,
 			wantErr: true,
 		},
 	}

@@ -16,6 +16,12 @@ import (
 	"servify/apps/server/internal/models"
 )
 
+type conversationMessageWriter interface {
+	PersistTextMessage(ctx context.Context, sessionID string, content string) error
+	HasActiveHumanAgent(ctx context.Context, sessionID string) (bool, error)
+	ListRecentMessages(ctx context.Context, sessionID string, limit int) ([]models.Message, error)
+}
+
 type WebSocketMessage struct {
 	Type      string      `json:"type"`
 	Data      interface{} `json:"data"`
@@ -43,6 +49,8 @@ type WebSocketHub struct {
 	transferService *SessionTransferService
 	// 可选：用于将文本消息落库（如未设置则仅记录日志）
 	db *gorm.DB
+	// 优先使用 conversation 模块适配器持久化消息
+	conversationWriter conversationMessageWriter
 }
 
 var upgrader = websocket.Upgrader{
@@ -79,6 +87,13 @@ func (h *WebSocketHub) SetDB(db *gorm.DB) {
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 	h.db = db
+}
+
+// SetConversationMessageWriter injects the modular conversation persistence adapter.
+func (h *WebSocketHub) SetConversationMessageWriter(writer conversationMessageWriter) {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	h.conversationWriter = writer
 }
 
 func (h *WebSocketHub) Run() {
@@ -303,7 +318,26 @@ func (c *WebSocketClient) persistTextMessage(message WebSocketMessage) error {
 	hub := c.Hub
 	hub.mutex.RLock()
 	db := hub.db
+	writer := hub.conversationWriter
 	hub.mutex.RUnlock()
+
+	// 优先走 conversation 模块适配器；未配置时退回旧 DB 直写路径
+	if writer != nil {
+		var content string
+		switch v := message.Data.(type) {
+		case map[string]interface{}:
+			if s, ok := v["content"].(string); ok {
+				content = s
+			}
+		case string:
+			content = v
+		}
+		if strings.TrimSpace(content) == "" {
+			return nil
+		}
+		return writer.PersistTextMessage(context.Background(), c.SessionID, content)
+	}
+
 	if db == nil {
 		return nil
 	}
@@ -365,6 +399,7 @@ func (c *WebSocketClient) processMessageWithAI(message WebSocketMessage) {
 	ai := h.aiService
 	transferSvc := h.transferService
 	db := h.db
+	writer := h.conversationWriter
 	h.mutex.RUnlock()
 	if ai == nil {
 		logrus.WithFields(logrus.Fields{
@@ -393,7 +428,13 @@ func (c *WebSocketClient) processMessageWithAI(message WebSocketMessage) {
 	}
 
 	// 若会话已分配人工客服，则停止 AI 自动回复（避免“人机抢答”）
-	if db != nil {
+	if writer != nil {
+		assigned, err := writer.HasActiveHumanAgent(context.Background(), c.SessionID)
+		if err == nil && assigned {
+			return
+		}
+	}
+	if writer == nil && db != nil {
 		var sess models.Session
 		if err := db.Select("id", "agent_id", "status").First(&sess, "id = ?", c.SessionID).Error; err == nil {
 			if sess.AgentID != nil && sess.Status != "ended" {
@@ -405,7 +446,9 @@ func (c *WebSocketClient) processMessageWithAI(message WebSocketMessage) {
 	// 触发“转人工”流程（优先于 AI 正常回答）
 	if transferSvc != nil {
 		var history []models.Message
-		if db != nil {
+		if writer != nil {
+			history, _ = writer.ListRecentMessages(context.Background(), c.SessionID, 6)
+		} else if db != nil {
 			_ = db.Where("session_id = ?", c.SessionID).
 				Order("created_at DESC").
 				Limit(6).

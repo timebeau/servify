@@ -9,6 +9,10 @@ import (
 type CommandRepository interface {
 	CreateTicket(ctx context.Context, ticket *domain.Ticket) error
 	UpdateTicket(ctx context.Context, ticket *domain.Ticket) error
+	UpdateTicketWithStatus(ctx context.Context, ticket *domain.Ticket, fromStatus string, userID uint, reason string) error
+	AssignTicket(ctx context.Context, ticket *domain.Ticket, previousAgentID *uint, fromStatus string, userID uint, reason string) error
+	UnassignTicket(ctx context.Context, ticket *domain.Ticket, previousAgentID uint, fromStatus string, userID uint, reason string) error
+	CloseTicket(ctx context.Context, ticket *domain.Ticket, fromStatus string, userID uint, reason string) error
 	AddComment(ctx context.Context, ticketID uint, comment *domain.Comment) error
 	RecordStatusChange(ctx context.Context, ticketID uint, change *domain.StatusChange) error
 	GetTicket(ctx context.Context, ticketID uint) (*domain.Ticket, error)

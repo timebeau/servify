@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package handlers
 
 import (
@@ -63,12 +66,12 @@ func TestSatisfactionHandler_CreateSatisfaction_Success(t *testing.T) {
 	db.Create(ticket)
 
 	payload := map[string]interface{}{
-		"ticket_id":  1,
+		"ticket_id":   1,
 		"customer_id": 1,
-		"agent_id":   1,
-		"rating":     5,
-		"comment":    "Great service!",
-		"category":   "quality",
+		"agent_id":    1,
+		"rating":      5,
+		"comment":     "Great service!",
+		"category":    "quality",
 	}
 	body, _ := json.Marshal(payload)
 

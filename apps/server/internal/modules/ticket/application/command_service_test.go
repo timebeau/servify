@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"servify/apps/server/internal/modules/ticket/domain"
+	"servify/apps/server/internal/platform/eventbus"
 )
 
 type stubCommandRepo struct {
@@ -18,7 +19,23 @@ type stubCommandRepo struct {
 	nextChangeID   uint
 	customerExists bool
 	agentAvailable bool
+	closeCalls     int
 	err            error
+}
+
+type stubEventBus struct {
+	events []eventbus.Event
+	err    error
+}
+
+func (s *stubEventBus) Subscribe(eventName string, handler eventbus.Handler) {}
+
+func (s *stubEventBus) Publish(ctx context.Context, event eventbus.Event) error {
+	if s.err != nil {
+		return s.err
+	}
+	s.events = append(s.events, event)
+	return nil
 }
 
 func (s *stubCommandRepo) CreateTicket(ctx context.Context, ticket *domain.Ticket) error {
@@ -41,6 +58,79 @@ func (s *stubCommandRepo) CreateTicket(ctx context.Context, ticket *domain.Ticke
 func (s *stubCommandRepo) UpdateTicket(ctx context.Context, ticket *domain.Ticket) error {
 	if s.err != nil {
 		return s.err
+	}
+	cp := *ticket
+	s.tickets[ticket.ID] = &cp
+	return nil
+}
+
+func (s *stubCommandRepo) UpdateTicketWithStatus(ctx context.Context, ticket *domain.Ticket, fromStatus string, userID uint, reason string) error {
+	if s.err != nil {
+		return s.err
+	}
+	if err := s.RecordStatusChange(ctx, ticket.ID, &domain.StatusChange{
+		UserID:     userID,
+		FromStatus: fromStatus,
+		ToStatus:   ticket.Status,
+		Reason:     reason,
+		CreatedAt:  ticket.UpdatedAt,
+	}); err != nil {
+		return err
+	}
+	cp := *ticket
+	s.tickets[ticket.ID] = &cp
+	return nil
+}
+
+func (s *stubCommandRepo) AssignTicket(ctx context.Context, ticket *domain.Ticket, previousAgentID *uint, fromStatus string, userID uint, reason string) error {
+	if s.err != nil {
+		return s.err
+	}
+	if err := s.RecordStatusChange(ctx, ticket.ID, &domain.StatusChange{
+		UserID:     userID,
+		FromStatus: fromStatus,
+		ToStatus:   ticket.Status,
+		Reason:     reason,
+		CreatedAt:  ticket.UpdatedAt,
+	}); err != nil {
+		return err
+	}
+	cp := *ticket
+	s.tickets[ticket.ID] = &cp
+	return nil
+}
+
+func (s *stubCommandRepo) UnassignTicket(ctx context.Context, ticket *domain.Ticket, previousAgentID uint, fromStatus string, userID uint, reason string) error {
+	if s.err != nil {
+		return s.err
+	}
+	if err := s.RecordStatusChange(ctx, ticket.ID, &domain.StatusChange{
+		UserID:     userID,
+		FromStatus: fromStatus,
+		ToStatus:   ticket.Status,
+		Reason:     reason,
+		CreatedAt:  ticket.UpdatedAt,
+	}); err != nil {
+		return err
+	}
+	cp := *ticket
+	s.tickets[ticket.ID] = &cp
+	return nil
+}
+
+func (s *stubCommandRepo) CloseTicket(ctx context.Context, ticket *domain.Ticket, fromStatus string, userID uint, reason string) error {
+	if s.err != nil {
+		return s.err
+	}
+	s.closeCalls++
+	if err := s.RecordStatusChange(ctx, ticket.ID, &domain.StatusChange{
+		UserID:     userID,
+		FromStatus: fromStatus,
+		ToStatus:   "closed",
+		Reason:     reason,
+		CreatedAt:  time.Now(),
+	}); err != nil {
+		return err
 	}
 	cp := *ticket
 	s.tickets[ticket.ID] = &cp
@@ -106,7 +196,9 @@ func (s *stubCommandRepo) AgentAssignable(ctx context.Context, agentID uint) (bo
 }
 
 func TestCommandServiceCreateTicket(t *testing.T) {
-	svc := NewCommandService(&stubCommandRepo{customerExists: true})
+	bus := &stubEventBus{}
+	repo := &stubCommandRepo{customerExists: true}
+	svc := NewCommandServiceWithBus(repo, bus)
 	got, err := svc.CreateTicket(context.Background(), CreateTicketCommand{
 		Title:      "Need Help",
 		CustomerID: 7,
@@ -116,6 +208,12 @@ func TestCommandServiceCreateTicket(t *testing.T) {
 	}
 	if got.ID == 0 || got.Status != "open" || got.Source != "web" {
 		t.Fatalf("unexpected created ticket: %+v", got)
+	}
+	if len(repo.statusChanges[got.ID]) != 1 || repo.statusChanges[got.ID][0].ToStatus != "open" {
+		t.Fatalf("expected initial open status history, got %+v", repo.statusChanges[got.ID])
+	}
+	if len(bus.events) != 1 || bus.events[0].Name() != TicketCreatedEventName {
+		t.Fatalf("expected created event, got %+v", bus.events)
 	}
 }
 
@@ -153,6 +251,30 @@ func TestCommandServiceUpdateTicket(t *testing.T) {
 	}
 }
 
+func TestCommandServiceUpdateTicketPublishesAssignedEventOnAgentChange(t *testing.T) {
+	bus := &stubEventBus{}
+	agentID := uint(8)
+	repo := &stubCommandRepo{
+		tickets: map[uint]*domain.Ticket{
+			1: {
+				ID:         1,
+				Title:      "Billing",
+				CustomerID: 9,
+				Status:     "open",
+				CreatedAt:  time.Now(),
+				UpdatedAt:  time.Now(),
+			},
+		},
+	}
+	svc := NewCommandServiceWithBus(repo, bus)
+	if _, err := svc.UpdateTicket(context.Background(), 1, UpdateTicketCommand{AgentID: &agentID, ActorID: 1}); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(bus.events) != 1 || bus.events[0].Name() != TicketAssignedEventName {
+		t.Fatalf("expected assigned event, got %+v", bus.events)
+	}
+}
+
 func TestCommandServiceAssignTicket(t *testing.T) {
 	repo := &stubCommandRepo{
 		agentAvailable: true,
@@ -177,6 +299,33 @@ func TestCommandServiceAssignTicket(t *testing.T) {
 	}
 	if len(repo.statusChanges[1]) != 1 || repo.statusChanges[1][0].ToStatus != "assigned" {
 		t.Fatalf("expected assignment status history, got %+v", repo.statusChanges[1])
+	}
+}
+
+func TestCommandServiceUnassignTicket(t *testing.T) {
+	repo := &stubCommandRepo{
+		tickets: map[uint]*domain.Ticket{
+			1: {
+				ID:         1,
+				Title:      "Billing",
+				CustomerID: 9,
+				Status:     "assigned",
+				AgentID:    uintPtr(88),
+				CreatedAt:  time.Now(),
+				UpdatedAt:  time.Now(),
+			},
+		},
+	}
+	svc := NewCommandService(repo)
+	got, err := svc.UnassignTicket(context.Background(), 1, UnassignTicketCommand{UserID: 5})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got.AgentID != nil || got.Status != "open" {
+		t.Fatalf("unexpected unassigned ticket: %+v", got)
+	}
+	if len(repo.statusChanges[1]) != 1 || repo.statusChanges[1][0].ToStatus != "open" {
+		t.Fatalf("expected unassign status history, got %+v", repo.statusChanges[1])
 	}
 }
 
@@ -210,6 +359,7 @@ func TestCommandServiceAddComment(t *testing.T) {
 }
 
 func TestCommandServiceCloseTicket(t *testing.T) {
+	bus := &stubEventBus{}
 	repo := &stubCommandRepo{
 		tickets: map[uint]*domain.Ticket{
 			1: {
@@ -222,7 +372,7 @@ func TestCommandServiceCloseTicket(t *testing.T) {
 			},
 		},
 	}
-	svc := NewCommandService(repo)
+	svc := NewCommandServiceWithBus(repo, bus)
 	got, err := svc.CloseTicket(context.Background(), 1, CloseTicketCommand{UserID: 8, Reason: "done"})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -230,8 +380,14 @@ func TestCommandServiceCloseTicket(t *testing.T) {
 	if got.Status != "closed" || got.ClosedAt == nil {
 		t.Fatalf("unexpected closed ticket: %+v", got)
 	}
+	if repo.closeCalls != 1 {
+		t.Fatalf("expected close repository path to be used, got %d", repo.closeCalls)
+	}
 	if len(repo.statusChanges[1]) != 1 || repo.statusChanges[1][0].ToStatus != "closed" {
 		t.Fatalf("expected close status history, got %+v", repo.statusChanges[1])
+	}
+	if len(bus.events) != 1 || bus.events[0].Name() != TicketClosedEventName {
+		t.Fatalf("expected closed event, got %+v", bus.events)
 	}
 }
 
@@ -257,5 +413,119 @@ func TestStatusTransitionPolicyRejectsInvalidTransition(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected invalid transition error")
+	}
+}
+
+func TestCommandServiceBulkUpdateTickets(t *testing.T) {
+	repo := &stubCommandRepo{
+		agentAvailable: true,
+		tickets: map[uint]*domain.Ticket{
+			1: {
+				ID:         1,
+				Title:      "Billing",
+				CustomerID: 9,
+				Status:     "open",
+				Tags:       "vip",
+				CreatedAt:  time.Now(),
+				UpdatedAt:  time.Now(),
+			},
+			2: {
+				ID:         2,
+				Title:      "Support",
+				CustomerID: 10,
+				Status:     "assigned",
+				Tags:       "old",
+				AgentID:    uintPtr(88),
+				CreatedAt:  time.Now(),
+				UpdatedAt:  time.Now(),
+			},
+		},
+	}
+	svc := NewCommandService(repo)
+	resolved := "resolved"
+	agentID := uint(7)
+
+	got, err := svc.BulkUpdateTickets(context.Background(), BulkUpdateTicketsCommand{
+		TicketIDs:  []uint{2, 1, 2, 0},
+		Status:     &resolved,
+		AddTags:    []string{"urgent"},
+		RemoveTags: []string{"old"},
+		AgentID:    &agentID,
+		UserID:     99,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(got.Failed) != 0 || len(got.Updated) != 2 {
+		t.Fatalf("unexpected bulk result: %+v", got)
+	}
+	if repo.tickets[1].Status != "resolved" || repo.tickets[2].Status != "resolved" {
+		t.Fatalf("expected tickets to be resolved: %+v %+v", repo.tickets[1], repo.tickets[2])
+	}
+	if repo.tickets[1].AgentID == nil || *repo.tickets[1].AgentID != agentID {
+		t.Fatalf("expected ticket 1 to be assigned: %+v", repo.tickets[1])
+	}
+	if repo.tickets[2].Tags != "urgent" || repo.tickets[1].Tags != "urgent,vip" {
+		t.Fatalf("unexpected tag merge: ticket1=%q ticket2=%q", repo.tickets[1].Tags, repo.tickets[2].Tags)
+	}
+}
+
+func TestCommandServiceBulkUpdateTicketsWithUnassign(t *testing.T) {
+	repo := &stubCommandRepo{
+		tickets: map[uint]*domain.Ticket{
+			1: {
+				ID:         1,
+				Title:      "Billing",
+				CustomerID: 9,
+				Status:     "assigned",
+				AgentID:    uintPtr(88),
+				CreatedAt:  time.Now(),
+				UpdatedAt:  time.Now(),
+			},
+		},
+	}
+	svc := NewCommandService(repo)
+
+	got, err := svc.BulkUpdateTickets(context.Background(), BulkUpdateTicketsCommand{
+		TicketIDs:     []uint{1},
+		UnassignAgent: true,
+		UserID:        5,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(got.Failed) != 0 || len(got.Updated) != 1 {
+		t.Fatalf("unexpected bulk result: %+v", got)
+	}
+	if repo.tickets[1].AgentID != nil || repo.tickets[1].Status != "open" {
+		t.Fatalf("expected ticket to be unassigned and reopened: %+v", repo.tickets[1])
+	}
+}
+
+func uintPtr(v uint) *uint {
+	return &v
+}
+
+func TestCommandServiceAssignTicketPublishesEvent(t *testing.T) {
+	bus := &stubEventBus{}
+	repo := &stubCommandRepo{
+		agentAvailable: true,
+		tickets: map[uint]*domain.Ticket{
+			1: {
+				ID:         1,
+				Title:      "Billing",
+				CustomerID: 9,
+				Status:     "open",
+				CreatedAt:  time.Now(),
+				UpdatedAt:  time.Now(),
+			},
+		},
+	}
+	svc := NewCommandServiceWithBus(repo, bus)
+	if _, err := svc.AssignTicket(context.Background(), 1, AssignTicketCommand{AgentID: 88, UserID: 2}); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(bus.events) != 1 || bus.events[0].Name() != TicketAssignedEventName {
+		t.Fatalf("expected assigned event, got %+v", bus.events)
 	}
 }

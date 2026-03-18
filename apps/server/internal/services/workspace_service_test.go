@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package services
 
 import (
@@ -5,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"github.com/sirupsen/logrus"
 	"servify/apps/server/internal/models"
 )
 
@@ -78,8 +81,8 @@ func TestWorkspaceService_GetOverview_WithSessions(t *testing.T) {
 
 	// Create agent
 	agent := &models.Agent{
-		UserID:  agentUser.ID,
-		Status:  "online",
+		UserID: agentUser.ID,
+		Status: "online",
 	}
 	db.Create(agent)
 
@@ -251,10 +254,10 @@ func TestNewWorkspaceService(t *testing.T) {
 
 func TestChannelSummary_Structure(t *testing.T) {
 	summary := ChannelSummary{
-		Platform:         "web",
-		ActiveSessions:   10,
-		WaitingSessions:  2,
-		AvgResponseTime:  150.5,
+		Platform:        "web",
+		ActiveSessions:  10,
+		WaitingSessions: 2,
+		AvgResponseTime: 150.5,
 	}
 
 	if summary.Platform != "web" {
@@ -268,9 +271,9 @@ func TestChannelSummary_Structure(t *testing.T) {
 func TestWorkspaceOverview_Structure(t *testing.T) {
 	overview := &WorkspaceOverview{
 		TotalActiveSessions: 5,
-		WaitingQueue:       2,
-		OnlineAgents:       3,
-		BusyAgents:         1,
+		WaitingQueue:        2,
+		OnlineAgents:        3,
+		BusyAgents:          1,
 		Channels: []ChannelSummary{
 			{Platform: "web", ActiveSessions: 3},
 		},

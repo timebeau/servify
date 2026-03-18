@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"servify/apps/server/internal/models"
 	"servify/apps/server/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -14,12 +16,29 @@ import (
 // @Summary SLA配置管理
 // @Tags SLA
 type SLAHandler struct {
-	slaService    *services.SLAService
-	ticketService *services.TicketService
+	slaService    slaHandlerSLAService
+	ticketService slaHandlerTicketService
+}
+
+type slaHandlerTicketService interface {
+	GetTicketByID(ctx context.Context, ticketID uint) (*models.Ticket, error)
+}
+
+type slaHandlerSLAService interface {
+	CreateSLAConfig(ctx context.Context, req *services.SLAConfigCreateRequest) (*models.SLAConfig, error)
+	GetSLAConfig(ctx context.Context, id uint) (*models.SLAConfig, error)
+	ListSLAConfigs(ctx context.Context, req *services.SLAConfigListRequest) ([]models.SLAConfig, int64, error)
+	UpdateSLAConfig(ctx context.Context, id uint, req *services.SLAConfigUpdateRequest) (*models.SLAConfig, error)
+	DeleteSLAConfig(ctx context.Context, id uint) error
+	GetSLAConfigByPriority(ctx context.Context, priority string, customerTier string) (*models.SLAConfig, error)
+	ListSLAViolations(ctx context.Context, req *services.SLAViolationListRequest) ([]models.SLAViolation, int64, error)
+	ResolveSLAViolation(ctx context.Context, id uint) error
+	GetSLAStats(ctx context.Context) (*services.SLAStatsResponse, error)
+	CheckSLAViolation(ctx context.Context, ticket *models.Ticket) (*models.SLAViolation, error)
 }
 
 // NewSLAHandler 创建SLA处理器
-func NewSLAHandler(slaService *services.SLAService, ticketService *services.TicketService) *SLAHandler {
+func NewSLAHandler(slaService slaHandlerSLAService, ticketService slaHandlerTicketService) *SLAHandler {
 	return &SLAHandler{
 		slaService:    slaService,
 		ticketService: ticketService,

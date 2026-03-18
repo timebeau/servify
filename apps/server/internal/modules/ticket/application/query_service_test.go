@@ -13,6 +13,7 @@ type stubQueryRepo struct {
 	details *domain.TicketDetails
 	items   []domain.Ticket
 	total   int64
+	stats   *TicketStatsDTO
 	err     error
 }
 
@@ -33,21 +34,31 @@ func (s stubQueryRepo) ListTickets(ctx context.Context, query ListTicketsQuery) 
 	return s.items, s.total, nil
 }
 
+func (s stubQueryRepo) GetTicketStats(ctx context.Context, agentID *uint) (*TicketStatsDTO, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	if s.stats == nil {
+		return &TicketStatsDTO{}, nil
+	}
+	return s.stats, nil
+}
+
 func TestQueryServiceGetTicketByID(t *testing.T) {
 	now := time.Now()
 	svc := NewQueryService(stubQueryRepo{
 		details: &domain.TicketDetails{
 			Ticket: domain.Ticket{
-				ID:         1,
-				Title:      "Billing issue",
-				Description:"Need help",
-				CustomerID: 10,
-				Status:     "open",
-				Priority:   "high",
-				Category:   "billing",
-				Source:     "web",
-				CreatedAt:  now,
-				UpdatedAt:  now,
+				ID:          1,
+				Title:       "Billing issue",
+				Description: "Need help",
+				CustomerID:  10,
+				Status:      "open",
+				Priority:    "high",
+				Category:    "billing",
+				Source:      "web",
+				CreatedAt:   now,
+				UpdatedAt:   now,
 			},
 		},
 	})
@@ -86,5 +97,26 @@ func TestQueryServiceListTickets(t *testing.T) {
 	}
 	if got.Total != 1 || len(got.Items) != 1 {
 		t.Fatalf("unexpected list result: %+v", got)
+	}
+}
+
+func TestQueryServiceGetTicketStats(t *testing.T) {
+	svc := NewQueryService(stubQueryRepo{
+		stats: &TicketStatsDTO{
+			Total:        3,
+			TodayCreated: 1,
+			Pending:      2,
+			Resolved:     1,
+			ByStatus:     []StatusCountDTO{{Status: "open", Count: 2}},
+			ByPriority:   []PriorityCountDTO{{Priority: "high", Count: 1}},
+		},
+	})
+
+	got, err := svc.GetTicketStats(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got.Total != 3 || got.Pending != 2 || len(got.ByStatus) != 1 || len(got.ByPriority) != 1 {
+		t.Fatalf("unexpected stats result: %+v", got)
 	}
 }

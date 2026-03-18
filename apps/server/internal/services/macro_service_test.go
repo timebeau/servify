@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package services
 
 import (
@@ -78,7 +81,7 @@ func TestMacroService_Create(t *testing.T) {
 			name: "with language",
 			req: &MacroCreateRequest{
 				Name:     "英文宏",
-				Content: "Hello",
+				Content:  "Hello",
 				Language: "en",
 			},
 			wantErr: false,
@@ -87,7 +90,7 @@ func TestMacroService_Create(t *testing.T) {
 			name: "empty language defaults to zh",
 			req: &MacroCreateRequest{
 				Name:     "默认语言",
-				Content: "内容",
+				Content:  "内容",
 				Language: "",
 			},
 			wantErr: false,

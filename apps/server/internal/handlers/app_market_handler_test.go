@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package handlers
 
 import (
@@ -64,9 +67,9 @@ func TestAppMarketHandler_CreateIntegration_Success(t *testing.T) {
 	router.POST("/apps/integrations", handler.CreateIntegration)
 
 	payload := map[string]interface{}{
-		"name":        "slack",
-		"category":    "communication",
-		"iframe_url":  "https://example.com/app",
+		"name":       "slack",
+		"category":   "communication",
+		"iframe_url": "https://example.com/app",
 	}
 	body, _ := json.Marshal(payload)
 

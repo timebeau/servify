@@ -41,6 +41,12 @@ type CustomFieldClause struct {
 	Value interface{}
 }
 
+type CustomFieldMutation struct {
+	ClearAll       bool
+	DeleteFieldIDs []uint
+	Upserts        []domain.CustomFieldValue
+}
+
 type CustomFieldValidator struct{}
 
 func NewCustomFieldValidator() CustomFieldValidator {

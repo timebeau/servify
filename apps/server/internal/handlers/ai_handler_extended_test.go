@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package handlers
 
 import (
@@ -61,4 +64,3 @@ func TestAgentHandler_CreateAgent_BadRequest(t *testing.T) {
 		})
 	}
 }
-

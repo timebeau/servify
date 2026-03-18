@@ -45,6 +45,25 @@ type ListTicketsResultDTO struct {
 	Total int64       `json:"total"`
 }
 
+type TicketStatsDTO struct {
+	Total        int64              `json:"total"`
+	TodayCreated int64              `json:"today_created"`
+	Pending      int64              `json:"pending"`
+	Resolved     int64              `json:"resolved"`
+	ByStatus     []StatusCountDTO   `json:"by_status"`
+	ByPriority   []PriorityCountDTO `json:"by_priority"`
+}
+
+type StatusCountDTO struct {
+	Status string `json:"status"`
+	Count  int64  `json:"count"`
+}
+
+type PriorityCountDTO struct {
+	Priority string `json:"priority"`
+	Count    int64  `json:"count"`
+}
+
 func MapTicket(ticket domain.Ticket) TicketDTO {
 	return TicketDTO{
 		ID:         ticket.ID,

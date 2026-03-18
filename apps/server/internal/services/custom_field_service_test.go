@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package services
 
 import (
@@ -116,8 +119,8 @@ func TestCustomFieldService_Create(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "nil request",
-			req:  nil,
+			name:    "nil request",
+			req:     nil,
 			wantErr: true,
 		},
 		{
@@ -273,9 +276,9 @@ func TestCustomFieldService_Update(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "nil request",
-			id:   field.ID,
-			req:  nil,
+			name:    "nil request",
+			id:      field.ID,
+			req:     nil,
 			wantErr: true,
 		},
 		{

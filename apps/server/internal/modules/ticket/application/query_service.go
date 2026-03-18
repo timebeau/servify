@@ -40,3 +40,7 @@ func (s *QueryService) ListTickets(ctx context.Context, query ListTicketsQuery) 
 		Total: total,
 	}, nil
 }
+
+func (s *QueryService) GetTicketStats(ctx context.Context, agentID *uint) (*TicketStatsDTO, error) {
+	return s.repo.GetTicketStats(ctx, agentID)
+}

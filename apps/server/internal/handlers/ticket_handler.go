@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/csv"
 	"fmt"
 	"net/http"
@@ -9,20 +10,34 @@ import (
 	"strings"
 	"time"
 
-	"servify/apps/server/internal/services"
+	"servify/apps/server/internal/models"
+	ticketcontract "servify/apps/server/internal/modules/ticket/contract"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
 
+type ticketHandlerService interface {
+	CreateTicket(ctx context.Context, req *ticketcontract.CreateTicketRequest) (*models.Ticket, error)
+	GetTicketByID(ctx context.Context, ticketID uint) (*models.Ticket, error)
+	UpdateTicket(ctx context.Context, ticketID uint, req *ticketcontract.UpdateTicketRequest, userID uint) (*models.Ticket, error)
+	ListTickets(ctx context.Context, req *ticketcontract.ListTicketRequest) ([]models.Ticket, int64, error)
+	ListTicketCustomFields(ctx context.Context, activeOnly bool) ([]models.CustomField, error)
+	AssignTicket(ctx context.Context, ticketID uint, agentID uint, assignerID uint) error
+	AddComment(ctx context.Context, ticketID uint, userID uint, content string, commentType string) (*models.TicketComment, error)
+	CloseTicket(ctx context.Context, ticketID uint, userID uint, reason string) error
+	GetTicketStats(ctx context.Context, agentID *uint) (*ticketcontract.TicketStats, error)
+	BulkUpdateTickets(ctx context.Context, req *ticketcontract.BulkUpdateTicketRequest, userID uint) (*ticketcontract.BulkUpdateResult, error)
+}
+
 // TicketHandler 工单处理器
 type TicketHandler struct {
-	ticketService *services.TicketService
+	ticketService ticketHandlerService
 	logger        *logrus.Logger
 }
 
 // NewTicketHandler 创建工单处理器
-func NewTicketHandler(ticketService *services.TicketService, logger *logrus.Logger) *TicketHandler {
+func NewTicketHandler(ticketService ticketHandlerService, logger *logrus.Logger) *TicketHandler {
 	return &TicketHandler{
 		ticketService: ticketService,
 		logger:        logger,
@@ -35,13 +50,13 @@ func NewTicketHandler(ticketService *services.TicketService, logger *logrus.Logg
 // @Tags 工单
 // @Accept json
 // @Produce json
-// @Param ticket body services.TicketCreateRequest true "工单信息"
+// @Param ticket body contract.CreateTicketRequest true "工单信息"
 // @Success 201 {object} models.Ticket
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
 // @Router /api/tickets [post]
 func (h *TicketHandler) CreateTicket(c *gin.Context) {
-	var req services.TicketCreateRequest
+	var req ticketcontract.CreateTicketRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "Invalid request body",
@@ -105,7 +120,7 @@ func (h *TicketHandler) GetTicket(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "工单ID"
-// @Param ticket body services.TicketUpdateRequest true "更新信息"
+// @Param ticket body contract.UpdateTicketRequest true "更新信息"
 // @Success 200 {object} models.Ticket
 // @Failure 400 {object} ErrorResponse
 // @Failure 404 {object} ErrorResponse
@@ -122,7 +137,7 @@ func (h *TicketHandler) UpdateTicket(c *gin.Context) {
 		return
 	}
 
-	var req services.TicketUpdateRequest
+	var req ticketcontract.UpdateTicketRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "Invalid request body",
@@ -171,7 +186,7 @@ func (h *TicketHandler) UpdateTicket(c *gin.Context) {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/tickets [get]
 func (h *TicketHandler) ListTickets(c *gin.Context) {
-	var req services.TicketListRequest
+	var req ticketcontract.ListTicketRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "Invalid query parameters",
@@ -212,7 +227,7 @@ func (h *TicketHandler) ListTickets(c *gin.Context) {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/tickets/export [get]
 func (h *TicketHandler) ExportTicketsCSV(c *gin.Context) {
-	var req services.TicketListRequest
+	var req ticketcontract.ListTicketRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid query parameters", Message: err.Error()})
 		return
@@ -480,7 +495,7 @@ func (h *TicketHandler) CloseTicket(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param agent_id query int false "客服ID，用于获取特定客服的统计"
-// @Success 200 {object} services.TicketStats
+// @Success 200 {object} contract.TicketStats
 // @Failure 500 {object} ErrorResponse
 // @Router /api/tickets/stats [get]
 func (h *TicketHandler) GetTicketStats(c *gin.Context) {
@@ -511,13 +526,13 @@ func (h *TicketHandler) GetTicketStats(c *gin.Context) {
 // @Tags 工单
 // @Accept json
 // @Produce json
-// @Param payload body services.TicketBulkUpdateRequest true "批量更新请求"
-// @Success 200 {object} services.TicketBulkUpdateResult
+// @Param payload body contract.BulkUpdateTicketRequest true "批量更新请求"
+// @Success 200 {object} contract.BulkUpdateResult
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
 // @Router /api/tickets/bulk [post]
 func (h *TicketHandler) BulkUpdateTickets(c *gin.Context) {
-	var req services.TicketBulkUpdateRequest
+	var req ticketcontract.BulkUpdateTicketRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "Invalid request body",

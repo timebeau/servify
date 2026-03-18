@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package services
 
 import (
@@ -104,9 +107,9 @@ func TestSuggestionService_Suggest_CustomLimits(t *testing.T) {
 	svc := NewSuggestionService(db)
 
 	req := &SuggestionRequest{
-		Query:             "test",
-		TicketLimit:       10,
-		KnowledgeDocLimit: 15,
+		Query:              "test",
+		TicketLimit:        10,
+		KnowledgeDocLimit:  15,
 		CandidateTicketMax: 500,
 	}
 
@@ -191,10 +194,10 @@ func TestExtractTokens(t *testing.T) {
 
 func TestClassifyIntent(t *testing.T) {
 	tests := []struct {
-		name             string
-		query            string
-		expectedLabel    string
-		minConfidence    float64
+		name          string
+		query         string
+		expectedLabel string
+		minConfidence float64
 	}{
 		{
 			name:          "empty query",
