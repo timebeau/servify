@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./icon.png" width="120" alt="Servify Logo">
+</p>
+
 # Servify
 
 Servify 是一个面向客服、工单、AI 协同和实时会话的服务平台。

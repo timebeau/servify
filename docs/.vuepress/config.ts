@@ -8,6 +8,7 @@ export default defineUserConfig({
   description: 'Servify architecture, implementation backlogs, and integration guides',
   bundler: viteBundler(),
   theme: defaultTheme({
+    logo: '/icon.png',
     navbar: [
       { text: '文档首页', link: '/' },
       { text: '实施计划', link: '/implementation/' },
