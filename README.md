@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./icon.png" width="120" alt="Servify Logo">
+  <img src="./docs/public/icon.png" width="120" alt="Servify Logo">
 </p>
 
 # Servify

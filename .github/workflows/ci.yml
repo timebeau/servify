@@ -132,14 +132,14 @@ jobs:
       - name: Lint SDK
         run: npm -C sdk run lint
 
+      - name: Build SDK
+        run: npm -C sdk run build
+
       - name: Typecheck SDK
         run: npm -C sdk run typecheck
 
       - name: Test SDK
         run: npm -C sdk run test
-
-      - name: Build SDK
-        run: npm -C sdk run build
 
       - name: Sync SDK to demo
         run: |
