@@ -51,6 +51,34 @@ func (r *InMemoryRepository) AnswerCall(ctx context.Context, cmd voiceapp.Answer
 	return call, nil
 }
 
+func (r *InMemoryRepository) HoldCall(ctx context.Context, cmd voiceapp.HoldCallCommand) (*voiceapp.CallDTO, error) {
+	_ = ctx
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	call, ok := r.calls[cmd.CallID]
+	if !ok {
+		return nil, fmt.Errorf("call not found")
+	}
+	now := time.Now()
+	call.Status = "held"
+	call.HeldAt = &now
+	return call, nil
+}
+
+func (r *InMemoryRepository) ResumeCall(ctx context.Context, cmd voiceapp.ResumeCallCommand) (*voiceapp.CallDTO, error) {
+	_ = ctx
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	call, ok := r.calls[cmd.CallID]
+	if !ok {
+		return nil, fmt.Errorf("call not found")
+	}
+	now := time.Now()
+	call.Status = "answered"
+	call.ResumedAt = &now
+	return call, nil
+}
+
 func (r *InMemoryRepository) EndCall(ctx context.Context, cmd voiceapp.EndCallCommand) (*voiceapp.CallDTO, error) {
 	_ = ctx
 	r.mu.Lock()
@@ -73,5 +101,7 @@ func (r *InMemoryRepository) TransferCall(ctx context.Context, cmd voiceapp.Tran
 	if !ok {
 		return nil, fmt.Errorf("call not found")
 	}
+	call.Status = "transferred"
+	call.TransferToAgent = &cmd.ToAgentID
 	return call, nil
 }

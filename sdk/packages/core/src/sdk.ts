@@ -1,6 +1,9 @@
 import EventEmitter from 'eventemitter3';
 import { ApiClient } from './api';
 import { WebSocketManager } from './websocket';
+import { createWebCapabilitySet } from './bindings/web';
+import type { ClientSession, SessionIdentity } from './contracts/client-session';
+import type { CapabilitySet } from './contracts/capability';
 import {
   ServifyConfig,
   ServifyEventMap,
@@ -9,12 +12,10 @@ import {
   ChatSession,
   Message,
   Ticket,
-  CustomerSatisfaction,
-  WebRTCConfig,
-  WebRTCCall
+  CustomerSatisfaction
 } from './types';
 
-export class ServifySDK extends EventEmitter<ServifyEventMap> {
+export class ServifySDK extends EventEmitter<ServifyEventMap> implements ClientSession<Record<string, unknown>, ServifyEventMap> {
   private config: ServifyConfig;
   private api: ApiClient;
   private ws: WebSocketManager | null = null;
@@ -23,9 +24,24 @@ export class ServifySDK extends EventEmitter<ServifyEventMap> {
   private currentAgent: Agent | null = null;
   private messageQueue: Message[] = [];
   private isInitialized = false;
+  readonly id: string;
+  readonly capabilities: CapabilitySet;
+  readonly events = this;
+  readonly authProvider = undefined;
+  readonly transport = {
+    get kind() { return 'session'; },
+    get state() { return 'idle' as const; },
+    connect: async () => undefined,
+    disconnect: async () => undefined,
+    send: async () => undefined,
+    isConnected: () => false,
+    subscribe: () => () => undefined,
+  };
 
   constructor(config: ServifyConfig) {
     super();
+    this.id = config.sessionId || `web-${Date.now()}`;
+    this.capabilities = createWebCapabilitySet();
 
     this.config = {
       autoConnect: true,
@@ -308,6 +324,28 @@ export class ServifySDK extends EventEmitter<ServifyEventMap> {
   // 获取当前客服代理
   getAgent(): Agent | null {
     return this.currentAgent;
+  }
+
+  getIdentity(): SessionIdentity {
+    return {
+      customerId: this.currentCustomer?.id?.toString(),
+      conversationId: this.currentSession?.id?.toString(),
+      agentId: this.currentAgent?.id?.toString(),
+    };
+  }
+
+  getState(): Record<string, unknown> {
+    return {
+      initialized: this.isInitialized,
+      connected: this.isConnected(),
+      customer: this.currentCustomer,
+      session: this.currentSession,
+      agent: this.currentAgent,
+    };
+  }
+
+  updateState(patch: Partial<Record<string, unknown>>): Record<string, unknown> {
+    return { ...this.getState(), ...patch };
   }
 
   // 检查连接状态

@@ -199,13 +199,32 @@
 - [x] 定义 `VoiceParticipant`
 - [x] 定义 `Recording`
 - [x] 定义 `Transcript`
+- [x] 抽象 `RecordingProvider`
+- [x] 抽象 `TranscriptProvider`
 - [x] 实现 StartCall
 - [x] 实现 AnswerCall
+- [x] 实现 HoldCall
+- [x] 实现 ResumeCall
 - [x] 实现 EndCall
 - [x] 实现 TransferCall
 - [x] 发布 `call.started`
+- [x] 发布 `call.held`
+- [x] 发布 `call.resumed`
+- [x] 发布 `call.transferred`
 - [x] 发布 `call.ended`
+- [x] 实现 StartRecording
+- [x] 实现 StopRecording
+- [x] 实现 AppendTranscript
+- [x] 发布 `recording.started`
+- [x] 发布 `recording.stopped`
+- [x] 发布 `transcript.appended`
+- [x] 组装 `VoiceCoordinator`
+- [x] 接入 runtime / WebRTC lifecycle
 
 验收：
 
 - voice 模块作为 SIP 的业务落点
+- `voice` 不直接绑定单一协议；signaling 走 `voiceprotocol.CallSignalingAdapter`，media 走 `voiceprotocol.MediaSessionAdapter`
+- 录音与转写通过 provider 接口预留，不与单一厂商绑定
+- 录音与转写已经形成正式 application use case，而不只是接口声明
+- runtime 已通过 `VoiceCoordinator` 把 WebRTC 生命周期接入 voice 模块

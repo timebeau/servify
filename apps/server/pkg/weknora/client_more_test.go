@@ -205,7 +205,7 @@ func TestCreateKnowledgeBase_WithConfig(t *testing.T) {
 		Name:        "Test KB",
 		Description: "Test knowledge base",
 		Config: KBConfig{
-			ChunkSize: 500,
+			ChunkSize:    500,
 			ChunkOverlap: 50,
 		},
 	})

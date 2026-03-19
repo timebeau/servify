@@ -312,25 +312,23 @@ docker cp servify_weknora:/app/data ./backup/weknora_data
 - [WeKnora Issues](https://github.com/Tencent/WeKnora/issues)
 - [PostgreSQL 中文社区](https://www.postgresql.org/community/)
 
-## 🎯 下一步计划
+## 🎯 当前状态与后续方向
 
-### v1.1.1 - 基础集成（本次完成）
-- [x] WeKnora 基础集成
-- [x] HTTP API 客户端
-- [x] 降级机制
-- [x] 基础监控
+当前仓库里的 WeKnora 集成已经完成了角色调整：
 
-### v1.1.2 - 功能增强（下一步）
-- [ ] 文件上传接口
-- [ ] 批量文档处理
-- [ ] 高级搜索策略
-- [ ] 缓存优化
+- WeKnora 不再作为系统内核能力存在，而是 `KnowledgeProvider` 的一个实现
+- AI 主流程已经迁移到 `QueryOrchestrator`，只依赖统一检索抽象
+- 标准模式和增强模式都可以在不改 handler 协议的前提下切换到编排式实现
+- 后续如果切换到其他知识库，只需要新增 provider adapter，不需要重写 AI 主流程
 
-### v1.1.3 - 生产就绪（后续）
-- [ ] 详细监控指标
-- [ ] 自动故障恢复
-- [ ] 性能调优
-- [ ] 安全加固
+更细的实施任务已经迁移到 `docs/implementation/02-ai-and-knowledge.md` 与 `docs/implementation/04-sdk-and-channel-adapters.md`，当前两份 backlog 都已清零。
+
+后续增量工作不再单独挂在 WeKnora 文档里，而是归到下面几个长期方向：
+
+1. 新增更多 `KnowledgeProvider` 实现，例如 pgvector、Milvus、Elasticsearch 或自研检索服务
+2. 补齐文档上传、批量索引、重建索引等管理能力的统一接口
+3. 把监控、缓存、故障恢复、安全策略沉到平台层，而不是绑定到某一个知识库实现
+4. 让 Web/API/App SDK 统一消费稳定的 AI/knowledge contract，而不是感知具体 provider
 
 ## 💬 支持和反馈
 
@@ -342,4 +340,4 @@ docker cp servify_weknora:/app/data ./backup/weknora_data
 
 ---
 
-**🎉 恭喜！WeKnora 集成计划已全部完成，现在可以享受企业级智能知识库的强大功能了！**
+当前结论：WeKnora 可以继续作为默认适配器使用，但系统架构已经不再依赖它，后续可以按成本、维护性和能力边界自由替换。

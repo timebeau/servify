@@ -21,6 +21,14 @@
 
 - [04-sdk-and-channel-adapters.md](./04-sdk-and-channel-adapters.md)
   - sdk core、web sdk、future api/app sdk 预留、channel adapters、SIP adapter
+- [05-engineering-hardening.md](./05-engineering-hardening.md)
+  - CI、测试金字塔、版本发布、文档站点
+- [06-voice-and-protocol-expansion.md](./06-voice-and-protocol-expansion.md)
+  - voice 协议入口深化、provider 落地、更多常见语音协议预留
+- [07-sdk-multi-surface.md](./07-sdk-multi-surface.md)
+  - web sdk 收口、future api/app sdk contract 深化、transport 演进
+- [08-ai-provider-expansion.md](./08-ai-provider-expansion.md)
+  - LLM/knowledge provider 扩展、编排层稳定性、AI 可观测性
 
 状态约定：
 
@@ -34,3 +42,4 @@
 2. 再做 `02-ai-and-knowledge`
 3. 再拆 `03-business-modules`
 4. 并行规划 `04-sdk-and-channel-adapters`，但当前只实现 web sdk
+5. 第一阶段清零后，进入 `05` 到 `08` 的工程化与扩展阶段

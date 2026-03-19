@@ -2,9 +2,12 @@
 export { ServifySDK } from './sdk';
 export { ApiClient } from './api';
 export { WebSocketManager } from './websocket';
+export { HttpTransport } from './transports/http';
 
 // 导出所有类型
 export * from './types';
+export * from './contracts';
+export * from './bindings';
 
 // 导出默认实例创建函数
 import { ServifySDK } from './sdk';

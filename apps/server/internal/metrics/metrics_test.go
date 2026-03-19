@@ -147,7 +147,7 @@ func TestIncRateLimitDrop_MultiplePrefixes(t *testing.T) {
 	expectedCounts := make(map[string]uint64)
 
 	for i, prefix := range prefixes {
-		count := uint64(i + 1) * 10
+		count := uint64(i+1) * 10
 		expectedCounts[prefix] = count
 
 		for j := uint64(0); j < count; j++ {

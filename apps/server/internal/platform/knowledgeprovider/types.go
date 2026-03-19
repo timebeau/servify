@@ -2,11 +2,11 @@ package knowledgeprovider
 
 // SearchRequest is the shared input model for retrieval providers.
 type SearchRequest struct {
-	Query      string  `json:"query"`
-	KnowledgeID string `json:"knowledge_id,omitempty"`
-	TopK       int     `json:"top_k,omitempty"`
-	Threshold  float64 `json:"threshold,omitempty"`
-	Strategy   string  `json:"strategy,omitempty"`
+	Query       string  `json:"query"`
+	KnowledgeID string  `json:"knowledge_id,omitempty"`
+	TopK        int     `json:"top_k,omitempty"`
+	Threshold   float64 `json:"threshold,omitempty"`
+	Strategy    string  `json:"strategy,omitempty"`
 }
 
 // KnowledgeHit is the shared output model for retrieval providers.

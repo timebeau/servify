@@ -140,7 +140,7 @@ flowchart TB
 
 ## SIP 与语音扩展
 
-当前还没有完整实现 SIP，但架构上已经明确预留。
+当前还没有完整实现全套语音协议栈，但架构上已经明确预留 `signaling + media` 两层扩展。
 
 ```mermaid
 flowchart LR
@@ -155,7 +155,14 @@ flowchart LR
 这意味着：
 
 - SIP 不会变成聊天模块里的特殊分支
+- SIP-WS、PSTN provider webhook 等未来也应走同一 signaling adapter 边界
+- runtime 已内置 `voiceprotocol.Registry`，统一注册 SIP、SIP-WS、PSTN provider 和 WebRTC media adapter
+- HTTP 已暴露统一协议入口：`/api/voice/protocols/:protocol/call-events/:event` 与 `/api/voice/protocols/:protocol/media-events/:event`
 - 语音会先进入 `voice` 业务模型
+- WebRTC、RTP/SRTP、录音、转写等媒体能力会走独立 media adapter
+- 录音和转写也应走 provider 抽象，而不是把第三方云厂商 SDK 直接写进 `voice` service
+- 当前录音/转写已形成独立应用层用例，后续只需要替换 provider
+- 当前 runtime 已通过 `VoiceCoordinator` 将 WebRTC 生命周期挂入 `voice` 模块
 - `voice` 再与 `routing`、`agent`、`conversation` 协同
 - 后续支持呼叫转接、录音、转写、语音质检时，边界仍然清晰
 
@@ -182,6 +189,8 @@ make migrate DB_HOST=localhost DB_PORT=5432 DB_USER=postgres DB_PASSWORD=passwor
 - 健康检查：`GET /health`
 - WebSocket：`GET /api/v1/ws?session_id=...`
 - AI 查询：`POST /api/v1/ai/query`
+- 语音协议列表：`GET /api/voice/protocols`
+- 语音协议信令事件：`POST /api/voice/protocols/:protocol/call-events/:event`
 - 管理后台：`/admin/`
 - 知识库 Portal：`/kb.html`
 
@@ -221,20 +230,30 @@ Jaeger 默认地址：`http://localhost:16686`
 - [docs/implementation/02-ai-and-knowledge.md](./docs/implementation/02-ai-and-knowledge.md)
 - [docs/implementation/03-business-modules.md](./docs/implementation/03-business-modules.md)
 - [docs/implementation/04-sdk-and-channel-adapters.md](./docs/implementation/04-sdk-and-channel-adapters.md)
+- [docs/implementation/05-engineering-hardening.md](./docs/implementation/05-engineering-hardening.md)
+- [docs/implementation/06-voice-and-protocol-expansion.md](./docs/implementation/06-voice-and-protocol-expansion.md)
+- [docs/implementation/07-sdk-multi-surface.md](./docs/implementation/07-sdk-multi-surface.md)
+- [docs/implementation/08-ai-provider-expansion.md](./docs/implementation/08-ai-provider-expansion.md)
 
 ## 当前实施进度
 
-按 `docs/implementation/03-business-modules.md` 当前状态：
+- `docs/implementation/01-platform-and-runtime.md`：已清零
+- `docs/implementation/02-ai-and-knowledge.md`：已清零
+- `docs/implementation/03-business-modules.md`：已清零
+- `docs/implementation/04-sdk-and-channel-adapters.md`：已清零
+- `docs/implementation/05-engineering-hardening.md`：第二阶段未开始
+- `docs/implementation/06-voice-and-protocol-expansion.md`：第二阶段未开始
+- `docs/implementation/07-sdk-multi-surface.md`：第二阶段未开始
+- `docs/implementation/08-ai-provider-expansion.md`：第二阶段未开始
 
-- 已完成：`ticket` 42 项、`conversation` 19 项、`routing` 19 项、`agent` 13 项、`customer` 13 项、`automation` 12 项、`analytics` 11 项、`voice` 15 项
-- 待完成：业务模块拆分主 backlog 已清零
-- 当前业务模块累计：已完成 144 项，待完成 0 项
+当前代码状态说明：
 
-说明：
-
-- `conversation`、`routing` 已经进入运行时路径，不再只是目录占位
-- `ticket` 已基本完成从旧超大 service 向模块壳收敛
-- 下一阶段建议转向 `platform/runtime` 和 `sdk/channel adapters` 两条 backlog，把入口装配、auth extraction、SIP adapter 和 SDK contract 继续收口
+- 服务端已从“大 service 直连 handler”收敛到模块化单体结构
+- AI 已统一到 `QueryOrchestrator + LLMProvider + KnowledgeProvider`
+- WeKnora 已降级为 `KnowledgeProvider` 适配器，不再是内核依赖
+- Web SDK 已按 `core + transport + binding` 方向收口
+- API/App SDK 当前只预留 contract 和目录，不做伪实现
+- SIP/渠道接入已建立平台层骨架，后续在 `voice` 模块上继续补业务语义
 
 ## CI 与文档发布
 
@@ -244,11 +263,9 @@ Jaeger 默认地址：`http://localhost:16686`
 
 ## 现阶段结论
 
-如果只看当前代码状态，Servify 已经不再适合继续按“一个大 service 加功能”的方式演进。
+第一阶段主 backlog 已全部实现，当前进入第二阶段：
 
-更合理的推进方式是：
-
-1. 继续完成 `agent`、`customer`、`automation`、`analytics`、`voice`
-2. 把平台层剩余的 `bootstrap`、`router assembly`、`auth extraction` 补齐
-3. 将 SDK 按 `core + transport + web bindings + future api/app reservation` 继续收口
-4. 让 SIP 和未来多渠道统一走 adapter，而不是侵入业务核心
+1. `05-engineering-hardening`：补齐 CI、测试金字塔、版本发布、文档站点交付
+2. `06-voice-and-protocol-expansion`：补齐 voice 协议入口端到端、provider 与媒体拓扑预留
+3. `07-sdk-multi-surface`：完善 Web SDK，并继续细化 future API/App SDK contract
+4. `08-ai-provider-expansion`：补齐多 provider 矩阵、fallback、可观测性与策略控制

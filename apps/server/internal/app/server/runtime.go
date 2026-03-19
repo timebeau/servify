@@ -15,7 +15,11 @@ import (
 	voicedelivery "servify/apps/server/internal/modules/voice/delivery"
 	voiceinfra "servify/apps/server/internal/modules/voice/infra"
 	"servify/apps/server/internal/platform/eventbus"
+	"servify/apps/server/internal/platform/pstnprovider"
 	realtimeplatform "servify/apps/server/internal/platform/realtime"
+	"servify/apps/server/internal/platform/sip"
+	"servify/apps/server/internal/platform/sipws"
+	"servify/apps/server/internal/platform/voiceprotocol"
 	"servify/apps/server/internal/services"
 
 	"github.com/sirupsen/logrus"
@@ -34,6 +38,8 @@ type Runtime struct {
 	RealtimeGateway       realtimeplatform.RealtimeGateway
 	RTCGateway            realtimeplatform.RTCGateway
 	MessageRouter         *services.MessageRouter
+	VoiceCoordinator      *voicedelivery.Coordinator
+	VoiceProtocolRegistry *voiceprotocol.Registry
 	CustomerService       *services.CustomerService
 	AgentService          *services.AgentService
 	TicketHandlerService  *ticketdelivery.HandlerServiceAdapter
@@ -86,7 +92,24 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	rt.WSHub.SetAIService(rt.AIService)
 
 	voiceService := voiceapp.NewService(voiceinfra.NewInMemoryRepository(), bus)
-	webrtcService.SetVoiceLifecycle(voicedelivery.NewWebRTCAdapter(voiceService))
+	mediaProvider := voiceinfra.NewInMemoryMediaProvider()
+	recordingService := voiceapp.NewRecordingService(
+		mediaProvider,
+		voiceinfra.NewInMemoryRecordingRepository(),
+		bus,
+	)
+	transcriptService := voiceapp.NewTranscriptService(
+		mediaProvider,
+		voiceinfra.NewInMemoryTranscriptRepository(),
+		bus,
+	)
+	rt.VoiceCoordinator = voicedelivery.NewCoordinator(voiceService, recordingService, transcriptService)
+	webrtcService.SetVoiceLifecycle(rt.VoiceCoordinator)
+	rt.VoiceProtocolRegistry = voiceprotocol.NewRegistry()
+	_ = rt.VoiceProtocolRegistry.RegisterSignaling(sip.NewVoiceProtocolAdapter())
+	_ = rt.VoiceProtocolRegistry.RegisterSignaling(sipws.NewAdapter())
+	_ = rt.VoiceProtocolRegistry.RegisterSignaling(pstnprovider.NewAdapter())
+	_ = rt.VoiceProtocolRegistry.RegisterMedia(voicedelivery.NewWebRTCAdapter(voiceService))
 
 	rt.SLAService = services.NewSLAService(db, logger)
 	rt.AutomationService = services.NewAutomationService(db, logger)
@@ -145,6 +168,8 @@ func (rt *Runtime) RouterDependencies() Dependencies {
 		RealtimeGateway:       rt.RealtimeGateway,
 		RTCGateway:            rt.RTCGateway,
 		MessageRouter:         rt.MessageRouter,
+		VoiceCoordinator:      rt.VoiceCoordinator,
+		VoiceProtocolRegistry: rt.VoiceProtocolRegistry,
 		CustomerService:       rt.CustomerService,
 		AgentService:          rt.AgentService,
 		TicketHandlerService:  rt.TicketHandlerService,

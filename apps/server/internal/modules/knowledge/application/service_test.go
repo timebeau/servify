@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"servify/apps/server/internal/modules/knowledge/domain"
-	mockkp "servify/apps/server/internal/platform/knowledgeprovider/mock"
 	"servify/apps/server/internal/platform/knowledgeprovider"
+	mockkp "servify/apps/server/internal/platform/knowledgeprovider/mock"
 )
 
 type memDocRepo struct {

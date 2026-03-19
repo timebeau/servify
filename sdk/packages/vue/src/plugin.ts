@@ -1,12 +1,12 @@
-import { App, inject, InjectionKey, ref, reactive, onUnmounted } from 'vue';
-import { ServifySDK, ServifyConfig } from '@servify/core';
+import { App, inject, InjectionKey, ref, onUnmounted } from 'vue';
+import { createWebServifySDK, type WebServifyClient, type WebServifyConfig } from '@servify/core';
 
 // Vue 3 的注入键
-const ServifyKey: InjectionKey<ServifySDK> = Symbol('servify');
+const ServifyKey: InjectionKey<WebServifyClient> = Symbol('servify');
 
 // 插件选项
 export interface ServifyPluginOptions {
-  config: ServifyConfig;
+  config: WebServifyConfig;
   onInitialized?: () => void;
   onError?: (error: Error) => void;
 }
@@ -14,7 +14,7 @@ export interface ServifyPluginOptions {
 // Vue 插件
 export const ServifyPlugin = {
   install(app: App, options: ServifyPluginOptions) {
-    const sdk = new ServifySDK(options.config);
+    const sdk = createWebServifySDK(options.config);
 
     // 初始化 SDK
     sdk.initialize()
@@ -35,7 +35,7 @@ export const ServifyPlugin = {
 };
 
 // 获取 SDK 实例的组合式 API
-export function useServify(): ServifySDK {
+export function useServify(): WebServifyClient {
   const sdk = inject(ServifyKey);
   if (!sdk) {
     throw new Error('Servify SDK not found. Make sure to install the ServifyPlugin.');

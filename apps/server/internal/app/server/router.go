@@ -5,7 +5,9 @@ import (
 	"servify/apps/server/internal/handlers"
 	"servify/apps/server/internal/middleware"
 	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
+	voicedelivery "servify/apps/server/internal/modules/voice/delivery"
 	realtimeplatform "servify/apps/server/internal/platform/realtime"
+	"servify/apps/server/internal/platform/voiceprotocol"
 	"servify/apps/server/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -22,6 +24,8 @@ type Dependencies struct {
 	RealtimeGateway       realtimeplatform.RealtimeGateway
 	RTCGateway            realtimeplatform.RTCGateway
 	MessageRouter         *services.MessageRouter
+	VoiceCoordinator      *voicedelivery.Coordinator
+	VoiceProtocolRegistry *voiceprotocol.Registry
 	CustomerService       *services.CustomerService
 	AgentService          *services.AgentService
 	TicketHandlerService  *ticketdelivery.HandlerServiceAdapter
@@ -120,6 +124,10 @@ func registerManagementRoutes(r *gin.Engine, deps Dependencies) {
 	gamificationAPI := api.Group("/")
 	gamificationAPI.Use(middleware.RequireResourcePermission("gamification"))
 	handlers.RegisterGamificationRoutes(gamificationAPI, handlers.NewGamificationHandler(deps.GamificationService))
+
+	voiceAPI := api.Group("/")
+	voiceAPI.Use(middleware.RequireResourcePermission("assist"))
+	handlers.RegisterVoiceRoutes(voiceAPI, handlers.NewVoiceHandler(deps.VoiceCoordinator, deps.VoiceProtocolRegistry))
 }
 
 func registerPublicRoutes(r *gin.Engine, deps Dependencies) {

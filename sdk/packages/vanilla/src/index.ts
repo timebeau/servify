@@ -1,14 +1,22 @@
-import { ServifySDK, ServifyConfig, Message, Customer, ChatSession, Agent } from '@servify/core';
+import {
+  createWebServifySDK,
+  type WebServifyClient,
+  type WebServifyConfig,
+  type Message,
+  type Customer,
+  type ChatSession,
+  type Agent,
+} from '@servify/core';
 
 /**
  * 为原生 JavaScript 提供更简单的 API 接口
  */
 export class VanillaServifySDK {
-  private sdk: ServifySDK;
-  private eventCallbacks: Map<string, Function[]> = new Map();
+  private sdk: WebServifyClient;
+  private eventCallbacks: Map<string, Array<(...args: unknown[]) => void>> = new Map();
 
-  constructor(config: ServifyConfig) {
-    this.sdk = new ServifySDK(config);
+  constructor(config: WebServifyConfig) {
+    this.sdk = createWebServifySDK(config);
 
     // 转发所有事件到回调函数
     this.sdk.on('connected', () => this.triggerCallback('connected'));
@@ -157,7 +165,7 @@ export class VanillaServifySDK {
   /**
    * 添加事件监听器（简化版）
    */
-  on(event: string, callback: Function): void {
+  on(event: string, callback: (...args: unknown[]) => void): void {
     if (!this.eventCallbacks.has(event)) {
       this.eventCallbacks.set(event, []);
     }
@@ -167,7 +175,7 @@ export class VanillaServifySDK {
   /**
    * 移除事件监听器
    */
-  off(event: string, callback?: Function): void {
+  off(event: string, callback?: (...args: unknown[]) => void): void {
     if (!callback) {
       this.eventCallbacks.delete(event);
       return;
@@ -203,15 +211,15 @@ export class VanillaServifySDK {
 declare global {
   interface Window {
     Servify: typeof VanillaServifySDK;
-    createServify: (config: ServifyConfig) => VanillaServifySDK;
+    createServify: (config: WebServifyConfig) => VanillaServifySDK;
   }
 }
 
 // 浏览器环境下的全局注册
 if (typeof window !== 'undefined') {
   window.Servify = VanillaServifySDK;
-  window.createServify = (config: ServifyConfig) => new VanillaServifySDK(config);
+  window.createServify = (config: WebServifyConfig) => new VanillaServifySDK(config);
 }
 
-export { ServifyConfig, Message, Customer, ChatSession, Agent } from '@servify/core';
+export type { WebServifyConfig as ServifyConfig, Message, Customer, ChatSession, Agent } from '@servify/core';
 export default VanillaServifySDK;

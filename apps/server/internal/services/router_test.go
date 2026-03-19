@@ -122,8 +122,8 @@ func TestNewMessageRouter(t *testing.T) {
 
 func TestWebSocketMessageTypes(t *testing.T) {
 	tests := []struct {
-		typeStr    string
-		isValid    bool
+		typeStr string
+		isValid bool
 	}{
 		{string(MessageTypeText), true},
 		{string(MessageTypeImage), true},
@@ -147,11 +147,11 @@ func TestWebSocketMessageTypes(t *testing.T) {
 func TestUnifiedMessage(t *testing.T) {
 	now := time.Now()
 	msg := UnifiedMessage{
-		UserID:    "user123",
+		UserID:     "user123",
 		PlatformID: "web",
-		Content:   "test message",
-		Type:      MessageTypeText,
-		Timestamp: now,
+		Content:    "test message",
+		Type:       MessageTypeText,
+		Timestamp:  now,
 	}
 
 	if msg.UserID != "user123" {
@@ -211,11 +211,11 @@ func TestMessageRouter_BroadcastMessage(t *testing.T) {
 
 	// Broadcast message should not panic
 	msg := UnifiedMessage{
-		UserID:    "test-user",
+		UserID:     "test-user",
 		PlatformID: "web",
-		Content:   "test broadcast",
-		Type:      MessageTypeText,
-		Timestamp: time.Now(),
+		Content:    "test broadcast",
+		Type:       MessageTypeText,
+		Timestamp:  time.Now(),
 	}
 	r.BroadcastMessage(msg)
 }
@@ -250,4 +250,3 @@ func (m *mockPlatformAdapter) Start() error {
 func (m *mockPlatformAdapter) Stop() error {
 	return nil
 }
-

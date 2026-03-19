@@ -20,8 +20,8 @@ type BaseEvent struct {
 	EventAggregateID string
 }
 
-func (e BaseEvent) ID() string           { return e.EventID }
-func (e BaseEvent) Name() string         { return e.EventName }
+func (e BaseEvent) ID() string            { return e.EventID }
+func (e BaseEvent) Name() string          { return e.EventName }
 func (e BaseEvent) OccurredAt() time.Time { return e.EventOccurredAt }
-func (e BaseEvent) TenantID() string     { return e.EventTenantID }
-func (e BaseEvent) AggregateID() string  { return e.EventAggregateID }
+func (e BaseEvent) TenantID() string      { return e.EventTenantID }
+func (e BaseEvent) AggregateID() string   { return e.EventAggregateID }

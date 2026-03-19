@@ -1,14 +1,11 @@
 # @servify/app-core
 
-Reserved package for future app and mobile SDK foundations.
+保留包，用于未来 App / Mobile SDK 的共享基础层。
 
-Planned use cases:
+预留场景：
 
-- mobile app session lifecycle
+- mobile app session
 - push token integration
-- offline queue and reconnect policy
+- reconnect and offline queue
 
-Status:
-
-- reserved only
-- no implementation yet
+当前不实现具体功能，只保留目录和用途约束。

@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	aimodule "servify/apps/server/internal/modules/ai/application"
 	"servify/apps/server/internal/models"
+	aimodule "servify/apps/server/internal/modules/ai/application"
 	"servify/apps/server/internal/platform/knowledgeprovider"
 	"servify/apps/server/internal/platform/llm"
 )

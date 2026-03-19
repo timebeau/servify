@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useRef, useEffect, ReactNode } from 'react';
-import { ServifySDK, ServifyConfig } from '@servify/core';
+import { createWebServifySDK, type WebServifyClient, type WebServifyConfig } from '@servify/core';
 
 interface ServifyContextType {
-  sdk: ServifySDK | null;
+  sdk: WebServifyClient | null;
   isInitialized: boolean;
   isConnected: boolean;
 }
@@ -14,7 +14,7 @@ const ServifyContext = createContext<ServifyContextType>({
 });
 
 export interface ServifyProviderProps {
-  config: ServifyConfig;
+  config: WebServifyConfig;
   children: ReactNode;
   onInitialized?: () => void;
   onError?: (error: Error) => void;
@@ -26,7 +26,7 @@ export function ServifyProvider({
   onInitialized,
   onError,
 }: ServifyProviderProps): JSX.Element {
-  const sdkRef = useRef<ServifySDK | null>(null);
+  const sdkRef = useRef<WebServifyClient | null>(null);
   const [isInitialized, setIsInitialized] = React.useState(false);
   const [isConnected, setIsConnected] = React.useState(false);
 
@@ -35,7 +35,7 @@ export function ServifyProvider({
     const initSDK = async () => {
       try {
         if (!sdkRef.current) {
-          sdkRef.current = new ServifySDK(config);
+          sdkRef.current = createWebServifySDK(config);
 
           // 设置事件监听器
           sdkRef.current.on('connected', () => setIsConnected(true));

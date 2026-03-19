@@ -10,11 +10,11 @@ import (
 
 // QueryOrchestrator coordinates retrieval and model execution.
 type QueryOrchestrator struct {
-	llmProvider       llm.LLMProvider
-	retriever         *Retriever
-	promptBuilder     *PromptBuilder
-	guardrails        *Guardrails
-	metrics           *Metrics
+	llmProvider   llm.LLMProvider
+	retriever     *Retriever
+	promptBuilder *PromptBuilder
+	guardrails    *Guardrails
+	metrics       *Metrics
 }
 
 func NewQueryOrchestrator(llmProvider llm.LLMProvider, knowledgeProvider knowledgeprovider.KnowledgeProvider) *QueryOrchestrator {

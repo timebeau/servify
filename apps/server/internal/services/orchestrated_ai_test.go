@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	mockkp "servify/apps/server/internal/platform/knowledgeprovider/mock"
 	"servify/apps/server/internal/platform/knowledgeprovider"
-	mockllm "servify/apps/server/internal/platform/llm/mock"
+	mockkp "servify/apps/server/internal/platform/knowledgeprovider/mock"
 	"servify/apps/server/internal/platform/llm"
+	mockllm "servify/apps/server/internal/platform/llm/mock"
 )
 
 func TestOrchestratedAIServiceProcessQuery(t *testing.T) {

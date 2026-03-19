@@ -1,6 +1,6 @@
-import { ref, reactive, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useServify } from './plugin';
-import { ChatSession, Message, Agent } from '@servify/core';
+import { ChatSession, Message, Agent, Ticket } from '@servify/core';
 
 export function useChat() {
   const sdk = useServify();
@@ -197,7 +197,7 @@ export function useAI() {
 // 工单相关的组合式 API
 export function useTickets() {
   const sdk = useServify();
-  const tickets = ref([]);
+  const tickets = ref<Ticket[]>([]);
   const isLoading = ref(false);
   const error = ref<Error | null>(null);
 

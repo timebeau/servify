@@ -24,6 +24,24 @@ func (s *Service) AnswerCall(ctx context.Context, cmd AnswerCallCommand) (*CallD
 	return s.repo.AnswerCall(ctx, cmd)
 }
 
+func (s *Service) HoldCall(ctx context.Context, cmd HoldCallCommand) (*CallDTO, error) {
+	call, err := s.repo.HoldCall(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+	s.publish(ctx, CallHeldEventName, call.ID, call)
+	return call, nil
+}
+
+func (s *Service) ResumeCall(ctx context.Context, cmd ResumeCallCommand) (*CallDTO, error) {
+	call, err := s.repo.ResumeCall(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+	s.publish(ctx, CallResumedEventName, call.ID, call)
+	return call, nil
+}
+
 func (s *Service) EndCall(ctx context.Context, cmd EndCallCommand) (*CallDTO, error) {
 	call, err := s.repo.EndCall(ctx, cmd)
 	if err != nil {
@@ -34,7 +52,12 @@ func (s *Service) EndCall(ctx context.Context, cmd EndCallCommand) (*CallDTO, er
 }
 
 func (s *Service) TransferCall(ctx context.Context, cmd TransferCallCommand) (*CallDTO, error) {
-	return s.repo.TransferCall(ctx, cmd)
+	call, err := s.repo.TransferCall(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+	s.publish(ctx, CallTransferredName, call.ID, call)
+	return call, nil
 }
 
 func (s *Service) publish(ctx context.Context, name, aggregateID string, payload interface{}) {

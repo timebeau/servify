@@ -47,8 +47,7 @@ export function useTickets(): UseTicketsReturn {
       throw new Error('SDK not initialized');
     }
 
-    const customer = sdk.getCustomer();
-    if (!customer) {
+    if (!sdk.getCustomer()) {
       throw new Error('Customer not found');
     }
 

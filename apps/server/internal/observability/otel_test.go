@@ -63,8 +63,8 @@ func TestSetupTracing_Enabled_DefaultValues(t *testing.T) {
 
 func TestSetupTracing_InvalidSampleRatio(t *testing.T) {
 	tests := []struct {
-		name   string
-		ratio  float64
+		name  string
+		ratio float64
 	}{
 		{"negative", -0.1},
 		{"zero", 0},
@@ -102,4 +102,3 @@ func TestSetupTracing_WithServiceName(t *testing.T) {
 		shutdown(context.Background())
 	}
 }
-

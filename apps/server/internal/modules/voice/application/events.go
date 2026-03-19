@@ -9,6 +9,9 @@ import (
 
 const (
 	CallStartedEventName = "call.started"
+	CallHeldEventName    = "call.held"
+	CallResumedEventName = "call.resumed"
+	CallTransferredName  = "call.transferred"
 	CallEndedEventName   = "call.ended"
 )
 

@@ -4,6 +4,7 @@ export { useChat, useAI, useTickets, useSatisfaction } from './composables';
 
 // 导出核心类型
 export * from '@servify/core';
+export { createWebServifySDK } from '@servify/core';
 
 // 导出类型定义
 export type { ServifyPluginOptions } from './plugin';

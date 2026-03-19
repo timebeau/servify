@@ -38,7 +38,7 @@ func TestNewClient(t *testing.T) {
 		wantNil bool
 	}{
 		{
-			name:    "with valid config",
+			name: "with valid config",
 			config: &Config{
 				BaseURL:    "http://localhost:9000",
 				APIKey:     "test-key",
@@ -111,9 +111,9 @@ func TestSearchKnowledge_Validation(t *testing.T) {
 	client := NewClient(nil, nil)
 
 	tests := []struct {
-		name        string
-		req         *SearchRequest
-		wantErrMsg  string
+		name       string
+		req        *SearchRequest
+		wantErrMsg string
 	}{
 		{
 			name: "missing knowledge base ID",
@@ -240,9 +240,9 @@ func TestChat_Validation(t *testing.T) {
 			wantErrMsg: "session ID is required",
 		},
 		{
-			name:      "missing message",
-			sessionID: "session-123",
-			req:       &ChatRequest{},
+			name:       "missing message",
+			sessionID:  "session-123",
+			req:        &ChatRequest{},
 			wantErrMsg: "message is required",
 		},
 	}
@@ -403,9 +403,9 @@ func TestSearchKnowledge_DefaultValues(t *testing.T) {
 	_, err := client.SearchKnowledge(context.Background(), &SearchRequest{
 		KnowledgeBaseID: "kb-123",
 		Query:           "test query",
-		Limit:           0,      // 使用默认值
-		Threshold:       0,      // 使用默认值
-		Strategy:        "",     // 使用默认值
+		Limit:           0,  // 使用默认值
+		Threshold:       0,  // 使用默认值
+		Strategy:        "", // 使用默认值
 	})
 
 	if err != nil {

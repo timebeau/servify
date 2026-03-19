@@ -144,7 +144,7 @@ export function useChat(): UseChatReturn {
       setSession(session);
     };
 
-    const handleSessionEnded = (session: ChatSession) => {
+    const handleSessionEnded = (_session: ChatSession) => {
       setSession(null);
       setMessages([]);
       setAgent(null);

@@ -345,4 +345,3 @@ func TestConfig_PathRateLimits(t *testing.T) {
 		t.Error("expected burst to be set")
 	}
 }
-

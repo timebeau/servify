@@ -17,6 +17,9 @@ func NewPromptBuilder() *PromptBuilder {
 func (b *PromptBuilder) Build(req AIRequest, hits []knowledgeprovider.KnowledgeHit) []llm.ChatMessage {
 	messages := append([]llm.ChatMessage(nil), req.Messages...)
 
+	if len(req.Messages) > 0 {
+		messages = append([]llm.ChatMessage{{Role: "system", Content: b.buildContextPrompt(req.Messages)}}, messages...)
+	}
 	if len(hits) > 0 {
 		messages = append([]llm.ChatMessage{{Role: "system", Content: b.buildKnowledgePrompt(hits)}}, messages...)
 	}
@@ -32,6 +35,23 @@ func (b *PromptBuilder) Build(req AIRequest, hits []knowledgeprovider.KnowledgeH
 
 func (b *PromptBuilder) buildSystemPrompt(systemPrompt string) string {
 	return strings.TrimSpace(systemPrompt)
+}
+
+func (b *PromptBuilder) buildContextPrompt(messages []llm.ChatMessage) string {
+	var sb strings.Builder
+	sb.WriteString("Conversation context:\n")
+	for _, message := range messages {
+		role := strings.TrimSpace(message.Role)
+		if role == "" {
+			role = "unknown"
+		}
+		sb.WriteString("- ")
+		sb.WriteString(role)
+		sb.WriteString(": ")
+		sb.WriteString(strings.TrimSpace(message.Content))
+		sb.WriteString("\n")
+	}
+	return sb.String()
 }
 
 func (b *PromptBuilder) buildKnowledgePrompt(hits []knowledgeprovider.KnowledgeHit) string {

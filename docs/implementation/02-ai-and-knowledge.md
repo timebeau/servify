@@ -75,7 +75,7 @@
 - [x] 新增 legacy `AIServiceInterface` 兼容适配器
 - [x] 让旧接口可调用新 `QueryOrchestrator`
 - [x] 在标准模式入口 wiring 中逐步替换旧 AI service
-- [ ] 在增强模式入口 wiring 中逐步替换旧 AI service
+- [x] 在增强模式入口 wiring 中逐步替换旧 AI service
 
 验收：
 
@@ -85,7 +85,7 @@
 
 - [x] 新增 `prompt_builder.go`
 - [x] 拆 system prompt
-- [ ] 拆 context prompt
+- [x] 拆 context prompt
 - [x] 拆 knowledge prompt
 - [x] 新增 `retriever.go`
 - [x] 支持 topK
@@ -101,7 +101,7 @@
 - [x] 定义 `Tool`
 - [x] 定义 `ToolRegistry`
 - [x] 定义 `ToolExecutor`
-- [ ] 第一批：
+- [x] 第一批：
   - [x] ticket lookup tool
   - [x] customer lookup tool
   - [x] handoff tool

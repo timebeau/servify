@@ -14,6 +14,10 @@
 - [02-ai-and-knowledge.md](docs/implementation/02-ai-and-knowledge.md)
 - [03-business-modules.md](docs/implementation/03-business-modules.md)
 - [04-sdk-and-channel-adapters.md](docs/implementation/04-sdk-and-channel-adapters.md)
+- [05-engineering-hardening.md](docs/implementation/05-engineering-hardening.md)
+- [06-voice-and-protocol-expansion.md](docs/implementation/06-voice-and-protocol-expansion.md)
+- [07-sdk-multi-surface.md](docs/implementation/07-sdk-multi-surface.md)
+- [08-ai-provider-expansion.md](docs/implementation/08-ai-provider-expansion.md)
 
 执行规则：
 
@@ -22,10 +26,16 @@
 - 每完成一个任务包，更新对应 backlog 状态
 - 如果中断，优先从最近一个 `[-]` 的任务包恢复
 
-当前推荐开工顺序：
+第一阶段状态：
 
-1. `01-platform-and-runtime` 的 `P1 bootstrap skeleton`
-2. `01-platform-and-runtime` 的 `P3 event bus`
-3. `02-ai-and-knowledge` 的 `A1 provider contracts`
-4. `04-sdk-and-channel-adapters` 的 `S1 sdk target structure`
-5. `03-business-modules` 的 `B4 ticket query split`
+1. `01-platform-and-runtime`：已清零
+2. `02-ai-and-knowledge`：已清零
+3. `03-business-modules`：已清零
+4. `04-sdk-and-channel-adapters`：已清零
+
+第二阶段推荐开工顺序：
+
+1. `05-engineering-hardening` 的 `H1 ci-quality-gates`
+2. `06-voice-and-protocol-expansion` 的 `V1 protocol-end-to-end`
+3. `07-sdk-multi-surface` 的 `M1 web-sdk-completion`
+4. `08-ai-provider-expansion` 的 `A1 provider-matrix`

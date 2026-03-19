@@ -1,14 +1,11 @@
 # @servify/api-client
 
-Reserved package for future server-side and automation-oriented API SDK support.
+保留包，用于未来服务端与服务端之间的 SDK 访问层。
 
-Planned use cases:
+预留场景：
 
 - server-to-server API calls
 - admin automation clients
-- bot and integration clients
+- bot integrations
 
-Status:
-
-- reserved only
-- no implementation yet
+当前不实现具体功能，只保留目录和用途约束。

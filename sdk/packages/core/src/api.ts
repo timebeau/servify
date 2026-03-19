@@ -1,4 +1,4 @@
-import { ApiResponse, Customer, Agent, ChatSession, Message, Ticket, CustomerSatisfaction } from './types';
+import { ApiResponse, Customer, ChatSession, Message, Ticket, CustomerSatisfaction } from './types';
 
 export interface ApiClientOptions {
   baseUrl: string;

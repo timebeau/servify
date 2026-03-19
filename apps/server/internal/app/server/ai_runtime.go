@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"servify/apps/server/internal/config"
+	weknorakp "servify/apps/server/internal/platform/knowledgeprovider/weknora"
 	"servify/apps/server/internal/platform/llm/openai"
 	"servify/apps/server/internal/services"
 	"servify/apps/server/pkg/weknora"
@@ -68,7 +69,14 @@ func BuildAIAssembly(cfg *config.Config, logger *logrus.Logger, opts AIAssemblyO
 	}
 	assembly.WeKnoraHealthy = true
 
-	enhanced := services.NewEnhancedAIService(baseAI, client, cfg.WeKnora.KnowledgeBaseID, logger)
+	enhanced := services.NewOrchestratedEnhancedAIService(
+		baseAI,
+		openai.NewProvider(cfg.AI.OpenAI.APIKey, cfg.AI.OpenAI.BaseURL),
+		weknorakp.NewProvider(client, cfg.WeKnora.KnowledgeBaseID),
+		client,
+		cfg.WeKnora.KnowledgeBaseID,
+		logger,
+	)
 	if opts.SyncKnowledgeBase {
 		syncCtx, syncCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer syncCancel()
