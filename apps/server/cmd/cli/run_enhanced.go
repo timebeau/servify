@@ -15,7 +15,6 @@ import (
 	appserver "servify/apps/server/internal/app/server"
 	"servify/apps/server/internal/config"
 	"servify/apps/server/internal/handlers"
-	"servify/apps/server/internal/services"
 	"servify/apps/server/pkg/weknora"
 
 	"github.com/gin-gonic/gin"
