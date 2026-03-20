@@ -8,6 +8,7 @@ import (
 
 	"servify/apps/server/internal/modules/knowledge/domain"
 	"servify/apps/server/internal/platform/knowledgeprovider"
+	memorykp "servify/apps/server/internal/platform/knowledgeprovider/memory"
 	mockkp "servify/apps/server/internal/platform/knowledgeprovider/mock"
 )
 
@@ -151,6 +152,44 @@ func TestServiceListDocuments(t *testing.T) {
 	}
 	if total != 1 || len(docs) != 1 {
 		t.Fatalf("unexpected docs: total=%d docs=%d", total, len(docs))
+	}
+}
+
+func TestServiceRunIndexJobProviderSwitchRegression(t *testing.T) {
+	providers := map[string]knowledgeprovider.KnowledgeProvider{
+		"mock":   &mockkp.Provider{},
+		"memory": memorykp.NewProvider("tenant-a", "kb-a"),
+	}
+
+	for name, provider := range providers {
+		t.Run(name, func(t *testing.T) {
+			docRepo := &memDocRepo{}
+			jobRepo := &memJobRepo{}
+			svc := NewService(docRepo, jobRepo, provider)
+
+			doc, err := svc.CreateDocument(context.Background(), CreateDocumentRequest{
+				ID:      "doc-switch",
+				Title:   "Billing",
+				Content: "Billing details",
+			})
+			if err != nil {
+				t.Fatalf("create doc: %v", err)
+			}
+			job, err := svc.QueueIndexJob(context.Background(), QueueIndexJobRequest{
+				JobID:      "job-switch",
+				DocumentID: doc.ID,
+			})
+			if err != nil {
+				t.Fatalf("queue job: %v", err)
+			}
+			result, err := svc.RunIndexJob(context.Background(), RunIndexJobRequest{JobID: job.ID})
+			if err != nil {
+				t.Fatalf("run job: %v", err)
+			}
+			if result.Status != string(domain.IndexJobDone) {
+				t.Fatalf("unexpected status: %+v", result)
+			}
+		})
 	}
 }
 

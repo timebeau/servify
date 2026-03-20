@@ -65,3 +65,7 @@ func (p *Provider) DeleteDocument(ctx context.Context, id string) error {
 func (p *Provider) HealthCheck(ctx context.Context) error {
 	return p.HealthError
 }
+
+func (p *Provider) RebuildIndex(ctx context.Context, req knowledgeprovider.RebuildRequest) error {
+	return nil
+}

@@ -19,7 +19,7 @@ func TestProviderChat(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
-			"choices":[{"finish_reason":"stop","message":{"content":"hello from model"}}],
+			"choices":[{"finish_reason":"tool_calls","message":{"content":"hello from model","tool_calls":[{"id":"call-1","type":"function","function":{"name":"lookup","arguments":"{\"query\":\"hello\"}"}}]}}],
 			"usage":{"prompt_tokens":11,"completion_tokens":7,"total_tokens":18}
 		}`))
 	}))
@@ -38,8 +38,37 @@ func TestProviderChat(t *testing.T) {
 	if resp.Content != "hello from model" {
 		t.Fatalf("unexpected content: %s", resp.Content)
 	}
+	if resp.Provider != "openai" {
+		t.Fatalf("unexpected provider: %s", resp.Provider)
+	}
+	if len(resp.ToolCalls) != 1 || resp.ToolCalls[0].Name != "lookup" {
+		t.Fatalf("unexpected tool calls: %+v", resp.ToolCalls)
+	}
 	if resp.TokenUsage == nil || resp.TokenUsage.TotalTokens != 18 {
 		t.Fatalf("unexpected token usage: %+v", resp.TokenUsage)
+	}
+}
+
+func TestProviderChatReturnsClassifiedHTTPError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`rate limited`))
+	}))
+	defer srv.Close()
+
+	provider := NewProvider("test-key", srv.URL)
+	_, err := provider.Chat(context.Background(), llm.ChatRequest{
+		Messages: []llm.ChatMessage{{Role: "user", Content: "hello"}},
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	providerErr, ok := err.(*llm.ProviderError)
+	if !ok {
+		t.Fatalf("expected ProviderError, got %T", err)
+	}
+	if providerErr.Code != llm.ProviderErrorRateLimited || !providerErr.Retryable {
+		t.Fatalf("unexpected provider error: %+v", providerErr)
 	}
 }
 

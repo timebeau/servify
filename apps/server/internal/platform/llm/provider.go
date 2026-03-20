@@ -5,6 +5,7 @@ import "context"
 // ChatChunk is the streaming unit returned by ChatStream.
 type ChatChunk struct {
 	ContentDelta string `json:"content_delta"`
+	ToolCall     *ToolCall `json:"tool_call,omitempty"`
 	Done         bool   `json:"done,omitempty"`
 }
 

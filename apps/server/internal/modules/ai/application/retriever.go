@@ -28,11 +28,13 @@ func (r *Retriever) Retrieve(ctx context.Context, req AIRequest) ([]knowledgepro
 	}
 
 	searchReq := knowledgeprovider.SearchRequest{
-		Query:       req.Query,
-		TopK:        req.RetrievalPolicy.TopK,
-		Threshold:   req.RetrievalPolicy.Threshold,
-		Strategy:    req.RetrievalPolicy.Strategy,
-		KnowledgeID: req.TenantID,
+		Query:           req.Query,
+		TenantID:        req.TenantID,
+		KnowledgeID:     req.ConversationID,
+		TopK:            req.RetrievalPolicy.TopK,
+		Threshold:       req.RetrievalPolicy.Threshold,
+		Strategy:        req.RetrievalPolicy.Strategy,
+		ConsistencyMode: knowledgeprovider.ConsistencyEventual,
 	}
 	return r.provider.Search(ctx, searchReq)
 }

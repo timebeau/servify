@@ -9,3 +9,8 @@ type KnowledgeProvider interface {
 	DeleteDocument(ctx context.Context, id string) error
 	HealthCheck(ctx context.Context) error
 }
+
+// RebuildableProvider is an optional extension for providers that can rebuild an index.
+type RebuildableProvider interface {
+	RebuildIndex(ctx context.Context, req RebuildRequest) error
+}

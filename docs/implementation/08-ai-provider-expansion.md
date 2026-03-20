@@ -20,10 +20,10 @@
 
 ## A2 llm-provider-expansion
 
-- [ ] 增加第二个真实 `LLMProvider` 适配器占位
-- [ ] 统一流式/非流式响应 contract
-- [ ] 统一 tool calling / function calling contract
-- [ ] 增加 provider 级超时、重试、错误分类
+- [x] 增加第二个真实 `LLMProvider` 适配器占位
+- [x] 统一流式/非流式响应 contract
+- [x] 统一 tool calling / function calling contract
+- [x] 增加 provider 级超时、重试、错误分类
 
 验收：
 
@@ -31,10 +31,10 @@
 
 ## A3 knowledge-provider-expansion
 
-- [ ] 增加第二个真实 `KnowledgeProvider` 适配器占位
-- [ ] 抽象索引、删除、重建、检索一致性语义
-- [ ] 定义 tenant / knowledge base 多租户映射规则
-- [ ] 增加 provider 切换回归测试
+- [x] 增加第二个真实 `KnowledgeProvider` 适配器占位
+- [x] 抽象索引、删除、重建、检索一致性语义
+- [x] 定义 tenant / knowledge base 多租户映射规则
+- [x] 增加 provider 切换回归测试
 
 验收：
 
@@ -42,10 +42,10 @@
 
 ## A4 orchestration-hardening
 
-- [ ] 补 query orchestration 场景测试矩阵
-- [ ] 补 prompt builder contract 测试矩阵
-- [ ] 补 retrieval 降级路径测试
-- [ ] 补 AI fallback 行为文档
+- [x] 补 query orchestration 场景测试矩阵
+- [x] 补 prompt builder contract 测试矩阵
+- [x] 补 retrieval 降级路径测试
+- [x] 补 AI fallback 行为文档
 
 验收：
 
@@ -53,10 +53,10 @@
 
 ## A5 ai-observability-and-policy
 
-- [ ] 增加 provider 维度 tracing/span 标签
-- [ ] 增加 token / latency / error 分类指标
-- [ ] 预留内容安全与策略拒答 hook
-- [ ] 预留 prompt/version 审计记录接口
+- [x] 增加 provider 维度 tracing/span 标签
+- [x] 增加 token / latency / error 分类指标
+- [x] 预留内容安全与策略拒答 hook
+- [x] 预留 prompt/version 审计记录接口
 
 验收：
 

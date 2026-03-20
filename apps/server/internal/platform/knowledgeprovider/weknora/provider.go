@@ -25,13 +25,10 @@ func (p *Provider) Search(ctx context.Context, req knowledgeprovider.SearchReque
 	if p.client == nil {
 		return nil, fmt.Errorf("weknora client is not configured")
 	}
-	kbID := req.KnowledgeID
-	if kbID == "" {
-		kbID = p.knowledgeID
-	}
+	namespace := knowledgeprovider.ResolveNamespace("", p.knowledgeID, req.TenantID, req.KnowledgeID)
 	resp, err := p.client.SearchKnowledge(ctx, &base.SearchRequest{
 		Query:           req.Query,
-		KnowledgeBaseID: kbID,
+		KnowledgeBaseID: namespace.KnowledgeID,
 		Limit:           req.TopK,
 		Threshold:       req.Threshold,
 		Strategy:        req.Strategy,
@@ -61,10 +58,11 @@ func (p *Provider) UpsertDocument(ctx context.Context, doc knowledgeprovider.Kno
 	if p.client == nil {
 		return fmt.Errorf("weknora client is not configured")
 	}
-	if p.knowledgeID == "" {
+	namespace := knowledgeprovider.ResolveNamespace("", p.knowledgeID, doc.TenantID, doc.KnowledgeID)
+	if namespace.KnowledgeID == "" {
 		return fmt.Errorf("knowledge base id is not configured")
 	}
-	_, err := p.client.UploadDocument(ctx, p.knowledgeID, &base.Document{
+	_, err := p.client.UploadDocument(ctx, namespace.KnowledgeID, &base.Document{
 		Type:     "text",
 		Title:    doc.Title,
 		Content:  doc.Content,
@@ -76,6 +74,13 @@ func (p *Provider) UpsertDocument(ctx context.Context, doc knowledgeprovider.Kno
 
 func (p *Provider) DeleteDocument(ctx context.Context, id string) error {
 	return fmt.Errorf("weknora delete document is not implemented yet")
+}
+
+func (p *Provider) RebuildIndex(ctx context.Context, req knowledgeprovider.RebuildRequest) error {
+	if p.client == nil {
+		return fmt.Errorf("weknora client is not configured")
+	}
+	return nil
 }
 
 func (p *Provider) HealthCheck(ctx context.Context) error {

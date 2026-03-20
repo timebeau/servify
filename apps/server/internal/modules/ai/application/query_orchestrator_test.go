@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"servify/apps/server/internal/platform/knowledgeprovider"
@@ -10,10 +11,29 @@ import (
 	mockllm "servify/apps/server/internal/platform/llm/mock"
 )
 
+type stubPolicyHook struct {
+	decision PolicyDecision
+	err      error
+}
+
+func (s stubPolicyHook) Evaluate(ctx context.Context, req AIRequest) (PolicyDecision, error) {
+	return s.decision, s.err
+}
+
+type stubAuditRecorder struct {
+	records []PromptAuditRecord
+}
+
+func (s *stubAuditRecorder) RecordPrompt(ctx context.Context, record PromptAuditRecord) error {
+	s.records = append(s.records, record)
+	return nil
+}
+
 func TestQueryOrchestratorHandleWithRetrieval(t *testing.T) {
 	llmProvider := &mockllm.Provider{
 		ChatResponse: llm.ChatResponse{
 			Content:      "answer",
+			Provider:     "openai",
 			Model:        "mock-model",
 			FinishReason: "stop",
 			TokenUsage: &llm.TokenUsage{
@@ -51,6 +71,9 @@ func TestQueryOrchestratorHandleWithRetrieval(t *testing.T) {
 	}
 	if resp.Model != "mock-model" {
 		t.Fatalf("expected mock-model, got %s", resp.Model)
+	}
+	if resp.Provider != "openai" {
+		t.Fatalf("expected openai provider, got %s", resp.Provider)
 	}
 }
 
@@ -152,5 +175,111 @@ func TestQueryOrchestratorSanitizesLongOutputAndTracksMetrics(t *testing.T) {
 	}
 	if metrics.LastTokenUsage != 123 {
 		t.Fatalf("unexpected token usage: %+v", metrics)
+	}
+}
+
+func TestQueryOrchestratorReturnsErrorWhenRetrieverFails(t *testing.T) {
+	llmProvider := &mockllm.Provider{
+		ChatResponse: llm.ChatResponse{Content: "unused"},
+	}
+	orchestrator := NewQueryOrchestrator(llmProvider, &mockkp.Provider{
+		SearchError: context.DeadlineExceeded,
+	})
+
+	_, err := orchestrator.Handle(context.Background(), AIRequest{
+		Query: "billing",
+		RetrievalPolicy: RetrievalPolicy{
+			Enabled: true,
+		},
+	})
+	if err == nil {
+		t.Fatal("expected retrieval error")
+	}
+
+	metrics := orchestrator.Metrics()
+	if metrics.FallbackCount != 1 {
+		t.Fatalf("expected fallback count to increment, got %+v", metrics)
+	}
+}
+
+func TestQueryOrchestratorPropagatesMessagesWithoutAppendingQuery(t *testing.T) {
+	llmProvider := &mockllm.Provider{
+		ChatResponse: llm.ChatResponse{Content: "answer", Provider: "anthropic"},
+	}
+	orchestrator := NewQueryOrchestrator(llmProvider, nil)
+
+	resp, err := orchestrator.Handle(context.Background(), AIRequest{
+		Query: "latest question",
+		Messages: []llm.ChatMessage{
+			{Role: "user", Content: "history question"},
+			{Role: "assistant", Content: "history answer"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if resp.Provider != "anthropic" {
+		t.Fatalf("expected anthropic provider, got %s", resp.Provider)
+	}
+}
+
+func TestQueryOrchestratorPolicyHookRejectsRequest(t *testing.T) {
+	orchestrator := NewQueryOrchestrator(&mockllm.Provider{}, nil)
+	orchestrator.SetPolicyHooks(stubPolicyHook{
+		decision: PolicyDecision{Allowed: false, Reason: "policy_denied"},
+	})
+
+	_, err := orchestrator.Handle(context.Background(), AIRequest{
+		Query: "blocked",
+	})
+	if err == nil {
+		t.Fatal("expected policy rejection")
+	}
+
+	metrics := orchestrator.Metrics()
+	if metrics.PolicyRejectCount != 1 || metrics.FallbackCount != 1 {
+		t.Fatalf("unexpected metrics: %+v", metrics)
+	}
+}
+
+func TestQueryOrchestratorPolicyHookErrorCountsAsFailure(t *testing.T) {
+	orchestrator := NewQueryOrchestrator(&mockllm.Provider{}, nil)
+	orchestrator.SetPolicyHooks(stubPolicyHook{
+		err: errors.New("policy backend down"),
+	})
+
+	_, err := orchestrator.Handle(context.Background(), AIRequest{
+		Query: "hello",
+	})
+	if err == nil {
+		t.Fatal("expected policy hook error")
+	}
+
+	metrics := orchestrator.Metrics()
+	if metrics.ErrorCount != 1 || metrics.LastErrorCategory != "policy_hook_error" {
+		t.Fatalf("unexpected metrics: %+v", metrics)
+	}
+}
+
+func TestQueryOrchestratorWritesPromptAuditRecord(t *testing.T) {
+	recorder := &stubAuditRecorder{}
+	orchestrator := NewQueryOrchestrator(&mockllm.Provider{
+		ChatResponse: llm.ChatResponse{Content: "answer", Provider: "openai"},
+	}, nil)
+	orchestrator.SetAuditRecorder(recorder)
+
+	_, err := orchestrator.Handle(context.Background(), AIRequest{
+		TaskType:     TaskTypeQA,
+		Query:        "hello",
+		SystemPrompt: "system",
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(recorder.records) != 1 {
+		t.Fatalf("expected 1 audit record, got %d", len(recorder.records))
+	}
+	if recorder.records[0].PromptVersion != "v1" {
+		t.Fatalf("unexpected audit record: %+v", recorder.records[0])
 	}
 }

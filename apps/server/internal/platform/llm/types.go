@@ -6,6 +6,13 @@ type ChatMessage struct {
 	Content string `json:"content"`
 }
 
+// ToolDefinition describes a callable tool/function exposed to the model.
+type ToolDefinition struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description,omitempty"`
+	InputSchema map[string]interface{} `json:"input_schema,omitempty"`
+}
+
 // ToolCall describes a tool request returned by a model.
 type ToolCall struct {
 	ID        string                 `json:"id"`
@@ -24,16 +31,30 @@ type TokenUsage struct {
 type ChatRequest struct {
 	Model       string        `json:"model,omitempty"`
 	Messages    []ChatMessage `json:"messages"`
+	Tools       []ToolDefinition `json:"tools,omitempty"`
 	Temperature float64       `json:"temperature,omitempty"`
 	MaxTokens   int           `json:"max_tokens,omitempty"`
 	Stream      bool          `json:"stream,omitempty"`
+	Options     RequestOptions `json:"options,omitempty"`
 }
 
 // ChatResponse is the shared output model for chat-style model responses.
 type ChatResponse struct {
 	Content      string      `json:"content"`
+	Provider     string      `json:"provider,omitempty"`
 	Model        string      `json:"model,omitempty"`
 	FinishReason string      `json:"finish_reason,omitempty"`
 	ToolCalls    []ToolCall  `json:"tool_calls,omitempty"`
 	TokenUsage   *TokenUsage `json:"token_usage,omitempty"`
+}
+
+type RequestOptions struct {
+	TimeoutMs  int         `json:"timeout_ms,omitempty"`
+	RetryPolicy RetryPolicy `json:"retry_policy,omitempty"`
+}
+
+type RetryPolicy struct {
+	MaxAttempts   int `json:"max_attempts,omitempty"`
+	BaseDelayMs   int `json:"base_delay_ms,omitempty"`
+	BackoffFactor int `json:"backoff_factor,omitempty"`
 }
