@@ -1,0 +1,71 @@
+# 10 Module Boundaries
+
+本文件定义 `handlers`、`services`、`modules` 三层在迁移阶段的职责与依赖方向，用于支持 M5 的边界治理。
+
+## 目标规则
+
+- `handlers/*`
+  - 只依赖 `modules/*/delivery` contract、少量平台接口、请求响应 DTO
+  - 不直接依赖 concrete legacy service 作为默认业务入口
+- `app/server/*`
+  - 负责 runtime assembly
+  - 可以持有 legacy concrete service，但对 HTTP 注入时应优先暴露 `modules/*/delivery` contract
+- `services/*`
+  - 允许保留兼容 facade、runtime glue、状态同步、side effect 组装
+  - 不应继续增长为新的默认业务中心
+- `modules/*/application`
+  - 承担新的核心业务逻辑
+- `modules/*/delivery`
+  - 承担 handler-facing / runtime-facing adapter 与 contract
+
+## 允许的依赖方向
+
+- `handlers -> modules/*/delivery`
+- `app/server -> modules/*/delivery`
+- `app/server -> services/*`
+- `services/* -> modules/*/application`
+- `services/* -> modules/*/delivery`
+- `modules/*/delivery -> modules/*/application`
+- `modules/*/application -> modules/*/domain|infra`
+
+## 禁止继续扩散的模式
+
+- `handlers -> *services.ConcreteType`
+- `handlers -> gorm.DB`
+- `handlers -> modules/*/application` 直接拼业务
+- `services/*` 为了新需求再次变成 handler 默认入口
+- runtime 新增一条与既有 module contract 平行的 legacy 入口
+
+## 当前已锁定的边界
+
+- `ticket`
+  - HTTP 入口必须走 `modules/ticket/delivery.HandlerService`
+- `agent`
+  - HTTP 入口必须走 `modules/agent/delivery.HandlerService`
+- `analytics`
+  - HTTP 入口必须走 `modules/analytics/delivery.HandlerService`
+- `routing / session transfer`
+  - HTTP 入口必须走 `modules/routing/delivery.HandlerService`
+- `ai`
+  - HTTP / health / metrics 入口必须走 `modules/ai/delivery.HandlerService`
+- `conversation`
+  - websocket persistence 入口必须走 `modules/conversation/delivery.WebSocketMessageWriter`
+
+## Legacy Service Freeze Policy
+
+- 已进入 `stabilized` 的能力：
+  - legacy `services/*` 只允许兼容 facade、runtime glue、状态同步、side effect 组装类修改
+  - 新业务逻辑优先进入 `modules/*/application`
+  - 新的 handler/router wiring 不得回退到 concrete service
+- 仍处于 `legacy` 的能力：
+  - 允许临时修改，但每次新增业务逻辑都应同步标注目标 module 归属
+
+## Retirement 条件
+
+某个 legacy service 可以进入“退役候选”状态，至少应满足：
+
+1. HTTP handler 已全部改为依赖 `modules/*/delivery`
+2. runtime 注入已不再需要 concrete legacy type 暴露给 router
+3. 关键兼容职责已被 adapter 或 platform layer 吸收
+4. 有测试覆盖迁移前后的关键行为
+5. scorecard 状态达到 `stabilized` 并持续一段时间无回退

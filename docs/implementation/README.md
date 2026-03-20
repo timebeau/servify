@@ -37,6 +37,10 @@
   - 旧 services/handlers 向 modules 架构迁移、适配层与边界收口
 - [10-migration-inventory.md](./10-migration-inventory.md)
   - 当前 handlers/services/modules 迁移盘点与优先级建议
+- [10-migration-scorecard.md](./10-migration-scorecard.md)
+  - 当前迁移完成度表与模块状态追踪
+- [10-module-boundaries.md](./10-module-boundaries.md)
+  - handlers/services/modules 迁移期边界规则与冻结策略
 - [11-tenant-auth-and-audit.md](./11-tenant-auth-and-audit.md)
   - 多租户、权限模型、审计日志、配置边界
 - [12-operator-observability.md](./12-operator-observability.md)

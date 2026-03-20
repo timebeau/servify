@@ -87,11 +87,16 @@
 
 ## M5 boundary-enforcement-and-scorecard
 
-- [ ] 增加迁移完成度表
-- [ ] 为目录职责与依赖方向补文档
-- [ ] 在 code review / CI 中增加边界约束检查
-- [ ] 明确 `services/*` 的冻结策略与退役条件
+- [x] 增加迁移完成度表
+- [x] 为目录职责与依赖方向补文档
+- [-] 在 code review / CI 中增加边界约束检查
+- [x] 明确 `services/*` 的冻结策略与退役条件
 
 验收：
 
 - 迁移工作可追踪、可量化，不会长期停留在“正在重构”
+
+产出：
+
+- [10-migration-scorecard.md](./10-migration-scorecard.md)
+- [10-module-boundaries.md](./10-module-boundaries.md)
