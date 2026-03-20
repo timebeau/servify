@@ -494,7 +494,16 @@ func (h *UploadHandler) UploadFile(c *gin.Context) {
 
 	// 2. 保存文件到指定目录
 	filename := fmt.Sprintf("%d_%s", time.Now().Unix(), header.Filename)
-	dstPath := fmt.Sprintf("%s/%s", h.config.Upload.StoragePath, filename)
+	storageDir := filepath.Clean(h.config.Upload.StoragePath)
+	if err := os.MkdirAll(storageDir, 0o755); err != nil {
+		h.logger.Errorf("Failed to create upload storage directory: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "Failed to prepare upload storage: " + err.Error(),
+		})
+		return
+	}
+	dstPath := filepath.Join(storageDir, filename)
 
 	if err := c.SaveUploadedFile(header, dstPath); err != nil {
 		h.logger.Errorf("Failed to save file: %v", err)

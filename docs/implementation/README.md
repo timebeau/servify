@@ -31,6 +31,14 @@
   - web sdk 收口、future api/app sdk contract 深化、transport 演进
 - [08-ai-provider-expansion.md](./08-ai-provider-expansion.md)
   - LLM/knowledge provider 扩展、编排层稳定性、AI 可观测性
+- [09-runtime-and-repo-hygiene.md](./09-runtime-and-repo-hygiene.md)
+  - 运行时产物清理、仓库卫生、ignore 策略、跨平台开发环境收口
+- [10-service-to-module-migration.md](./10-service-to-module-migration.md)
+  - 旧 services/handlers 向 modules 架构迁移、适配层与边界收口
+- [11-tenant-auth-and-audit.md](./11-tenant-auth-and-audit.md)
+  - 多租户、权限模型、审计日志、配置边界
+- [12-operator-observability.md](./12-operator-observability.md)
+  - tracing、metrics、日志、告警、回放与运营诊断
 
 状态约定：
 
@@ -49,6 +57,7 @@
 当前进度：
 
 - `01` 到 `08` 已全部清零
+- `09` 到 `12` 已建档，待拆分执行
 - 新增实施项应以新的 backlog 文件继续拆分，避免回填已完成任务包
 
 配套专题：
@@ -56,3 +65,4 @@
 - [版本发布策略](../release-versioning.md)
 - [测试金字塔](../testing-pyramid.md)
 - [Mermaid 兼容性](../MERMAID_COMPATIBILITY.md)
+- [仓库卫生与生成物边界](../repo-hygiene.md)

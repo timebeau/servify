@@ -343,7 +343,7 @@ func GetDefaultConfig() *Config {
 			Enabled:      true,
 			MaxFileSize:  "10MB",
 			AllowedTypes: []string{".pdf", ".docx", ".txt", ".md", ".png", ".jpg", ".jpeg"},
-			StoragePath:  "./uploads",
+			StoragePath:  "./.runtime/uploads",
 			AutoProcess:  true,
 			AutoIndex:    true,
 		},

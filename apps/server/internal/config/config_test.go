@@ -127,6 +127,9 @@ func TestConfig_UploadSettings(t *testing.T) {
 	if len(cfg.Upload.AllowedTypes) == 0 {
 		t.Error("expected allowed types to be set")
 	}
+	if cfg.Upload.StoragePath != "./.runtime/uploads" {
+		t.Fatalf("expected upload storage path to use runtime directory, got %q", cfg.Upload.StoragePath)
+	}
 }
 
 func TestConfig_RBACRoles(t *testing.T) {

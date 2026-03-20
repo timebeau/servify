@@ -157,7 +157,12 @@ jobs:
           ./scripts/verify-generated-assets.sh
 
       - name: Verify generated assets are committed
-        run: git diff --exit-code
+        run: |
+          chmod +x scripts/check-generated-drift.sh
+          ./scripts/check-generated-drift.sh \
+            "SDK generated assets" \
+            "sh scripts/regenerate-generated-assets.sh" \
+            apps/demo-web/sdk
 
   docs-checks:
     name: Docs Checks
@@ -189,7 +194,12 @@ jobs:
         run: npm -C docs ci --no-audit --no-fund
 
       - name: Verify docs lockfile is committed
-        run: git diff --exit-code -- docs/package-lock.json
+        run: |
+          chmod +x scripts/check-generated-drift.sh
+          ./scripts/check-generated-drift.sh \
+            "Docs lockfile" \
+            "npm -C docs ci --no-audit --no-fund" \
+            docs/package-lock.json
 
       - name: Generate API docs
         run: go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g apps/server/cmd/server/main.go -o docs/generated/api
@@ -198,7 +208,13 @@ jobs:
         run: npm -C docs run build
 
       - name: Verify docs generated assets are committed
-        run: git diff --exit-code -- docs/generated/api docs/package-lock.json
+        run: |
+          chmod +x scripts/check-generated-drift.sh
+          ./scripts/check-generated-drift.sh \
+            "Docs generated assets" \
+            "sh scripts/regenerate-generated-assets.sh" \
+            docs/generated/api \
+            docs/package-lock.json
 
       - name: Upload docs artifact
         if: always()
@@ -226,6 +242,11 @@ jobs:
             exit 0
           fi
           bash -n "${files[@]}"
+
+      - name: Validate repository hygiene
+        run: |
+          chmod +x scripts/check-repo-hygiene.sh
+          ./scripts/check-repo-hygiene.sh
 
   website-worker-checks:
     name: Website Worker Checks

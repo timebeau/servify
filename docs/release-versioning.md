@@ -29,5 +29,8 @@
 ## Changelog and release flow
 
 - Draft changelog generation is provided by `scripts/generate-changelog.sh`
+- Local draft file generation is provided by `make release-changelog`
+- Local release draft output defaults to `./.runtime/release/RELEASE_CHANGELOG.md`
 - Manual release preparation is reserved in `.github/workflows/release.yml`
 - Current release workflow prepares metadata and artifacts; it does not publish packages automatically
+- `RELEASE_CHANGELOG.md` is treated as a release artifact, not a committed generated asset

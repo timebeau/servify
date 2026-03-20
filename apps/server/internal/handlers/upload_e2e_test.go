@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -102,7 +103,10 @@ func TestUpload_TextExtraction(t *testing.T) {
 	cfg.Upload.AutoIndex = false
 	r, dir := setupUploadRouter(t, cfg)
 
-	content := []byte("hello extraction")
+	content, err := os.ReadFile(filepath.Join("testdata", "upload-note.txt"))
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
 	req, err := newUploadRequest("/api/v1/upload", "file", "note.txt", "text/plain", content)
 	if err != nil {
 		t.Fatal(err)

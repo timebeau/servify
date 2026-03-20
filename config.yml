@@ -101,3 +101,11 @@ security:
         prefix: "/api/"
         requests_per_minute: 60
         burst: 15
+
+upload:
+  enabled: true
+  max_file_size: "10MB"
+  allowed_types: [".pdf", ".docx", ".txt", ".md", ".png", ".jpg", ".jpeg"]
+  storage_path: "./.runtime/uploads"
+  auto_process: true
+  auto_index: true

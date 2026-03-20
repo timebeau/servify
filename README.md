@@ -31,6 +31,33 @@ Servify 是一个面向客服、工单、AI 协同和实时会话的服务平台
 `-- sdk/                     # SDK 工作区
 ```
 
+## 根目录职责
+
+- `apps/`
+  - 应用入口与可运行表面，例如服务端、demo、官网
+- `docs/`
+  - 说明文档、实施 backlog、发布与协作规则
+- `infra/`
+  - 本地或部署环境相关的 compose、可观测性与辅助配置
+- `scripts/`
+  - CI、本地开发、生成物与检查脚本
+- `sdk/`
+  - SDK workspace 与示例
+- `config.yml`、`config.weknora.yml`
+  - 本地运行配置样例
+- `generated-assets.manifest`
+  - 必须提交的生成物清单
+- `Makefile`、`build.sh`
+  - 常用构建与开发入口
+- `todo.md`
+  - 实施主题索引入口
+
+不应长期出现在根目录的内容：
+
+- 本地构建二进制，例如 `server`、`server.exe`
+- 运行时输出目录，例如 `uploads/`、`.runtime/`
+- 临时调试文件、测试残留、缓存文件
+
 ## 架构原则
 
 - 业务能力按模块拆分：每个模块具备 `domain`、`application`、`infra`、`delivery`
@@ -186,6 +213,10 @@ make build
 make run-cli CONFIG=./config.yml
 make run-weknora CONFIG=./config.weknora.yml
 make migrate DB_HOST=localhost DB_PORT=5432 DB_USER=postgres DB_PASSWORD=password DB_NAME=servify
+make repo-hygiene
+make local-check
+make release-changelog FROM=<previous-tag-or-commit> TO=HEAD
+make clean-runtime
 ```
 
 ### 常用入口
@@ -226,6 +257,10 @@ Jaeger 默认地址：`http://localhost:16686`
 - [docs/README.md](./docs/README.md)
 - [docs/WEKNORA_INTEGRATION.md](./docs/WEKNORA_INTEGRATION.md)
 - [docs/CI_SELF_HOSTED.md](./docs/CI_SELF_HOSTED.md) - GitHub Hosted CI 说明
+- [docs/repo-hygiene.md](./docs/repo-hygiene.md) - 运行时产物、生成物与 ignore 边界
+- [docs/generated-assets.md](./docs/generated-assets.md) - 受控生成物、重建入口与校验规则
+- [docs/local-development.md](./docs/local-development.md) - Windows / WSL / Linux 本地开发约定
+- [docs/contributing.md](./docs/contributing.md) - 提交前自检与协作约定
 
 ### 实施 backlog
 
@@ -238,6 +273,10 @@ Jaeger 默认地址：`http://localhost:16686`
 - [docs/implementation/06-voice-and-protocol-expansion.md](./docs/implementation/06-voice-and-protocol-expansion.md)
 - [docs/implementation/07-sdk-multi-surface.md](./docs/implementation/07-sdk-multi-surface.md)
 - [docs/implementation/08-ai-provider-expansion.md](./docs/implementation/08-ai-provider-expansion.md)
+- [docs/implementation/09-runtime-and-repo-hygiene.md](./docs/implementation/09-runtime-and-repo-hygiene.md)
+- [docs/implementation/10-service-to-module-migration.md](./docs/implementation/10-service-to-module-migration.md)
+- [docs/implementation/11-tenant-auth-and-audit.md](./docs/implementation/11-tenant-auth-and-audit.md)
+- [docs/implementation/12-operator-observability.md](./docs/implementation/12-operator-observability.md)
 
 ## 当前实施进度
 
@@ -245,10 +284,14 @@ Jaeger 默认地址：`http://localhost:16686`
 - `docs/implementation/02-ai-and-knowledge.md`：已清零
 - `docs/implementation/03-business-modules.md`：已清零
 - `docs/implementation/04-sdk-and-channel-adapters.md`：已清零
-- `docs/implementation/05-engineering-hardening.md`：第二阶段未开始
-- `docs/implementation/06-voice-and-protocol-expansion.md`：第二阶段未开始
-- `docs/implementation/07-sdk-multi-surface.md`：第二阶段未开始
-- `docs/implementation/08-ai-provider-expansion.md`：第二阶段未开始
+- `docs/implementation/05-engineering-hardening.md`：已清零
+- `docs/implementation/06-voice-and-protocol-expansion.md`：已清零
+- `docs/implementation/07-sdk-multi-surface.md`：已清零
+- `docs/implementation/08-ai-provider-expansion.md`：已清零
+- `docs/implementation/09-runtime-and-repo-hygiene.md`：进行中
+- `docs/implementation/10-service-to-module-migration.md`：待开始
+- `docs/implementation/11-tenant-auth-and-audit.md`：待开始
+- `docs/implementation/12-operator-observability.md`：待开始
 
 当前代码状态说明：
 
@@ -267,9 +310,9 @@ Jaeger 默认地址：`http://localhost:16686`
 
 ## 现阶段结论
 
-第一阶段主 backlog 已全部实现，当前进入第二阶段：
+第一阶段与第二阶段主 backlog 已全部清零，当前进入第三阶段：
 
-1. `05-engineering-hardening`：补齐 CI、测试金字塔、版本发布、文档站点交付
-2. `06-voice-and-protocol-expansion`：补齐 voice 协议入口端到端、provider 与媒体拓扑预留
-3. `07-sdk-multi-surface`：完善 Web SDK，并继续细化 future API/App SDK contract
-4. `08-ai-provider-expansion`：补齐多 provider 矩阵、fallback、可观测性与策略控制
+1. `09-runtime-and-repo-hygiene`：清理运行时脏产物、统一 ignore 策略、收口跨平台开发环境
+2. `10-service-to-module-migration`：把旧 `services` / `handlers` 链路逐步收口到 `modules/*`
+3. `11-tenant-auth-and-audit`：补齐租户、权限、审计、配置边界
+4. `12-operator-observability`：补齐 tracing、metrics、日志、告警、回放与运营诊断能力

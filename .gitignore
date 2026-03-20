@@ -1,5 +1,7 @@
 # 构建产物
 /servify
+/server
+/server.exe
 *.exe
 /server
 
@@ -25,6 +27,7 @@ Thumbs.db
 # 临时文件
 *.tmp
 *.temp
+.runtime/
 
 # 测试覆盖率
 # go test 常见产物/覆盖率文件
@@ -44,3 +47,4 @@ bin/
 # Upload 存储（运行时/测试产物）
 uploads/
 apps/server/uploads/
+internal/handlers/uploads/

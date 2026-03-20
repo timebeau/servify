@@ -169,7 +169,7 @@ upload:
   enabled: true
   max_file_size: "10MB"
   allowed_types: [".pdf", ".docx", ".txt", ".md", ".png", ".jpg", ".jpeg"]
-  storage_path: "./uploads"
+  storage_path: "./.runtime/uploads"
 
   # WeKnora 文档处理
   auto_process: true

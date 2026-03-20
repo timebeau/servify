@@ -1,6 +1,6 @@
 # Servify Makefile
 
-.PHONY: help build build-cli build-weknora run run-cli run-weknora migrate migrate-seed test clean docker-build docker-run docker-up-weknora docker-down docker-logs-weknora docker-up-observ docker-down-observ dev-setup fmt lint update-deps docs changelog sdk-sync-versions sdk-check-versions
+.PHONY: help build build-cli build-weknora run run-cli run-weknora migrate migrate-seed test clean clean-runtime docker-build docker-run docker-up-weknora docker-down docker-logs-weknora docker-up-observ docker-down-observ dev-setup fmt lint update-deps docs changelog release-changelog sdk-sync-versions sdk-check-versions repo-hygiene generated-assets local-check
 
 # Default target
 help:
@@ -15,6 +15,7 @@ help:
 	@echo "  migrate-seed  - Run database migrations with seed data"
 	@echo "  test          - Run tests"
 	@echo "  clean         - Clean build artifacts"
+	@echo "  clean-runtime - Remove local runtime output directories"
 	@echo "  docker-build  - Build Docker image"
 	@echo "  docker-run    - Run with Docker Compose"
 	@echo "  docker-up-weknora - Up WeKnora compose (server+weknora+db)"
@@ -24,8 +25,12 @@ help:
 	@echo "  docker-down-observ  - Down observability stack"
 	@echo "  docker-stop   - Stop Docker Compose services"
 	@echo "  changelog     - Generate a release changelog draft"
+	@echo "  release-changelog - Write changelog draft to .runtime/release/RELEASE_CHANGELOG.md"
 	@echo "  sdk-sync-versions - Sync SDK package versions from sdk/package.json"
 	@echo "  sdk-check-versions - Check SDK package versions without modifying files"
+	@echo "  repo-hygiene  - Validate runtime/build artifacts are not tracked"
+	@echo "  generated-assets - Regenerate and verify committed generated assets"
+	@echo "  local-check   - Run the minimal local environment verification"
 
 # Build the application
 build:
@@ -76,6 +81,10 @@ clean:
 	@echo "Cleaning up..."
 	rm -rf bin/
 	go clean
+
+clean-runtime:
+	@echo "Cleaning runtime output..."
+	sh ./scripts/clean-runtime.sh
 
 # Build Docker image
 docker-build:
@@ -147,6 +156,12 @@ changelog:
 	@echo "Generating changelog draft..."
 	./scripts/generate-changelog.sh $(FROM) $(TO)
 
+release-changelog:
+	@echo "Generating release changelog draft file..."
+	@mkdir -p ./.runtime/release
+	./scripts/generate-changelog.sh $(FROM) $(TO) > ./.runtime/release/RELEASE_CHANGELOG.md
+	@echo "Wrote ./.runtime/release/RELEASE_CHANGELOG.md"
+
 sdk-sync-versions:
 	@echo "Syncing SDK workspace versions..."
 	npm -C sdk run version:sync
@@ -154,6 +169,18 @@ sdk-sync-versions:
 sdk-check-versions:
 	@echo "Checking SDK workspace versions..."
 	npm -C sdk run version:check
+
+repo-hygiene:
+	@echo "Running repository hygiene checks..."
+	sh ./scripts/check-repo-hygiene.sh
+
+generated-assets:
+	@echo "Regenerating committed generated assets..."
+	sh ./scripts/regenerate-generated-assets.sh
+
+local-check:
+	@echo "Running local environment verification..."
+	sh ./scripts/check-local-environment.sh
 
 # Internal targets with ldflags (version info)
 VERSION ?= dev
