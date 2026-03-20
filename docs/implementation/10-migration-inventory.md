@@ -36,6 +36,11 @@
   - handler 已开始收口到 `modules/ai/delivery.HandlerService`
   - 结论：迁移重点是继续压缩 legacy `AIServiceInterface` 的 handler 可见面，只保留 runtime 兼容用途
 
+- `customer`
+  - `services/CustomerService` 已经是 `modules/customer/application.Service` 的轻量 facade
+  - HTTP handler 只消费请求/响应 DTO 与兼容方法，核心业务已经下沉到 module application + infra repository
+  - 结论：适合先定义 handler-facing contract，并把 router/runtime 注入切到 `modules/customer/delivery`
+
 ## 按迁移成熟度分组
 
 ### A. 已有明显 module facade
@@ -54,12 +59,14 @@
 
 - `routing / session transfer`
 - `conversation` 相关 websocket/runtime 路径
+- `customer`
 
 这些模块的共同特点：
 
 - module 已存在
 - 但核心运行时仍由旧 service 或旧 runtime struct 主导
 - 需要先画清 runtime 职责边界，再做 handler/adapter 收口
+- `customer` 的 handler 已可先行收口，但 runtime 仍保留旧 facade 用于兼容 DTO 和构造装配
 
 ### C. 多实现并存，需要先确定默认主路径
 
@@ -76,8 +83,9 @@
 1. `ticket`
 2. `agent`
 3. `analytics`
-4. `routing / session transfer`
-5. `ai`
+4. `customer`
+5. `routing / session transfer`
+6. `ai`
 
 ## 当前高风险点
 
@@ -106,6 +114,9 @@
 - `analytics`
   - HTTP handler 入口：`modules/analytics/delivery.HandlerService`
   - 旧 `services/StatisticsService` 定位：兼容 facade + event bus subscriber / DTO mapping glue
+- `customer`
+  - HTTP handler 入口：`modules/customer/delivery.HandlerService`
+  - 旧 `services/CustomerService` 定位：兼容 facade + DTO mapping + module application 装配
 - `routing / session transfer`
   - HTTP handler 入口：`modules/routing/delivery.HandlerService`
   - 旧 `services/SessionTransferService` 定位：兼容 facade + runtime glue + legacy transfer orchestration
@@ -127,6 +138,9 @@
 - `services/StatisticsService`
   - 允许保留：旧调用方兼容入口、event bus 订阅注册、DTO 映射、统计后台任务调度
   - 不应新增：新的 HTTP handler 直接依赖、绕过 `modules/analytics/application.Service` 的主统计读写路径
+- `services/CustomerService`
+  - 允许保留：旧调用方兼容入口、DTO 映射、`modules/customer/application.Service` 与 repository 的装配
+  - 不应新增：新的 HTTP handler 直接依赖、绕过 `modules/customer/application.Service` 的核心客户读写路径
 - `services/SessionTransferService`
   - 允许保留：旧调用方兼容入口、AgentService/WebSocketHub/AIService 协调、转接实时通知与 legacy transfer orchestration
   - 不应新增：新的 HTTP handler 直接依赖、等待队列之外继续扩散 routing 读写规则
@@ -140,6 +154,6 @@
 ## 当前自动化守护
 
 - `scripts/check-module-boundaries.sh`
-  - 校验 `ticket` / `agent` / `analytics` / `routing` / `ai` 的 handler constructor 必须依赖 `modules/*/delivery.HandlerService`
-  - 校验 router/runtime 对这五个模块的注入类型必须停留在 handler-facing contract，并校验 `conversation` 的 websocket persistence 入口必须走 module delivery adapter
+  - 校验 `ticket` / `agent` / `analytics` / `customer` / `routing` / `ai` 的 handler constructor 必须依赖 `modules/*/delivery.HandlerService`
+  - 校验 router/runtime 对这六个模块的注入类型必须停留在 handler-facing contract，并校验 `conversation` 的 websocket persistence 入口必须走 module delivery adapter
   - 目的：先锁住已完成迁移的入口，避免回退到 handler 直连具体旧 service

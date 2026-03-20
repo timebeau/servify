@@ -28,17 +28,18 @@
 | `routing / session transfer` | `modules/routing/delivery.HandlerService` | `services.SessionTransferService` as contract impl | compatibility facade + runtime glue | `stabilized` | waiting queue 已接 module adapter，主流程仍有 legacy orchestration |
 | `conversation / websocket runtime` | n/a | `modules/conversation/delivery.WebSocketMessageWriter` | runtime connection hub | `stabilized` | 主 runtime 与 lightweight realtime runtime 都已走 adapter 注入 |
 | `ai` | `modules/ai/delivery.HandlerService` | `AIAssembly.RuntimeService` | runtime compatibility surface for websocket/router/transfer | `stabilized` | handler 主路径已切到 orchestrated enhanced AI |
-| `customer` | concrete handler/service | concrete runtime service | business layer | `legacy` | 尚未定义 module-facing handler contract |
+| `customer` | `modules/customer/delivery.HandlerService` | `services.CustomerService` as contract impl | compatibility facade + DTO mapping | `contracted` | handler/router 已收口，runtime 仍保留 legacy facade |
 | `automation` | concrete handler/service | concrete runtime service | business layer | `legacy` | 尚未拆出稳定 delivery contract |
-| `knowledge` | concrete handler/service | concrete runtime service | business layer | `legacy` | 仍主要走旧 service |
+| `knowledge` | concrete handler/service | concrete runtime service | business layer | `legacy` | 仍主要走旧 service，尚无 module delivery 层 |
 | `voice` | already module coordinator | module coordinator | not primarily legacy | `mixed` | 已较模块化，但不属于本轮 `services -> modules` 的典型迁移样式 |
 
 ## 当前结论
 
 - `ticket`、`agent`、`analytics`、`routing`、`conversation runtime`、`ai` 已具备持续守护条件
+- `customer` 已完成 handler-facing contract 收口，但 runtime 仍保留 legacy facade
 - 上述 `stabilized` 条目都已进入 `scripts/module-boundaries.rules`
 - 旧 `services/*` 仍然存在，但对这些能力来说，已不再是 HTTP 默认入口
 - 下一阶段重点不再是“再找一个模块收口”，而是：
   - 扩大 scorecard 覆盖范围
-  - 持续压缩 `legacy` 状态条目
+  - 持续压缩 `legacy` 状态条目，优先推进 `automation` 与 `knowledge`
   - 为 `legacy` 条目明确冻结策略与退役条件

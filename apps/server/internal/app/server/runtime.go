@@ -10,6 +10,7 @@ import (
 	conversationapp "servify/apps/server/internal/modules/conversation/application"
 	conversationdelivery "servify/apps/server/internal/modules/conversation/delivery"
 	conversationinfra "servify/apps/server/internal/modules/conversation/infra"
+	customerdelivery "servify/apps/server/internal/modules/customer/delivery"
 	routingapp "servify/apps/server/internal/modules/routing/application"
 	routingdelivery "servify/apps/server/internal/modules/routing/delivery"
 	routinginfra "servify/apps/server/internal/modules/routing/infra"
@@ -45,6 +46,7 @@ type Runtime struct {
 	MessageRouter            *services.MessageRouter
 	VoiceCoordinator         *voicedelivery.Coordinator
 	VoiceProtocolRegistry    *voiceprotocol.Registry
+	CustomerHandlerService   customerdelivery.HandlerService
 	CustomerService          *services.CustomerService
 	AgentHandlerService      agentdelivery.HandlerService
 	AgentService             *services.AgentService
@@ -127,6 +129,7 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	rt.SLAService.SetAutomationService(rt.AutomationService)
 
 	rt.CustomerService = services.NewCustomerService(db, logger)
+	rt.CustomerHandlerService = customerdelivery.NewHandlerServiceAdapter(rt.CustomerService)
 	rt.AgentService = services.NewAgentService(db, logger)
 	rt.AgentHandlerService = rt.AgentService
 
@@ -184,7 +187,7 @@ func (rt *Runtime) RouterDependencies() Dependencies {
 		MessageRouter:            rt.MessageRouter,
 		VoiceCoordinator:         rt.VoiceCoordinator,
 		VoiceProtocolRegistry:    rt.VoiceProtocolRegistry,
-		CustomerService:          rt.CustomerService,
+		CustomerHandlerService:   rt.CustomerHandlerService,
 		AgentHandlerService:      rt.AgentHandlerService,
 		AgentService:             rt.AgentService,
 		TicketHandlerService:     rt.TicketHandlerService,

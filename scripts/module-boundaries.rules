@@ -6,9 +6,11 @@
 handler|Agent|apps/server/internal/handlers/agent_handler.go|agentService|agentdelivery\.HandlerService|func NewAgentHandler\(agentService agentdelivery\.HandlerService, logger \*logrus\.Logger\)|\*services\.AgentService
 handler|Ticket|apps/server/internal/handlers/ticket_handler.go|ticketService|ticketdelivery\.HandlerService|func NewTicketHandler\(ticketService ticketdelivery\.HandlerService, logger \*logrus\.Logger\)|\*services\.TicketService
 handler|Statistics|apps/server/internal/handlers/statistics_handler.go|statsService|analyticsdelivery\.HandlerService|func NewStatisticsHandler\(statsService analyticsdelivery\.HandlerService, logger \*logrus\.Logger\)|\*services\.StatisticsService
+handler|Customer|apps/server/internal/handlers/customer_handler.go|customerService|customerdelivery\.HandlerService|func NewCustomerHandler\(customerService customerdelivery\.HandlerService, logger \*logrus\.Logger\)|\*services\.CustomerService
 handler|Session transfer|apps/server/internal/handlers/session_transfer_handler.go|transferService|routingdelivery\.HandlerService|func NewSessionTransferHandler\(transferService routingdelivery\.HandlerService, logger \*logrus\.Logger\)|\*services\.SessionTransferService
 handler|AI|apps/server/internal/handlers/ai_handler.go|aiService|aidelivery\.HandlerService|func NewAIHandler\(aiService aidelivery\.HandlerService\)|aiService services\.AIServiceInterface
 
+runtime|customer handlers|CustomerHandlerService|customerdelivery\.HandlerService
 runtime|agent handlers|AgentHandlerService|agentdelivery\.HandlerService
 runtime|ticket handlers|TicketHandlerService|ticketdelivery\.HandlerService
 runtime|statistics handlers|StatisticsHandlerService|analyticsdelivery\.HandlerService

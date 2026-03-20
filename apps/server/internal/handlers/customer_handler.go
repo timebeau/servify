@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	customerdelivery "servify/apps/server/internal/modules/customer/delivery"
 	"servify/apps/server/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -12,12 +13,12 @@ import (
 
 // CustomerHandler 客户管理处理器
 type CustomerHandler struct {
-	customerService *services.CustomerService
+	customerService customerdelivery.HandlerService
 	logger          *logrus.Logger
 }
 
 // NewCustomerHandler 创建客户处理器
-func NewCustomerHandler(customerService *services.CustomerService, logger *logrus.Logger) *CustomerHandler {
+func NewCustomerHandler(customerService customerdelivery.HandlerService, logger *logrus.Logger) *CustomerHandler {
 	return &CustomerHandler{
 		customerService: customerService,
 		logger:          logger,
