@@ -8,13 +8,13 @@ import (
 type ProviderErrorCode string
 
 const (
-	ProviderErrorTimeout       ProviderErrorCode = "timeout"
-	ProviderErrorUnavailable   ProviderErrorCode = "unavailable"
-	ProviderErrorRateLimited   ProviderErrorCode = "rate_limited"
-	ProviderErrorAuthFailed    ProviderErrorCode = "auth_failed"
-	ProviderErrorInvalid       ProviderErrorCode = "invalid_request"
-	ProviderErrorUpstream      ProviderErrorCode = "upstream_error"
-	ProviderErrorNotSupported  ProviderErrorCode = "not_supported"
+	ProviderErrorTimeout      ProviderErrorCode = "timeout"
+	ProviderErrorUnavailable  ProviderErrorCode = "unavailable"
+	ProviderErrorRateLimited  ProviderErrorCode = "rate_limited"
+	ProviderErrorAuthFailed   ProviderErrorCode = "auth_failed"
+	ProviderErrorInvalid      ProviderErrorCode = "invalid_request"
+	ProviderErrorUpstream     ProviderErrorCode = "upstream_error"
+	ProviderErrorNotSupported ProviderErrorCode = "not_supported"
 )
 
 type ProviderError struct {

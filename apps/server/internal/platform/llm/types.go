@@ -29,13 +29,13 @@ type TokenUsage struct {
 
 // ChatRequest is the shared input model for chat-style model requests.
 type ChatRequest struct {
-	Model       string        `json:"model,omitempty"`
-	Messages    []ChatMessage `json:"messages"`
+	Model       string           `json:"model,omitempty"`
+	Messages    []ChatMessage    `json:"messages"`
 	Tools       []ToolDefinition `json:"tools,omitempty"`
-	Temperature float64       `json:"temperature,omitempty"`
-	MaxTokens   int           `json:"max_tokens,omitempty"`
-	Stream      bool          `json:"stream,omitempty"`
-	Options     RequestOptions `json:"options,omitempty"`
+	Temperature float64          `json:"temperature,omitempty"`
+	MaxTokens   int              `json:"max_tokens,omitempty"`
+	Stream      bool             `json:"stream,omitempty"`
+	Options     RequestOptions   `json:"options,omitempty"`
 }
 
 // ChatResponse is the shared output model for chat-style model responses.
@@ -49,7 +49,7 @@ type ChatResponse struct {
 }
 
 type RequestOptions struct {
-	TimeoutMs  int         `json:"timeout_ms,omitempty"`
+	TimeoutMs   int         `json:"timeout_ms,omitempty"`
 	RetryPolicy RetryPolicy `json:"retry_policy,omitempty"`
 }
 

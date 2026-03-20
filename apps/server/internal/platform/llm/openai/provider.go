@@ -30,8 +30,8 @@ type requestMessage struct {
 }
 
 type requestTool struct {
-	Type     string               `json:"type"`
-	Function requestToolFunction  `json:"function"`
+	Type     string              `json:"type"`
+	Function requestToolFunction `json:"function"`
 }
 
 type requestToolFunction struct {
@@ -44,7 +44,7 @@ type response struct {
 	Choices []struct {
 		FinishReason string `json:"finish_reason"`
 		Message      struct {
-			Content string `json:"content"`
+			Content   string `json:"content"`
 			ToolCalls []struct {
 				ID       string `json:"id"`
 				Type     string `json:"type"`

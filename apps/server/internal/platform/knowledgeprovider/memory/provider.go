@@ -46,9 +46,9 @@ func (p *Provider) Search(ctx context.Context, req knowledgeprovider.SearchReque
 			Score:      1,
 			Source:     "memory",
 			Metadata: map[string]interface{}{
-				"tenant_id":     docNS.TenantID,
-				"knowledge_id":  docNS.KnowledgeID,
-				"consistency":   knowledgeprovider.ConsistencyStrong,
+				"tenant_id":    docNS.TenantID,
+				"knowledge_id": docNS.KnowledgeID,
+				"consistency":  knowledgeprovider.ConsistencyStrong,
 			},
 		})
 	}

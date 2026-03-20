@@ -8,10 +8,10 @@ type MediaBridgeContract interface {
 }
 
 type BridgeRequest struct {
-	CallID            string
-	WebRTCConnection  string
-	PacketConnection  string
-	PacketProtocol    string
+	CallID           string
+	WebRTCConnection string
+	PacketConnection string
+	PacketProtocol   string
 }
 
 type BridgeSession struct {
@@ -39,12 +39,12 @@ type ConferenceSession struct {
 }
 
 type VoiceQualitySample struct {
-	CallID      string  `json:"call_id"`
-	PacketLoss  float64 `json:"packet_loss"`
-	JitterMs    float64 `json:"jitter_ms"`
-	RTTMs       float64 `json:"rtt_ms"`
-	MOS         float64 `json:"mos"`
-	Source      string  `json:"source"`
+	CallID     string  `json:"call_id"`
+	PacketLoss float64 `json:"packet_loss"`
+	JitterMs   float64 `json:"jitter_ms"`
+	RTTMs      float64 `json:"rtt_ms"`
+	MOS        float64 `json:"mos"`
+	Source     string  `json:"source"`
 }
 
 type VoiceQualityMetricsSink interface {

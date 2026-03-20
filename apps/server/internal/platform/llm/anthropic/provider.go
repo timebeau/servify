@@ -16,12 +16,12 @@ import (
 )
 
 type request struct {
-	Model       string        `json:"model"`
-	Messages    []message     `json:"messages"`
-	System      string        `json:"system,omitempty"`
-	MaxTokens   int           `json:"max_tokens"`
-	Temperature float64       `json:"temperature,omitempty"`
-	Tools       []tool        `json:"tools,omitempty"`
+	Model       string    `json:"model"`
+	Messages    []message `json:"messages"`
+	System      string    `json:"system,omitempty"`
+	MaxTokens   int       `json:"max_tokens"`
+	Temperature float64   `json:"temperature,omitempty"`
+	Tools       []tool    `json:"tools,omitempty"`
 }
 
 type message struct {
@@ -36,14 +36,14 @@ type tool struct {
 }
 
 type response struct {
-	ID           string `json:"id"`
-	Model        string `json:"model"`
-	StopReason   string `json:"stop_reason"`
-	Content      []struct {
-		Type  string `json:"type"`
-		Text  string `json:"text,omitempty"`
-		ID    string `json:"id,omitempty"`
-		Name  string `json:"name,omitempty"`
+	ID         string `json:"id"`
+	Model      string `json:"model"`
+	StopReason string `json:"stop_reason"`
+	Content    []struct {
+		Type  string                 `json:"type"`
+		Text  string                 `json:"text,omitempty"`
+		ID    string                 `json:"id,omitempty"`
+		Name  string                 `json:"name,omitempty"`
 		Input map[string]interface{} `json:"input,omitempty"`
 	} `json:"content"`
 	Usage *struct {

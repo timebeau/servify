@@ -5,14 +5,14 @@ import "time"
 type Protocol string
 
 const (
-	ProtocolSIP          Protocol = "sip"
-	ProtocolSIPWebSocket Protocol = "sip-ws"
-	ProtocolWebRTC       Protocol = "webrtc"
-	ProtocolRTP          Protocol = "rtp"
-	ProtocolSRTP         Protocol = "srtp"
-	ProtocolPSTNProvider Protocol = "pstn-provider"
-	ProtocolH323         Protocol = "h323"
-	ProtocolFreeSWITCHESL Protocol = "freeswitch-esl"
+	ProtocolSIP                 Protocol = "sip"
+	ProtocolSIPWebSocket        Protocol = "sip-ws"
+	ProtocolWebRTC              Protocol = "webrtc"
+	ProtocolRTP                 Protocol = "rtp"
+	ProtocolSRTP                Protocol = "srtp"
+	ProtocolPSTNProvider        Protocol = "pstn-provider"
+	ProtocolH323                Protocol = "h323"
+	ProtocolFreeSWITCHESL       Protocol = "freeswitch-esl"
 	ProtocolHostedVendorWebhook Protocol = "hosted-vendor-webhook"
 )
 

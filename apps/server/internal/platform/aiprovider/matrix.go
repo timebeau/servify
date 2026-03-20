@@ -26,9 +26,9 @@ const (
 )
 
 type CapabilityDeclaration struct {
-	Name     CapabilityName     `json:"name"`
-	Enabled  bool               `json:"enabled"`
-	Metadata map[string]any     `json:"metadata,omitempty"`
+	Name     CapabilityName `json:"name"`
+	Enabled  bool           `json:"enabled"`
+	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
 type CircuitBreakerPolicy struct {
