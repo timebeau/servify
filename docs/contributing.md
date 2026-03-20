@@ -7,6 +7,7 @@
 - If you touched generated assets, rebuild them and verify the diff is intentional
 - If you touched runtime/build boundaries, run `sh scripts/check-repo-hygiene.sh`
 - If you touched handler-to-module wiring, run `sh scripts/check-module-boundaries.sh`
+- If you changed a locked boundary, update `scripts/module-boundaries.rules` and the corresponding `docs/implementation/10-*.md` docs together
 - If you changed workflow, architecture, or backlog scope, update the relevant docs
 
 ## Repo hygiene

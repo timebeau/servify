@@ -2,6 +2,19 @@
 
 本文件定义 `handlers`、`services`、`modules` 三层在迁移阶段的职责与依赖方向，用于支持 M5 的边界治理。
 
+可执行规则来源：
+
+- [scripts/module-boundaries.rules](../../scripts/module-boundaries.rules)
+  - 这是当前边界检查的规则清单
+- [scripts/check-module-boundaries.sh](../../scripts/check-module-boundaries.sh)
+  - 这是规则执行器
+
+维护约定：
+
+- 新增一个已收口模块时，优先更新 `scripts/module-boundaries.rules`
+- 文档中的“当前已锁定的边界”应与规则清单保持一致
+- 如果文档与规则冲突，以规则清单和 CI 结果为准，再回补文档
+
 ## 目标规则
 
 - `handlers/*`
@@ -50,6 +63,11 @@
   - HTTP / health / metrics 入口必须走 `modules/ai/delivery.HandlerService`
 - `conversation`
   - websocket persistence 入口必须走 `modules/conversation/delivery.WebSocketMessageWriter`
+
+对应规则：
+
+- `handler` / `runtime` 规则记录在 `scripts/module-boundaries.rules`
+- `conversation` 的 websocket persistence 与 `AIAssembly` 的双入口规则也记录在同一规则文件
 
 ## Legacy Service Freeze Policy
 

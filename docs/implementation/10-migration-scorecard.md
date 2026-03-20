@@ -13,6 +13,11 @@
 - `stabilized`
   - 已收口，且有 CI / 文档 / 兼容职责规则持续守护
 
+判定补充：
+
+- 若某能力已经收口，但尚未进入 `scripts/module-boundaries.rules`，不能标记为 `stabilized`
+- 若文档已声明收口，但 CI 规则尚未覆盖，最多只能标记为 `contracted`
+
 ## Scorecard
 
 | Capability | Handler Entry | Runtime Entry | Legacy Service Role | Status | Notes |
@@ -31,6 +36,7 @@
 ## 当前结论
 
 - `ticket`、`agent`、`analytics`、`routing`、`conversation runtime`、`ai` 已具备持续守护条件
+- 上述 `stabilized` 条目都已进入 `scripts/module-boundaries.rules`
 - 旧 `services/*` 仍然存在，但对这些能力来说，已不再是 HTTP 默认入口
 - 下一阶段重点不再是“再找一个模块收口”，而是：
   - 扩大 scorecard 覆盖范围
