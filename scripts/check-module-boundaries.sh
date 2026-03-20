@@ -4,6 +4,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+RULES_FILE="$ROOT_DIR/scripts/module-boundaries.rules"
 
 has_error=0
 
@@ -64,62 +65,34 @@ check_runtime_contract() {
     "Runtime must keep ${label} behind ${contract_expr}."
 }
 
-handler_specs=(
-  "Agent|apps/server/internal/handlers/agent_handler.go|agentService|agentdelivery\\.HandlerService|func NewAgentHandler\\(agentService agentdelivery\\.HandlerService, logger \\*logrus\\.Logger\\)|\\*services\\.AgentService"
-  "Ticket|apps/server/internal/handlers/ticket_handler.go|ticketService|ticketdelivery\\.HandlerService|func NewTicketHandler\\(ticketService ticketdelivery\\.HandlerService, logger \\*logrus\\.Logger\\)|\\*services\\.TicketService"
-  "Statistics|apps/server/internal/handlers/statistics_handler.go|statsService|analyticsdelivery\\.HandlerService|func NewStatisticsHandler\\(statsService analyticsdelivery\\.HandlerService, logger \\*logrus\\.Logger\\)|\\*services\\.StatisticsService"
-  "Session transfer|apps/server/internal/handlers/session_transfer_handler.go|transferService|routingdelivery\\.HandlerService|func NewSessionTransferHandler\\(transferService routingdelivery\\.HandlerService, logger \\*logrus\\.Logger\\)|\\*services\\.SessionTransferService"
-  "AI|apps/server/internal/handlers/ai_handler.go|aiService|aidelivery\\.HandlerService|func NewAIHandler\\(aiService aidelivery\\.HandlerService\\)|aiService services\\.AIServiceInterface"
-)
+if [[ ! -f "$RULES_FILE" ]]; then
+  echo "Rules file not found: $RULES_FILE"
+  exit 1
+fi
 
-runtime_specs=(
-  "agent handlers|AgentHandlerService|agentdelivery\\.HandlerService"
-  "ticket handlers|TicketHandlerService|ticketdelivery\\.HandlerService"
-  "statistics handlers|StatisticsHandlerService|analyticsdelivery\\.HandlerService"
-  "session transfer handlers|TransferHandlerService|routingdelivery\\.HandlerService"
-  "AI handlers|AIHandlerService|aidelivery\\.HandlerService"
-)
+while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
+  line="${raw_line#"${raw_line%%[![:space:]]*}"}"
+  if [[ -z "$line" || "$line" == \#* ]]; then
+    continue
+  fi
 
-for spec in "${handler_specs[@]}"; do
-  IFS='|' read -r label file field_name contract_expr constructor_pattern forbidden_pattern <<<"$spec"
-  check_handler_contract "$label" "$file" "$field_name" "$contract_expr" "$constructor_pattern" "$forbidden_pattern"
-done
-
-for spec in "${runtime_specs[@]}"; do
-  IFS='|' read -r label contract_field contract_expr <<<"$spec"
-  check_runtime_contract "$label" "$contract_field" "$contract_expr"
-done
-
-require_pattern \
-  "apps/server/internal/handlers/health_enhanced.go" \
-  'aiService aidelivery\.HandlerService' \
-  "Enhanced health handler must store modules/ai/delivery.HandlerService."
-
-require_pattern \
-  "apps/server/internal/services/websocket.go" \
-  'conversationWriter conversationdelivery\.WebSocketMessageWriter' \
-  "WebSocket hub must store the public conversationdelivery.WebSocketMessageWriter contract."
-require_pattern \
-  "apps/server/internal/services/websocket.go" \
-  'func \(h \*WebSocketHub\) SetConversationMessageWriter\(writer conversationdelivery\.WebSocketMessageWriter\)' \
-  "WebSocket hub must accept conversationdelivery.WebSocketMessageWriter."
-require_pattern \
-  "apps/server/internal/app/server/runtime.go" \
-  'SetConversationMessageWriter\(conversationdelivery\.NewWebSocketMessageAdapter\(conversationService\)\)' \
-  "Main runtime must wire conversation websocket persistence through the module delivery adapter."
-require_pattern \
-  "apps/server/internal/app/server/realtime_runtime.go" \
-  'SetConversationMessageWriter\(conversationdelivery\.NewWebSocketMessageAdapter\(conversationService\)\)' \
-  "Realtime runtime must wire conversation websocket persistence through the module delivery adapter."
-
-require_pattern \
-  "apps/server/internal/app/server/ai_runtime.go" \
-  'Service[[:space:]]+aidelivery\.HandlerService' \
-  "AI assembly must expose the handler-facing AI contract."
-require_pattern \
-  "apps/server/internal/app/server/ai_runtime.go" \
-  'RuntimeService[[:space:]]+services\.AIServiceInterface' \
-  "AI assembly must keep a separate runtime AIServiceInterface for non-handler callers."
+  IFS='|' read -r kind a b c d e f <<<"$line"
+  case "$kind" in
+    handler)
+      check_handler_contract "$a" "$b" "$c" "$d" "$e" "$f"
+      ;;
+    runtime)
+      check_runtime_contract "$a" "$b" "$c"
+      ;;
+    require)
+      require_pattern "$a" "$b" "$c"
+      ;;
+    *)
+      echo "Unknown rule kind in $RULES_FILE: $kind"
+      has_error=1
+      ;;
+  esac
+done < "$RULES_FILE"
 
 if [[ "$has_error" -ne 0 ]]; then
   exit 1

@@ -1,0 +1,24 @@
+# format:
+# handler|Label|file|field_name|contract_expr|constructor_pattern|forbidden_pattern
+# runtime|Label|contract_field|contract_expr
+# require|file|pattern|message
+
+handler|Agent|apps/server/internal/handlers/agent_handler.go|agentService|agentdelivery\.HandlerService|func NewAgentHandler\(agentService agentdelivery\.HandlerService, logger \*logrus\.Logger\)|\*services\.AgentService
+handler|Ticket|apps/server/internal/handlers/ticket_handler.go|ticketService|ticketdelivery\.HandlerService|func NewTicketHandler\(ticketService ticketdelivery\.HandlerService, logger \*logrus\.Logger\)|\*services\.TicketService
+handler|Statistics|apps/server/internal/handlers/statistics_handler.go|statsService|analyticsdelivery\.HandlerService|func NewStatisticsHandler\(statsService analyticsdelivery\.HandlerService, logger \*logrus\.Logger\)|\*services\.StatisticsService
+handler|Session transfer|apps/server/internal/handlers/session_transfer_handler.go|transferService|routingdelivery\.HandlerService|func NewSessionTransferHandler\(transferService routingdelivery\.HandlerService, logger \*logrus\.Logger\)|\*services\.SessionTransferService
+handler|AI|apps/server/internal/handlers/ai_handler.go|aiService|aidelivery\.HandlerService|func NewAIHandler\(aiService aidelivery\.HandlerService\)|aiService services\.AIServiceInterface
+
+runtime|agent handlers|AgentHandlerService|agentdelivery\.HandlerService
+runtime|ticket handlers|TicketHandlerService|ticketdelivery\.HandlerService
+runtime|statistics handlers|StatisticsHandlerService|analyticsdelivery\.HandlerService
+runtime|session transfer handlers|TransferHandlerService|routingdelivery\.HandlerService
+runtime|AI handlers|AIHandlerService|aidelivery\.HandlerService
+
+require|apps/server/internal/handlers/health_enhanced.go|aiService aidelivery\.HandlerService|Enhanced health handler must store modules/ai/delivery.HandlerService.
+require|apps/server/internal/services/websocket.go|conversationWriter conversationdelivery\.WebSocketMessageWriter|WebSocket hub must store the public conversationdelivery.WebSocketMessageWriter contract.
+require|apps/server/internal/services/websocket.go|func \(h \*WebSocketHub\) SetConversationMessageWriter\(writer conversationdelivery\.WebSocketMessageWriter\)|WebSocket hub must accept conversationdelivery.WebSocketMessageWriter.
+require|apps/server/internal/app/server/runtime.go|SetConversationMessageWriter\(conversationdelivery\.NewWebSocketMessageAdapter\(conversationService\)\)|Main runtime must wire conversation websocket persistence through the module delivery adapter.
+require|apps/server/internal/app/server/realtime_runtime.go|SetConversationMessageWriter\(conversationdelivery\.NewWebSocketMessageAdapter\(conversationService\)\)|Realtime runtime must wire conversation websocket persistence through the module delivery adapter.
+require|apps/server/internal/app/server/ai_runtime.go|Service[[:space:]]+aidelivery\.HandlerService|AI assembly must expose the handler-facing AI contract.
+require|apps/server/internal/app/server/ai_runtime.go|RuntimeService[[:space:]]+services\.AIServiceInterface|AI assembly must keep a separate runtime AIServiceInterface for non-handler callers.
