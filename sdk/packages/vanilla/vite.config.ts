@@ -7,6 +7,11 @@ export default defineConfig({
       insertTypesEntry: true,
       outDir: 'dist',
       include: ['src/**/*'],
+      compilerOptions: {
+        preserveSymlinks: false,
+      },
+      rollupTypes: true,
+      tsconfigPath: './tsconfig.json',
     }),
   ],
   build: {
