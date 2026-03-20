@@ -17,5 +17,6 @@ VANILLA_DIST="$SDK_DIR/packages/vanilla/dist"
 # Copy and rename bundles
 cp -f "$VANILLA_DIST/index.esm.js" "$DEMO_SDK_DIR/servify-sdk.esm.js"
 cp -f "$VANILLA_DIST/index.js" "$DEMO_SDK_DIR/servify-sdk.umd.js"
+cp -f "$VANILLA_DIST/index.d.ts" "$DEMO_SDK_DIR/index.d.ts"
 
 echo "✅ SDK synced to apps/demo-web/sdk"

@@ -11,7 +11,7 @@
 
 ## 使用最新 SDK（重要）
 
-本目录下的 `sdk/servify-sdk.umd.js`、`sdk/servify-sdk.esm.js`、`sdk/index.d.ts` 不再纳入版本控制，构建时由 SDK 包产物同步生成。
+本目录下的 `sdk/servify-sdk.umd.js`、`sdk/servify-sdk.esm.js`、`sdk/index.d.ts` 由 SDK 包产物同步生成，并保持提交到仓库，以满足 CI 的生成产物校验。
 
 同步方式：
 - 全量构建并同步（推荐）：
