@@ -33,9 +33,14 @@
 3. `03-business-modules`：已清零
 4. `04-sdk-and-channel-adapters`：已清零
 
-第二阶段推荐开工顺序：
+第二阶段状态：
 
-1. `05-engineering-hardening` 的 `H1 ci-quality-gates`
-2. `06-voice-and-protocol-expansion` 的 `V1 protocol-end-to-end`
-3. `07-sdk-multi-surface` 的 `M1 web-sdk-completion`
-4. `08-ai-provider-expansion` 的 `A1 provider-matrix`
+1. `05-engineering-hardening`：已清零
+2. `06-voice-and-protocol-expansion`：已清零
+3. `07-sdk-multi-surface`：已清零
+4. `08-ai-provider-expansion`：已清零
+
+当前状态：
+
+- `01` 到 `08` 全部 backlog 已清零
+- 后续新增任务应新开专题 backlog，避免回填旧任务包
