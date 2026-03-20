@@ -7,6 +7,7 @@ import (
 	agentdelivery "servify/apps/server/internal/modules/agent/delivery"
 	aidelivery "servify/apps/server/internal/modules/ai/delivery"
 	analyticsdelivery "servify/apps/server/internal/modules/analytics/delivery"
+	automationdelivery "servify/apps/server/internal/modules/automation/delivery"
 	conversationapp "servify/apps/server/internal/modules/conversation/application"
 	conversationdelivery "servify/apps/server/internal/modules/conversation/delivery"
 	conversationinfra "servify/apps/server/internal/modules/conversation/infra"
@@ -63,6 +64,7 @@ type Runtime struct {
 	StatisticsService        *services.StatisticsService
 	SLAService               *services.SLAService
 	ShiftService             *services.ShiftService
+	AutomationHandlerService automationdelivery.HandlerService
 	AutomationService        *services.AutomationService
 	KnowledgeDocService      *services.KnowledgeDocService
 	SuggestionService        *services.SuggestionService
@@ -125,6 +127,7 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 
 	rt.SLAService = services.NewSLAService(db, logger)
 	rt.AutomationService = services.NewAutomationService(db, logger)
+	rt.AutomationHandlerService = services.NewAutomationHandlerAdapter(rt.AutomationService)
 	rt.AutomationService.SetEventBus(bus)
 	rt.SLAService.SetAutomationService(rt.AutomationService)
 
@@ -202,6 +205,7 @@ func (rt *Runtime) RouterDependencies() Dependencies {
 		StatisticsHandlerService: rt.StatisticsHandlerService,
 		SLAService:               rt.SLAService,
 		ShiftService:             rt.ShiftService,
+		AutomationHandlerService: rt.AutomationHandlerService,
 		AutomationService:        rt.AutomationService,
 		KnowledgeDocService:      rt.KnowledgeDocService,
 		SuggestionService:        rt.SuggestionService,

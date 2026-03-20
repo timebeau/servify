@@ -4,7 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"servify/apps/server/internal/services"
+	automationapp "servify/apps/server/internal/modules/automation/application"
+	automationdelivery "servify/apps/server/internal/modules/automation/delivery"
 
 	"github.com/gin-gonic/gin"
 )
@@ -12,10 +13,10 @@ import (
 // AutomationHandler 管理自动化触发器
 // 说明：当前版本提供最小 CRUD，动作/条件由前端传递 JSON。
 type AutomationHandler struct {
-	service *services.AutomationService
+	service automationdelivery.HandlerService
 }
 
-func NewAutomationHandler(service *services.AutomationService) *AutomationHandler {
+func NewAutomationHandler(service automationdelivery.HandlerService) *AutomationHandler {
 	return &AutomationHandler{service: service}
 }
 
@@ -31,7 +32,7 @@ func (h *AutomationHandler) ListTriggers(c *gin.Context) {
 
 // CreateTrigger 创建触发器
 func (h *AutomationHandler) CreateTrigger(c *gin.Context) {
-	var req services.AutomationTriggerRequest
+	var req automationapp.TriggerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid request", Message: err.Error()})
 		return
@@ -69,7 +70,7 @@ func (h *AutomationHandler) DeleteTrigger(c *gin.Context) {
 
 // ListRuns 获取自动化执行记录
 func (h *AutomationHandler) ListRuns(c *gin.Context) {
-	var req services.AutomationRunListRequest
+	var req automationapp.RunListQuery
 	if err := c.ShouldBindQuery(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid query parameters", Message: err.Error()})
 		return
@@ -92,7 +93,7 @@ func (h *AutomationHandler) ListRuns(c *gin.Context) {
 
 // RunBatch 批量执行某个自动化 event（支持 dry-run）
 func (h *AutomationHandler) RunBatch(c *gin.Context) {
-	var req services.AutomationBatchRunRequest
+	var req automationapp.BatchRunRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid request", Message: err.Error()})
 		return

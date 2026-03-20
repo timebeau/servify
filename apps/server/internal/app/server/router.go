@@ -7,6 +7,7 @@ import (
 	agentdelivery "servify/apps/server/internal/modules/agent/delivery"
 	aidelivery "servify/apps/server/internal/modules/ai/delivery"
 	analyticsdelivery "servify/apps/server/internal/modules/analytics/delivery"
+	automationdelivery "servify/apps/server/internal/modules/automation/delivery"
 	customerdelivery "servify/apps/server/internal/modules/customer/delivery"
 	routingdelivery "servify/apps/server/internal/modules/routing/delivery"
 	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
@@ -47,6 +48,7 @@ type Dependencies struct {
 	StatisticsHandlerService analyticsdelivery.HandlerService
 	SLAService               *services.SLAService
 	ShiftService             *services.ShiftService
+	AutomationHandlerService automationdelivery.HandlerService
 	AutomationService        *services.AutomationService
 	KnowledgeDocService      *services.KnowledgeDocService
 	SuggestionService        *services.SuggestionService
@@ -119,7 +121,7 @@ func registerManagementRoutes(r *gin.Engine, deps Dependencies) {
 
 	automationAPI := api.Group("/")
 	automationAPI.Use(middleware.RequireResourcePermission("automation"))
-	handlers.RegisterAutomationRoutes(automationAPI, handlers.NewAutomationHandler(deps.AutomationService))
+	handlers.RegisterAutomationRoutes(automationAPI, handlers.NewAutomationHandler(deps.AutomationHandlerService))
 
 	knowledgeAPI := api.Group("/")
 	knowledgeAPI.Use(middleware.RequireResourcePermission("knowledge"))
