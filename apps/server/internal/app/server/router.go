@@ -5,6 +5,7 @@ import (
 	"servify/apps/server/internal/handlers"
 	"servify/apps/server/internal/middleware"
 	agentdelivery "servify/apps/server/internal/modules/agent/delivery"
+	aidelivery "servify/apps/server/internal/modules/ai/delivery"
 	analyticsdelivery "servify/apps/server/internal/modules/analytics/delivery"
 	routingdelivery "servify/apps/server/internal/modules/routing/delivery"
 	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
@@ -24,6 +25,7 @@ type Dependencies struct {
 	Logger                   *logrus.Logger
 	DB                       *gorm.DB
 	AIService                services.AIServiceInterface
+	AIHandlerService         aidelivery.HandlerService
 	RealtimeGateway          realtimeplatform.RealtimeGateway
 	RTCGateway               realtimeplatform.RTCGateway
 	MessageRouter            *services.MessageRouter
@@ -156,7 +158,7 @@ func registerRealtimeRoutes(r *gin.Engine, deps Dependencies) {
 	messageHandler := handlers.NewMessageHandler(deps.MessageRouter)
 	v1.GET("/messages/platforms", messageHandler.GetPlatformStats)
 
-	aiHandler := handlers.NewAIHandler(deps.AIService)
+	aiHandler := handlers.NewAIHandler(deps.AIHandlerService)
 	aiAPI := v1.Group("/ai")
 	aiAPI.POST("/query", aiHandler.ProcessQuery)
 	aiAPI.GET("/status", aiHandler.GetStatus)

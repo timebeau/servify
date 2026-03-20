@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	aidelivery "servify/apps/server/internal/modules/ai/delivery"
 	"servify/apps/server/internal/services"
 )
 
@@ -70,7 +71,7 @@ func TestAIHandler_GetMetrics_EnhancedService(t *testing.T) {
 		weKnoraEnabled: true,
 	}
 	mockService.InitializeKnowledgeBase()
-	handler := NewAIHandler(mockService)
+	handler := NewAIHandler(aidelivery.NewHandlerServiceAdapter(mockService))
 
 	router := gin.New()
 	router.GET("/api/v1/ai/metrics", handler.GetMetrics)
@@ -103,7 +104,7 @@ func TestAIHandler_GetMetrics_StandardService(t *testing.T) {
 
 	baseService := services.NewAIService("", "")
 	baseService.InitializeKnowledgeBase()
-	handler := NewAIHandler(baseService)
+	handler := NewAIHandler(aidelivery.NewHandlerServiceAdapter(baseService))
 
 	router := gin.New()
 	router.GET("/api/v1/ai/metrics", handler.GetMetrics)
@@ -126,7 +127,7 @@ func TestAIHandler_UploadDocument_EnhancedService(t *testing.T) {
 		weKnoraEnabled: true,
 	}
 	mockService.InitializeKnowledgeBase()
-	handler := NewAIHandler(mockService)
+	handler := NewAIHandler(aidelivery.NewHandlerServiceAdapter(mockService))
 
 	router := gin.New()
 	router.POST("/api/v1/ai/upload", handler.UploadDocument)
@@ -157,7 +158,7 @@ func TestAIHandler_UploadDocument_InvalidRequest(t *testing.T) {
 		weKnoraEnabled: true,
 	}
 	mockService.InitializeKnowledgeBase()
-	handler := NewAIHandler(mockService)
+	handler := NewAIHandler(aidelivery.NewHandlerServiceAdapter(mockService))
 
 	router := gin.New()
 	router.POST("/api/v1/ai/upload", handler.UploadDocument)
@@ -184,7 +185,7 @@ func TestAIHandler_UploadDocument_StandardService(t *testing.T) {
 
 	baseService := services.NewAIService("", "")
 	baseService.InitializeKnowledgeBase()
-	handler := NewAIHandler(baseService)
+	handler := NewAIHandler(aidelivery.NewHandlerServiceAdapter(baseService))
 
 	router := gin.New()
 	router.POST("/api/v1/ai/upload", handler.UploadDocument)
@@ -214,7 +215,7 @@ func TestAIHandler_SyncKnowledgeBase_EnhancedService(t *testing.T) {
 		weKnoraEnabled: true,
 	}
 	mockService.InitializeKnowledgeBase()
-	handler := NewAIHandler(mockService)
+	handler := NewAIHandler(aidelivery.NewHandlerServiceAdapter(mockService))
 
 	router := gin.New()
 	router.POST("/api/v1/ai/sync", handler.SyncKnowledgeBase)
@@ -234,7 +235,7 @@ func TestAIHandler_SyncKnowledgeBase_StandardService(t *testing.T) {
 
 	baseService := services.NewAIService("", "")
 	baseService.InitializeKnowledgeBase()
-	handler := NewAIHandler(baseService)
+	handler := NewAIHandler(aidelivery.NewHandlerServiceAdapter(baseService))
 
 	router := gin.New()
 	router.POST("/api/v1/ai/sync", handler.SyncKnowledgeBase)
@@ -257,7 +258,7 @@ func TestAIHandler_EnableWeKnora_EnhancedService(t *testing.T) {
 		weKnoraEnabled: false,
 	}
 	mockService.InitializeKnowledgeBase()
-	handler := NewAIHandler(mockService)
+	handler := NewAIHandler(aidelivery.NewHandlerServiceAdapter(mockService))
 
 	router := gin.New()
 	router.POST("/api/v1/ai/weknora/enable", handler.EnableWeKnora)
@@ -281,7 +282,7 @@ func TestAIHandler_EnableWeKnora_StandardService(t *testing.T) {
 
 	baseService := services.NewAIService("", "")
 	baseService.InitializeKnowledgeBase()
-	handler := NewAIHandler(baseService)
+	handler := NewAIHandler(aidelivery.NewHandlerServiceAdapter(baseService))
 
 	router := gin.New()
 	router.POST("/api/v1/ai/weknora/enable", handler.EnableWeKnora)
@@ -304,7 +305,7 @@ func TestAIHandler_DisableWeKnora_EnhancedService(t *testing.T) {
 		weKnoraEnabled: true,
 	}
 	mockService.InitializeKnowledgeBase()
-	handler := NewAIHandler(mockService)
+	handler := NewAIHandler(aidelivery.NewHandlerServiceAdapter(mockService))
 
 	router := gin.New()
 	router.POST("/api/v1/ai/weknora/disable", handler.DisableWeKnora)
@@ -328,7 +329,7 @@ func TestAIHandler_DisableWeKnora_StandardService(t *testing.T) {
 
 	baseService := services.NewAIService("", "")
 	baseService.InitializeKnowledgeBase()
-	handler := NewAIHandler(baseService)
+	handler := NewAIHandler(aidelivery.NewHandlerServiceAdapter(baseService))
 
 	router := gin.New()
 	router.POST("/api/v1/ai/weknora/disable", handler.DisableWeKnora)
@@ -351,7 +352,7 @@ func TestAIHandler_ResetCircuitBreaker_EnhancedService(t *testing.T) {
 		weKnoraEnabled: true,
 	}
 	mockService.InitializeKnowledgeBase()
-	handler := NewAIHandler(mockService)
+	handler := NewAIHandler(aidelivery.NewHandlerServiceAdapter(mockService))
 
 	router := gin.New()
 	router.POST("/api/v1/ai/circuit-breaker/reset", handler.ResetCircuitBreaker)
@@ -371,7 +372,7 @@ func TestAIHandler_ResetCircuitBreaker_StandardService(t *testing.T) {
 
 	baseService := services.NewAIService("", "")
 	baseService.InitializeKnowledgeBase()
-	handler := NewAIHandler(baseService)
+	handler := NewAIHandler(aidelivery.NewHandlerServiceAdapter(baseService))
 
 	router := gin.New()
 	router.POST("/api/v1/ai/circuit-breaker/reset", handler.ResetCircuitBreaker)
@@ -394,7 +395,7 @@ func TestAIHandler_ProcessQuery_EnhancedService(t *testing.T) {
 		weKnoraEnabled: true,
 	}
 	mockService.InitializeKnowledgeBase()
-	handler := NewAIHandler(mockService)
+	handler := NewAIHandler(aidelivery.NewHandlerServiceAdapter(mockService))
 
 	router := gin.New()
 	router.POST("/api/v1/ai/query", handler.ProcessQuery)
@@ -424,7 +425,7 @@ func TestAIHandler_ProcessQuery_MissingQuery(t *testing.T) {
 		weKnoraEnabled: true,
 	}
 	mockService.InitializeKnowledgeBase()
-	handler := NewAIHandler(mockService)
+	handler := NewAIHandler(aidelivery.NewHandlerServiceAdapter(mockService))
 
 	router := gin.New()
 	router.POST("/api/v1/ai/query", handler.ProcessQuery)
@@ -453,7 +454,7 @@ func TestAIHandler_ProcessQuery_InvalidJSON(t *testing.T) {
 		weKnoraEnabled: true,
 	}
 	mockService.InitializeKnowledgeBase()
-	handler := NewAIHandler(mockService)
+	handler := NewAIHandler(aidelivery.NewHandlerServiceAdapter(mockService))
 
 	router := gin.New()
 	router.POST("/api/v1/ai/query", handler.ProcessQuery)

@@ -7,7 +7,7 @@ import (
 )
 
 func registerHealthRoutes(r routeRegistrar, deps Dependencies) {
-	healthHandler := handlers.NewEnhancedHealthHandler(deps.Config, deps.AIService)
+	healthHandler := handlers.NewEnhancedHealthHandler(deps.Config, deps.AIHandlerService)
 	r.GET("/health", healthHandler.Health)
 	r.GET("/ready", healthHandler.Ready)
 
@@ -15,7 +15,7 @@ func registerHealthRoutes(r routeRegistrar, deps Dependencies) {
 		r.GET(deps.Config.Monitoring.MetricsPath, handlers.NewMetricsHandler(
 			deps.RealtimeGateway,
 			deps.RTCGateway,
-			deps.AIService,
+			deps.AIHandlerService,
 			deps.MessageRouter,
 			deps.DB,
 		).GetMetrics)

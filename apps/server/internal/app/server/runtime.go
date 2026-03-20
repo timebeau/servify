@@ -5,6 +5,7 @@ import (
 
 	"servify/apps/server/internal/config"
 	agentdelivery "servify/apps/server/internal/modules/agent/delivery"
+	aidelivery "servify/apps/server/internal/modules/ai/delivery"
 	analyticsdelivery "servify/apps/server/internal/modules/analytics/delivery"
 	conversationapp "servify/apps/server/internal/modules/conversation/application"
 	conversationdelivery "servify/apps/server/internal/modules/conversation/delivery"
@@ -37,6 +38,7 @@ type Runtime struct {
 	Bus    eventbus.Bus
 
 	AIService                services.AIServiceInterface
+	AIHandlerService         aidelivery.HandlerService
 	WSHub                    *services.WebSocketHub
 	RealtimeGateway          realtimeplatform.RealtimeGateway
 	RTCGateway               realtimeplatform.RTCGateway
@@ -78,7 +80,8 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	if err != nil {
 		return nil, err
 	}
-	rt.AIService = aiAssembly.Service
+	rt.AIService = aiAssembly.RuntimeService
+	rt.AIHandlerService = aiAssembly.Service
 
 	rt.WSHub = services.NewWebSocketHub()
 	rt.RealtimeGateway = realtimeplatform.NewWebSocketAdapter(rt.WSHub)
@@ -175,6 +178,7 @@ func (rt *Runtime) RouterDependencies() Dependencies {
 		Logger:                   rt.Logger,
 		DB:                       rt.DB,
 		AIService:                rt.AIService,
+		AIHandlerService:         rt.AIHandlerService,
 		RealtimeGateway:          rt.RealtimeGateway,
 		RTCGateway:               rt.RTCGateway,
 		MessageRouter:            rt.MessageRouter,

@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"servify/apps/server/internal/config"
+	aidelivery "servify/apps/server/internal/modules/ai/delivery"
 	"servify/apps/server/internal/services"
 )
 
@@ -24,7 +25,7 @@ func TestEnhancedHealthHandler_Health_And_Ready(t *testing.T) {
 	ai := services.NewAIService("", "")
 	ai.InitializeKnowledgeBase()
 
-	h := NewEnhancedHealthHandler(cfg, ai)
+	h := NewEnhancedHealthHandler(cfg, aidelivery.NewHandlerServiceAdapter(ai))
 
 	r := gin.New()
 	r.GET("/health", h.Health)
@@ -57,7 +58,7 @@ func TestEnhancedHealthHandler_Health_WithDatabaseCheck(t *testing.T) {
 	ai := services.NewAIService("", "")
 	ai.InitializeKnowledgeBase()
 
-	h := NewEnhancedHealthHandler(cfg, ai)
+	h := NewEnhancedHealthHandler(cfg, aidelivery.NewHandlerServiceAdapter(ai))
 
 	r := gin.New()
 	r.GET("/health", h.Health)
@@ -84,7 +85,7 @@ func TestEnhancedHealthHandler_Health_WithRedisCheck(t *testing.T) {
 	ai := services.NewAIService("", "")
 	ai.InitializeKnowledgeBase()
 
-	h := NewEnhancedHealthHandler(cfg, ai)
+	h := NewEnhancedHealthHandler(cfg, aidelivery.NewHandlerServiceAdapter(ai))
 
 	r := gin.New()
 	r.GET("/health", h.Health)
@@ -112,7 +113,7 @@ func TestEnhancedHealthHandler_Health_WithWeKnoraCheck(t *testing.T) {
 	ai := services.NewAIService("", "")
 	ai.InitializeKnowledgeBase()
 
-	h := NewEnhancedHealthHandler(cfg, ai)
+	h := NewEnhancedHealthHandler(cfg, aidelivery.NewHandlerServiceAdapter(ai))
 
 	r := gin.New()
 	r.GET("/health", h.Health)

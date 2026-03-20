@@ -33,8 +33,8 @@
 - `ai`
   - 同时存在旧 `services/AIService`、`EnhancedAIService`、`OrchestratedAIService`
   - `OrchestratedAIService` 已是 `modules/ai/application.QueryOrchestrator` 的适配层
-  - handler 仍面向 `AIServiceInterface`，但接口下挂着多套实现
-  - 结论：迁移重点不是单纯改 handler，而是先收敛“哪一个才是默认主路径”
+  - handler 已开始收口到 `modules/ai/delivery.HandlerService`
+  - 结论：迁移重点是继续压缩 legacy `AIServiceInterface` 的 handler 可见面，只保留 runtime 兼容用途
 
 ## 按迁移成熟度分组
 
@@ -112,6 +112,9 @@
 - `conversation / websocket runtime`
   - websocket 持久化入口：`modules/conversation/delivery.WebSocketMessageWriter`
   - `services/WebSocketHub` 定位：runtime connection hub，不再自定义 conversation 私有持久化接口
+- `ai`
+  - HTTP handler 入口：`modules/ai/delivery.HandlerService`
+  - `AIAssembly` 定位：显式区分 handler-facing AI contract 与 runtime-facing `AIServiceInterface`
 
 ## 已确认的兼容职责边界
 
@@ -130,10 +133,13 @@
 - `services/WebSocketHub`
   - 允许保留：连接管理、广播、协议消息分发、对 AI/transfer 的 runtime glue
   - 不应新增：新的 conversation 私有持久化接口、绕过 `modules/conversation/delivery.WebSocketMessageWriter` 的消息落库路径
+- `services/AIServiceInterface` 及 legacy AI types
+  - 允许保留：WebSocketHub、MessageRouter、SessionTransferService 等 runtime 兼容调用面
+  - 不应新增：新的 HTTP handler 直接依赖、继续扩散为默认 AI 主入口
 
 ## 当前自动化守护
 
 - `scripts/check-module-boundaries.sh`
-  - 校验 `ticket` / `agent` / `analytics` / `routing` 的 handler constructor 必须依赖 `modules/*/delivery.HandlerService`
-  - 校验 router/runtime 对这四个模块的注入类型必须停留在 handler-facing contract，并校验 `conversation` 的 websocket persistence 入口必须走 module delivery adapter
+  - 校验 `ticket` / `agent` / `analytics` / `routing` / `ai` 的 handler constructor 必须依赖 `modules/*/delivery.HandlerService`
+  - 校验 router/runtime 对这五个模块的注入类型必须停留在 handler-facing contract，并校验 `conversation` 的 websocket persistence 入口必须走 module delivery adapter
   - 目的：先锁住已完成迁移的入口，避免回退到 handler 直连具体旧 service

@@ -129,6 +129,39 @@ require_pattern \
   'TransferHandlerService\s+routingdelivery\.HandlerService' \
   "Runtime must keep session transfer handler wiring behind routingdelivery.HandlerService."
 
+require_pattern \
+  "apps/server/internal/handlers/ai_handler.go" \
+  'aiService aidelivery\.HandlerService' \
+  "AI handler must store modules/ai/delivery.HandlerService."
+require_pattern \
+  "apps/server/internal/handlers/ai_handler.go" \
+  'func NewAIHandler\(aiService aidelivery\.HandlerService\)' \
+  "AI handler constructor must accept modules/ai/delivery.HandlerService."
+forbid_pattern \
+  "apps/server/internal/handlers/ai_handler.go" \
+  'aiService services\.AIServiceInterface' \
+  "AI handler must not depend on services.AIServiceInterface directly."
+require_pattern \
+  "apps/server/internal/handlers/health_enhanced.go" \
+  'aiService aidelivery\.HandlerService' \
+  "Enhanced health handler must store modules/ai/delivery.HandlerService."
+require_pattern \
+  "apps/server/internal/app/server/router.go" \
+  'AIHandlerService\s+aidelivery\.HandlerService' \
+  "Router dependencies must expose aidelivery.HandlerService for AI handlers."
+require_pattern \
+  "apps/server/internal/app/server/runtime.go" \
+  'AIHandlerService\s+aidelivery\.HandlerService' \
+  "Runtime must keep AI handler wiring behind aidelivery.HandlerService."
+require_pattern \
+  "apps/server/internal/app/server/ai_runtime.go" \
+  'Service\s+aidelivery\.HandlerService' \
+  "AI assembly must expose the handler-facing AI contract."
+require_pattern \
+  "apps/server/internal/app/server/ai_runtime.go" \
+  'RuntimeService services\.AIServiceInterface' \
+  "AI assembly must keep a separate runtime AIServiceInterface for non-handler callers."
+
 if [[ "$has_error" -ne 0 ]]; then
   exit 1
 fi

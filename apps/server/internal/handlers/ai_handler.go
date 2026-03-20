@@ -15,6 +15,7 @@ import (
 	"gorm.io/gorm"
 	"servify/apps/server/internal/config"
 	svrmetrics "servify/apps/server/internal/metrics"
+	aidelivery "servify/apps/server/internal/modules/ai/delivery"
 	"servify/apps/server/internal/platform/realtime"
 	"servify/apps/server/internal/services"
 	"servify/apps/server/internal/version"
@@ -25,12 +26,12 @@ import (
 
 // AIHandler AI 服务处理器
 type AIHandler struct {
-	aiService services.AIServiceInterface
+	aiService aidelivery.HandlerService
 	logger    *logrus.Logger
 }
 
 // NewAIHandler 创建 AI 处理器
-func NewAIHandler(aiService services.AIServiceInterface) *AIHandler {
+func NewAIHandler(aiService aidelivery.HandlerService) *AIHandler {
 	return &AIHandler{
 		aiService: aiService,
 		logger:    logrus.StandardLogger(),
@@ -70,47 +71,24 @@ func (h *AIHandler) ProcessQuery(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
 
-	// 检查是否是增强服务，优先使用增强查询
-	if enhancedService, ok := h.aiService.(services.EnhancedAIServiceInterface); ok {
-		response, err := enhancedService.ProcessQueryEnhanced(ctx, req.Query, req.SessionID)
-		if err != nil {
-			h.logger.Errorf("Enhanced AI query failed: %v", err)
-			c.JSON(http.StatusInternalServerError, QueryResponse{
-				Success:   false,
-				Error:     "AI processing failed: " + err.Error(),
-				Timestamp: time.Now(),
-				Duration:  time.Since(start).String(),
-			})
-			return
-		}
-
-		c.JSON(http.StatusOK, QueryResponse{
-			Success:   true,
-			Data:      response,
+	response, err := h.aiService.ProcessQuery(ctx, req.Query, req.SessionID)
+	if err != nil {
+		h.logger.Errorf("AI query failed: %v", err)
+		c.JSON(http.StatusInternalServerError, QueryResponse{
+			Success:   false,
+			Error:     "AI processing failed: " + err.Error(),
 			Timestamp: time.Now(),
 			Duration:  time.Since(start).String(),
 		})
-	} else {
-		// 使用标准查询
-		response, err := h.aiService.ProcessQuery(ctx, req.Query, req.SessionID)
-		if err != nil {
-			h.logger.Errorf("AI query failed: %v", err)
-			c.JSON(http.StatusInternalServerError, QueryResponse{
-				Success:   false,
-				Error:     "AI processing failed: " + err.Error(),
-				Timestamp: time.Now(),
-				Duration:  time.Since(start).String(),
-			})
-			return
-		}
-
-		c.JSON(http.StatusOK, QueryResponse{
-			Success:   true,
-			Data:      response,
-			Timestamp: time.Now(),
-			Duration:  time.Since(start).String(),
-		})
+		return
 	}
+
+	c.JSON(http.StatusOK, QueryResponse{
+		Success:   true,
+		Data:      response,
+		Timestamp: time.Now(),
+		Duration:  time.Since(start).String(),
+	})
 }
 
 // GetStatus 获取 AI 服务状态
@@ -129,7 +107,7 @@ func (h *AIHandler) GetStatus(c *gin.Context) {
 
 // GetMetrics 获取 AI 服务指标（仅增强服务支持）
 func (h *AIHandler) GetMetrics(c *gin.Context) {
-	enhancedService, ok := h.aiService.(services.EnhancedAIServiceInterface)
+	metrics, ok := h.aiService.GetMetrics()
 	if !ok {
 		c.JSON(http.StatusNotFound, gin.H{
 			"success": false,
@@ -137,8 +115,6 @@ func (h *AIHandler) GetMetrics(c *gin.Context) {
 		})
 		return
 	}
-
-	metrics := enhancedService.GetMetrics()
 
 	c.JSON(http.StatusOK, gin.H{
 		"success":   true,
@@ -156,15 +132,6 @@ type UploadDocumentRequest struct {
 
 // UploadDocument 上传文档到知识库
 func (h *AIHandler) UploadDocument(c *gin.Context) {
-	enhancedService, ok := h.aiService.(services.EnhancedAIServiceInterface)
-	if !ok {
-		c.JSON(http.StatusNotFound, gin.H{
-			"success": false,
-			"error":   "Document upload not available for standard AI service",
-		})
-		return
-	}
-
 	var req UploadDocumentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -177,12 +144,10 @@ func (h *AIHandler) UploadDocument(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
 
-	err := enhancedService.UploadDocumentToWeKnora(ctx, req.Title, req.Content, req.Tags)
-	if err != nil {
-		h.logger.Errorf("Document upload failed: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
+	if err := h.aiService.UploadDocumentToWeKnora(ctx, req.Title, req.Content, req.Tags); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
 			"success": false,
-			"error":   "Document upload failed: " + err.Error(),
+			"error":   err.Error(),
 		})
 		return
 	}
@@ -199,24 +164,13 @@ func (h *AIHandler) UploadDocument(c *gin.Context) {
 
 // SyncKnowledgeBase 同步知识库
 func (h *AIHandler) SyncKnowledgeBase(c *gin.Context) {
-	enhancedService, ok := h.aiService.(services.EnhancedAIServiceInterface)
-	if !ok {
-		c.JSON(http.StatusNotFound, gin.H{
-			"success": false,
-			"error":   "Knowledge base sync not available for standard AI service",
-		})
-		return
-	}
-
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 60*time.Second)
 	defer cancel()
 
-	err := enhancedService.SyncKnowledgeBase(ctx)
-	if err != nil {
-		h.logger.Errorf("Knowledge base sync failed: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
+	if err := h.aiService.SyncKnowledgeBase(ctx); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
 			"success": false,
-			"error":   "Knowledge base sync failed: " + err.Error(),
+			"error":   err.Error(),
 		})
 		return
 	}
@@ -229,16 +183,13 @@ func (h *AIHandler) SyncKnowledgeBase(c *gin.Context) {
 
 // EnableWeKnora 启用 WeKnora
 func (h *AIHandler) EnableWeKnora(c *gin.Context) {
-	enhancedService, ok := h.aiService.(services.EnhancedAIServiceInterface)
-	if !ok {
+	if !h.aiService.SetWeKnoraEnabled(true) {
 		c.JSON(http.StatusNotFound, gin.H{
 			"success": false,
 			"error":   "WeKnora control not available for standard AI service",
 		})
 		return
 	}
-
-	enhancedService.SetWeKnoraEnabled(true)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -248,16 +199,13 @@ func (h *AIHandler) EnableWeKnora(c *gin.Context) {
 
 // DisableWeKnora 禁用 WeKnora
 func (h *AIHandler) DisableWeKnora(c *gin.Context) {
-	enhancedService, ok := h.aiService.(services.EnhancedAIServiceInterface)
-	if !ok {
+	if !h.aiService.SetWeKnoraEnabled(false) {
 		c.JSON(http.StatusNotFound, gin.H{
 			"success": false,
 			"error":   "WeKnora control not available for standard AI service",
 		})
 		return
 	}
-
-	enhancedService.SetWeKnoraEnabled(false)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -267,16 +215,13 @@ func (h *AIHandler) DisableWeKnora(c *gin.Context) {
 
 // ResetCircuitBreaker 重置熔断器
 func (h *AIHandler) ResetCircuitBreaker(c *gin.Context) {
-	enhancedService, ok := h.aiService.(services.EnhancedAIServiceInterface)
-	if !ok {
+	if !h.aiService.ResetCircuitBreaker() {
 		c.JSON(http.StatusNotFound, gin.H{
 			"success": false,
 			"error":   "Circuit breaker control not available for standard AI service",
 		})
 		return
 	}
-
-	enhancedService.ResetCircuitBreaker()
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -288,14 +233,14 @@ func (h *AIHandler) ResetCircuitBreaker(c *gin.Context) {
 type MetricsHandler struct {
 	wsHub         realtime.RealtimeGateway
 	webrtcService realtime.RTCGateway
-	aiService     services.AIServiceInterface
+	aiService     aidelivery.HandlerService
 	messageRouter *services.MessageRouter
 	startedAt     time.Time
 	db            *gorm.DB
 }
 
 // NewMetricsHandler 创建指标处理器
-func NewMetricsHandler(wsHub realtime.RealtimeGateway, webrtc realtime.RTCGateway, ai services.AIServiceInterface, router *services.MessageRouter, db *gorm.DB) *MetricsHandler {
+func NewMetricsHandler(wsHub realtime.RealtimeGateway, webrtc realtime.RTCGateway, ai aidelivery.HandlerService, router *services.MessageRouter, db *gorm.DB) *MetricsHandler {
 	return &MetricsHandler{wsHub: wsHub, webrtcService: webrtc, aiService: ai, messageRouter: router, startedAt: time.Now(), db: db}
 }
 
@@ -316,8 +261,7 @@ func (h *MetricsHandler) GetMetrics(c *gin.Context) {
 
 	var aiQueries, aiWeKnora, aiFallback int64
 	var aiAvgLatency float64
-	if enh, ok := h.aiService.(services.EnhancedAIServiceInterface); ok && enh.GetMetrics() != nil {
-		m := enh.GetMetrics()
+	if m, ok := h.aiService.GetMetrics(); ok && m != nil {
 		aiQueries = m.QueryCount
 		aiWeKnora = m.WeKnoraUsageCount
 		aiFallback = m.FallbackUsageCount
@@ -436,12 +380,12 @@ func (h *MetricsHandler) GetMetrics(c *gin.Context) {
 // UploadHandler 文件上传处理器
 type UploadHandler struct {
 	config    *config.Config
-	aiService services.AIServiceInterface
+	aiService aidelivery.HandlerService
 	logger    *logrus.Logger
 }
 
 // NewUploadHandler 创建文件上传处理器
-func NewUploadHandler(cfg *config.Config, aiService services.AIServiceInterface) *UploadHandler {
+func NewUploadHandler(cfg *config.Config, aiService aidelivery.HandlerService) *UploadHandler {
 	return &UploadHandler{
 		config:    cfg,
 		aiService: aiService,
@@ -543,12 +487,11 @@ func (h *UploadHandler) UploadFile(c *gin.Context) {
 
 	// 4. 如果启用自动索引，上传到 WeKnora
 	if h.config.Upload.AutoIndex {
-		if enhancedService, ok := h.aiService.(services.EnhancedAIServiceInterface); ok {
+		if h.aiService != nil {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 
-			err := enhancedService.UploadDocumentToWeKnora(ctx, header.Filename, extractedText, []string{"uploaded_file"})
-			if err != nil {
+			if err := h.aiService.UploadDocumentToWeKnora(ctx, header.Filename, extractedText, []string{"uploaded_file"}); err != nil {
 				h.logger.Warnf("Failed to index file in WeKnora: %v", err)
 			}
 		}

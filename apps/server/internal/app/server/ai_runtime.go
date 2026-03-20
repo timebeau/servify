@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"servify/apps/server/internal/config"
+	aidelivery "servify/apps/server/internal/modules/ai/delivery"
 	weknorakp "servify/apps/server/internal/platform/knowledgeprovider/weknora"
 	"servify/apps/server/internal/platform/llm/openai"
 	"servify/apps/server/internal/services"
@@ -21,7 +22,8 @@ type AIAssemblyOptions struct {
 }
 
 type AIAssembly struct {
-	Service        services.AIServiceInterface
+	Service        aidelivery.HandlerService
+	RuntimeService services.AIServiceInterface
 	LegacyService  *services.AIService
 	WeKnoraClient  weknora.WeKnoraInterface
 	WeKnoraHealthy bool
@@ -33,10 +35,19 @@ func BuildAIAssembly(cfg *config.Config, logger *logrus.Logger, opts AIAssemblyO
 	}
 	baseAI := services.NewAIService(cfg.AI.OpenAI.APIKey, cfg.AI.OpenAI.BaseURL)
 	baseAI.InitializeKnowledgeBase()
+	defaultService := services.NewOrchestratedEnhancedAIService(
+		baseAI,
+		openai.NewProvider(cfg.AI.OpenAI.APIKey, cfg.AI.OpenAI.BaseURL),
+		nil,
+		nil,
+		"",
+		logger,
+	)
 
 	assembly := &AIAssembly{
-		Service:       services.NewOrchestratedAIService(openai.NewProvider(cfg.AI.OpenAI.APIKey, cfg.AI.OpenAI.BaseURL), nil),
-		LegacyService: baseAI,
+		Service:        aidelivery.NewHandlerServiceAdapter(defaultService),
+		RuntimeService: defaultService,
+		LegacyService:  baseAI,
 	}
 	if !cfg.WeKnora.Enabled {
 		return assembly, nil
@@ -84,6 +95,7 @@ func BuildAIAssembly(cfg *config.Config, logger *logrus.Logger, opts AIAssemblyO
 			logger.Warnf("Knowledge base sync failed: %v", err)
 		}
 	}
-	assembly.Service = enhanced
+	assembly.Service = aidelivery.NewHandlerServiceAdapter(enhanced)
+	assembly.RuntimeService = enhanced
 	return assembly, nil
 }

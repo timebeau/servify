@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"servify/apps/server/internal/config"
-	"servify/apps/server/internal/services"
+	aidelivery "servify/apps/server/internal/modules/ai/delivery"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -15,12 +15,12 @@ import (
 // EnhancedHealthHandler 增强的健康检查处理器
 type EnhancedHealthHandler struct {
 	config    *config.Config
-	aiService services.AIServiceInterface
+	aiService aidelivery.HandlerService
 	logger    *logrus.Logger
 }
 
 // NewEnhancedHealthHandler 创建增强的健康检查处理器
-func NewEnhancedHealthHandler(cfg *config.Config, aiService services.AIServiceInterface) *EnhancedHealthHandler {
+func NewEnhancedHealthHandler(cfg *config.Config, aiService aidelivery.HandlerService) *EnhancedHealthHandler {
 	return &EnhancedHealthHandler{
 		config:    cfg,
 		aiService: aiService,
@@ -160,8 +160,7 @@ func (h *EnhancedHealthHandler) checkAIService(ctx context.Context, response *He
 	}
 
 	// 检查 WeKnora 状态（如果是增强服务）
-	if enhancedService, ok := h.aiService.(services.EnhancedAIServiceInterface); ok {
-		metrics := enhancedService.GetMetrics()
+	if metrics, ok := h.aiService.GetMetrics(); ok {
 		serviceInfo.Details = map[string]interface{}{
 			"type":    "enhanced",
 			"status":  status,
@@ -263,8 +262,8 @@ func (h *EnhancedHealthHandler) checkWeKnora(ctx context.Context, response *Heal
 	start := time.Now()
 
 	// 如果是增强 AI 服务，获取 WeKnora 状态
-	if enhancedService, ok := h.aiService.(services.EnhancedAIServiceInterface); ok {
-		status := enhancedService.GetStatus(ctx)
+	if _, ok := h.aiService.GetMetrics(); ok {
+		status := h.aiService.GetStatus(ctx)
 
 		weKnoraHealthy, exists := status["weknora_healthy"].(bool)
 		if !exists || !weKnoraHealthy {
