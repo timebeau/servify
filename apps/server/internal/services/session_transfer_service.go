@@ -328,13 +328,9 @@ func (s *SessionTransferService) addToWaitingQueue(ctx context.Context, session 
 
 // ProcessWaitingQueue 处理等待队列
 func (s *SessionTransferService) ProcessWaitingQueue(ctx context.Context) error {
-	// 获取等待中的会话
-	var waitingRecords []models.WaitingRecord
-	if err := s.db.Where("status = ?", "waiting").
-		Order("priority DESC, queued_at ASC").
-		Limit(10).
-		Find(&waitingRecords).Error; err != nil {
-		return fmt.Errorf("failed to get waiting records: %w", err)
+	waitingRecords, err := s.loadWaitingQueue(ctx, 10)
+	if err != nil {
+		return err
 	}
 
 	for _, record := range waitingRecords {
@@ -381,6 +377,25 @@ func (s *SessionTransferService) ProcessWaitingQueue(ctx context.Context) error 
 	}
 
 	return nil
+}
+
+func (s *SessionTransferService) loadWaitingQueue(ctx context.Context, limit int) ([]models.WaitingRecord, error) {
+	if s.routing != nil {
+		records, err := s.routing.ListWaitingRecords(ctx, "waiting", limit)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get waiting records: %w", err)
+		}
+		return records, nil
+	}
+
+	var waitingRecords []models.WaitingRecord
+	if err := s.db.Where("status = ?", "waiting").
+		Order("priority DESC, queued_at ASC").
+		Limit(limit).
+		Find(&waitingRecords).Error; err != nil {
+		return nil, fmt.Errorf("failed to get waiting records: %w", err)
+	}
+	return waitingRecords, nil
 }
 
 // generateSessionSummary 生成会话摘要
