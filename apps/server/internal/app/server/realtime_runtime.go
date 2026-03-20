@@ -4,6 +4,9 @@ import (
 	"context"
 
 	"servify/apps/server/internal/config"
+	conversationapp "servify/apps/server/internal/modules/conversation/application"
+	conversationdelivery "servify/apps/server/internal/modules/conversation/delivery"
+	conversationinfra "servify/apps/server/internal/modules/conversation/infra"
 	realtimeplatform "servify/apps/server/internal/platform/realtime"
 	"servify/apps/server/internal/services"
 
@@ -28,6 +31,9 @@ func BuildRealtimeRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB
 	wsHub := services.NewWebSocketHub()
 	if db != nil {
 		wsHub.SetDB(db)
+		conversationRepo := conversationinfra.NewGormRepository(db)
+		conversationService := conversationapp.NewService(conversationRepo, nil)
+		wsHub.SetConversationMessageWriter(conversationdelivery.NewWebSocketMessageAdapter(conversationService))
 	}
 	wsHub.SetAIService(ai)
 

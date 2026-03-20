@@ -51,9 +51,12 @@
   - handler-facing contract 已收口到 `modules/routing/delivery.HandlerService`
   - runtime 仍复用 `services.SessionTransferService` 作为 contract 实现
   - `services.SessionTransferService` 明确保留为兼容 facade + runtime glue
+- `conversation / websocket runtime`
+  - websocket 持久化入口已显式收口到 `modules/conversation/delivery.WebSocketMessageWriter`
+  - 主 runtime 与 lightweight realtime runtime 都通过 `WebSocketMessageAdapter` 注入 conversation 模块
 - 边界守护
   - CI 已增加 `scripts/check-module-boundaries.sh`
-  - 当前自动校验 `ticket` / `agent` / `analytics` / `routing` 的 handler constructor、router dependency、runtime wiring 都必须停留在 `modules/*/delivery.HandlerService`
+  - 当前自动校验 `ticket` / `agent` / `analytics` / `routing` 的 handler constructor、router dependency、runtime wiring，以及 `conversation` 的 websocket persistence wiring，都必须停留在 module delivery contract
 
 ## M3 compatibility-adapters
 

@@ -109,6 +109,9 @@
 - `routing / session transfer`
   - HTTP handler 入口：`modules/routing/delivery.HandlerService`
   - 旧 `services/SessionTransferService` 定位：兼容 facade + runtime glue + legacy transfer orchestration
+- `conversation / websocket runtime`
+  - websocket 持久化入口：`modules/conversation/delivery.WebSocketMessageWriter`
+  - `services/WebSocketHub` 定位：runtime connection hub，不再自定义 conversation 私有持久化接口
 
 ## 已确认的兼容职责边界
 
@@ -124,10 +127,13 @@
 - `services/SessionTransferService`
   - 允许保留：旧调用方兼容入口、AgentService/WebSocketHub/AIService 协调、转接实时通知与 legacy transfer orchestration
   - 不应新增：新的 HTTP handler 直接依赖、等待队列之外继续扩散 routing 读写规则
+- `services/WebSocketHub`
+  - 允许保留：连接管理、广播、协议消息分发、对 AI/transfer 的 runtime glue
+  - 不应新增：新的 conversation 私有持久化接口、绕过 `modules/conversation/delivery.WebSocketMessageWriter` 的消息落库路径
 
 ## 当前自动化守护
 
 - `scripts/check-module-boundaries.sh`
   - 校验 `ticket` / `agent` / `analytics` / `routing` 的 handler constructor 必须依赖 `modules/*/delivery.HandlerService`
-  - 校验 router/runtime 对这四个模块的注入类型必须停留在 handler-facing contract
+  - 校验 router/runtime 对这四个模块的注入类型必须停留在 handler-facing contract，并校验 `conversation` 的 websocket persistence 入口必须走 module delivery adapter
   - 目的：先锁住已完成迁移的入口，避免回退到 handler 直连具体旧 service

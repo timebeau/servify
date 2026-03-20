@@ -14,13 +14,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 	"servify/apps/server/internal/models"
+	conversationdelivery "servify/apps/server/internal/modules/conversation/delivery"
 )
-
-type conversationMessageWriter interface {
-	PersistTextMessage(ctx context.Context, sessionID string, content string) error
-	HasActiveHumanAgent(ctx context.Context, sessionID string) (bool, error)
-	ListRecentMessages(ctx context.Context, sessionID string, limit int) ([]models.Message, error)
-}
 
 type WebSocketMessage struct {
 	Type      string      `json:"type"`
@@ -50,7 +45,7 @@ type WebSocketHub struct {
 	// 可选：用于将文本消息落库（如未设置则仅记录日志）
 	db *gorm.DB
 	// 优先使用 conversation 模块适配器持久化消息
-	conversationWriter conversationMessageWriter
+	conversationWriter conversationdelivery.WebSocketMessageWriter
 }
 
 var upgrader = websocket.Upgrader{
@@ -90,7 +85,7 @@ func (h *WebSocketHub) SetDB(db *gorm.DB) {
 }
 
 // SetConversationMessageWriter injects the modular conversation persistence adapter.
-func (h *WebSocketHub) SetConversationMessageWriter(writer conversationMessageWriter) {
+func (h *WebSocketHub) SetConversationMessageWriter(writer conversationdelivery.WebSocketMessageWriter) {
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 	h.conversationWriter = writer

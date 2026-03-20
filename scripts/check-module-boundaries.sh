@@ -92,6 +92,23 @@ require_pattern \
   "Runtime must keep statistics handler wiring behind analyticsdelivery.HandlerService."
 
 require_pattern \
+  "apps/server/internal/services/websocket.go" \
+  'conversationWriter conversationdelivery\.WebSocketMessageWriter' \
+  "WebSocket hub must store the public conversationdelivery.WebSocketMessageWriter contract."
+require_pattern \
+  "apps/server/internal/services/websocket.go" \
+  'func \(h \*WebSocketHub\) SetConversationMessageWriter\(writer conversationdelivery\.WebSocketMessageWriter\)' \
+  "WebSocket hub must accept conversationdelivery.WebSocketMessageWriter."
+require_pattern \
+  "apps/server/internal/app/server/runtime.go" \
+  'SetConversationMessageWriter\(conversationdelivery\.NewWebSocketMessageAdapter\(conversationService\)\)' \
+  "Main runtime must wire conversation websocket persistence through the module delivery adapter."
+require_pattern \
+  "apps/server/internal/app/server/realtime_runtime.go" \
+  'SetConversationMessageWriter\(conversationdelivery\.NewWebSocketMessageAdapter\(conversationService\)\)' \
+  "Realtime runtime must wire conversation websocket persistence through the module delivery adapter."
+
+require_pattern \
   "apps/server/internal/handlers/session_transfer_handler.go" \
   'transferService\s+routingdelivery\.HandlerService' \
   "Session transfer handler must store modules/routing/delivery.HandlerService."
