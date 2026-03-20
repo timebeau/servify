@@ -48,6 +48,7 @@ type Runtime struct {
 	AgentService             *services.AgentService
 	TicketHandlerService     ticketdelivery.HandlerService
 	TicketReaderService      *ticketdelivery.ReaderServiceAdapter
+	TransferHandlerService   routingdelivery.HandlerService
 	TransferService          *services.SessionTransferService
 	SatisfactionService      *services.SatisfactionService
 	WorkspaceService         *services.WorkspaceService
@@ -132,6 +133,7 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 
 	rt.TransferService = services.NewSessionTransferService(db, logger, rt.AIService, rt.AgentService, rt.WSHub)
 	rt.TransferService.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingService))
+	rt.TransferHandlerService = rt.TransferService
 
 	rt.StatisticsService = services.NewStatisticsService(db, logger)
 	rt.StatisticsService.SetEventBus(bus)
@@ -183,6 +185,7 @@ func (rt *Runtime) RouterDependencies() Dependencies {
 		AgentService:             rt.AgentService,
 		TicketHandlerService:     rt.TicketHandlerService,
 		TicketReaderService:      rt.TicketReaderService,
+		TransferHandlerService:   rt.TransferHandlerService,
 		TransferService:          rt.TransferService,
 		SatisfactionService:      rt.SatisfactionService,
 		WorkspaceService:         rt.WorkspaceService,

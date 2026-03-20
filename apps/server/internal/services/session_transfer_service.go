@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"servify/apps/server/internal/models"
+	routingcontract "servify/apps/server/internal/modules/routing/contract"
 	routingdelivery "servify/apps/server/internal/modules/routing/delivery"
 
 	"github.com/sirupsen/logrus"
@@ -44,14 +45,8 @@ func NewSessionTransferService(
 	}
 }
 
-// TransferRequest 转接请求
-type TransferRequest struct {
-	SessionID    string   `json:"session_id" binding:"required"`
-	Reason       string   `json:"reason"`
-	TargetSkills []string `json:"target_skills"`
-	Priority     string   `json:"priority"`
-	Notes        string   `json:"notes"`
-}
+type TransferRequest = routingcontract.TransferRequest
+type TransferResult = routingcontract.TransferResult
 
 // TransferToHuman 转接到人工客服
 func (s *SessionTransferService) TransferToHuman(ctx context.Context, req *TransferRequest) (*TransferResult, error) {
@@ -561,14 +556,4 @@ func (s *SessionTransferService) AutoTransferCheck(ctx context.Context, sessionI
 
 	// 使用 AI 服务判断是否需要转人工
 	return s.aiService.ShouldTransferToHuman(query, messages)
-}
-
-type TransferResult struct {
-	Success       bool       `json:"success"`
-	SessionID     string     `json:"session_id"`
-	NewAgentID    uint       `json:"new_agent_id,omitempty"`
-	IsWaiting     bool       `json:"is_waiting,omitempty"`
-	QueuedAt      *time.Time `json:"queued_at,omitempty"`
-	TransferredAt time.Time  `json:"transferred_at,omitempty"`
-	Summary       string     `json:"summary"`
 }

@@ -91,6 +91,27 @@ require_pattern \
   'StatisticsHandlerService\s+analyticsdelivery\.HandlerService' \
   "Runtime must keep statistics handler wiring behind analyticsdelivery.HandlerService."
 
+require_pattern \
+  "apps/server/internal/handlers/session_transfer_handler.go" \
+  'transferService\s+routingdelivery\.HandlerService' \
+  "Session transfer handler must store modules/routing/delivery.HandlerService."
+require_pattern \
+  "apps/server/internal/handlers/session_transfer_handler.go" \
+  'func NewSessionTransferHandler\(transferService routingdelivery\.HandlerService, logger \*logrus\.Logger\)' \
+  "Session transfer handler constructor must accept modules/routing/delivery.HandlerService."
+forbid_pattern \
+  "apps/server/internal/handlers/session_transfer_handler.go" \
+  '\*services\.SessionTransferService' \
+  "Session transfer handler must not depend on concrete services.SessionTransferService."
+require_pattern \
+  "apps/server/internal/app/server/router.go" \
+  'TransferHandlerService\s+routingdelivery\.HandlerService' \
+  "Router dependencies must expose routingdelivery.HandlerService for session transfer handlers."
+require_pattern \
+  "apps/server/internal/app/server/runtime.go" \
+  'TransferHandlerService\s+routingdelivery\.HandlerService' \
+  "Runtime must keep session transfer handler wiring behind routingdelivery.HandlerService."
+
 if [[ "$has_error" -ne 0 ]]; then
   exit 1
 fi

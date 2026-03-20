@@ -5,7 +5,8 @@ import (
 	"strconv"
 
 	"servify/apps/server/internal/models"
-	"servify/apps/server/internal/services"
+	routingcontract "servify/apps/server/internal/modules/routing/contract"
+	routingdelivery "servify/apps/server/internal/modules/routing/delivery"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -13,12 +14,12 @@ import (
 
 // SessionTransferHandler 会话转接处理器
 type SessionTransferHandler struct {
-	transferService *services.SessionTransferService
+	transferService routingdelivery.HandlerService
 	logger          *logrus.Logger
 }
 
 // NewSessionTransferHandler 创建会话转接处理器
-func NewSessionTransferHandler(transferService *services.SessionTransferService, logger *logrus.Logger) *SessionTransferHandler {
+func NewSessionTransferHandler(transferService routingdelivery.HandlerService, logger *logrus.Logger) *SessionTransferHandler {
 	return &SessionTransferHandler{
 		transferService: transferService,
 		logger:          logger,
@@ -31,13 +32,13 @@ func NewSessionTransferHandler(transferService *services.SessionTransferService,
 // @Tags 会话转接
 // @Accept json
 // @Produce json
-// @Param transfer body services.TransferRequest true "转接请求"
-// @Success 200 {object} services.TransferResult
+// @Param transfer body contract.TransferRequest true "转接请求"
+// @Success 200 {object} contract.TransferResult
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
 // @Router /api/session-transfer/to-human [post]
 func (h *SessionTransferHandler) TransferToHuman(c *gin.Context) {
-	var req services.TransferRequest
+	var req routingcontract.TransferRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "Invalid request body",
@@ -66,7 +67,7 @@ func (h *SessionTransferHandler) TransferToHuman(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param transfer body map[string]interface{} true "转接信息"
-// @Success 200 {object} services.TransferResult
+// @Success 200 {object} contract.TransferResult
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
 // @Router /api/session-transfer/to-agent [post]
