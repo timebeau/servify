@@ -27,69 +27,73 @@ forbid_pattern() {
   fi
 }
 
-require_pattern \
-  "apps/server/internal/handlers/agent_handler.go" \
-  'agentService\s+agentdelivery\.HandlerService' \
-  "Agent handler must store modules/agent/delivery.HandlerService."
-require_pattern \
-  "apps/server/internal/handlers/agent_handler.go" \
-  'func NewAgentHandler\(agentService agentdelivery\.HandlerService, logger \*logrus\.Logger\)' \
-  "Agent handler constructor must accept modules/agent/delivery.HandlerService."
-forbid_pattern \
-  "apps/server/internal/handlers/agent_handler.go" \
-  '\*services\.AgentService' \
-  "Agent handler must not depend on concrete services.AgentService."
+check_handler_contract() {
+  local label="$1"
+  local file="$2"
+  local field_name="$3"
+  local contract_expr="$4"
+  local constructor_pattern="$5"
+  local forbidden_pattern="$6"
+
+  require_pattern \
+    "$file" \
+    "${field_name}[[:space:]]+${contract_expr}" \
+    "${label} handler must store ${contract_expr}."
+  require_pattern \
+    "$file" \
+    "$constructor_pattern" \
+    "${label} handler constructor must accept ${contract_expr}."
+  forbid_pattern \
+    "$file" \
+    "$forbidden_pattern" \
+    "${label} handler must not depend on its concrete legacy service."
+}
+
+check_runtime_contract() {
+  local label="$1"
+  local contract_field="$2"
+  local contract_expr="$3"
+
+  require_pattern \
+    "apps/server/internal/app/server/router.go" \
+    "${contract_field}[[:space:]]+${contract_expr}" \
+    "Router dependencies must expose ${contract_expr} for ${label}."
+  require_pattern \
+    "apps/server/internal/app/server/runtime.go" \
+    "${contract_field}[[:space:]]+${contract_expr}" \
+    "Runtime must keep ${label} behind ${contract_expr}."
+}
+
+handler_specs=(
+  "Agent|apps/server/internal/handlers/agent_handler.go|agentService|agentdelivery\\.HandlerService|func NewAgentHandler\\(agentService agentdelivery\\.HandlerService, logger \\*logrus\\.Logger\\)|\\*services\\.AgentService"
+  "Ticket|apps/server/internal/handlers/ticket_handler.go|ticketService|ticketdelivery\\.HandlerService|func NewTicketHandler\\(ticketService ticketdelivery\\.HandlerService, logger \\*logrus\\.Logger\\)|\\*services\\.TicketService"
+  "Statistics|apps/server/internal/handlers/statistics_handler.go|statsService|analyticsdelivery\\.HandlerService|func NewStatisticsHandler\\(statsService analyticsdelivery\\.HandlerService, logger \\*logrus\\.Logger\\)|\\*services\\.StatisticsService"
+  "Session transfer|apps/server/internal/handlers/session_transfer_handler.go|transferService|routingdelivery\\.HandlerService|func NewSessionTransferHandler\\(transferService routingdelivery\\.HandlerService, logger \\*logrus\\.Logger\\)|\\*services\\.SessionTransferService"
+  "AI|apps/server/internal/handlers/ai_handler.go|aiService|aidelivery\\.HandlerService|func NewAIHandler\\(aiService aidelivery\\.HandlerService\\)|aiService services\\.AIServiceInterface"
+)
+
+runtime_specs=(
+  "agent handlers|AgentHandlerService|agentdelivery\\.HandlerService"
+  "ticket handlers|TicketHandlerService|ticketdelivery\\.HandlerService"
+  "statistics handlers|StatisticsHandlerService|analyticsdelivery\\.HandlerService"
+  "session transfer handlers|TransferHandlerService|routingdelivery\\.HandlerService"
+  "AI handlers|AIHandlerService|aidelivery\\.HandlerService"
+)
+
+for spec in "${handler_specs[@]}"; do
+  IFS='|' read -r label file field_name contract_expr constructor_pattern forbidden_pattern <<<"$spec"
+  check_handler_contract "$label" "$file" "$field_name" "$contract_expr" "$constructor_pattern" "$forbidden_pattern"
+done
+
+for spec in "${runtime_specs[@]}"; do
+  IFS='|' read -r label contract_field contract_expr <<<"$spec"
+  check_runtime_contract "$label" "$contract_field" "$contract_expr"
+done
 
 require_pattern \
-  "apps/server/internal/handlers/ticket_handler.go" \
-  'ticketService\s+ticketdelivery\.HandlerService' \
-  "Ticket handler must store modules/ticket/delivery.HandlerService."
-require_pattern \
-  "apps/server/internal/handlers/ticket_handler.go" \
-  'func NewTicketHandler\(ticketService ticketdelivery\.HandlerService, logger \*logrus\.Logger\)' \
-  "Ticket handler constructor must accept modules/ticket/delivery.HandlerService."
-forbid_pattern \
-  "apps/server/internal/handlers/ticket_handler.go" \
-  '\*services\.TicketService' \
-  "Ticket handler must not depend on concrete services.TicketService."
-
-require_pattern \
-  "apps/server/internal/app/server/router.go" \
-  'AgentHandlerService\s+agentdelivery\.HandlerService' \
-  "Router dependencies must expose agentdelivery.HandlerService for agent handlers."
-require_pattern \
-  "apps/server/internal/app/server/router.go" \
-  'TicketHandlerService\s+ticketdelivery\.HandlerService' \
-  "Router dependencies must expose ticketdelivery.HandlerService for ticket handlers."
-require_pattern \
-  "apps/server/internal/app/server/runtime.go" \
-  'AgentHandlerService\s+agentdelivery\.HandlerService' \
-  "Runtime must keep agent handler wiring behind agentdelivery.HandlerService."
-require_pattern \
-  "apps/server/internal/app/server/runtime.go" \
-  'TicketHandlerService\s+ticketdelivery\.HandlerService' \
-  "Runtime must keep ticket handler wiring behind ticketdelivery.HandlerService."
-
-require_pattern \
-  "apps/server/internal/handlers/statistics_handler.go" \
-  'statsService\s+analyticsdelivery\.HandlerService' \
-  "Statistics handler must store modules/analytics/delivery.HandlerService."
-require_pattern \
-  "apps/server/internal/handlers/statistics_handler.go" \
-  'func NewStatisticsHandler\(statsService analyticsdelivery\.HandlerService, logger \*logrus\.Logger\)' \
-  "Statistics handler constructor must accept modules/analytics/delivery.HandlerService."
-forbid_pattern \
-  "apps/server/internal/handlers/statistics_handler.go" \
-  '\*services\.StatisticsService' \
-  "Statistics handler must not depend on concrete services.StatisticsService."
-require_pattern \
-  "apps/server/internal/app/server/router.go" \
-  'StatisticsHandlerService\s+analyticsdelivery\.HandlerService' \
-  "Router dependencies must expose analyticsdelivery.HandlerService for statistics handlers."
-require_pattern \
-  "apps/server/internal/app/server/runtime.go" \
-  'StatisticsHandlerService\s+analyticsdelivery\.HandlerService' \
-  "Runtime must keep statistics handler wiring behind analyticsdelivery.HandlerService."
+  "apps/server/internal/handlers/health_enhanced.go" \
+  'aiService aidelivery\.HandlerService' \
+  "Enhanced health handler must store modules/ai/delivery.HandlerService."
 
 require_pattern \
   "apps/server/internal/services/websocket.go" \
@@ -109,57 +113,12 @@ require_pattern \
   "Realtime runtime must wire conversation websocket persistence through the module delivery adapter."
 
 require_pattern \
-  "apps/server/internal/handlers/session_transfer_handler.go" \
-  'transferService\s+routingdelivery\.HandlerService' \
-  "Session transfer handler must store modules/routing/delivery.HandlerService."
-require_pattern \
-  "apps/server/internal/handlers/session_transfer_handler.go" \
-  'func NewSessionTransferHandler\(transferService routingdelivery\.HandlerService, logger \*logrus\.Logger\)' \
-  "Session transfer handler constructor must accept modules/routing/delivery.HandlerService."
-forbid_pattern \
-  "apps/server/internal/handlers/session_transfer_handler.go" \
-  '\*services\.SessionTransferService' \
-  "Session transfer handler must not depend on concrete services.SessionTransferService."
-require_pattern \
-  "apps/server/internal/app/server/router.go" \
-  'TransferHandlerService\s+routingdelivery\.HandlerService' \
-  "Router dependencies must expose routingdelivery.HandlerService for session transfer handlers."
-require_pattern \
-  "apps/server/internal/app/server/runtime.go" \
-  'TransferHandlerService\s+routingdelivery\.HandlerService' \
-  "Runtime must keep session transfer handler wiring behind routingdelivery.HandlerService."
-
-require_pattern \
-  "apps/server/internal/handlers/ai_handler.go" \
-  'aiService aidelivery\.HandlerService' \
-  "AI handler must store modules/ai/delivery.HandlerService."
-require_pattern \
-  "apps/server/internal/handlers/ai_handler.go" \
-  'func NewAIHandler\(aiService aidelivery\.HandlerService\)' \
-  "AI handler constructor must accept modules/ai/delivery.HandlerService."
-forbid_pattern \
-  "apps/server/internal/handlers/ai_handler.go" \
-  'aiService services\.AIServiceInterface' \
-  "AI handler must not depend on services.AIServiceInterface directly."
-require_pattern \
-  "apps/server/internal/handlers/health_enhanced.go" \
-  'aiService aidelivery\.HandlerService' \
-  "Enhanced health handler must store modules/ai/delivery.HandlerService."
-require_pattern \
-  "apps/server/internal/app/server/router.go" \
-  'AIHandlerService\s+aidelivery\.HandlerService' \
-  "Router dependencies must expose aidelivery.HandlerService for AI handlers."
-require_pattern \
-  "apps/server/internal/app/server/runtime.go" \
-  'AIHandlerService\s+aidelivery\.HandlerService' \
-  "Runtime must keep AI handler wiring behind aidelivery.HandlerService."
-require_pattern \
   "apps/server/internal/app/server/ai_runtime.go" \
-  'Service\s+aidelivery\.HandlerService' \
+  'Service[[:space:]]+aidelivery\.HandlerService' \
   "AI assembly must expose the handler-facing AI contract."
 require_pattern \
   "apps/server/internal/app/server/ai_runtime.go" \
-  'RuntimeService services\.AIServiceInterface' \
+  'RuntimeService[[:space:]]+services\.AIServiceInterface' \
   "AI assembly must keep a separate runtime AIServiceInterface for non-handler callers."
 
 if [[ "$has_error" -ne 0 ]]; then
