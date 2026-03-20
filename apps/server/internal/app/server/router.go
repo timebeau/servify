@@ -9,6 +9,7 @@ import (
 	analyticsdelivery "servify/apps/server/internal/modules/analytics/delivery"
 	automationdelivery "servify/apps/server/internal/modules/automation/delivery"
 	customerdelivery "servify/apps/server/internal/modules/customer/delivery"
+	knowledgedelivery "servify/apps/server/internal/modules/knowledge/delivery"
 	routingdelivery "servify/apps/server/internal/modules/routing/delivery"
 	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
 	voicedelivery "servify/apps/server/internal/modules/voice/delivery"
@@ -50,7 +51,7 @@ type Dependencies struct {
 	ShiftService             *services.ShiftService
 	AutomationHandlerService automationdelivery.HandlerService
 	AutomationService        *services.AutomationService
-	KnowledgeDocService      *services.KnowledgeDocService
+	KnowledgeDocHandler      knowledgedelivery.HandlerService
 	SuggestionService        *services.SuggestionService
 	GamificationService      *services.GamificationService
 }
@@ -125,7 +126,7 @@ func registerManagementRoutes(r *gin.Engine, deps Dependencies) {
 
 	knowledgeAPI := api.Group("/")
 	knowledgeAPI.Use(middleware.RequireResourcePermission("knowledge"))
-	handlers.RegisterKnowledgeDocRoutes(knowledgeAPI, handlers.NewKnowledgeDocHandler(deps.KnowledgeDocService))
+	handlers.RegisterKnowledgeDocRoutes(knowledgeAPI, handlers.NewKnowledgeDocHandler(deps.KnowledgeDocHandler))
 
 	assistAPI := api.Group("/")
 	assistAPI.Use(middleware.RequireResourcePermission("assist"))
@@ -143,7 +144,7 @@ func registerManagementRoutes(r *gin.Engine, deps Dependencies) {
 func registerPublicRoutes(r *gin.Engine, deps Dependencies) {
 	public := r.Group("/public")
 	handlers.RegisterCSATSurveyRoutes(public, handlers.NewCSATSurveyHandler(deps.SatisfactionService))
-	handlers.RegisterPublicKnowledgeBaseRoutes(public, handlers.NewKnowledgeDocHandler(deps.KnowledgeDocService))
+	handlers.RegisterPublicKnowledgeBaseRoutes(public, handlers.NewKnowledgeDocHandler(deps.KnowledgeDocHandler))
 	public.GET("/portal/config", handlers.NewPortalConfigHandler(deps.Config).Get)
 }
 

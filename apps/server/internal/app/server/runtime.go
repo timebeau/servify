@@ -12,6 +12,7 @@ import (
 	conversationdelivery "servify/apps/server/internal/modules/conversation/delivery"
 	conversationinfra "servify/apps/server/internal/modules/conversation/infra"
 	customerdelivery "servify/apps/server/internal/modules/customer/delivery"
+	knowledgedelivery "servify/apps/server/internal/modules/knowledge/delivery"
 	routingapp "servify/apps/server/internal/modules/routing/application"
 	routingdelivery "servify/apps/server/internal/modules/routing/delivery"
 	routinginfra "servify/apps/server/internal/modules/routing/infra"
@@ -66,6 +67,7 @@ type Runtime struct {
 	ShiftService             *services.ShiftService
 	AutomationHandlerService automationdelivery.HandlerService
 	AutomationService        *services.AutomationService
+	KnowledgeDocHandler      knowledgedelivery.HandlerService
 	KnowledgeDocService      *services.KnowledgeDocService
 	SuggestionService        *services.SuggestionService
 	GamificationService      *services.GamificationService
@@ -157,6 +159,7 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	rt.AppIntegrationService = services.NewAppIntegrationService(db, logger)
 	rt.CustomFieldService = services.NewCustomFieldService(db)
 	rt.KnowledgeDocService = services.NewKnowledgeDocService(db)
+	rt.KnowledgeDocHandler = knowledgedelivery.NewHandlerServiceAdapter(rt.KnowledgeDocService)
 	rt.SuggestionService = services.NewSuggestionService(db)
 	rt.GamificationService = services.NewGamificationService(db)
 	rt.TicketHandlerService = ticketdelivery.NewHandlerServiceAdapter(db, ticketService.ModuleCommandService(), ticketService.Orchestrator())
@@ -207,7 +210,7 @@ func (rt *Runtime) RouterDependencies() Dependencies {
 		ShiftService:             rt.ShiftService,
 		AutomationHandlerService: rt.AutomationHandlerService,
 		AutomationService:        rt.AutomationService,
-		KnowledgeDocService:      rt.KnowledgeDocService,
+		KnowledgeDocHandler:      rt.KnowledgeDocHandler,
 		SuggestionService:        rt.SuggestionService,
 		GamificationService:      rt.GamificationService,
 	}

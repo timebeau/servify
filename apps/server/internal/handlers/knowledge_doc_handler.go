@@ -4,16 +4,17 @@ import (
 	"net/http"
 	"strconv"
 
+	knowledgedelivery "servify/apps/server/internal/modules/knowledge/delivery"
 	"servify/apps/server/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
 
 type KnowledgeDocHandler struct {
-	service *services.KnowledgeDocService
+	service knowledgedelivery.HandlerService
 }
 
-func NewKnowledgeDocHandler(service *services.KnowledgeDocService) *KnowledgeDocHandler {
+func NewKnowledgeDocHandler(service knowledgedelivery.HandlerService) *KnowledgeDocHandler {
 	return &KnowledgeDocHandler{service: service}
 }
 

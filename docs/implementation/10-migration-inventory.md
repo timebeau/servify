@@ -46,6 +46,11 @@
   - legacy service 主要保留 event bus subscriber 注册、测试兼容 helper 与 module 装配
   - 结论：适合先定义 handler-facing contract，并保留 runtime/event bus glue 在旧 service
 
+- `knowledge`
+  - 已存在 `modules/knowledge/application`，但此前缺少 Gorm repository 与 handler-facing delivery contract
+  - 旧 `services/KnowledgeDocService` 主要承接 CRUD 与 tag/category DTO，适合改成 module facade
+  - 结论：先补 module 落地层和 handler contract，再把 runtime 中的 provider/indexing 接口留待后续收口
+
 ## 按迁移成熟度分组
 
 ### A. 已有明显 module facade
@@ -73,6 +78,7 @@
 - 需要先画清 runtime 职责边界，再做 handler/adapter 收口
 - `customer` 的 handler 已可先行收口，但 runtime 仍保留旧 facade 用于兼容 DTO 和构造装配
 - `automation` 的 handler 已可先行收口，但 runtime 仍需要旧 service 持有 event bus subscriber
+- `knowledge` 的 handler 已可先行收口，但 indexing/provider 尚未进入统一 runtime 装配
 
 ### C. 多实现并存，需要先确定默认主路径
 
@@ -91,8 +97,9 @@
 3. `analytics`
 4. `customer`
 5. `automation`
-6. `routing / session transfer`
-7. `ai`
+6. `knowledge`
+7. `routing / session transfer`
+8. `ai`
 
 ## 当前高风险点
 
@@ -127,6 +134,9 @@
 - `automation`
   - HTTP handler 入口：`modules/automation/delivery.HandlerService`
   - 旧 `services/AutomationService` 定位：兼容 facade + event bus subscriber + module application 装配
+- `knowledge`
+  - HTTP handler 入口：`modules/knowledge/delivery.HandlerService`
+  - 旧 `services/KnowledgeDocService` 定位：兼容 facade + module application / repository 装配
 - `routing / session transfer`
   - HTTP handler 入口：`modules/routing/delivery.HandlerService`
   - 旧 `services/SessionTransferService` 定位：兼容 facade + runtime glue + legacy transfer orchestration
@@ -154,6 +164,9 @@
 - `services/AutomationService`
   - 允许保留：旧调用方兼容入口、event bus subscriber 注册、测试辅助方法、`modules/automation/application.Service` 的装配
   - 不应新增：新的 HTTP handler 直接依赖、绕过 `modules/automation/application.Service` 的触发器和执行记录主入口
+- `services/KnowledgeDocService`
+  - 允许保留：旧调用方兼容入口、DTO 映射、`modules/knowledge/application.Service` 与 repository 的装配
+  - 不应新增：新的 HTTP handler 直接依赖、绕过 `modules/knowledge/application.Service` 的文档 CRUD 主入口
 - `services/SessionTransferService`
   - 允许保留：旧调用方兼容入口、AgentService/WebSocketHub/AIService 协调、转接实时通知与 legacy transfer orchestration
   - 不应新增：新的 HTTP handler 直接依赖、等待队列之外继续扩散 routing 读写规则
@@ -167,6 +180,6 @@
 ## 当前自动化守护
 
 - `scripts/check-module-boundaries.sh`
-  - 校验 `ticket` / `agent` / `analytics` / `customer` / `automation` / `routing` / `ai` 的 handler constructor 必须依赖 `modules/*/delivery.HandlerService`
-  - 校验 router/runtime 对这七个模块的注入类型必须停留在 handler-facing contract，并校验 `conversation` 的 websocket persistence 入口必须走 module delivery adapter
+  - 校验 `ticket` / `agent` / `analytics` / `customer` / `automation` / `knowledge` / `routing` / `ai` 的 handler constructor 必须依赖 `modules/*/delivery.HandlerService`
+  - 校验 router/runtime 对这八个模块的注入类型必须停留在 handler-facing contract，并校验 `conversation` 的 websocket persistence 入口必须走 module delivery adapter
   - 目的：先锁住已完成迁移的入口，避免回退到 handler 直连具体旧 service

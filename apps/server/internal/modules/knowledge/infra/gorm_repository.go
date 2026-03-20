@@ -1,0 +1,173 @@
+package infra
+
+import (
+	"context"
+	"fmt"
+	"strconv"
+	"strings"
+
+	"servify/apps/server/internal/models"
+	knowledgeapp "servify/apps/server/internal/modules/knowledge/application"
+	"servify/apps/server/internal/modules/knowledge/domain"
+
+	"gorm.io/gorm"
+)
+
+type GormDocumentRepository struct {
+	db *gorm.DB
+}
+
+func NewGormDocumentRepository(db *gorm.DB) *GormDocumentRepository {
+	return &GormDocumentRepository{db: db}
+}
+
+func (r *GormDocumentRepository) Create(ctx context.Context, doc *domain.Document) error {
+	model := &models.KnowledgeDoc{
+		Title:     doc.Title,
+		Content:   doc.Content,
+		Category:  doc.Category,
+		Tags:      strings.Join(doc.Tags, ","),
+		CreatedAt: doc.CreatedAt,
+		UpdatedAt: doc.UpdatedAt,
+	}
+	if err := r.db.WithContext(ctx).Create(model).Error; err != nil {
+		return err
+	}
+	doc.ID = strconv.FormatUint(uint64(model.ID), 10)
+	return nil
+}
+
+func (r *GormDocumentRepository) Update(ctx context.Context, doc *domain.Document) error {
+	id, err := parseDocumentID(doc.ID)
+	if err != nil {
+		return err
+	}
+	result := r.db.WithContext(ctx).Model(&models.KnowledgeDoc{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"title":      doc.Title,
+		"content":    doc.Content,
+		"category":   doc.Category,
+		"tags":       strings.Join(doc.Tags, ","),
+		"updated_at": doc.UpdatedAt,
+	})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *GormDocumentRepository) Delete(ctx context.Context, id string) error {
+	docID, err := parseDocumentID(id)
+	if err != nil {
+		return err
+	}
+	result := r.db.WithContext(ctx).Delete(&models.KnowledgeDoc{}, docID)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *GormDocumentRepository) Get(ctx context.Context, id string) (*domain.Document, error) {
+	docID, err := parseDocumentID(id)
+	if err != nil {
+		return nil, err
+	}
+	var model models.KnowledgeDoc
+	if err := r.db.WithContext(ctx).First(&model, docID).Error; err != nil {
+		return nil, err
+	}
+	return documentFromModel(model), nil
+}
+
+func (r *GormDocumentRepository) List(ctx context.Context, filter knowledgeapp.ListDocumentsFilter) ([]domain.Document, int64, error) {
+	q := r.db.WithContext(ctx).Model(&models.KnowledgeDoc{})
+	if c := strings.TrimSpace(filter.Category); c != "" {
+		q = q.Where("category = ?", c)
+	}
+	if s := strings.TrimSpace(filter.Search); s != "" {
+		like := "%" + s + "%"
+		q = q.Where("title LIKE ? OR content LIKE ? OR tags LIKE ?", like, like, like)
+	}
+
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	offset := (filter.Page - 1) * filter.PageSize
+	var rows []models.KnowledgeDoc
+	if err := q.Order("created_at DESC").Limit(filter.PageSize).Offset(offset).Find(&rows).Error; err != nil {
+		return nil, 0, err
+	}
+
+	out := make([]domain.Document, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, *documentFromModel(row))
+	}
+	return out, total, nil
+}
+
+type NoopIndexJobRepository struct{}
+
+func NewNoopIndexJobRepository() *NoopIndexJobRepository {
+	return &NoopIndexJobRepository{}
+}
+
+func (r *NoopIndexJobRepository) Create(ctx context.Context, job *domain.IndexJob) error {
+	if job == nil {
+		return fmt.Errorf("index job required")
+	}
+	return nil
+}
+
+func (r *NoopIndexJobRepository) Update(ctx context.Context, job *domain.IndexJob) error {
+	if job == nil {
+		return fmt.Errorf("index job required")
+	}
+	return nil
+}
+
+func (r *NoopIndexJobRepository) Get(ctx context.Context, id string) (*domain.IndexJob, error) {
+	return nil, fmt.Errorf("knowledge index jobs not configured")
+}
+
+func documentFromModel(model models.KnowledgeDoc) *domain.Document {
+	return &domain.Document{
+		ID:        strconv.FormatUint(uint64(model.ID), 10),
+		Title:     model.Title,
+		Content:   model.Content,
+		Category:  model.Category,
+		Tags:      splitTags(model.Tags),
+		CreatedAt: model.CreatedAt,
+		UpdatedAt: model.UpdatedAt,
+	}
+}
+
+func parseDocumentID(raw string) (uint, error) {
+	id, err := strconv.ParseUint(strings.TrimSpace(raw), 10, 32)
+	if err != nil || id == 0 {
+		return 0, fmt.Errorf("invalid document id")
+	}
+	return uint(id), nil
+}
+
+func splitTags(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
+}

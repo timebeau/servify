@@ -30,7 +30,7 @@
 | `ai` | `modules/ai/delivery.HandlerService` | `AIAssembly.RuntimeService` | runtime compatibility surface for websocket/router/transfer | `stabilized` | handler 主路径已切到 orchestrated enhanced AI |
 | `customer` | `modules/customer/delivery.HandlerService` | `services.CustomerService` as contract impl | compatibility facade + DTO mapping | `contracted` | handler/router 已收口，runtime 仍保留 legacy facade |
 | `automation` | `modules/automation/delivery.HandlerService` | `services.AutomationService` as contract impl | compatibility facade + event bus glue | `contracted` | handler/router 已收口，runtime 仍保留 subscriber / event bus glue |
-| `knowledge` | concrete handler/service | concrete runtime service | business layer | `legacy` | 仍主要走旧 service，尚无 module delivery 层 |
+| `knowledge` | `modules/knowledge/delivery.HandlerService` | `services.KnowledgeDocService` as contract impl | compatibility facade + module assembly | `contracted` | handler/router 已收口，index job runtime 仍未接入 |
 | `voice` | already module coordinator | module coordinator | not primarily legacy | `mixed` | 已较模块化，但不属于本轮 `services -> modules` 的典型迁移样式 |
 
 ## 当前结论
@@ -38,9 +38,10 @@
 - `ticket`、`agent`、`analytics`、`routing`、`conversation runtime`、`ai` 已具备持续守护条件
 - `customer` 已完成 handler-facing contract 收口，但 runtime 仍保留 legacy facade
 - `automation` 已完成 handler-facing contract 收口，但 runtime 仍保留 event bus subscriber 与旧兼容 facade
+- `knowledge` 已完成 handler-facing contract 收口，但索引任务与 provider 集成仍未纳入 runtime 主路径
 - 上述 `stabilized` 条目都已进入 `scripts/module-boundaries.rules`
 - 旧 `services/*` 仍然存在，但对这些能力来说，已不再是 HTTP 默认入口
 - 下一阶段重点不再是“再找一个模块收口”，而是：
   - 扩大 scorecard 覆盖范围
-  - 持续压缩 `legacy` 状态条目，优先推进 `knowledge`
+  - 持续压缩剩余 `legacy` 状态条目，并补齐 `knowledge` 的 indexing/runtime 策略
   - 为 `legacy` 条目明确冻结策略与退役条件

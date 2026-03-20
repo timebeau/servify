@@ -3,20 +3,30 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strconv"
 	"strings"
-	"time"
 
 	"servify/apps/server/internal/models"
+	knowledgeapp "servify/apps/server/internal/modules/knowledge/application"
+	knowledgedomain "servify/apps/server/internal/modules/knowledge/domain"
+	knowledgeinfra "servify/apps/server/internal/modules/knowledge/infra"
 
 	"gorm.io/gorm"
 )
 
 type KnowledgeDocService struct {
-	db *gorm.DB
+	module *knowledgeapp.Service
 }
 
 func NewKnowledgeDocService(db *gorm.DB) *KnowledgeDocService {
-	return &KnowledgeDocService{db: db}
+	return &KnowledgeDocService{
+		module: knowledgeapp.NewService(
+			knowledgeinfra.NewGormDocumentRepository(db),
+			knowledgeinfra.NewNoopIndexJobRepository(),
+			nil,
+		),
+	}
 }
 
 type KnowledgeDocCreateRequest struct {
@@ -44,121 +54,67 @@ func (s *KnowledgeDocService) Create(ctx context.Context, req *KnowledgeDocCreat
 	if req == nil {
 		return nil, errors.New("request required")
 	}
-	title := strings.TrimSpace(req.Title)
-	content := strings.TrimSpace(req.Content)
-	if title == "" {
-		return nil, errors.New("title required")
-	}
-	if content == "" {
-		return nil, errors.New("content required")
-	}
-
-	now := time.Now()
-	doc := &models.KnowledgeDoc{
-		Title:     title,
-		Content:   content,
-		Category:  strings.TrimSpace(req.Category),
-		Tags:      joinTagsCSV(req.Tags),
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-	if err := s.db.WithContext(ctx).Create(doc).Error; err != nil {
+	doc, err := s.module.CreateDocument(ctx, knowledgeapp.CreateDocumentRequest{
+		Title:    req.Title,
+		Content:  req.Content,
+		Category: req.Category,
+		Tags:     req.Tags,
+	})
+	if err != nil {
 		return nil, err
 	}
-	return doc, nil
+	return knowledgeDocFromDomain(doc)
 }
 
 func (s *KnowledgeDocService) Get(ctx context.Context, id uint) (*models.KnowledgeDoc, error) {
-	var doc models.KnowledgeDoc
-	if err := s.db.WithContext(ctx).First(&doc, id).Error; err != nil {
+	doc, err := s.module.GetDocument(ctx, strconv.FormatUint(uint64(id), 10))
+	if err != nil {
 		return nil, err
 	}
-	return &doc, nil
+	return knowledgeDocFromDomain(doc)
 }
 
 func (s *KnowledgeDocService) List(ctx context.Context, req *KnowledgeDocListRequest) ([]models.KnowledgeDoc, int64, error) {
-	page := 1
-	pageSize := 20
+	filter := knowledgeapp.ListDocumentsFilter{}
 	if req != nil {
-		if req.Page > 0 {
-			page = req.Page
-		}
-		if req.PageSize > 0 {
-			pageSize = req.PageSize
-		}
+		filter.Page = req.Page
+		filter.PageSize = req.PageSize
+		filter.Category = req.Category
+		filter.Search = req.Search
 	}
-	if pageSize > 100 {
-		pageSize = 100
-	}
-	offset := (page - 1) * pageSize
-
-	q := s.db.WithContext(ctx).Model(&models.KnowledgeDoc{})
-	if req != nil {
-		if c := strings.TrimSpace(req.Category); c != "" {
-			q = q.Where("category = ?", c)
-		}
-		if sTerm := strings.TrimSpace(req.Search); sTerm != "" {
-			like := "%" + sTerm + "%"
-			q = q.Where("title LIKE ? OR content LIKE ? OR tags LIKE ?", like, like, like)
-		}
-	}
-
-	var total int64
-	if err := q.Count(&total).Error; err != nil {
+	docs, total, err := s.module.ListDocuments(ctx, filter)
+	if err != nil {
 		return nil, 0, err
 	}
-
-	var docs []models.KnowledgeDoc
-	if err := q.Order("created_at DESC").Limit(pageSize).Offset(offset).Find(&docs).Error; err != nil {
-		return nil, 0, err
+	out := make([]models.KnowledgeDoc, 0, len(docs))
+	for _, doc := range docs {
+		model, err := knowledgeDocFromDomain(&doc)
+		if err != nil {
+			return nil, 0, err
+		}
+		out = append(out, *model)
 	}
-	return docs, total, nil
+	return out, total, nil
 }
 
 func (s *KnowledgeDocService) Update(ctx context.Context, id uint, req *KnowledgeDocUpdateRequest) (*models.KnowledgeDoc, error) {
 	if req == nil {
 		return nil, errors.New("request required")
 	}
-	var doc models.KnowledgeDoc
-	if err := s.db.WithContext(ctx).First(&doc, id).Error; err != nil {
+	doc, err := s.module.UpdateDocument(ctx, strconv.FormatUint(uint64(id), 10), knowledgeapp.UpdateDocumentRequest{
+		Title:    req.Title,
+		Content:  req.Content,
+		Category: req.Category,
+		Tags:     req.Tags,
+	})
+	if err != nil {
 		return nil, err
 	}
-
-	if req.Title != nil {
-		doc.Title = strings.TrimSpace(*req.Title)
-	}
-	if req.Content != nil {
-		doc.Content = strings.TrimSpace(*req.Content)
-	}
-	if req.Category != nil {
-		doc.Category = strings.TrimSpace(*req.Category)
-	}
-	if req.Tags != nil {
-		doc.Tags = joinTagsCSV(*req.Tags)
-	}
-	if strings.TrimSpace(doc.Title) == "" {
-		return nil, errors.New("title required")
-	}
-	if strings.TrimSpace(doc.Content) == "" {
-		return nil, errors.New("content required")
-	}
-
-	doc.UpdatedAt = time.Now()
-	if err := s.db.WithContext(ctx).Save(&doc).Error; err != nil {
-		return nil, err
-	}
-	return &doc, nil
+	return knowledgeDocFromDomain(doc)
 }
 
 func (s *KnowledgeDocService) Delete(ctx context.Context, id uint) error {
-	result := s.db.WithContext(ctx).Delete(&models.KnowledgeDoc{}, id)
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
-	}
-	return nil
+	return s.module.DeleteDocument(ctx, strconv.FormatUint(uint64(id), 10))
 }
 
 func joinTagsCSV(tags []string) string {
@@ -174,4 +130,23 @@ func joinTagsCSV(tags []string) string {
 		out = append(out, t)
 	}
 	return strings.Join(out, ",")
+}
+
+func knowledgeDocFromDomain(doc *knowledgedomain.Document) (*models.KnowledgeDoc, error) {
+	if doc == nil {
+		return nil, nil
+	}
+	id, err := strconv.ParseUint(doc.ID, 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("invalid document id: %w", err)
+	}
+	return &models.KnowledgeDoc{
+		ID:        uint(id),
+		Title:     doc.Title,
+		Content:   doc.Content,
+		Category:  doc.Category,
+		Tags:      joinTagsCSV(doc.Tags),
+		CreatedAt: doc.CreatedAt,
+		UpdatedAt: doc.UpdatedAt,
+	}, nil
 }
