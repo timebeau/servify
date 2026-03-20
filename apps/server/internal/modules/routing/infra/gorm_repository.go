@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -92,6 +93,24 @@ func (r *GormRepository) UpdateQueueEntry(ctx context.Context, entry *domain.Que
 		Model(&models.WaitingRecord{}).
 		Where("session_id = ?", entry.SessionID).
 		Updates(updates).Error
+}
+
+func (r *GormRepository) MarkQueueEntryTransferred(ctx context.Context, sessionID string, agentID uint, assignedAt time.Time) (*domain.QueueEntry, error) {
+	result := r.db.WithContext(ctx).
+		Model(&models.WaitingRecord{}).
+		Where("session_id = ? AND status = ?", sessionID, "waiting").
+		Updates(map[string]interface{}{
+			"status":      string(domain.QueueStatusTransferred),
+			"assigned_at": assignedAt,
+			"assigned_to": agentID,
+		})
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return r.GetQueueEntry(ctx, sessionID)
 }
 
 func mapTransferRecordModel(item domain.Assignment) models.TransferRecord {

@@ -35,6 +35,12 @@ type CancelWaitingCommand struct {
 	Reason    string
 }
 
+type MarkWaitingTransferredCommand struct {
+	SessionID  string
+	AssignedTo uint
+	AssignedAt time.Time
+}
+
 type AssignmentDTO struct {
 	SessionID   string    `json:"session_id"`
 	FromAgentID *uint     `json:"from_agent_id,omitempty"`

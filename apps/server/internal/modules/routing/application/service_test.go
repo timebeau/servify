@@ -79,6 +79,22 @@ func (s *stubRoutingRepo) UpdateQueueEntry(ctx context.Context, entry *domain.Qu
 	return nil
 }
 
+func (s *stubRoutingRepo) MarkQueueEntryTransferred(ctx context.Context, sessionID string, agentID uint, assignedAt time.Time) (*domain.QueueEntry, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	item, ok := s.queue[sessionID]
+	if !ok {
+		return nil, fmt.Errorf("not found")
+	}
+	cp := *item
+	cp.Status = domain.QueueStatusTransferred
+	cp.AssignedAt = &assignedAt
+	cp.AssignedTo = &agentID
+	s.queue[sessionID] = &cp
+	return &cp, nil
+}
+
 type stubRoutingPublisher struct {
 	events []eventbus.Event
 }
@@ -175,5 +191,27 @@ func TestServiceListWaitingEntries(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].SessionID != "sess-1" {
 		t.Fatalf("unexpected waiting entries: %+v", got)
+	}
+}
+
+func TestServiceMarkWaitingTransferred(t *testing.T) {
+	repo := &stubRoutingRepo{
+		queue: map[string]*domain.QueueEntry{
+			"sess-1": {SessionID: "sess-1", Status: domain.QueueStatusWaiting},
+		},
+	}
+	svc := NewService(repo, nil)
+	now := time.Now()
+	svc.now = func() time.Time { return now }
+
+	got, err := svc.MarkWaitingTransferred(context.Background(), MarkWaitingTransferredCommand{
+		SessionID:  "sess-1",
+		AssignedTo: 9,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got.Status != string(domain.QueueStatusTransferred) || got.AssignedTo == nil || *got.AssignedTo != 9 {
+		t.Fatalf("unexpected transferred entry: %+v", got)
 	}
 }

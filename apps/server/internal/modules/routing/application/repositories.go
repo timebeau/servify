@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"time"
 
 	"servify/apps/server/internal/modules/routing/domain"
 )
@@ -12,4 +13,5 @@ type RoutingRepository interface {
 	GetQueueEntry(ctx context.Context, sessionID string) (*domain.QueueEntry, error)
 	ListQueueEntries(ctx context.Context, status string, limit int) ([]domain.QueueEntry, error)
 	UpdateQueueEntry(ctx context.Context, entry *domain.QueueEntry) error
+	MarkQueueEntryTransferred(ctx context.Context, sessionID string, agentID uint, assignedAt time.Time) (*domain.QueueEntry, error)
 }

@@ -60,6 +60,18 @@ func (a *SessionTransferAdapter) CancelWaiting(ctx context.Context, sessionID st
 	return mapWaitingRecord(entry), nil
 }
 
+func (a *SessionTransferAdapter) MarkWaitingTransferred(ctx context.Context, sessionID string, agentID uint, assignedAt time.Time) (*models.WaitingRecord, error) {
+	entry, err := a.service.MarkWaitingTransferred(ctx, routingapp.MarkWaitingTransferredCommand{
+		SessionID:  sessionID,
+		AssignedTo: agentID,
+		AssignedAt: assignedAt,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return mapWaitingRecord(entry), nil
+}
+
 func mapWaitingRecord(item *routingapp.QueueEntryDTO) *models.WaitingRecord {
 	if item == nil {
 		return nil

@@ -110,6 +110,25 @@ func (s *Service) ListWaitingEntries(ctx context.Context, status string, limit i
 	return out, nil
 }
 
+func (s *Service) MarkWaitingTransferred(ctx context.Context, cmd MarkWaitingTransferredCommand) (*QueueEntryDTO, error) {
+	if strings.TrimSpace(cmd.SessionID) == "" {
+		return nil, fmt.Errorf("session_id required")
+	}
+	if cmd.AssignedTo == 0 {
+		return nil, fmt.Errorf("assigned_to required")
+	}
+	at := cmd.AssignedAt
+	if at.IsZero() {
+		at = s.now()
+	}
+	item, err := s.repo.MarkQueueEntryTransferred(ctx, cmd.SessionID, cmd.AssignedTo, at)
+	if err != nil {
+		return nil, err
+	}
+	dto := MapQueueEntry(*item)
+	return &dto, nil
+}
+
 func (s *Service) publish(ctx context.Context, name, sessionID string, payload interface{}) {
 	if s.publisher == nil {
 		return
