@@ -40,7 +40,7 @@ export function ServifyProvider({
           // 设置事件监听器
           sdkRef.current.on('connected', () => setIsConnected(true));
           sdkRef.current.on('disconnected', () => setIsConnected(false));
-          sdkRef.current.on('error', (error) => onError?.(error));
+          sdkRef.current.on('error', (error: Error) => onError?.(error));
         }
 
         await sdkRef.current.initialize();

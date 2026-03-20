@@ -2,7 +2,13 @@
   "extends": "../core/tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
-    "declarationDir": "dist"
+    "declarationDir": "dist",
+    "baseUrl": ".",
+    "paths": {
+      "@servify/core": [
+        "../core/src/index.ts"
+      ]
+    }
   },
   "include": [
     "src/**/*"

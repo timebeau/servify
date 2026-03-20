@@ -25,8 +25,8 @@ export class VanillaServifySDK {
     return undefined;
   }
 
-  private normalizeMessageType(type: string): Message['message_type'] {
-    if (type === 'image' || type === 'file' || type === 'system') {
+  private normalizeMessageType(type: string): 'text' | 'image' | 'file' {
+    if (type === 'image' || type === 'file') {
       return type;
     }
 

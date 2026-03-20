@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ServifyError } from './contracts/errors';
 import { WebSocketManager } from './websocket';
 
 class FakeWebSocket {
@@ -94,7 +93,7 @@ describe('WebSocketManager', () => {
       onTokenRefreshRequired: async () => undefined,
     });
 
-    await expect(manager.connect()).rejects.toMatchObject<Partial<ServifyError>>({
+    await expect(manager.connect()).rejects.toMatchObject({
       code: 'auth_refresh_required',
     });
   });

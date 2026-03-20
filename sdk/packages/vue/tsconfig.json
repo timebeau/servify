@@ -3,7 +3,13 @@
   "compilerOptions": {
     "outDir": "dist",
     "declarationDir": "dist",
-    "jsx": "preserve"
+    "jsx": "preserve",
+    "baseUrl": ".",
+    "paths": {
+      "@servify/core": [
+        "../core/src/index.ts"
+      ]
+    }
   },
   "include": [
     "src/**/*"

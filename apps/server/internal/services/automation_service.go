@@ -97,3 +97,30 @@ func (s *AutomationService) CreateTrigger(ctx context.Context, req *AutomationTr
 func (s *AutomationService) DeleteTrigger(ctx context.Context, id uint) error {
 	return s.module.DeleteTrigger(ctx, id)
 }
+
+// matchTrigger preserves the legacy test-facing helper while delegating to the automation module.
+func (s *AutomationService) matchTrigger(ctx context.Context, trig models.AutomationTrigger, evt AutomationEvent, ticket *models.Ticket, dryRun bool) bool {
+	if s == nil || s.module == nil {
+		return false
+	}
+
+	var ticketView *automationapp.TicketView
+	if ticket != nil {
+		ticketView = &automationapp.TicketView{
+			ID:       ticket.ID,
+			Priority: ticket.Priority,
+			Status:   ticket.Status,
+			Tags:     ticket.Tags,
+		}
+	}
+
+	return s.module.MatchTrigger(ctx, trig, evt, ticketView, dryRun)
+}
+
+func evaluateCondition(cond TriggerCondition, attrs map[string]interface{}) bool {
+	return automationapp.EvaluateCondition(cond, attrs)
+}
+
+func isSupportedEvent(event string) bool {
+	return automationapp.IsSupportedEvent(event)
+}

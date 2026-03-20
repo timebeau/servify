@@ -3,7 +3,13 @@
   "compilerOptions": {
     "outDir": "dist",
     "declarationDir": "dist",
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@servify/core": [
+        "../core/src/index.ts"
+      ]
+    }
   },
   "include": [
     "src/**/*"

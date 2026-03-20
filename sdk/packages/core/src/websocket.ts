@@ -7,7 +7,7 @@ import {
   shouldReconnect,
 } from './contracts/reconnect';
 import type { Transport, TransportConnectOptions, TransportSendOptions, ReconnectPolicy, TransportState } from './contracts/transport';
-import { WSMessage, ServifyEventMap } from './types';
+import { WSMessage, ServifyEventMap, Message, ChatSession } from './types';
 
 export interface WebSocketManagerOptions {
   url: string;
@@ -192,12 +192,12 @@ export class WebSocketManager extends EventEmitter<ServifyEventMap> implements T
       subscriber(message);
     }
 
-    switch (message.type) {
+      switch (message.type) {
       case 'message':
-        this.emit('message', message.data);
+        this.emit('message', message.data as Message);
         break;
       case 'session_update':
-        this.emit('session_updated', message.data);
+        this.emit('session_updated', message.data as ChatSession);
         break;
       case 'agent_status':
         if (typeof message.data === 'object' && message.data !== null) {

@@ -152,6 +152,10 @@ func (s *Service) applyTrigger(ctx context.Context, trig models.AutomationTrigge
 	return true
 }
 
+func (s *Service) MatchTrigger(ctx context.Context, trig models.AutomationTrigger, evt Event, ticket *TicketView, dryRun bool) bool {
+	return s.applyTrigger(ctx, trig, evt, ticket, dryRun)
+}
+
 func (s *Service) executeAction(ctx context.Context, act TriggerAction, ticket *TicketView) error {
 	switch act.Type {
 	case "set_priority":
@@ -233,4 +237,8 @@ func isSupportedEvent(event string) bool {
 	default:
 		return false
 	}
+}
+
+func IsSupportedEvent(event string) bool {
+	return isSupportedEvent(normalizeEvent(event))
 }
