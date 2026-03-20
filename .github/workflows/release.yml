@@ -1,0 +1,73 @@
+name: Release Preparation
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version, for example 1.2.3
+        required: true
+        type: string
+      previous_ref:
+        description: Previous tag or commit for changelog generation
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  prepare-release:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/server/go.mod
+          cache-dependency-path: |
+            apps/server/go.sum
+            go.work.sum
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            sdk/package-lock.json
+            docs/package-lock.json
+            apps/website-worker/package-lock.json
+
+      - name: Validate release version format
+        run: |
+          if ! [[ "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Version must be semver-like"
+            exit 1
+          fi
+
+      - name: Check SDK workspace versions
+        run: npm -C sdk run version:check
+
+      - name: Build release artifacts
+        run: make VERSION="${{ inputs.version }}" build build-weknora
+
+      - name: Generate changelog draft
+        run: |
+          chmod +x scripts/generate-changelog.sh
+          ./scripts/generate-changelog.sh "${{ inputs.previous_ref }}" HEAD > RELEASE_CHANGELOG.md
+
+      - name: Upload release bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ inputs.version }}
+          path: |
+            bin/
+            RELEASE_CHANGELOG.md

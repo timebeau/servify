@@ -24,8 +24,13 @@
     "dev:core": "npm --workspace @servify/core run dev",
     "test": "npm run test:core",
     "test:core": "npm --workspace @servify/core run test",
-    "lint": "eslint packages/*/src/**/*.{js,ts,tsx}",
-    "clean": "rm -rf packages/*/dist"
+    "test:examples": "node ./scripts/run-example-smoke-tests.mjs",
+    "test:surfaces": "node ./scripts/run-surface-smoke-tests.mjs",
+    "test:governance": "node ./scripts/check-surface-governance.mjs",
+    "lint": "npx eslint \"packages/*/src/**/*.{js,ts,tsx}\"",
+    "clean": "rm -rf packages/*/dist",
+    "version:sync": "node ./scripts/sync-versions.mjs",
+    "version:check": "node ./scripts/sync-versions.mjs --check"
   },
   "keywords": [
     "customer-support",

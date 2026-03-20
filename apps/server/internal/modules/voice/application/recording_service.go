@@ -12,18 +12,29 @@ const (
 )
 
 type RecordingService struct {
-	provider  RecordingProvider
-	repo      RecordingRepository
-	publisher Publisher
+	provider     RecordingProvider
+	repo         RecordingRepository
+	publisher    Publisher
+	retryPolicy  RetryPolicy
+	callbackSink AsyncCallbackSink
 }
 
 func NewRecordingService(provider RecordingProvider, repo RecordingRepository, publisher Publisher) *RecordingService {
-	return &RecordingService{provider: provider, repo: repo, publisher: publisher}
+	return &RecordingService{
+		provider:    provider,
+		repo:        repo,
+		publisher:   publisher,
+		retryPolicy: RetryPolicy{MaxAttempts: 2},
+	}
 }
 
 func (s *RecordingService) StartRecording(ctx context.Context, cmd StartRecordingCommand) (*RecordingDTO, error) {
-	recordingID, err := s.provider.StartRecording(ctx, cmd)
-	if err != nil {
+	var recordingID string
+	if err := applyRetry(s.retryPolicy.MaxAttempts, func() error {
+		var err error
+		recordingID, err = s.provider.StartRecording(ctx, cmd)
+		return err
+	}); err != nil {
 		return nil, err
 	}
 	recording := &RecordingDTO{
@@ -39,11 +50,16 @@ func (s *RecordingService) StartRecording(ctx context.Context, cmd StartRecordin
 		}
 	}
 	s.publish(ctx, RecordingStartedEventName, recording.ID, recording)
+	if s.callbackSink != nil {
+		_ = s.callbackSink.NotifyRecording(ctx, *recording)
+	}
 	return recording, nil
 }
 
 func (s *RecordingService) StopRecording(ctx context.Context, cmd StopRecordingCommand) error {
-	if err := s.provider.StopRecording(ctx, cmd); err != nil {
+	if err := applyRetry(s.retryPolicy.MaxAttempts, func() error {
+		return s.provider.StopRecording(ctx, cmd)
+	}); err != nil {
 		return err
 	}
 	if s.repo != nil {
@@ -67,4 +83,15 @@ func (s *RecordingService) publish(ctx context.Context, name, aggregateID string
 		return
 	}
 	_ = s.publisher.Publish(ctx, NewVoiceEvent(name, aggregateID, payload))
+}
+
+func (s *RecordingService) SetRetryPolicy(policy RetryPolicy) {
+	if policy.MaxAttempts <= 0 {
+		policy.MaxAttempts = 1
+	}
+	s.retryPolicy = policy
+}
+
+func (s *RecordingService) SetCallbackSink(sink AsyncCallbackSink) {
+	s.callbackSink = sink
 }

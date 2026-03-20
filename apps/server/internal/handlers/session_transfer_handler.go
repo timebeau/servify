@@ -104,7 +104,7 @@ func (h *SessionTransferHandler) TransferToAgent(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param session_id path string true "会话ID"
-// @Success 200 {array} services.TransferRecord
+// @Success 200 {array} models.TransferRecord
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
 // @Router /api/session-transfer/history/{session_id} [get]

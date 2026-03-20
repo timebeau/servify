@@ -1,0 +1,14 @@
+{
+  "name": "@servify/transport-websocket",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Reserved package for future Servify websocket and streaming transports",
+  "type": "module",
+  "scripts": {
+    "typecheck": "npx tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

@@ -6,6 +6,8 @@ import {
   type Customer,
   type ChatSession,
   type Agent,
+  type Ticket,
+  type CustomerSatisfaction,
 } from '@servify/core';
 
 /**
@@ -14,6 +16,22 @@ import {
 export class VanillaServifySDK {
   private sdk: WebServifyClient;
   private eventCallbacks: Map<string, Array<(...args: unknown[]) => void>> = new Map();
+
+  private normalizePriority(priority?: string): ChatSession['priority'] | undefined {
+    if (priority === 'low' || priority === 'normal' || priority === 'high' || priority === 'urgent') {
+      return priority;
+    }
+
+    return undefined;
+  }
+
+  private normalizeMessageType(type: string): Message['message_type'] {
+    if (type === 'image' || type === 'file' || type === 'system') {
+      return type;
+    }
+
+    return 'text';
+  }
 
   constructor(config: WebServifyConfig) {
     this.sdk = createWebServifySDK(config);
@@ -60,7 +78,7 @@ export class VanillaServifySDK {
     message?: string;
   }): Promise<ChatSession> {
     return this.sdk.startChat({
-      priority: options?.priority as any,
+      priority: this.normalizePriority(options?.priority),
       message: options?.message,
     });
   }
@@ -69,7 +87,7 @@ export class VanillaServifySDK {
    * 发送消息
    */
   async sendMessage(content: string, type: string = 'text'): Promise<Message> {
-    return this.sdk.sendMessage(content, { type: type as any });
+    return this.sdk.sendMessage(content, { type: this.normalizeMessageType(type) });
   }
 
   /**
@@ -106,17 +124,17 @@ export class VanillaServifySDK {
     description: string;
     priority?: string;
     category: string;
-  }): Promise<any> {
+  }): Promise<Ticket> {
     return this.sdk.createTicket({
       ...data,
-      priority: data.priority as any,
+      priority: this.normalizePriority(data.priority),
     });
   }
 
   /**
    * 提交满意度评价
    */
-  async submitRating(rating: number, comment?: string): Promise<any> {
+  async submitRating(rating: number, comment?: string): Promise<CustomerSatisfaction> {
     return this.sdk.submitSatisfaction({
       rating,
       comment,
@@ -193,14 +211,14 @@ export class VanillaServifySDK {
   /**
    * 触发回调函数
    */
-  private triggerCallback(event: string, ...args: any[]): void {
+  private triggerCallback(event: string, ...args: unknown[]): void {
     const callbacks = this.eventCallbacks.get(event);
     if (callbacks) {
       callbacks.forEach(callback => {
         try {
           callback(...args);
         } catch (error) {
-          console.error(`Error in ${event} callback:`, error);
+          console.warn(`Error in ${event} callback:`, error);
         }
       });
     }

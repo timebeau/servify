@@ -1,6 +1,11 @@
 import EventEmitter from 'eventemitter3';
 import type { AuthProvider } from './contracts/auth-provider';
 import { ServifyError } from './contracts/errors';
+import {
+  computeReconnectDelay,
+  normalizeReconnectPolicy,
+  shouldReconnect,
+} from './contracts/reconnect';
 import type { Transport, TransportConnectOptions, TransportSendOptions, ReconnectPolicy, TransportState } from './contracts/transport';
 import { WSMessage, ServifyEventMap } from './types';
 
@@ -37,25 +42,27 @@ export class WebSocketManager extends EventEmitter<ServifyEventMap> implements T
   constructor(options: WebSocketManagerOptions) {
     super();
 
+    const reconnectPolicy = normalizeReconnectPolicy(options.reconnectPolicy, {
+      reconnectAttempts: options.reconnectAttempts,
+      reconnectDelay: options.reconnectDelay,
+    });
+
     this.options = {
       protocols: [],
       reconnectAttempts: 5,
       reconnectDelay: 1000,
       heartbeatInterval: 30000,
       debug: false,
-      reconnectPolicy: {
-        maxAttempts: options.reconnectAttempts ?? 5,
-        baseDelayMs: options.reconnectDelay ?? 1000,
-        backoffFactor: 2,
-        maxDelayMs: 30000,
-      },
+      reconnectPolicy,
       authProvider: options.authProvider,
       onTokenRefreshRequired: options.onTokenRefreshRequired ?? (async () => undefined),
       ...options
     };
   }
 
-  connect(_options?: TransportConnectOptions): Promise<void> {
+  async connect(_options?: TransportConnectOptions): Promise<void> {
+    const connectionUrl = await this.resolveConnectionUrl();
+
     return new Promise((resolve, reject) => {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         this.state = 'connected';
@@ -65,10 +72,10 @@ export class WebSocketManager extends EventEmitter<ServifyEventMap> implements T
 
       this.isManualClose = false;
       this.state = 'connecting';
-      this.log('正在连接 WebSocket...', this.options.url);
+      this.log('正在连接 WebSocket...', connectionUrl);
 
       try {
-        this.ws = new WebSocket(this.options.url, this.options.protocols);
+        this.ws = new WebSocket(connectionUrl, this.options.protocols);
       } catch (error) {
         this.state = 'error';
         reject(error);
@@ -100,7 +107,13 @@ export class WebSocketManager extends EventEmitter<ServifyEventMap> implements T
         this.state = this.isManualClose ? 'closed' : 'idle';
         this.emit('disconnected', event.reason || '连接关闭');
 
-        if (!this.isManualClose && this.reconnectAttempts < this.options.reconnectPolicy.maxAttempts) {
+        if (shouldReconnect(
+          {
+            attempt: this.reconnectAttempts,
+            isManualClose: this.isManualClose,
+          },
+          this.options.reconnectPolicy,
+        )) {
           this.state = 'reconnecting';
           this.scheduleReconnect();
         }
@@ -187,18 +200,26 @@ export class WebSocketManager extends EventEmitter<ServifyEventMap> implements T
         this.emit('session_updated', message.data);
         break;
       case 'agent_status':
-        if (message.data.type === 'assigned') {
-          this.emit('agent_assigned', message.data.agent);
-        } else if (message.data.type === 'typing') {
-          this.emit('agent_typing', message.data.typing);
+        if (typeof message.data === 'object' && message.data !== null) {
+          const agentStatus = message.data as {
+            type?: 'assigned' | 'typing';
+            agent?: ServifyEventMap['agent_assigned'][0];
+            typing?: boolean;
+          };
+
+          if (agentStatus.type === 'assigned' && agentStatus.agent) {
+            this.emit('agent_assigned', agentStatus.agent);
+          } else if (agentStatus.type === 'typing' && typeof agentStatus.typing === 'boolean') {
+            this.emit('agent_typing', agentStatus.typing);
+          }
         }
         break;
       case 'error':
-        this.emit('error', new Error(message.data.message || 'Unknown error'));
+        this.emit('error', new Error(this.extractMessageText(message.data) || 'Unknown error'));
         break;
       case 'system':
         // 处理系统消息，如心跳响应
-        if (message.data?.type === 'pong') {
+        if (typeof message.data === 'object' && message.data !== null && 'type' in message.data && message.data.type === 'pong') {
           // 心跳响应处理
           this.log('收到心跳响应');
         }
@@ -212,12 +233,7 @@ export class WebSocketManager extends EventEmitter<ServifyEventMap> implements T
     this.reconnectAttempts++;
     this.emit('reconnecting', this.reconnectAttempts);
 
-    const factor = this.options.reconnectPolicy.backoffFactor ?? 2;
-    const maxDelay = this.options.reconnectPolicy.maxDelayMs ?? 30000;
-    const delay = Math.min(
-      this.options.reconnectPolicy.baseDelayMs * Math.pow(factor, this.reconnectAttempts - 1),
-      maxDelay
-    );
+    const delay = computeReconnectDelay(this.options.reconnectPolicy, this.reconnectAttempts);
     this.log(`${delay}ms 后重连 (第 ${this.reconnectAttempts}/${this.options.reconnectPolicy.maxAttempts} 次)`);
 
     this.reconnectTimer = setTimeout(() => {
@@ -247,9 +263,56 @@ export class WebSocketManager extends EventEmitter<ServifyEventMap> implements T
     }
   }
 
-  private log(...args: any[]): void {
+  private log(...args: unknown[]): void {
     if (this.options.debug) {
-      console.log('[ServifyWS]', ...args);
+      console.warn('[ServifyWS]', ...args);
     }
+  }
+
+  private async resolveConnectionUrl(): Promise<string> {
+    const token = await this.resolveAuthToken(this.options.authProvider);
+    if (!token) {
+      return this.options.url;
+    }
+
+    const url = new URL(this.options.url);
+    url.searchParams.set('access_token', token);
+    return url.toString();
+  }
+
+  private async resolveAuthToken(authProvider?: AuthProvider): Promise<string | null> {
+    if (!authProvider) {
+      return null;
+    }
+
+    const currentToken = await authProvider.getToken();
+    if (currentToken?.accessToken) {
+      return currentToken.accessToken;
+    }
+
+    if (!authProvider.refreshToken) {
+      return null;
+    }
+
+    await this.options.onTokenRefreshRequired();
+
+    const refreshedToken = await authProvider.refreshToken();
+    if (refreshedToken?.accessToken) {
+      return refreshedToken.accessToken;
+    }
+
+    throw new ServifyError('Authentication refresh required', {
+      code: 'auth_refresh_required',
+      retryable: false,
+      details: { url: this.options.url },
+    });
+  }
+
+  private extractMessageText(data: unknown): string | null {
+    if (typeof data === 'object' && data !== null && 'message' in data && typeof data.message === 'string') {
+      return data.message;
+    }
+
+    return null;
   }
 }

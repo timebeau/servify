@@ -6,17 +6,26 @@ import (
 )
 
 type TranscriptService struct {
-	provider  TranscriptProvider
-	repo      TranscriptRepository
-	publisher Publisher
+	provider     TranscriptProvider
+	repo         TranscriptRepository
+	publisher    Publisher
+	retryPolicy  RetryPolicy
+	callbackSink AsyncCallbackSink
 }
 
 func NewTranscriptService(provider TranscriptProvider, repo TranscriptRepository, publisher Publisher) *TranscriptService {
-	return &TranscriptService{provider: provider, repo: repo, publisher: publisher}
+	return &TranscriptService{
+		provider:    provider,
+		repo:        repo,
+		publisher:   publisher,
+		retryPolicy: RetryPolicy{MaxAttempts: 2},
+	}
 }
 
 func (s *TranscriptService) Append(ctx context.Context, cmd AppendTranscriptCommand) (*TranscriptDTO, error) {
-	if err := s.provider.AppendTranscript(ctx, cmd); err != nil {
+	if err := applyRetry(s.retryPolicy.MaxAttempts, func() error {
+		return s.provider.AppendTranscript(ctx, cmd)
+	}); err != nil {
 		return nil, err
 	}
 	transcript := &TranscriptDTO{
@@ -32,6 +41,9 @@ func (s *TranscriptService) Append(ctx context.Context, cmd AppendTranscriptComm
 		}
 	}
 	s.publish(ctx, TranscriptAppendedEventName, cmd.CallID, transcript)
+	if s.callbackSink != nil {
+		_ = s.callbackSink.NotifyTranscript(ctx, *transcript)
+	}
 	return transcript, nil
 }
 
@@ -47,4 +59,15 @@ func (s *TranscriptService) publish(ctx context.Context, name, aggregateID strin
 		return
 	}
 	_ = s.publisher.Publish(ctx, NewVoiceEvent(name, aggregateID, payload))
+}
+
+func (s *TranscriptService) SetRetryPolicy(policy RetryPolicy) {
+	if policy.MaxAttempts <= 0 {
+		policy.MaxAttempts = 1
+	}
+	s.retryPolicy = policy
+}
+
+func (s *TranscriptService) SetCallbackSink(sink AsyncCallbackSink) {
+	s.callbackSink = sink
 }

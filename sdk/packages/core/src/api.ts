@@ -7,6 +7,10 @@ export interface ApiClientOptions {
   debug?: boolean;
 }
 
+function isStructuredApiResponse<T>(value: unknown): value is ApiResponse<T> {
+  return typeof value === 'object' && value !== null && 'success' in value;
+}
+
 export class ApiClient {
   private options: Required<ApiClientOptions>;
 
@@ -25,7 +29,7 @@ export class ApiClient {
   private async request<T>(
     method: 'GET' | 'POST' | 'PUT' | 'DELETE',
     endpoint: string,
-    data?: any,
+    data?: unknown,
     options?: Partial<ApiClientOptions>
   ): Promise<ApiResponse<T>> {
     const url = `${this.options.baseUrl}${endpoint}`;
@@ -46,20 +50,21 @@ export class ApiClient {
 
       clearTimeout(timeoutId);
 
-      const result = await response.json();
+      const result = await response.json() as unknown;
+      const structuredResult = isStructuredApiResponse<T>(result) ? result : undefined;
       this.log(`响应:`, result);
 
       if (!response.ok) {
         return {
           success: false,
-          error: result.error || `HTTP ${response.status}: ${response.statusText}`,
+          error: structuredResult?.error || `HTTP ${response.status}: ${response.statusText}`,
         };
       }
 
       return {
         success: true,
-        data: result.data || result,
-        message: result.message,
+        data: structuredResult?.data ?? (result as T),
+        message: structuredResult?.message,
       };
     } catch (error) {
       this.log(`请求失败:`, error);
@@ -204,13 +209,25 @@ export class ApiClient {
         }
       });
 
-      const result = await response.json();
+      const result = await response.json() as unknown;
+      const structuredResult = isStructuredApiResponse<{
+        file_url: string;
+        file_name: string;
+        file_size: number;
+      }>(result) ? result : undefined;
 
       if (!response.ok) {
-        return { success: false, error: result.error || 'Upload failed' };
+        return { success: false, error: structuredResult?.error || 'Upload failed' };
       }
 
-      return { success: true, data: result.data || result };
+      return {
+        success: true,
+        data: structuredResult?.data ?? result as {
+          file_url: string;
+          file_name: string;
+          file_size: number;
+        },
+      };
     } catch (error) {
       return {
         success: false,
@@ -248,9 +265,9 @@ export class ApiClient {
     this.options.headers['X-Customer-ID'] = customerId.toString();
   }
 
-  private log(...args: any[]): void {
+  private log(...args: unknown[]): void {
     if (this.options.debug) {
-      console.log('[ServifyAPI]', ...args);
+      console.warn('[ServifyAPI]', ...args);
     }
   }
 }

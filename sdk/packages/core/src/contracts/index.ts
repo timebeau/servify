@@ -3,4 +3,6 @@ export * from './capability';
 export * from './client-session';
 export * from './errors';
 export * from './event-emitter';
+export * from './reconnect';
+export * from './serializer';
 export * from './transport';

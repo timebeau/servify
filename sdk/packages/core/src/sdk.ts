@@ -104,6 +104,9 @@ export class ServifySDK extends EventEmitter<ServifyEventMap> implements ClientS
       url: `${wsUrl}?customer_id=${this.currentCustomer.id}`,
       reconnectAttempts: this.config.reconnectAttempts!,
       reconnectDelay: this.config.reconnectDelay!,
+      reconnectPolicy: this.config.reconnectPolicy,
+      authProvider: this.config.authProvider,
+      onTokenRefreshRequired: this.config.onTokenRefreshRequired,
       debug: this.config.debug,
     });
 
@@ -136,7 +139,7 @@ export class ServifySDK extends EventEmitter<ServifyEventMap> implements ClientS
   async startChat(options?: {
     priority?: 'low' | 'normal' | 'high' | 'urgent';
     message?: string;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
   }): Promise<ChatSession> {
     if (!this.currentCustomer) {
       throw new Error('Customer not initialized');
@@ -169,7 +172,7 @@ export class ServifySDK extends EventEmitter<ServifyEventMap> implements ClientS
   async sendMessage(content: string, options?: {
     type?: 'text' | 'image' | 'file';
     attachments?: string[];
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
   }): Promise<Message> {
     if (!this.currentSession) {
       throw new Error('No active session. Start a chat first.');
@@ -224,7 +227,7 @@ export class ServifySDK extends EventEmitter<ServifyEventMap> implements ClientS
     description: string;
     priority?: 'low' | 'normal' | 'high' | 'urgent';
     category: string;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
   }): Promise<Ticket> {
     if (!this.currentCustomer) {
       throw new Error('Customer not initialized');
@@ -387,9 +390,9 @@ export class ServifySDK extends EventEmitter<ServifyEventMap> implements ClientS
   }
 
   // 私有方法：日志输出
-  private log(...args: any[]): void {
+  private log(...args: unknown[]): void {
     if (this.config.debug) {
-      console.log('[ServifySDK]', ...args);
+      console.warn('[ServifySDK]', ...args);
     }
   }
 }

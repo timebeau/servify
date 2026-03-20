@@ -15,6 +15,12 @@ func (a testSignalingAdapter) MapInvite(context.Context, interface{}) (CallEvent
 func (a testSignalingAdapter) MapAnswer(context.Context, interface{}) (CallEvent, error) {
 	return CallEvent{}, nil
 }
+func (a testSignalingAdapter) MapHold(context.Context, interface{}) (CallEvent, error) {
+	return CallEvent{}, nil
+}
+func (a testSignalingAdapter) MapResume(context.Context, interface{}) (CallEvent, error) {
+	return CallEvent{}, nil
+}
 func (a testSignalingAdapter) MapHangup(context.Context, interface{}) (CallEvent, error) {
 	return CallEvent{}, nil
 }

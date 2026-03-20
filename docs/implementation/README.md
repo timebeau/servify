@@ -10,6 +10,8 @@
 
 文件说明：
 
+- [总体架构设计](../ARCHITECTURE.md)
+  - 宏观边界、运行时分层、未来扩展方向
 - [01-platform-and-runtime.md](./01-platform-and-runtime.md)
   - 入口、bootstrap、router、auth、event bus、realtime 等平台任务
 
@@ -43,3 +45,9 @@
 3. 再拆 `03-business-modules`
 4. 并行规划 `04-sdk-and-channel-adapters`，但当前只实现 web sdk
 5. 第一阶段清零后，进入 `05` 到 `08` 的工程化与扩展阶段
+
+配套专题：
+
+- [版本发布策略](../release-versioning.md)
+- [测试金字塔](../testing-pyramid.md)
+- [Mermaid 兼容性](../MERMAID_COMPATIBILITY.md)

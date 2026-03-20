@@ -40,6 +40,22 @@ func (a *VoiceProtocolAdapter) MapAnswer(_ context.Context, payload interface{})
 	return toCallEvent(call, voiceprotocol.CallEventAnswer), nil
 }
 
+func (a *VoiceProtocolAdapter) MapHold(_ context.Context, payload interface{}) (voiceprotocol.CallEvent, error) {
+	call, err := asInboundCall(payload)
+	if err != nil {
+		return voiceprotocol.CallEvent{}, err
+	}
+	return toCallEvent(call, voiceprotocol.CallEventHold), nil
+}
+
+func (a *VoiceProtocolAdapter) MapResume(_ context.Context, payload interface{}) (voiceprotocol.CallEvent, error) {
+	call, err := asInboundCall(payload)
+	if err != nil {
+		return voiceprotocol.CallEvent{}, err
+	}
+	return toCallEvent(call, voiceprotocol.CallEventResume), nil
+}
+
 func (a *VoiceProtocolAdapter) MapHangup(_ context.Context, payload interface{}) (voiceprotocol.CallEvent, error) {
 	call, err := asInboundCall(payload)
 	if err != nil {

@@ -127,7 +127,7 @@ func (s *CustomerService) ListCustomers(ctx context.Context, req *CustomerListRe
 	}
 	out := make([]CustomerInfo, 0, len(items))
 	for _, item := range items {
-		out = append(out, CustomerInfo(item))
+		out = append(out, customerInfoFromDTO(item))
 	}
 	return out, total, nil
 }
@@ -137,7 +137,7 @@ func (s *CustomerService) GetCustomerActivity(ctx context.Context, customerID ui
 	if err != nil {
 		return nil, err
 	}
-	return activity, nil
+	return customerActivityFromDTO(activity), nil
 }
 
 func (s *CustomerService) AddCustomerNote(ctx context.Context, customerID uint, note string, userID uint) error {
@@ -153,17 +153,123 @@ func (s *CustomerService) GetCustomerStats(ctx context.Context) (*CustomerStats,
 	if err != nil {
 		return nil, err
 	}
-	return stats, nil
+	return customerStatsFromDTO(stats), nil
 }
 
 // CustomerInfo 客户信息（用于列表显示）。
-type CustomerInfo = customerapp.CustomerInfoDTO
+type CustomerInfo struct {
+	models.User
+	Company  string `json:"company"`
+	Industry string `json:"industry"`
+	Source   string `json:"source"`
+	Tags     string `json:"tags"`
+	Notes    string `json:"notes"`
+	Priority string `json:"priority"`
+}
 
 // CustomerActivity 客户活动记录。
-type CustomerActivity = customerapp.CustomerActivityDTO
+type CustomerActivity struct {
+	CustomerID     uint             `json:"customer_id"`
+	RecentSessions []models.Session `json:"recent_sessions"`
+	RecentTickets  []models.Ticket  `json:"recent_tickets"`
+	RecentMessages []models.Message `json:"recent_messages"`
+}
 
 // CustomerStats 客户统计信息。
-type CustomerStats = customerapp.CustomerStatsDTO
+type CustomerStats struct {
+	Total       int64                   `json:"total"`
+	Active      int64                   `json:"active"`
+	NewThisWeek int64                   `json:"new_this_week"`
+	BySource    []CustomerSourceCount   `json:"by_source"`
+	ByIndustry  []CustomerIndustryCount `json:"by_industry"`
+	ByPriority  []CustomerPriorityCount `json:"by_priority"`
+}
+
+type CustomerSourceCount struct {
+	Source string `json:"source"`
+	Count  int64  `json:"count"`
+}
+
+type CustomerIndustryCount struct {
+	Industry string `json:"industry"`
+	Count    int64  `json:"count"`
+}
+
+type CustomerPriorityCount struct {
+	Priority string `json:"priority"`
+	Count    int64  `json:"count"`
+}
+
+func customerInfoFromDTO(dto customerapp.CustomerInfoDTO) CustomerInfo {
+	return CustomerInfo{
+		User:     dto.User,
+		Company:  dto.Company,
+		Industry: dto.Industry,
+		Source:   dto.Source,
+		Tags:     dto.Tags,
+		Notes:    dto.Notes,
+		Priority: dto.Priority,
+	}
+}
+
+func customerActivityFromDTO(dto *customerapp.CustomerActivityDTO) *CustomerActivity {
+	if dto == nil {
+		return nil
+	}
+	return &CustomerActivity{
+		CustomerID:     dto.CustomerID,
+		RecentSessions: dto.RecentSessions,
+		RecentTickets:  dto.RecentTickets,
+		RecentMessages: dto.RecentMessages,
+	}
+}
+
+func customerStatsFromDTO(dto *customerapp.CustomerStatsDTO) *CustomerStats {
+	if dto == nil {
+		return nil
+	}
+	return &CustomerStats{
+		Total:       dto.Total,
+		Active:      dto.Active,
+		NewThisWeek: dto.NewThisWeek,
+		BySource:    sourceCountsFromDTO(dto.BySource),
+		ByIndustry:  industryCountsFromDTO(dto.ByIndustry),
+		ByPriority:  priorityCountsFromDTO(dto.ByPriority),
+	}
+}
+
+func sourceCountsFromDTO(items []customerapp.SourceCount) []CustomerSourceCount {
+	out := make([]CustomerSourceCount, 0, len(items))
+	for _, item := range items {
+		out = append(out, CustomerSourceCount{
+			Source: item.Source,
+			Count:  item.Count,
+		})
+	}
+	return out
+}
+
+func industryCountsFromDTO(items []customerapp.IndustryCount) []CustomerIndustryCount {
+	out := make([]CustomerIndustryCount, 0, len(items))
+	for _, item := range items {
+		out = append(out, CustomerIndustryCount{
+			Industry: item.Industry,
+			Count:    item.Count,
+		})
+	}
+	return out
+}
+
+func priorityCountsFromDTO(items []customerapp.PriorityCount) []CustomerPriorityCount {
+	out := make([]CustomerPriorityCount, 0, len(items))
+	for _, item := range items {
+		out = append(out, CustomerPriorityCount{
+			Priority: item.Priority,
+			Count:    item.Count,
+		})
+	}
+	return out
+}
 
 func splitTags(raw string) []string {
 	if raw == "" {

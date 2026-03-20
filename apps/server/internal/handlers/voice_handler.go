@@ -238,6 +238,10 @@ func mapCallEvent(ctx context.Context, adapter voiceprotocol.CallSignalingAdapte
 		return adapter.MapInvite(ctx, payload)
 	case voiceprotocol.CallEventAnswer:
 		return adapter.MapAnswer(ctx, payload)
+	case voiceprotocol.CallEventHold:
+		return adapter.MapHold(ctx, payload)
+	case voiceprotocol.CallEventResume:
+		return adapter.MapResume(ctx, payload)
 	case voiceprotocol.CallEventHangup:
 		return adapter.MapHangup(ctx, payload)
 	case voiceprotocol.CallEventTransfer:

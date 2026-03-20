@@ -3,5 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "description": "Reserved package for future Servify server-side API client SDK",
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "typecheck": "npx tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
 }

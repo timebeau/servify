@@ -9,10 +9,10 @@
 
 ## A1 provider-matrix
 
-- [ ] 盘点当前 `LLMProvider` 与 `KnowledgeProvider` contract 缺口
-- [ ] 定义多 provider 配置矩阵
-- [ ] 定义优先级、fallback、熔断策略矩阵
-- [ ] 为 provider capability 建立声明模型
+- [x] 盘点当前 `LLMProvider` 与 `KnowledgeProvider` contract 缺口
+- [x] 定义多 provider 配置矩阵
+- [x] 定义优先级、fallback、熔断策略矩阵
+- [x] 为 provider capability 建立声明模型
 
 验收：
 

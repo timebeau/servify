@@ -1,28 +1,35 @@
-# Servify Docs
-
-这是 Servify 的文档入口页，目录结构按未来 VuePress 部署方式组织。
-
-## 文档导航
-
-### 架构与实施
-
-- [总体架构设计](../ARCHITECTURE.md)
-- [实施 Backlog 索引](./implementation/README.md)
-
-### 专题文档
-
-- [WeKnora 集成](./WEKNORA_INTEGRATION.md)
-- [CI / GitHub Hosted Runner](./CI_SELF_HOSTED.md)
+---
+home: true
+title: Servify Docs
+heroText: Servify Docs
+tagline: 架构、实施 backlog、工程化约束与集成指南
+actions:
+  - text: 查看架构
+    link: /ARCHITECTURE
+    type: primary
+  - text: 进入实施计划
+    link: /implementation/
+    type: secondary
+features:
+  - title: 架构与模块边界
+    details: 先看整体架构，再进入 platform、AI、业务模块和 voice 扩展任务。
+  - title: 工程化约束
+    details: CI 质量门禁、生成物一致性、版本发布链路、测试金字塔都在文档站统一维护。
+  - title: 集成专题
+    details: WeKnora、CI Runner、Mermaid 兼容性和发布策略作为长期维护专题单独收口。
+footer: Servify documentation site
+---
 
 ## 推荐阅读顺序
 
-1. [总体架构设计](../ARCHITECTURE.md)
-2. [实施 Backlog 索引](./implementation/README.md)
-3. 按主题进入对应 backlog
+1. [总体架构设计](/ARCHITECTURE)
+2. [实施 Backlog 索引](/implementation/)
+3. [工程化硬化与交付](/implementation/05-engineering-hardening)
 
-## 实施 Backlog
+## 专题文档
 
-- [平台与运行时](./implementation/01-platform-and-runtime.md)
-- [AI 与知识库](./implementation/02-ai-and-knowledge.md)
-- [业务模块](./implementation/03-business-modules.md)
-- [SDK 与渠道接入](./implementation/04-sdk-and-channel-adapters.md)
+- [WeKnora 集成](/WEKNORA_INTEGRATION)
+- [CI / GitHub Hosted Runner](/CI_SELF_HOSTED)
+- [版本发布策略](/release-versioning)
+- [测试金字塔](/testing-pyramid)
+- [Mermaid 兼容性](/MERMAID_COMPATIBILITY)

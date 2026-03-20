@@ -11,6 +11,7 @@ import (
 	voiceapp "servify/apps/server/internal/modules/voice/application"
 	voicedelivery "servify/apps/server/internal/modules/voice/delivery"
 	voiceinfra "servify/apps/server/internal/modules/voice/infra"
+	voiceprovidermock "servify/apps/server/internal/modules/voice/provider/mock"
 	"servify/apps/server/internal/platform/eventbus"
 	"servify/apps/server/internal/platform/pstnprovider"
 	"servify/apps/server/internal/platform/sip"
@@ -23,9 +24,8 @@ import (
 func newVoiceCoordinatorForTest() *voicedelivery.Coordinator {
 	bus := &voiceTestBus{}
 	callService := voiceapp.NewService(voiceinfra.NewInMemoryRepository(), bus)
-	mediaProvider := voiceinfra.NewInMemoryMediaProvider()
-	recordingService := voiceapp.NewRecordingService(mediaProvider, voiceinfra.NewInMemoryRecordingRepository(), bus)
-	transcriptService := voiceapp.NewTranscriptService(mediaProvider, voiceinfra.NewInMemoryTranscriptRepository(), bus)
+	recordingService := voiceapp.NewRecordingService(voiceprovidermock.NewRecordingProvider(), voiceinfra.NewInMemoryRecordingRepository(), bus)
+	transcriptService := voiceapp.NewTranscriptService(voiceprovidermock.NewTranscriptProvider(), voiceinfra.NewInMemoryTranscriptRepository(), bus)
 	return voicedelivery.NewCoordinator(callService, recordingService, transcriptService)
 }
 
@@ -35,6 +35,8 @@ func newVoiceRegistryForTest() *voiceprotocol.Registry {
 	_ = registry.RegisterSignaling(sipws.NewAdapter())
 	_ = registry.RegisterSignaling(pstnprovider.NewAdapter())
 	_ = registry.RegisterMedia(voicedelivery.NewWebRTCAdapter(voiceapp.NewService(voiceinfra.NewInMemoryRepository(), &voiceTestBus{})))
+	_ = registry.RegisterMedia(voicedelivery.NewRTPAdapter())
+	_ = registry.RegisterMedia(voicedelivery.NewSRTPAdapter())
 	return registry
 }
 

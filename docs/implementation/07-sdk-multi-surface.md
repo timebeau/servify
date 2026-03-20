@@ -14,11 +14,11 @@
 
 ## M1 web-sdk-completion
 
-- [ ] 补 `core` capability negotiation 测试矩阵
-- [ ] 补 reconnect policy 实现与测试
-- [ ] 补 token refresh hook 实现与测试
-- [ ] 补 `react/vue/vanilla` 对统一 contract 的 smoke tests
-- [ ] 收敛当前 lint warning
+- [x] 补 `core` capability negotiation 测试矩阵
+- [x] 补 reconnect policy 实现与测试
+- [x] 补 token refresh hook 实现与测试
+- [x] 补 `react/vue/vanilla` 对统一 contract 的 smoke tests
+- [x] 收敛当前 lint warning
 
 验收：
 
@@ -26,10 +26,10 @@
 
 ## M2 api-sdk-reservation
 
-- [ ] 在 `api-client` 中定义 server-side auth contract
-- [ ] 定义 retry/backoff contract
-- [ ] 定义 idempotency/request middleware contract
-- [ ] 定义 bot/admin automation 使用示例
+- [x] 在 `api-client` 中定义 server-side auth contract
+- [x] 定义 retry/backoff contract
+- [x] 定义 idempotency/request middleware contract
+- [x] 定义 bot/admin automation 使用示例
 
 验收：
 
@@ -37,10 +37,10 @@
 
 ## M3 app-sdk-reservation
 
-- [ ] 在 `app-core` 中定义 offline queue contract
-- [ ] 定义 push token registration contract
-- [ ] 定义 reconnect/session restore contract
-- [ ] 定义 mobile storage abstraction contract
+- [x] 在 `app-core` 中定义 offline queue contract
+- [x] 定义 push token registration contract
+- [x] 定义 reconnect/session restore contract
+- [x] 定义 mobile storage abstraction contract
 
 验收：
 
@@ -48,10 +48,10 @@
 
 ## M4 surface-governance
 
-- [ ] 定义 package 命名与发布策略
-- [ ] 定义 public API 审核边界
-- [ ] 增加 breaking change checklist
-- [ ] 增加 examples 与 package README 对齐检查
+- [x] 定义 package 命名与发布策略
+- [x] 定义 public API 审核边界
+- [x] 增加 breaking change checklist
+- [x] 增加 examples 与 package README 对齐检查
 
 验收：
 
@@ -59,10 +59,10 @@
 
 ## M5 transport-evolution
 
-- [ ] 细化 `transport-http` 包结构
-- [ ] 细化 `transport-websocket` 包结构
-- [ ] 预留 SSE / webhook callback transport contract
-- [ ] 预留 API/App/Web 共享 serializer contract
+- [x] 细化 `transport-http` 包结构
+- [x] 细化 `transport-websocket` 包结构
+- [x] 预留 SSE / webhook callback transport contract
+- [x] 预留 API/App/Web 共享 serializer contract
 
 验收：
 

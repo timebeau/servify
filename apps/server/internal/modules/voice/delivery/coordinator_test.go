@@ -6,15 +6,15 @@ import (
 
 	voiceapp "servify/apps/server/internal/modules/voice/application"
 	voiceinfra "servify/apps/server/internal/modules/voice/infra"
+	voiceprovidermock "servify/apps/server/internal/modules/voice/provider/mock"
 	"servify/apps/server/internal/platform/eventbus"
 )
 
 func TestCoordinatorStartRecordingAndAppendTranscript(t *testing.T) {
 	bus := &stubBus{}
 	callService := voiceapp.NewService(voiceinfra.NewInMemoryRepository(), bus)
-	mediaProvider := voiceinfra.NewInMemoryMediaProvider()
-	recordingService := voiceapp.NewRecordingService(mediaProvider, voiceinfra.NewInMemoryRecordingRepository(), bus)
-	transcriptService := voiceapp.NewTranscriptService(mediaProvider, voiceinfra.NewInMemoryTranscriptRepository(), bus)
+	recordingService := voiceapp.NewRecordingService(voiceprovidermock.NewRecordingProvider(), voiceinfra.NewInMemoryRecordingRepository(), bus)
+	transcriptService := voiceapp.NewTranscriptService(voiceprovidermock.NewTranscriptProvider(), voiceinfra.NewInMemoryTranscriptRepository(), bus)
 	coord := NewCoordinator(callService, recordingService, transcriptService)
 
 	rec, err := coord.StartRecording(context.Background(), voiceapp.StartRecordingCommand{CallID: "call-1", Provider: "mock"})

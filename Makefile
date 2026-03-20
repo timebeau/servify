@@ -1,6 +1,6 @@
 # Servify Makefile
 
-.PHONY: help build build-cli build-weknora run run-cli run-weknora migrate migrate-seed test clean docker-build docker-run docker-up-weknora docker-down docker-logs-weknora docker-up-observ docker-down-observ dev-setup fmt lint update-deps docs
+.PHONY: help build build-cli build-weknora run run-cli run-weknora migrate migrate-seed test clean docker-build docker-run docker-up-weknora docker-down docker-logs-weknora docker-up-observ docker-down-observ dev-setup fmt lint update-deps docs changelog sdk-sync-versions sdk-check-versions
 
 # Default target
 help:
@@ -23,6 +23,9 @@ help:
 	@echo "  docker-up-observ    - Up OTel Collector + Jaeger"
 	@echo "  docker-down-observ  - Down observability stack"
 	@echo "  docker-stop   - Stop Docker Compose services"
+	@echo "  changelog     - Generate a release changelog draft"
+	@echo "  sdk-sync-versions - Sync SDK package versions from sdk/package.json"
+	@echo "  sdk-check-versions - Check SDK package versions without modifying files"
 
 # Build the application
 build:
@@ -139,6 +142,18 @@ docs:
 	@echo "Generating API documentation..."
 	@command -v swag >/dev/null 2>&1 || { echo "swag is not installed. Install with: go install github.com/swaggo/swag/cmd/swag@latest"; exit 1; }
 	swag init -g apps/server/cmd/server/main.go -o docs/
+
+changelog:
+	@echo "Generating changelog draft..."
+	./scripts/generate-changelog.sh $(FROM) $(TO)
+
+sdk-sync-versions:
+	@echo "Syncing SDK workspace versions..."
+	npm -C sdk run version:sync
+
+sdk-check-versions:
+	@echo "Checking SDK workspace versions..."
+	npm -C sdk run version:check
 
 # Internal targets with ldflags (version info)
 VERSION ?= dev

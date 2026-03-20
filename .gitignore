@@ -38,6 +38,7 @@ scripts/test-results/
 
 # 缓存文件
 .cache/
+.gocache/
 bin/
 apps/demo-web/sdk/servify-sdk.esm.js
 apps/demo-web/sdk/servify-sdk.umd.js

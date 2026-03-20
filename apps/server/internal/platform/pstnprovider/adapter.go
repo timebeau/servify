@@ -39,6 +39,22 @@ func (a *Adapter) MapAnswer(_ context.Context, payload interface{}) (voiceprotoc
 	return toCallEvent(event, voiceprotocol.CallEventAnswer), nil
 }
 
+func (a *Adapter) MapHold(_ context.Context, payload interface{}) (voiceprotocol.CallEvent, error) {
+	event, err := asWebhook(payload)
+	if err != nil {
+		return voiceprotocol.CallEvent{}, err
+	}
+	return toCallEvent(event, voiceprotocol.CallEventHold), nil
+}
+
+func (a *Adapter) MapResume(_ context.Context, payload interface{}) (voiceprotocol.CallEvent, error) {
+	event, err := asWebhook(payload)
+	if err != nil {
+		return voiceprotocol.CallEvent{}, err
+	}
+	return toCallEvent(event, voiceprotocol.CallEventResume), nil
+}
+
 func (a *Adapter) MapHangup(_ context.Context, payload interface{}) (voiceprotocol.CallEvent, error) {
 	event, err := asWebhook(payload)
 	if err != nil {

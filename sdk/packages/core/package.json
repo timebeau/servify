@@ -6,10 +6,10 @@
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "vite build",
-    "dev": "vite build --watch",
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "build": "npx vite build",
+    "dev": "npx vite build --watch",
+    "test": "npx vitest run",
+    "typecheck": "npx tsc --noEmit"
   },
   "dependencies": {
     "eventemitter3": "^5.0.0"

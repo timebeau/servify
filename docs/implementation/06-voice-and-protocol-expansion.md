@@ -14,10 +14,10 @@
 
 ## V1 protocol-end-to-end
 
-- [ ] 为 `sip` 协议入口补 invite -> answer -> hangup 端到端测试
-- [ ] 为 `sip-ws` 协议入口补 invite -> dtmf -> hangup 端到端测试
-- [ ] 为 `pstn-provider` webhook 入口补 invite -> transfer -> hangup 测试
-- [ ] 为 `/api/voice/protocols` 增加契约测试
+- [x] 为 `sip` 协议入口补 invite -> answer -> hangup 端到端测试
+- [x] 为 `sip-ws` 协议入口补 invite -> dtmf -> hangup 端到端测试
+- [x] 为 `pstn-provider` webhook 入口补 invite -> transfer -> hangup 测试
+- [x] 为 `/api/voice/protocols` 增加契约测试
 
 验收：
 
@@ -25,10 +25,16 @@
 
 ## V2 call-control-semantics
 
-- [ ] 在统一协议入口补 hold 事件映射
-- [ ] 在统一协议入口补 resume 事件映射
-- [ ] 在统一协议入口补 transfer 事件映射到 `voice` use case
-- [ ] 明确 DTMF 在 voice/conversation/automation 间的分发策略
+- [x] 在统一协议入口补 hold 事件映射
+- [x] 在统一协议入口补 resume 事件映射
+- [x] 在统一协议入口补 transfer 事件映射到 `voice` use case
+- [x] 明确 DTMF 在 voice/conversation/automation 间的分发策略
+
+当前 DTMF 策略：
+
+- 协议 adapter 先统一归一为 `voiceprotocol.CallEventDTMF`
+- `voice` runtime 负责承接并保留统一入口，不直接写入通话状态
+- 后续如需联动 `conversation` 或 `automation`，应订阅统一 `voice` 事件，而不是反向依赖具体协议 DTO
 
 验收：
 
@@ -36,10 +42,10 @@
 
 ## V3 provider-implementation
 
-- [ ] 将录音 provider 从 in-memory 抽成独立 mock/provider 包
-- [ ] 将转写 provider 从 in-memory 抽成独立 mock/provider 包
-- [ ] 为 provider 增加失败重试和错误模型
-- [ ] 预留异步 webhook/callback 回写接口
+- [x] 将录音 provider 从 in-memory 抽成独立 mock/provider 包
+- [x] 将转写 provider 从 in-memory 抽成独立 mock/provider 包
+- [x] 为 provider 增加失败重试和错误模型
+- [x] 预留异步 webhook/callback 回写接口
 
 验收：
 
@@ -47,10 +53,10 @@
 
 ## V4 media-topology
 
-- [ ] 抽象 RTP/SRTP adapter 占位
-- [ ] 明确 WebRTC 与 RTP bridge 的 contract
-- [ ] 预留 conference/mixer 能力接口
-- [ ] 预留 QoS / voice quality metrics 采集点
+- [x] 抽象 RTP/SRTP adapter 占位
+- [x] 明确 WebRTC 与 RTP bridge 的 contract
+- [x] 预留 conference/mixer 能力接口
+- [x] 预留 QoS / voice quality metrics 采集点
 
 验收：
 
@@ -58,10 +64,10 @@
 
 ## V5 protocol-reservation
 
-- [ ] 预留 `voiceprotocol.ProtocolH323`
-- [ ] 预留 `voiceprotocol.ProtocolFreeSWITCHEventSocket` 或同类 PBX 适配能力
-- [ ] 预留 hosted voice vendor webhook adapter contract
-- [ ] 为新协议接入编写最小实现模板文档
+- [x] 预留 `voiceprotocol.ProtocolH323`
+- [x] 预留 `voiceprotocol.ProtocolFreeSWITCHEventSocket` 或同类 PBX 适配能力
+- [x] 预留 hosted voice vendor webhook adapter contract
+- [x] 为新协议接入编写最小实现模板文档
 
 验收：
 

@@ -3,6 +3,7 @@ package delivery
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	voiceapp "servify/apps/server/internal/modules/voice/application"
 	"servify/apps/server/internal/platform/voiceprotocol"
@@ -56,11 +57,21 @@ func (c *Coordinator) HandleCallEvent(ctx context.Context, event voiceprotocol.C
 		_, err := c.calls.ResumeCall(ctx, voiceapp.ResumeCallCommand{CallID: event.CallID})
 		return err
 	case voiceprotocol.CallEventTransfer:
-		return nil
+		targetAgentID, err := targetAgentIDFromMetadata(event.Metadata)
+		if err != nil {
+			return err
+		}
+		_, err = c.calls.TransferCall(ctx, voiceapp.TransferCallCommand{
+			CallID:    event.CallID,
+			ToAgentID: targetAgentID,
+		})
+		return err
 	case voiceprotocol.CallEventHangup:
 		_, err := c.calls.EndCall(ctx, voiceapp.EndCallCommand{CallID: event.CallID})
 		return err
 	case voiceprotocol.CallEventDTMF:
+		// DTMF is normalized in voice first. Downstream conversation or automation
+		// dispatch should subscribe to this unified voice event instead of protocol DTOs.
 		return nil
 	default:
 		return fmt.Errorf("unsupported call event kind %q", event.Kind)
@@ -151,4 +162,43 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func targetAgentIDFromMetadata(metadata map[string]interface{}) (uint, error) {
+	if len(metadata) == 0 {
+		return 0, fmt.Errorf("transfer event missing target_agent_id")
+	}
+
+	raw, ok := metadata["target_agent_id"]
+	if !ok {
+		return 0, fmt.Errorf("transfer event missing target_agent_id")
+	}
+
+	switch value := raw.(type) {
+	case uint:
+		return value, nil
+	case int:
+		if value < 0 {
+			return 0, fmt.Errorf("invalid target_agent_id %d", value)
+		}
+		return uint(value), nil
+	case int64:
+		if value < 0 {
+			return 0, fmt.Errorf("invalid target_agent_id %d", value)
+		}
+		return uint(value), nil
+	case float64:
+		if value < 0 {
+			return 0, fmt.Errorf("invalid target_agent_id %v", value)
+		}
+		return uint(value), nil
+	case string:
+		n, err := strconv.ParseUint(value, 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("invalid target_agent_id %q", value)
+		}
+		return uint(n), nil
+	default:
+		return 0, fmt.Errorf("unsupported target_agent_id type %T", raw)
+	}
 }

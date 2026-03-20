@@ -11,6 +11,9 @@ const (
 	ProtocolRTP          Protocol = "rtp"
 	ProtocolSRTP         Protocol = "srtp"
 	ProtocolPSTNProvider Protocol = "pstn-provider"
+	ProtocolH323         Protocol = "h323"
+	ProtocolFreeSWITCHESL Protocol = "freeswitch-esl"
+	ProtocolHostedVendorWebhook Protocol = "hosted-vendor-webhook"
 )
 
 type CallEventKind string

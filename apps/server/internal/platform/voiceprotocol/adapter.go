@@ -8,6 +8,8 @@ type CallSignalingAdapter interface {
 	Protocol() Protocol
 	MapInvite(context.Context, interface{}) (CallEvent, error)
 	MapAnswer(context.Context, interface{}) (CallEvent, error)
+	MapHold(context.Context, interface{}) (CallEvent, error)
+	MapResume(context.Context, interface{}) (CallEvent, error)
 	MapHangup(context.Context, interface{}) (CallEvent, error)
 	MapTransfer(context.Context, interface{}) (CallEvent, error)
 	MapDTMF(context.Context, interface{}) (CallEvent, error)

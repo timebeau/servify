@@ -105,3 +105,16 @@ func (r *InMemoryRepository) TransferCall(ctx context.Context, cmd voiceapp.Tran
 	call.TransferToAgent = &cmd.ToAgentID
 	return call, nil
 }
+
+func (r *InMemoryRepository) GetCall(callID string) (*voiceapp.CallDTO, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	call, ok := r.calls[callID]
+	if !ok {
+		return nil, false
+	}
+
+	copy := *call
+	return &copy, true
+}

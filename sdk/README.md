@@ -14,6 +14,8 @@ This workspace currently implements web SDK packages and reserves package slots 
 - `packages/api-client`
 - `packages/app-core`
 
+Reserved packages now include stable design-time contracts so future SDK work can extend them without copying Web SDK internals.
+
 ## Target structure
 
 - `core`
@@ -24,5 +26,7 @@ This workspace currently implements web SDK packages and reserves package slots 
 - `web-vue`
 - `api-client`
 - `app-core`
+- `transport-http`
+- `transport-websocket`
 
 Current implementation remains web-only. Reserved packages are placeholders for future expansion and should not contain production logic yet.

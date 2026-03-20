@@ -3,13 +3,9 @@ package cli
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
-)
+	"servify/apps/server/internal/version"
 
-var (
-	Version   = "dev"
-	Commit    = "none"
-	BuildTime = "unknown"
+	"github.com/spf13/cobra"
 )
 
 var versionCmd = &cobra.Command{
@@ -17,7 +13,7 @@ var versionCmd = &cobra.Command{
 	Short: "Print the version number of servify",
 	Long:  `All software has versions. This is servify's`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("Version: %s\nCommit: %s\nBuildTime: %s\n", Version, Commit, BuildTime)
+		fmt.Printf("Version: %s\nCommit: %s\nBuildTime: %s\n", version.Version, version.Commit, version.BuildTime)
 	},
 }
 

@@ -1,3 +1,6 @@
+import type { AuthProvider } from './contracts/auth-provider';
+import type { ReconnectPolicy } from './contracts/transport';
+
 // 基础类型定义
 export interface ServifyConfig {
   apiUrl: string;
@@ -10,6 +13,9 @@ export interface ServifyConfig {
   autoConnect?: boolean;
   reconnectAttempts?: number;
   reconnectDelay?: number;
+  reconnectPolicy?: ReconnectPolicy;
+  authProvider?: AuthProvider;
+  onTokenRefreshRequired?: () => Promise<void>;
 }
 
 export interface Customer {
@@ -59,7 +65,7 @@ export interface Message {
   message_type: 'text' | 'image' | 'file' | 'system';
   attachments?: string[];
   is_ai_response?: boolean;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   created_at: string;
 }
 
@@ -73,7 +79,7 @@ export interface Ticket {
   priority: 'low' | 'normal' | 'high' | 'urgent';
   category: string;
   tags?: string[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
   resolved_at?: string;
@@ -93,7 +99,7 @@ export interface CustomerSatisfaction {
 // WebSocket 消息类型
 export interface WSMessage {
   type: 'message' | 'session_update' | 'agent_status' | 'typing' | 'error' | 'system';
-  data: any;
+  data: unknown;
   timestamp?: string;
 }
 
@@ -114,7 +120,7 @@ export type ServifyEventMap = {
 };
 
 // API 响应类型
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   message?: string;

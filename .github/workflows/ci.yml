@@ -49,7 +49,7 @@ jobs:
       - name: Go mod tidy check
         run: |
           go -C apps/server mod tidy
-          git diff --exit-code -- apps/server/go.mod apps/server/go.sum
+          git diff --exit-code -- go.work.sum apps/server/go.mod apps/server/go.sum
 
       - name: Go vet
         run: go -C apps/server vet ./...
@@ -58,6 +58,11 @@ jobs:
         env:
           TEST_COVERAGE_TARGET: "5"
         run: ./scripts/run-tests.sh
+
+      - name: Run Go race tests
+        env:
+          CGO_ENABLED: "1"
+        run: ./scripts/run-go-race-tests.sh
 
       - name: Upload test artifacts
         if: always()
@@ -146,6 +151,11 @@ jobs:
           chmod +x scripts/sync-sdk-to-demo.sh
           ./scripts/sync-sdk-to-demo.sh
 
+      - name: Verify generated assets manifest
+        run: |
+          chmod +x scripts/verify-generated-assets.sh
+          ./scripts/verify-generated-assets.sh
+
       - name: Verify generated assets are committed
         run: git diff --exit-code
 
@@ -160,16 +170,35 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/server/go.mod
+          cache-dependency-path: |
+            apps/server/go.sum
+            go.work.sum
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: docs/package-lock.json
 
       - name: Install docs dependencies
-        run: npm -C docs install --no-audit --no-fund
+        run: npm -C docs ci --no-audit --no-fund
+
+      - name: Verify docs lockfile is committed
+        run: git diff --exit-code -- docs/package-lock.json
+
+      - name: Generate API docs
+        run: go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g apps/server/cmd/server/main.go -o docs/generated/api
 
       - name: Build docs site
         run: npm -C docs run build
+
+      - name: Verify docs generated assets are committed
+        run: git diff --exit-code -- docs/generated/api docs/package-lock.json
 
       - name: Upload docs artifact
         if: always()
@@ -213,12 +242,51 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/website-worker/package-lock.json
 
       - name: Install worker dependencies
-        run: npm -C apps/website-worker install --no-audit --no-fund
+        run: npm -C apps/website-worker ci --no-audit --no-fund
+
+      - name: Verify worker lockfile is committed
+        run: git diff --exit-code -- apps/website-worker/package-lock.json
 
       - name: Type check worker
         run: npm -C apps/website-worker run types
+
+  smoke-checks:
+    name: Smoke Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/server/go.mod
+          cache-dependency-path: |
+            apps/server/go.sum
+            go.work.sum
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: sdk/package-lock.json
+
+      - name: Install SDK dependencies
+        run: npm -C sdk ci --no-audit --no-fund
+
+      - name: Run smoke suite
+        run: |
+          chmod +x scripts/run-smoke-tests.sh
+          ./scripts/run-smoke-tests.sh
 
   integration:
     name: Integration
@@ -228,6 +296,7 @@ jobs:
       - sdk-checks
       - docs-checks
       - script-checks
+      - smoke-checks
     timeout-minutes: 25
     defaults:
       run:

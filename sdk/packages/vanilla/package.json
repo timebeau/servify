@@ -6,13 +6,13 @@
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "vite build",
-    "dev": "vite build --watch",
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "build": "npx vite build",
+    "dev": "npx vite build --watch",
+    "test": "npx vitest run",
+    "typecheck": "npx tsc --noEmit"
   },
   "dependencies": {
-    "@servify/core": "^1.0.0"
+    "@servify/core": "1.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

@@ -14,6 +14,7 @@ import (
 	voiceapp "servify/apps/server/internal/modules/voice/application"
 	voicedelivery "servify/apps/server/internal/modules/voice/delivery"
 	voiceinfra "servify/apps/server/internal/modules/voice/infra"
+	voiceprovidermock "servify/apps/server/internal/modules/voice/provider/mock"
 	"servify/apps/server/internal/platform/eventbus"
 	"servify/apps/server/internal/platform/pstnprovider"
 	realtimeplatform "servify/apps/server/internal/platform/realtime"
@@ -92,14 +93,13 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	rt.WSHub.SetAIService(rt.AIService)
 
 	voiceService := voiceapp.NewService(voiceinfra.NewInMemoryRepository(), bus)
-	mediaProvider := voiceinfra.NewInMemoryMediaProvider()
 	recordingService := voiceapp.NewRecordingService(
-		mediaProvider,
+		voiceprovidermock.NewRecordingProvider(),
 		voiceinfra.NewInMemoryRecordingRepository(),
 		bus,
 	)
 	transcriptService := voiceapp.NewTranscriptService(
-		mediaProvider,
+		voiceprovidermock.NewTranscriptProvider(),
 		voiceinfra.NewInMemoryTranscriptRepository(),
 		bus,
 	)
@@ -110,6 +110,8 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	_ = rt.VoiceProtocolRegistry.RegisterSignaling(sipws.NewAdapter())
 	_ = rt.VoiceProtocolRegistry.RegisterSignaling(pstnprovider.NewAdapter())
 	_ = rt.VoiceProtocolRegistry.RegisterMedia(voicedelivery.NewWebRTCAdapter(voiceService))
+	_ = rt.VoiceProtocolRegistry.RegisterMedia(voicedelivery.NewRTPAdapter())
+	_ = rt.VoiceProtocolRegistry.RegisterMedia(voicedelivery.NewSRTPAdapter())
 
 	rt.SLAService = services.NewSLAService(db, logger)
 	rt.AutomationService = services.NewAutomationService(db, logger)
