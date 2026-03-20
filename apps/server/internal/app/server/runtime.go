@@ -5,6 +5,7 @@ import (
 
 	"servify/apps/server/internal/config"
 	agentdelivery "servify/apps/server/internal/modules/agent/delivery"
+	analyticsdelivery "servify/apps/server/internal/modules/analytics/delivery"
 	conversationapp "servify/apps/server/internal/modules/conversation/application"
 	conversationdelivery "servify/apps/server/internal/modules/conversation/delivery"
 	conversationinfra "servify/apps/server/internal/modules/conversation/infra"
@@ -35,31 +36,32 @@ type Runtime struct {
 	DB     *gorm.DB
 	Bus    eventbus.Bus
 
-	AIService             services.AIServiceInterface
-	WSHub                 *services.WebSocketHub
-	RealtimeGateway       realtimeplatform.RealtimeGateway
-	RTCGateway            realtimeplatform.RTCGateway
-	MessageRouter         *services.MessageRouter
-	VoiceCoordinator      *voicedelivery.Coordinator
-	VoiceProtocolRegistry *voiceprotocol.Registry
-	CustomerService       *services.CustomerService
-	AgentHandlerService   agentdelivery.HandlerService
-	AgentService          *services.AgentService
-	TicketHandlerService  ticketdelivery.HandlerService
-	TicketReaderService   *ticketdelivery.ReaderServiceAdapter
-	TransferService       *services.SessionTransferService
-	SatisfactionService   *services.SatisfactionService
-	WorkspaceService      *services.WorkspaceService
-	MacroService          *services.MacroService
-	AppIntegrationService *services.AppIntegrationService
-	CustomFieldService    *services.CustomFieldService
-	StatisticsService     *services.StatisticsService
-	SLAService            *services.SLAService
-	ShiftService          *services.ShiftService
-	AutomationService     *services.AutomationService
-	KnowledgeDocService   *services.KnowledgeDocService
-	SuggestionService     *services.SuggestionService
-	GamificationService   *services.GamificationService
+	AIService                services.AIServiceInterface
+	WSHub                    *services.WebSocketHub
+	RealtimeGateway          realtimeplatform.RealtimeGateway
+	RTCGateway               realtimeplatform.RTCGateway
+	MessageRouter            *services.MessageRouter
+	VoiceCoordinator         *voicedelivery.Coordinator
+	VoiceProtocolRegistry    *voiceprotocol.Registry
+	CustomerService          *services.CustomerService
+	AgentHandlerService      agentdelivery.HandlerService
+	AgentService             *services.AgentService
+	TicketHandlerService     ticketdelivery.HandlerService
+	TicketReaderService      *ticketdelivery.ReaderServiceAdapter
+	TransferService          *services.SessionTransferService
+	SatisfactionService      *services.SatisfactionService
+	WorkspaceService         *services.WorkspaceService
+	MacroService             *services.MacroService
+	AppIntegrationService    *services.AppIntegrationService
+	CustomFieldService       *services.CustomFieldService
+	StatisticsHandlerService analyticsdelivery.HandlerService
+	StatisticsService        *services.StatisticsService
+	SLAService               *services.SLAService
+	ShiftService             *services.ShiftService
+	AutomationService        *services.AutomationService
+	KnowledgeDocService      *services.KnowledgeDocService
+	SuggestionService        *services.SuggestionService
+	GamificationService      *services.GamificationService
 }
 
 // BuildRuntime wires the current modular-monolith runtime behind an explicit assembly boundary.
@@ -133,6 +135,7 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 
 	rt.StatisticsService = services.NewStatisticsService(db, logger)
 	rt.StatisticsService.SetEventBus(bus)
+	rt.StatisticsHandlerService = rt.StatisticsService
 
 	rt.SatisfactionService = services.NewSatisfactionService(db, logger)
 	ticketService.SetSatisfactionService(rt.SatisfactionService)
@@ -166,32 +169,32 @@ func (rt *Runtime) Stop(context.Context) error {
 
 func (rt *Runtime) RouterDependencies() Dependencies {
 	return Dependencies{
-		Config:                rt.Config,
-		Logger:                rt.Logger,
-		DB:                    rt.DB,
-		AIService:             rt.AIService,
-		RealtimeGateway:       rt.RealtimeGateway,
-		RTCGateway:            rt.RTCGateway,
-		MessageRouter:         rt.MessageRouter,
-		VoiceCoordinator:      rt.VoiceCoordinator,
-		VoiceProtocolRegistry: rt.VoiceProtocolRegistry,
-		CustomerService:       rt.CustomerService,
-		AgentHandlerService:   rt.AgentHandlerService,
-		AgentService:          rt.AgentService,
-		TicketHandlerService:  rt.TicketHandlerService,
-		TicketReaderService:   rt.TicketReaderService,
-		TransferService:       rt.TransferService,
-		SatisfactionService:   rt.SatisfactionService,
-		WorkspaceService:      rt.WorkspaceService,
-		MacroService:          rt.MacroService,
-		AppIntegrationService: rt.AppIntegrationService,
-		CustomFieldService:    rt.CustomFieldService,
-		StatisticsService:     rt.StatisticsService,
-		SLAService:            rt.SLAService,
-		ShiftService:          rt.ShiftService,
-		AutomationService:     rt.AutomationService,
-		KnowledgeDocService:   rt.KnowledgeDocService,
-		SuggestionService:     rt.SuggestionService,
-		GamificationService:   rt.GamificationService,
+		Config:                   rt.Config,
+		Logger:                   rt.Logger,
+		DB:                       rt.DB,
+		AIService:                rt.AIService,
+		RealtimeGateway:          rt.RealtimeGateway,
+		RTCGateway:               rt.RTCGateway,
+		MessageRouter:            rt.MessageRouter,
+		VoiceCoordinator:         rt.VoiceCoordinator,
+		VoiceProtocolRegistry:    rt.VoiceProtocolRegistry,
+		CustomerService:          rt.CustomerService,
+		AgentHandlerService:      rt.AgentHandlerService,
+		AgentService:             rt.AgentService,
+		TicketHandlerService:     rt.TicketHandlerService,
+		TicketReaderService:      rt.TicketReaderService,
+		TransferService:          rt.TransferService,
+		SatisfactionService:      rt.SatisfactionService,
+		WorkspaceService:         rt.WorkspaceService,
+		MacroService:             rt.MacroService,
+		AppIntegrationService:    rt.AppIntegrationService,
+		CustomFieldService:       rt.CustomFieldService,
+		StatisticsHandlerService: rt.StatisticsHandlerService,
+		SLAService:               rt.SLAService,
+		ShiftService:             rt.ShiftService,
+		AutomationService:        rt.AutomationService,
+		KnowledgeDocService:      rt.KnowledgeDocService,
+		SuggestionService:        rt.SuggestionService,
+		GamificationService:      rt.GamificationService,
 	}
 }

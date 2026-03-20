@@ -5,6 +5,7 @@ import (
 	"servify/apps/server/internal/handlers"
 	"servify/apps/server/internal/middleware"
 	agentdelivery "servify/apps/server/internal/modules/agent/delivery"
+	analyticsdelivery "servify/apps/server/internal/modules/analytics/delivery"
 	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
 	voicedelivery "servify/apps/server/internal/modules/voice/delivery"
 	realtimeplatform "servify/apps/server/internal/platform/realtime"
@@ -18,33 +19,33 @@ import (
 
 // Dependencies contains the runtime services required to assemble the HTTP router.
 type Dependencies struct {
-	Config                *config.Config
-	Logger                *logrus.Logger
-	DB                    *gorm.DB
-	AIService             services.AIServiceInterface
-	RealtimeGateway       realtimeplatform.RealtimeGateway
-	RTCGateway            realtimeplatform.RTCGateway
-	MessageRouter         *services.MessageRouter
-	VoiceCoordinator      *voicedelivery.Coordinator
-	VoiceProtocolRegistry *voiceprotocol.Registry
-	CustomerService       *services.CustomerService
-	AgentHandlerService   agentdelivery.HandlerService
-	AgentService          *services.AgentService
-	TicketHandlerService  ticketdelivery.HandlerService
-	TicketReaderService   *ticketdelivery.ReaderServiceAdapter
-	TransferService       *services.SessionTransferService
-	SatisfactionService   *services.SatisfactionService
-	WorkspaceService      *services.WorkspaceService
-	MacroService          *services.MacroService
-	AppIntegrationService *services.AppIntegrationService
-	CustomFieldService    *services.CustomFieldService
-	StatisticsService     *services.StatisticsService
-	SLAService            *services.SLAService
-	ShiftService          *services.ShiftService
-	AutomationService     *services.AutomationService
-	KnowledgeDocService   *services.KnowledgeDocService
-	SuggestionService     *services.SuggestionService
-	GamificationService   *services.GamificationService
+	Config                   *config.Config
+	Logger                   *logrus.Logger
+	DB                       *gorm.DB
+	AIService                services.AIServiceInterface
+	RealtimeGateway          realtimeplatform.RealtimeGateway
+	RTCGateway               realtimeplatform.RTCGateway
+	MessageRouter            *services.MessageRouter
+	VoiceCoordinator         *voicedelivery.Coordinator
+	VoiceProtocolRegistry    *voiceprotocol.Registry
+	CustomerService          *services.CustomerService
+	AgentHandlerService      agentdelivery.HandlerService
+	AgentService             *services.AgentService
+	TicketHandlerService     ticketdelivery.HandlerService
+	TicketReaderService      *ticketdelivery.ReaderServiceAdapter
+	TransferService          *services.SessionTransferService
+	SatisfactionService      *services.SatisfactionService
+	WorkspaceService         *services.WorkspaceService
+	MacroService             *services.MacroService
+	AppIntegrationService    *services.AppIntegrationService
+	CustomFieldService       *services.CustomFieldService
+	StatisticsHandlerService analyticsdelivery.HandlerService
+	SLAService               *services.SLAService
+	ShiftService             *services.ShiftService
+	AutomationService        *services.AutomationService
+	KnowledgeDocService      *services.KnowledgeDocService
+	SuggestionService        *services.SuggestionService
+	GamificationService      *services.GamificationService
 }
 
 // BuildRouter assembles the HTTP routes and middleware around already-wired services.
@@ -101,7 +102,7 @@ func registerManagementRoutes(r *gin.Engine, deps Dependencies) {
 
 	statisticsAPI := api.Group("/")
 	statisticsAPI.Use(middleware.RequireResourcePermission("statistics"))
-	handlers.RegisterStatisticsRoutes(statisticsAPI, handlers.NewStatisticsHandler(deps.StatisticsService, deps.Logger))
+	handlers.RegisterStatisticsRoutes(statisticsAPI, handlers.NewStatisticsHandler(deps.StatisticsHandlerService, deps.Logger))
 
 	slaAPI := api.Group("/")
 	slaAPI.Use(middleware.RequireResourcePermission("sla"))

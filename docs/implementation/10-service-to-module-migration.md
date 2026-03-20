@@ -24,7 +24,7 @@
 
 ## M2 module-entry-contracts
 
-- [-] 为 `conversation`、`routing`、`ticket`、`ai` 定义唯一应用入口
+- [-] 为 `conversation`、`routing`、`ticket`、`analytics`、`ai` 定义唯一应用入口
 - [-] 明确 handler 只能依赖 adapter / application contract，不能直接拼业务
 - [-] 为旧 service 定义允许保留的兼容职责
 - [ ] 为 repo / gorm 依赖建立单向约束
@@ -43,9 +43,13 @@
   - handler-facing contract 已收口到 `modules/agent/delivery.HandlerService`
   - runtime 仍复用 `services.AgentService` 作为 contract 实现
   - `services.AgentService` 明确保留为兼容 facade + runtime state holder
+- `analytics`
+  - handler-facing contract 已收口到 `modules/analytics/delivery.HandlerService`
+  - runtime 仍复用 `services.StatisticsService` 作为 contract 实现
+  - `services.StatisticsService` 明确保留为兼容 facade + event bus glue
 - 边界守护
   - CI 已增加 `scripts/check-module-boundaries.sh`
-  - 当前自动校验 `ticket` / `agent` 的 handler constructor、router dependency、runtime wiring 都必须停留在 `modules/*/delivery.HandlerService`
+  - 当前自动校验 `ticket` / `agent` / `analytics` 的 handler constructor、router dependency、runtime wiring 都必须停留在 `modules/*/delivery.HandlerService`
 
 ## M3 compatibility-adapters
 

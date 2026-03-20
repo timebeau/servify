@@ -103,6 +103,9 @@
 - `agent`
   - HTTP handler 入口：`modules/agent/delivery.HandlerService`
   - 旧 `services/AgentService` 定位：兼容 facade + runtime state holder
+- `analytics`
+  - HTTP handler 入口：`modules/analytics/delivery.HandlerService`
+  - 旧 `services/StatisticsService` 定位：兼容 facade + event bus subscriber / DTO mapping glue
 
 ## 已确认的兼容职责边界
 
@@ -112,10 +115,13 @@
 - `services/AgentService`
   - 允许保留：旧调用方兼容入口、在线客服运行时状态、队列与后台同步逻辑
   - 不应新增：新的 HTTP handler 直接依赖、脱离 `modules/agent/application.Service` 的核心业务写路径
+- `services/StatisticsService`
+  - 允许保留：旧调用方兼容入口、event bus 订阅注册、DTO 映射、统计后台任务调度
+  - 不应新增：新的 HTTP handler 直接依赖、绕过 `modules/analytics/application.Service` 的主统计读写路径
 
 ## 当前自动化守护
 
 - `scripts/check-module-boundaries.sh`
-  - 校验 `ticket` / `agent` 的 handler constructor 必须依赖 `modules/*/delivery.HandlerService`
-  - 校验 router/runtime 对这两个模块的注入类型必须停留在 handler-facing contract
+  - 校验 `ticket` / `agent` / `analytics` 的 handler constructor 必须依赖 `modules/*/delivery.HandlerService`
+  - 校验 router/runtime 对这三个模块的注入类型必须停留在 handler-facing contract
   - 目的：先锁住已完成迁移的入口，避免回退到 handler 直连具体旧 service

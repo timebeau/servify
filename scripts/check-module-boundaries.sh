@@ -70,6 +70,27 @@ require_pattern \
   'TicketHandlerService\s+ticketdelivery\.HandlerService' \
   "Runtime must keep ticket handler wiring behind ticketdelivery.HandlerService."
 
+require_pattern \
+  "apps/server/internal/handlers/statistics_handler.go" \
+  'statsService\s+analyticsdelivery\.HandlerService' \
+  "Statistics handler must store modules/analytics/delivery.HandlerService."
+require_pattern \
+  "apps/server/internal/handlers/statistics_handler.go" \
+  'func NewStatisticsHandler\(statsService analyticsdelivery\.HandlerService, logger \*logrus\.Logger\)' \
+  "Statistics handler constructor must accept modules/analytics/delivery.HandlerService."
+forbid_pattern \
+  "apps/server/internal/handlers/statistics_handler.go" \
+  '\*services\.StatisticsService' \
+  "Statistics handler must not depend on concrete services.StatisticsService."
+require_pattern \
+  "apps/server/internal/app/server/router.go" \
+  'StatisticsHandlerService\s+analyticsdelivery\.HandlerService' \
+  "Router dependencies must expose analyticsdelivery.HandlerService for statistics handlers."
+require_pattern \
+  "apps/server/internal/app/server/runtime.go" \
+  'StatisticsHandlerService\s+analyticsdelivery\.HandlerService' \
+  "Runtime must keep statistics handler wiring behind analyticsdelivery.HandlerService."
+
 if [[ "$has_error" -ne 0 ]]; then
   exit 1
 fi
