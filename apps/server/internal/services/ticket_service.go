@@ -15,7 +15,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// TicketService 工单管理服务
+// TicketService 工单管理服务兼容层。
+//
+// 它仍然负责组装 orchestration 所需的 legacy side effects，但不应再作为 HTTP handler
+// 的直接入口。HTTP 层应依赖 modules/ticket/delivery.HandlerService。
 type TicketService struct {
 	db           *gorm.DB
 	logger       *logrus.Logger
@@ -29,7 +32,7 @@ type TicketService struct {
 	moduleBus    eventbus.Bus
 }
 
-// NewTicketService 创建工单服务
+// NewTicketService 创建工单服务兼容层。
 func NewTicketService(db *gorm.DB, logger *logrus.Logger, slaService *SLAService) *TicketService {
 	if logger == nil {
 		logger = logrus.New()

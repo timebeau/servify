@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"bytes"
-	"context"
 	"encoding/csv"
 	"fmt"
 	"net/http"
@@ -10,34 +9,21 @@ import (
 	"strings"
 	"time"
 
-	"servify/apps/server/internal/models"
+	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
 	ticketcontract "servify/apps/server/internal/modules/ticket/contract"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
 
-type ticketHandlerService interface {
-	CreateTicket(ctx context.Context, req *ticketcontract.CreateTicketRequest) (*models.Ticket, error)
-	GetTicketByID(ctx context.Context, ticketID uint) (*models.Ticket, error)
-	UpdateTicket(ctx context.Context, ticketID uint, req *ticketcontract.UpdateTicketRequest, userID uint) (*models.Ticket, error)
-	ListTickets(ctx context.Context, req *ticketcontract.ListTicketRequest) ([]models.Ticket, int64, error)
-	ListTicketCustomFields(ctx context.Context, activeOnly bool) ([]models.CustomField, error)
-	AssignTicket(ctx context.Context, ticketID uint, agentID uint, assignerID uint) error
-	AddComment(ctx context.Context, ticketID uint, userID uint, content string, commentType string) (*models.TicketComment, error)
-	CloseTicket(ctx context.Context, ticketID uint, userID uint, reason string) error
-	GetTicketStats(ctx context.Context, agentID *uint) (*ticketcontract.TicketStats, error)
-	BulkUpdateTickets(ctx context.Context, req *ticketcontract.BulkUpdateTicketRequest, userID uint) (*ticketcontract.BulkUpdateResult, error)
-}
-
 // TicketHandler 工单处理器
 type TicketHandler struct {
-	ticketService ticketHandlerService
+	ticketService ticketdelivery.HandlerService
 	logger        *logrus.Logger
 }
 
 // NewTicketHandler 创建工单处理器
-func NewTicketHandler(ticketService ticketHandlerService, logger *logrus.Logger) *TicketHandler {
+func NewTicketHandler(ticketService ticketdelivery.HandlerService, logger *logrus.Logger) *TicketHandler {
 	return &TicketHandler{
 		ticketService: ticketService,
 		logger:        logger,

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"servify/apps/server/internal/config"
+	agentdelivery "servify/apps/server/internal/modules/agent/delivery"
 	conversationapp "servify/apps/server/internal/modules/conversation/application"
 	conversationdelivery "servify/apps/server/internal/modules/conversation/delivery"
 	conversationinfra "servify/apps/server/internal/modules/conversation/infra"
@@ -42,8 +43,9 @@ type Runtime struct {
 	VoiceCoordinator      *voicedelivery.Coordinator
 	VoiceProtocolRegistry *voiceprotocol.Registry
 	CustomerService       *services.CustomerService
+	AgentHandlerService   agentdelivery.HandlerService
 	AgentService          *services.AgentService
-	TicketHandlerService  *ticketdelivery.HandlerServiceAdapter
+	TicketHandlerService  ticketdelivery.HandlerService
 	TicketReaderService   *ticketdelivery.ReaderServiceAdapter
 	TransferService       *services.SessionTransferService
 	SatisfactionService   *services.SatisfactionService
@@ -120,6 +122,7 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 
 	rt.CustomerService = services.NewCustomerService(db, logger)
 	rt.AgentService = services.NewAgentService(db, logger)
+	rt.AgentHandlerService = rt.AgentService
 
 	ticketService := services.NewTicketService(db, logger, rt.SLAService)
 	ticketService.SetEventBus(bus)
@@ -173,6 +176,7 @@ func (rt *Runtime) RouterDependencies() Dependencies {
 		VoiceCoordinator:      rt.VoiceCoordinator,
 		VoiceProtocolRegistry: rt.VoiceProtocolRegistry,
 		CustomerService:       rt.CustomerService,
+		AgentHandlerService:   rt.AgentHandlerService,
 		AgentService:          rt.AgentService,
 		TicketHandlerService:  rt.TicketHandlerService,
 		TicketReaderService:   rt.TicketReaderService,

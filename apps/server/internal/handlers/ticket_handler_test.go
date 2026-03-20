@@ -18,6 +18,7 @@ import (
 	"gorm.io/gorm"
 
 	"servify/apps/server/internal/models"
+	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
 	"servify/apps/server/internal/services"
 )
 
@@ -81,7 +82,7 @@ func TestTicketHandler_Create_Get_List_Assign(t *testing.T) {
 	}
 
 	ticketSvc := services.NewTicketService(db, logger, nil)
-	h := NewTicketHandler(ticketSvc, logger)
+	h := NewTicketHandler(ticketdelivery.NewHandlerServiceAdapter(db, ticketSvc.ModuleCommandService(), ticketSvc.Orchestrator()), logger)
 
 	r := gin.New()
 	r.POST("/api/tickets", h.CreateTicket)
@@ -245,7 +246,7 @@ func TestTicketHandler_CustomFields_Create_Filter_Export(t *testing.T) {
 	}
 
 	svc := services.NewTicketService(db, logger, nil)
-	h := NewTicketHandler(svc, logger)
+	h := NewTicketHandler(ticketdelivery.NewHandlerServiceAdapter(db, svc.ModuleCommandService(), svc.Orchestrator()), logger)
 
 	r := gin.New()
 	r.POST("/api/tickets", h.CreateTicket)

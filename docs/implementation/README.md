@@ -35,6 +35,8 @@
   - 运行时产物清理、仓库卫生、ignore 策略、跨平台开发环境收口
 - [10-service-to-module-migration.md](./10-service-to-module-migration.md)
   - 旧 services/handlers 向 modules 架构迁移、适配层与边界收口
+- [10-migration-inventory.md](./10-migration-inventory.md)
+  - 当前 handlers/services/modules 迁移盘点与优先级建议
 - [11-tenant-auth-and-audit.md](./11-tenant-auth-and-audit.md)
   - 多租户、权限模型、审计日志、配置边界
 - [12-operator-observability.md](./12-operator-observability.md)

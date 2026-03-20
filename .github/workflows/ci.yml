@@ -248,6 +248,11 @@ jobs:
           chmod +x scripts/check-repo-hygiene.sh
           ./scripts/check-repo-hygiene.sh
 
+      - name: Validate module boundaries
+        run: |
+          chmod +x scripts/check-module-boundaries.sh
+          ./scripts/check-module-boundaries.sh
+
   website-worker-checks:
     name: Website Worker Checks
     runs-on: ubuntu-latest

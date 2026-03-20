@@ -15,6 +15,12 @@ import (
 )
 
 // AgentService 人工客服服务兼容层。
+//
+// 它目前同时承担两类职责：
+// 1. 作为 HTTP handler 的兼容 contract 实现
+// 2. 维护尚未迁出的 runtime 状态同步逻辑（onlineAgents、agentQueues）
+//
+// 后续迁移中，HTTP 层应只依赖 modules/agent/delivery.HandlerService，而不是直接依赖此具体类型。
 type AgentService struct {
 	db           *gorm.DB
 	logger       *logrus.Logger

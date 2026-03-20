@@ -20,6 +20,20 @@ type HandlerServiceAdapter struct {
 	orchestrator *ticketorchestration.TicketOrchestrator
 }
 
+// HandlerService is the only ticket contract that HTTP handlers should depend on.
+type HandlerService interface {
+	CreateTicket(ctx context.Context, req *ticketcontract.CreateTicketRequest) (*models.Ticket, error)
+	GetTicketByID(ctx context.Context, ticketID uint) (*models.Ticket, error)
+	UpdateTicket(ctx context.Context, ticketID uint, req *ticketcontract.UpdateTicketRequest, userID uint) (*models.Ticket, error)
+	ListTickets(ctx context.Context, req *ticketcontract.ListTicketRequest) ([]models.Ticket, int64, error)
+	ListTicketCustomFields(ctx context.Context, activeOnly bool) ([]models.CustomField, error)
+	AssignTicket(ctx context.Context, ticketID uint, agentID uint, assignerID uint) error
+	AddComment(ctx context.Context, ticketID uint, userID uint, content string, commentType string) (*models.TicketComment, error)
+	CloseTicket(ctx context.Context, ticketID uint, userID uint, reason string) error
+	GetTicketStats(ctx context.Context, agentID *uint) (*ticketcontract.TicketStats, error)
+	BulkUpdateTickets(ctx context.Context, req *ticketcontract.BulkUpdateTicketRequest, userID uint) (*ticketcontract.BulkUpdateResult, error)
+}
+
 type ticketStatsQueryService interface {
 	GetTicketStats(ctx context.Context, agentID *uint) (*ticketapp.TicketStatsDTO, error)
 }
@@ -192,3 +206,5 @@ func (a *HandlerServiceAdapter) BulkUpdateTickets(ctx context.Context, req *tick
 	}
 	return out, nil
 }
+
+var _ HandlerService = (*HandlerServiceAdapter)(nil)

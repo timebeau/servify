@@ -9,25 +9,43 @@
 
 ## M1 migration-inventory
 
-- [ ] 盘点 `handlers -> services -> repo` 旧链路
-- [ ] 盘点 `delivery -> application -> domain -> infra` 新链路覆盖情况
-- [ ] 为每个领域模块绘制当前入口与目标入口映射
-- [ ] 标出高风险交叉依赖、共享模型、循环引用点
+- [x] 盘点 `handlers -> services -> repo` 旧链路
+- [x] 盘点 `delivery -> application -> domain -> infra` 新链路覆盖情况
+- [x] 为每个领域模块绘制当前入口与目标入口映射
+- [x] 标出高风险交叉依赖、共享模型、循环引用点
 
 验收：
 
 - 每个核心能力都能回答“当前走哪条链路，目标走哪条链路”
 
+产出：
+
+- [10-migration-inventory.md](./10-migration-inventory.md)
+
 ## M2 module-entry-contracts
 
-- [ ] 为 `conversation`、`routing`、`ticket`、`ai` 定义唯一应用入口
-- [ ] 明确 handler 只能依赖 adapter / application contract，不能直接拼业务
-- [ ] 为旧 service 定义允许保留的兼容职责
+- [-] 为 `conversation`、`routing`、`ticket`、`ai` 定义唯一应用入口
+- [-] 明确 handler 只能依赖 adapter / application contract，不能直接拼业务
+- [-] 为旧 service 定义允许保留的兼容职责
 - [ ] 为 repo / gorm 依赖建立单向约束
 
 验收：
 
 - 新增需求不会再同时落入旧 service 和新 module 两套实现
+
+当前已落地：
+
+- `ticket`
+  - handler-facing contract 已收口到 `modules/ticket/delivery.HandlerService`
+  - runtime 已使用 `HandlerServiceAdapter`
+  - `services/TicketService` 明确保留为兼容 facade，而不是 HTTP 入口
+- `agent`
+  - handler-facing contract 已收口到 `modules/agent/delivery.HandlerService`
+  - runtime 仍复用 `services.AgentService` 作为 contract 实现
+  - `services.AgentService` 明确保留为兼容 facade + runtime state holder
+- 边界守护
+  - CI 已增加 `scripts/check-module-boundaries.sh`
+  - 当前自动校验 `ticket` / `agent` 的 handler constructor、router dependency、runtime wiring 都必须停留在 `modules/*/delivery.HandlerService`
 
 ## M3 compatibility-adapters
 
@@ -62,4 +80,3 @@
 验收：
 
 - 迁移工作可追踪、可量化，不会长期停留在“正在重构”
-

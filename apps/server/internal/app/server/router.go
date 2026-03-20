@@ -4,6 +4,7 @@ import (
 	"servify/apps/server/internal/config"
 	"servify/apps/server/internal/handlers"
 	"servify/apps/server/internal/middleware"
+	agentdelivery "servify/apps/server/internal/modules/agent/delivery"
 	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
 	voicedelivery "servify/apps/server/internal/modules/voice/delivery"
 	realtimeplatform "servify/apps/server/internal/platform/realtime"
@@ -27,8 +28,9 @@ type Dependencies struct {
 	VoiceCoordinator      *voicedelivery.Coordinator
 	VoiceProtocolRegistry *voiceprotocol.Registry
 	CustomerService       *services.CustomerService
+	AgentHandlerService   agentdelivery.HandlerService
 	AgentService          *services.AgentService
-	TicketHandlerService  *ticketdelivery.HandlerServiceAdapter
+	TicketHandlerService  ticketdelivery.HandlerService
 	TicketReaderService   *ticketdelivery.ReaderServiceAdapter
 	TransferService       *services.SessionTransferService
 	SatisfactionService   *services.SatisfactionService
@@ -67,7 +69,7 @@ func registerManagementRoutes(r *gin.Engine, deps Dependencies) {
 
 	agentsAPI := api.Group("/")
 	agentsAPI.Use(middleware.RequireResourcePermission("agents"))
-	handlers.RegisterAgentRoutes(agentsAPI, handlers.NewAgentHandler(deps.AgentService, deps.Logger))
+	handlers.RegisterAgentRoutes(agentsAPI, handlers.NewAgentHandler(deps.AgentHandlerService, deps.Logger))
 
 	ticketsAPI := api.Group("/")
 	ticketsAPI.Use(middleware.RequireResourcePermission("tickets"))

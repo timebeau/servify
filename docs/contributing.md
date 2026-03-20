@@ -6,6 +6,7 @@
 - Prefer `make local-check` before opening a PR when environment/tooling changed
 - If you touched generated assets, rebuild them and verify the diff is intentional
 - If you touched runtime/build boundaries, run `sh scripts/check-repo-hygiene.sh`
+- If you touched handler-to-module wiring, run `sh scripts/check-module-boundaries.sh`
 - If you changed workflow, architecture, or backlog scope, update the relevant docs
 
 ## Repo hygiene
