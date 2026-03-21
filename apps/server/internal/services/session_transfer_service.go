@@ -215,17 +215,22 @@ func (s *SessionTransferService) executeTransfer(ctx context.Context, session *m
 			return fmt.Errorf("increment target agent load: %w", err)
 		}
 
-		// 创建系统消息（通知用户）
-		transferMessage := &models.Message{
-			SessionID: session.ID,
-			UserID:    targetAgentID,
-			Content:   transferMessageContent,
-			Type:      "system",
-			Sender:    "system",
-			CreatedAt: transferAt,
-		}
-		if err := tx.Create(transferMessage).Error; err != nil {
-			return fmt.Errorf("create transfer message: %w", err)
+		if s.conversation != nil {
+			if err := s.conversation.AppendSystemMessage(ctx, tx, session.ID, transferMessageContent, transferAt); err != nil {
+				return fmt.Errorf("create transfer message: %w", err)
+			}
+		} else {
+			transferMessage := &models.Message{
+				SessionID: session.ID,
+				UserID:    targetAgentID,
+				Content:   transferMessageContent,
+				Type:      "system",
+				Sender:    "system",
+				CreatedAt: transferAt,
+			}
+			if err := tx.Create(transferMessage).Error; err != nil {
+				return fmt.Errorf("create transfer message: %w", err)
+			}
 		}
 
 		if s.routing != nil {
@@ -339,7 +344,11 @@ func (s *SessionTransferService) addToWaitingQueue(ctx context.Context, session 
 			}
 		}
 
-		if err := tx.Create(waitingMessage).Error; err != nil {
+		if s.conversation != nil {
+			if err := s.conversation.AppendSystemMessage(ctx, tx, session.ID, waitingMessage.Content, waitingMessage.CreatedAt); err != nil {
+				return fmt.Errorf("create waiting message: %w", err)
+			}
+		} else if err := tx.Create(waitingMessage).Error; err != nil {
 			return fmt.Errorf("create waiting message: %w", err)
 		}
 		return nil

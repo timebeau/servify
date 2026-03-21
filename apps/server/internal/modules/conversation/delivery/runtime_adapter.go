@@ -49,6 +49,43 @@ func (a *RuntimeAdapter) SyncTransferAssignment(ctx context.Context, tx *gorm.DB
 	return conversationinfra.NewGormRepository(tx).UpdateConversation(ctx, item)
 }
 
+func (a *RuntimeAdapter) AppendSystemMessage(ctx context.Context, tx *gorm.DB, sessionID string, content string, createdAt time.Time) error {
+	repo := conversationinfra.NewGormRepository(tx)
+	conversation, err := repo.GetConversation(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+
+	if createdAt.IsZero() {
+		createdAt = a.now()
+	}
+
+	message := &conversationdomain.ConversationMessage{
+		ID:             fmt.Sprintf("%s-system-%d", sessionID, createdAt.UnixNano()),
+		ConversationID: sessionID,
+		Sender:         conversationdomain.ParticipantRoleSystem,
+		Kind:           conversationdomain.MessageKindSystem,
+		Content:        content,
+		CreatedAt:      createdAt,
+	}
+	if err := repo.AppendMessage(ctx, message); err != nil {
+		return err
+	}
+
+	item := &conversationdomain.Conversation{
+		ID:            conversation.ID,
+		CustomerID:    conversation.CustomerID,
+		Status:        conversationdomain.ConversationStatusActive,
+		Subject:       conversation.Subject,
+		Channel:       conversation.Channel,
+		Participants:  conversation.Participants,
+		StartedAt:     conversation.StartedAt,
+		LastMessageAt: &createdAt,
+		EndedAt:       conversation.EndedAt,
+	}
+	return repo.UpdateConversation(ctx, item)
+}
+
 func buildParticipantID(prefix string, userID uint) string {
 	return fmt.Sprintf("%s:%d", prefix, userID)
 }

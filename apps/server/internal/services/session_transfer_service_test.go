@@ -123,6 +123,7 @@ func TestSessionTransferService_ToHuman_NoAgents_GoesWaitingViaRoutingAdapter(t 
 	bus := eventbus.NewInMemoryBus()
 	routingSvc := routingapp.NewService(routinginfra.NewGormRepository(db), bus)
 	transferSvc.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingSvc, bus))
+	transferSvc.SetConversationRuntime(conversationdelivery.NewRuntimeAdapter(bus))
 	transferSvc.SetTicketRuntime(ticketdelivery.NewRuntimeAdapter(bus))
 	transferSvc.SetConversationRuntime(conversationdelivery.NewRuntimeAdapter(bus))
 
@@ -259,6 +260,7 @@ func TestSessionTransferService_ToHuman_AssignsAgent_RecordsTransferViaRoutingAd
 	bus := eventbus.NewInMemoryBus()
 	routingSvc := routingapp.NewService(routinginfra.NewGormRepository(db), bus)
 	transferSvc.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingSvc, bus))
+	transferSvc.SetConversationRuntime(conversationdelivery.NewRuntimeAdapter(bus))
 
 	res, err := transferSvc.TransferToHuman(context.Background(), &TransferRequest{
 		SessionID: "s3",

@@ -28,6 +28,7 @@
 - `routing / session transfer`
   - `services/SessionTransferService` 已注入 `modules/routing/delivery.SessionTransferAdapter`
   - session assignment 同步已改走 `modules/conversation/delivery` runtime adapter，不再直接更新 `Session`
+  - transfer / waiting 的系统消息写入已改走 `modules/conversation/delivery` runtime adapter，不再直接写 `Message`
   - waiting queue 的读取、新增、取消、查询、转态同步，以及 transfer record 写入已收口到 routing module 状态机
   - waiting -> transferred 与 transfer record 写入已纳入同一事务，不再依赖事务后的补写同步
   - 会话转接触发的 ticket assignment 同步已改走 `modules/ticket/delivery` runtime adapter，不再直接写 `Ticket` / `TicketStatus`
