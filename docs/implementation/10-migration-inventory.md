@@ -32,6 +32,7 @@
   - waiting queue 的读取、新增、取消、查询、转态同步，以及 transfer record 写入已收口到 routing module 状态机
   - waiting -> transferred 与 transfer record 写入已纳入同一事务，不再依赖事务后的补写同步
   - 会话转接触发的 ticket assignment 同步已改走 `modules/ticket/delivery` runtime adapter，不再直接写 `Ticket` / `TicketStatus`
+  - agent load 调整已抽到 `services` 侧 runtime adapter；因 `modules/agent/delivery` 现有 handler contract 依赖 `services`，当前不适合反向放入 module delivery 以免形成 import cycle
   - 但主流程仍强依赖 `gorm.DB`、`AgentService`、`WebSocketHub` 和旧会话模型
   - 结论：属于“局部接入 module adapter，但主流程仍是 legacy service”的高风险混合区
 

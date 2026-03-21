@@ -125,7 +125,7 @@ func TestSessionTransferService_ToHuman_NoAgents_GoesWaitingViaRoutingAdapter(t 
 	transferSvc.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingSvc, bus))
 	transferSvc.SetConversationRuntime(conversationdelivery.NewRuntimeAdapter(bus))
 	transferSvc.SetTicketRuntime(ticketdelivery.NewRuntimeAdapter(bus))
-	transferSvc.SetConversationRuntime(conversationdelivery.NewRuntimeAdapter(bus))
+	transferSvc.SetAgentRuntime(NewAgentTransferRuntimeAdapter())
 
 	res, err := transferSvc.TransferToHuman(context.Background(), &TransferRequest{
 		SessionID:    "s-routing-wait",
@@ -261,6 +261,8 @@ func TestSessionTransferService_ToHuman_AssignsAgent_RecordsTransferViaRoutingAd
 	routingSvc := routingapp.NewService(routinginfra.NewGormRepository(db), bus)
 	transferSvc.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingSvc, bus))
 	transferSvc.SetConversationRuntime(conversationdelivery.NewRuntimeAdapter(bus))
+	transferSvc.SetTicketRuntime(ticketdelivery.NewRuntimeAdapter(bus))
+	transferSvc.SetAgentRuntime(NewAgentTransferRuntimeAdapter())
 
 	res, err := transferSvc.TransferToHuman(context.Background(), &TransferRequest{
 		SessionID: "s3",
@@ -296,6 +298,14 @@ func TestSessionTransferService_ToHuman_AssignsAgent_RecordsTransferViaRoutingAd
 	}
 	if ticket.AgentID == nil || *ticket.AgentID != 2 || ticket.Status != "assigned" {
 		t.Fatalf("unexpected ticket after transfer: %+v", ticket)
+	}
+
+	var agent models.Agent
+	if err := db.First(&agent, "user_id = ?", 2).Error; err != nil {
+		t.Fatalf("load agent: %v", err)
+	}
+	if agent.CurrentLoad != 1 {
+		t.Fatalf("unexpected agent load after transfer: %+v", agent)
 	}
 }
 

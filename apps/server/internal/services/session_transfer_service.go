@@ -26,6 +26,11 @@ type SessionTransferService struct {
 	routing      routingdelivery.RuntimeService
 	tickets      ticketdelivery.RuntimeService
 	conversation conversationdelivery.RuntimeService
+	agents       AgentTransferRuntime
+}
+
+type AgentTransferRuntime interface {
+	SyncTransferLoad(ctx context.Context, tx *gorm.DB, fromAgentID *uint, toAgentID uint) error
 }
 
 // NewSessionTransferService 创建会话转接服务
@@ -206,13 +211,19 @@ func (s *SessionTransferService) executeTransfer(ctx context.Context, session *m
 		}
 
 		// 负载：转移需要先减后加（最佳努力不低于 0）
-		if fromAgentID != nil && *fromAgentID != targetAgentID {
-			if err := tx.Exec(`UPDATE agents SET current_load = CASE WHEN current_load > 0 THEN current_load - 1 ELSE 0 END WHERE user_id = ?`, *fromAgentID).Error; err != nil {
-				return fmt.Errorf("decrement from agent load: %w", err)
+		if s.agents != nil {
+			if err := s.agents.SyncTransferLoad(ctx, tx, fromAgentID, targetAgentID); err != nil {
+				return fmt.Errorf("sync agent load: %w", err)
 			}
-		}
-		if err := tx.Exec(`UPDATE agents SET current_load = current_load + 1 WHERE user_id = ?`, targetAgentID).Error; err != nil {
-			return fmt.Errorf("increment target agent load: %w", err)
+		} else {
+			if fromAgentID != nil && *fromAgentID != targetAgentID {
+				if err := tx.Exec(`UPDATE agents SET current_load = CASE WHEN current_load > 0 THEN current_load - 1 ELSE 0 END WHERE user_id = ?`, *fromAgentID).Error; err != nil {
+					return fmt.Errorf("decrement from agent load: %w", err)
+				}
+			}
+			if err := tx.Exec(`UPDATE agents SET current_load = current_load + 1 WHERE user_id = ?`, targetAgentID).Error; err != nil {
+				return fmt.Errorf("increment target agent load: %w", err)
+			}
 		}
 
 		if s.conversation != nil {
@@ -613,6 +624,10 @@ func (s *SessionTransferService) SetTicketRuntime(adapter ticketdelivery.Runtime
 
 func (s *SessionTransferService) SetConversationRuntime(adapter conversationdelivery.RuntimeService) {
 	s.conversation = adapter
+}
+
+func (s *SessionTransferService) SetAgentRuntime(adapter AgentTransferRuntime) {
+	s.agents = adapter
 }
 
 // AutoTransferCheck 自动转接检查
