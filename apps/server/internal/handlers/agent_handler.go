@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	agentdelivery "servify/apps/server/internal/modules/agent/delivery"
-	"servify/apps/server/internal/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -31,13 +30,13 @@ func NewAgentHandler(agentService agentdelivery.HandlerService, logger *logrus.L
 // @Tags 客服管理
 // @Accept json
 // @Produce json
-// @Param agent body services.AgentCreateRequest true "客服信息"
+// @Param agent body agentdelivery.AgentCreateRequest true "客服信息"
 // @Success 201 {object} models.Agent
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
 // @Router /api/agents [post]
 func (h *AgentHandler) CreateAgent(c *gin.Context) {
-	var req services.AgentCreateRequest
+	var req agentdelivery.AgentCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "Invalid request body",
@@ -224,7 +223,7 @@ func (h *AgentHandler) AgentGoOffline(c *gin.Context) {
 // @Tags 客服管理
 // @Accept json
 // @Produce json
-// @Success 200 {array} services.AgentInfo
+// @Success 200 {array} agentdelivery.AgentInfo
 // @Failure 500 {object} ErrorResponse
 // @Router /api/agents/online [get]
 func (h *AgentHandler) GetOnlineAgents(c *gin.Context) {
@@ -368,7 +367,7 @@ func (h *AgentHandler) ReleaseSession(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param agent_id query int false "特定客服ID，用于获取单个客服的统计"
-// @Success 200 {object} services.AgentStats
+// @Success 200 {object} agentdelivery.AgentStats
 // @Failure 500 {object} ErrorResponse
 // @Router /api/agents/stats [get]
 func (h *AgentHandler) GetAgentStats(c *gin.Context) {
@@ -401,7 +400,7 @@ func (h *AgentHandler) GetAgentStats(c *gin.Context) {
 // @Produce json
 // @Param skills query []string false "所需技能"
 // @Param priority query string false "优先级"
-// @Success 200 {object} services.AgentInfo
+// @Success 200 {object} agentdelivery.AgentInfo
 // @Failure 404 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
 // @Router /api/agents/find-available [get]

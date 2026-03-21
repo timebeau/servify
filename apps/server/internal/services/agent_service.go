@@ -8,6 +8,7 @@ import (
 
 	"servify/apps/server/internal/models"
 	agentapp "servify/apps/server/internal/modules/agent/application"
+	agentdelivery "servify/apps/server/internal/modules/agent/delivery"
 	agentinfra "servify/apps/server/internal/modules/agent/infra"
 
 	"github.com/sirupsen/logrus"
@@ -48,29 +49,10 @@ func NewAgentService(db *gorm.DB, logger *logrus.Logger) *AgentService {
 }
 
 // AgentInfo 在线客服信息。
-type AgentInfo struct {
-	UserID          uint                       `json:"user_id"`
-	Username        string                     `json:"username"`
-	Name            string                     `json:"name"`
-	Department      string                     `json:"department"`
-	Skills          []string                   `json:"skills"`
-	Status          string                     `json:"status"`
-	MaxConcurrent   int                        `json:"max_concurrent"`
-	CurrentLoad     int                        `json:"current_load"`
-	Rating          float64                    `json:"rating"`
-	AvgResponseTime int                        `json:"avg_response_time"`
-	LastActivity    time.Time                  `json:"last_activity"`
-	ConnectedAt     time.Time                  `json:"connected_at"`
-	Sessions        map[string]*models.Session `json:"-"`
-}
+type AgentInfo = agentdelivery.AgentInfo
 
 // AgentCreateRequest 创建客服请求。
-type AgentCreateRequest struct {
-	UserID        uint   `json:"user_id" binding:"required"`
-	Department    string `json:"department"`
-	Skills        string `json:"skills"`
-	MaxConcurrent int    `json:"max_concurrent"`
-}
+type AgentCreateRequest = agentdelivery.AgentCreateRequest
 
 // AgentUpdateRequest 更新客服请求。
 type AgentUpdateRequest struct {
@@ -277,10 +259,4 @@ func mapRuntimeToLegacy(runtime *agentapp.AgentRuntimeDTO) *AgentInfo {
 }
 
 // AgentStats 客服统计信息。
-type AgentStats struct {
-	Total           int64   `json:"total"`
-	Online          int64   `json:"online"`
-	Busy            int64   `json:"busy"`
-	AvgResponseTime int64   `json:"avg_response_time"`
-	AvgRating       float64 `json:"avg_rating"`
-}
+type AgentStats = agentdelivery.AgentStats

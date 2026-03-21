@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	agentdelivery "servify/apps/server/internal/modules/agent/delivery"
 	conversationdelivery "servify/apps/server/internal/modules/conversation/delivery"
 	routingapp "servify/apps/server/internal/modules/routing/application"
 	routingdelivery "servify/apps/server/internal/modules/routing/delivery"
@@ -125,7 +126,7 @@ func TestSessionTransferService_ToHuman_NoAgents_GoesWaitingViaRoutingAdapter(t 
 	transferSvc.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingSvc, bus))
 	transferSvc.SetConversationRuntime(conversationdelivery.NewRuntimeAdapter(bus))
 	transferSvc.SetTicketRuntime(ticketdelivery.NewRuntimeAdapter(bus))
-	transferSvc.SetAgentRuntime(NewAgentTransferRuntimeAdapter())
+	transferSvc.SetAgentRuntime(agentdelivery.NewTransferRuntimeAdapter())
 
 	res, err := transferSvc.TransferToHuman(context.Background(), &TransferRequest{
 		SessionID:    "s-routing-wait",
@@ -262,7 +263,7 @@ func TestSessionTransferService_ToHuman_AssignsAgent_RecordsTransferViaRoutingAd
 	transferSvc.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingSvc, bus))
 	transferSvc.SetConversationRuntime(conversationdelivery.NewRuntimeAdapter(bus))
 	transferSvc.SetTicketRuntime(ticketdelivery.NewRuntimeAdapter(bus))
-	transferSvc.SetAgentRuntime(NewAgentTransferRuntimeAdapter())
+	transferSvc.SetAgentRuntime(agentdelivery.NewTransferRuntimeAdapter())
 
 	res, err := transferSvc.TransferToHuman(context.Background(), &TransferRequest{
 		SessionID: "s3",

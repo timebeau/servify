@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"servify/apps/server/internal/models"
+	agentdelivery "servify/apps/server/internal/modules/agent/delivery"
 	conversationdelivery "servify/apps/server/internal/modules/conversation/delivery"
 	routingcontract "servify/apps/server/internal/modules/routing/contract"
 	routingdelivery "servify/apps/server/internal/modules/routing/delivery"
@@ -26,11 +27,7 @@ type SessionTransferService struct {
 	routing      routingdelivery.RuntimeService
 	tickets      ticketdelivery.RuntimeService
 	conversation conversationdelivery.RuntimeService
-	agents       AgentTransferRuntime
-}
-
-type AgentTransferRuntime interface {
-	SyncTransferLoad(ctx context.Context, tx *gorm.DB, fromAgentID *uint, toAgentID uint) error
+	agents       agentdelivery.RuntimeService
 }
 
 // NewSessionTransferService 创建会话转接服务
@@ -626,7 +623,7 @@ func (s *SessionTransferService) SetConversationRuntime(adapter conversationdeli
 	s.conversation = adapter
 }
 
-func (s *SessionTransferService) SetAgentRuntime(adapter AgentTransferRuntime) {
+func (s *SessionTransferService) SetAgentRuntime(adapter agentdelivery.RuntimeService) {
 	s.agents = adapter
 }
 
