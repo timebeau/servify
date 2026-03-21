@@ -27,6 +27,7 @@
   - `services/StatisticsService` 基本是 module facade
   - 核心统计能力已走 `modules/analytics/application.Service`
   - 还保留事件总线订阅和 DTO 映射的兼容包装
+  - `app/server` runtime 已不再对外暴露 `*services.StatisticsService` 字段，仅保留 handler-facing contract 与局部 wiring
   - 结论：迁移风险低，适合作为后续收口样板
 
 - `routing / session transfer`
@@ -61,6 +62,7 @@
 - `knowledge`
   - 已存在 `modules/knowledge/application`，但此前缺少 Gorm repository 与 handler-facing delivery contract
   - 旧 `services/KnowledgeDocService` 主要承接 CRUD 与 tag/category DTO，适合改成 module facade
+  - `app/server` runtime 已不再对外暴露 `*services.KnowledgeDocService` 字段，仅保留 handler-facing contract 与局部 wiring
   - 结论：先补 module 落地层和 handler contract，再把 runtime 中的 provider/indexing 接口留待后续收口
 
 ## 按迁移成熟度分组

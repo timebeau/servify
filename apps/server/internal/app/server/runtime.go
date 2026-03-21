@@ -59,12 +59,10 @@ type Runtime struct {
 	AppIntegrationService    *services.AppIntegrationService
 	CustomFieldService       *services.CustomFieldService
 	StatisticsHandlerService analyticsdelivery.HandlerService
-	StatisticsService        *services.StatisticsService
 	SLAService               *services.SLAService
 	ShiftService             *services.ShiftService
 	AutomationHandlerService automationdelivery.HandlerService
 	KnowledgeDocHandler      knowledgedelivery.HandlerService
-	KnowledgeDocService      *services.KnowledgeDocService
 	SuggestionService        *services.SuggestionService
 	GamificationService      *services.GamificationService
 }
@@ -146,9 +144,9 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	transferService.SetAgentRuntime(agentdelivery.NewTransferRuntimeAdapter())
 	rt.TransferHandlerService = transferService
 
-	rt.StatisticsService = services.NewStatisticsService(db, logger)
-	rt.StatisticsService.SetEventBus(bus)
-	rt.StatisticsHandlerService = rt.StatisticsService
+	statisticsService := services.NewStatisticsService(db, logger)
+	statisticsService.SetEventBus(bus)
+	rt.StatisticsHandlerService = statisticsService
 
 	rt.SatisfactionService = services.NewSatisfactionService(db, logger)
 	ticketService.SetSatisfactionService(rt.SatisfactionService)
@@ -158,8 +156,8 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	rt.MacroService = services.NewMacroService(db)
 	rt.AppIntegrationService = services.NewAppIntegrationService(db, logger)
 	rt.CustomFieldService = services.NewCustomFieldService(db)
-	rt.KnowledgeDocService = services.NewKnowledgeDocService(db)
-	rt.KnowledgeDocHandler = knowledgedelivery.NewHandlerServiceAdapter(rt.KnowledgeDocService)
+	knowledgeDocService := services.NewKnowledgeDocService(db)
+	rt.KnowledgeDocHandler = knowledgedelivery.NewHandlerServiceAdapter(knowledgeDocService)
 	rt.SuggestionService = services.NewSuggestionService(db)
 	rt.GamificationService = services.NewGamificationService(db)
 	rt.TicketHandlerService = ticketdelivery.NewHandlerServiceAdapter(db, ticketService.ModuleCommandService(), ticketService.Orchestrator())
