@@ -349,19 +349,7 @@ func (s *SessionTransferService) ProcessWaitingQueue(ctx context.Context) error 
 			continue
 		}
 
-		if s.routing != nil {
-			if _, err := s.routing.MarkWaitingTransferred(ctx, record.SessionID, agent.UserID, time.Now()); err != nil && err != gorm.ErrRecordNotFound {
-				s.logger.Warnf("Failed to sync waiting status for session %s through routing module: %v", record.SessionID, err)
-			}
-		} else {
-			s.db.Model(&models.WaitingRecord{}).
-				Where("id = ?", record.ID).
-				Updates(map[string]interface{}{
-					"status":      "transferred",
-					"assigned_at": time.Now(),
-					"assigned_to": agent.UserID,
-				})
-		}
+		s.syncWaitingTransferred(ctx, record.SessionID, agent.UserID, time.Now())
 
 		s.logger.Infof("Successfully transferred waiting session %s to agent %d",
 			result.SessionID, result.NewAgentID)
