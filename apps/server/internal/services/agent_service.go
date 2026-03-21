@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"strings"
-	"time"
 
 	"servify/apps/server/internal/models"
 	agentapp "servify/apps/server/internal/modules/agent/application"
@@ -42,7 +41,7 @@ func NewAgentService(db *gorm.DB, logger *logrus.Logger) *AgentService {
 		module: agentapp.NewService(repo, registry),
 	}
 
-	go service.backgroundTasks()
+	go newAgentRuntimeMaintenance(logger, service.module, service.syncLegacyRuntime).Start()
 	return service
 }
 
@@ -171,30 +170,6 @@ func (s *AgentService) parseSkills(skillsStr string) []string {
 	}
 	return skills
 }
-
-func (s *AgentService) backgroundTasks() {
-	ticker := time.NewTicker(1 * time.Minute)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		s.cleanupInactiveAgents()
-		s.updateAgentMetrics()
-	}
-}
-
-func (s *AgentService) cleanupInactiveAgents() {
-	timeout := 5 * time.Minute
-	runtimes := s.module.GetOnlineAgents(context.Background())
-	for _, item := range runtimes {
-		if time.Since(item.LastActivity) > timeout {
-			s.logger.Warnf("Agent %d appears inactive, marking as away", item.UserID)
-			_ = s.module.MarkAway(context.Background(), item.UserID)
-		}
-	}
-	s.syncLegacyRuntime(context.Background())
-}
-
-func (s *AgentService) updateAgentMetrics() {}
 
 func (s *AgentService) ApplySessionTransfer(sessionID string, fromAgentID *uint, toAgentID uint) {
 	ctx := context.Background()
