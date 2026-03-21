@@ -49,11 +49,13 @@
 - `customer`
   - `services/CustomerService` 已经是 `modules/customer/application.Service` 的轻量 facade
   - HTTP handler 只消费请求/响应 DTO 与兼容方法，核心业务已经下沉到 module application + infra repository
+  - `app/server` runtime 已不再对外暴露 `*services.CustomerService` 字段，仅保留 handler-facing contract 与局部 wiring
   - 结论：适合先定义 handler-facing contract，并把 router/runtime 注入切到 `modules/customer/delivery`
 
 - `automation`
   - `services/AutomationService` 已经把核心触发器与执行查询下沉到 `modules/automation/application.Service`
   - legacy service 主要保留 event bus subscriber 注册、测试兼容 helper 与 module 装配
+  - `app/server` runtime/router 已不再对外暴露 `*services.AutomationService` 字段，仅保留 handler-facing contract 与局部 wiring
   - 结论：适合先定义 handler-facing contract，并保留 runtime/event bus glue 在旧 service
 
 - `knowledge`

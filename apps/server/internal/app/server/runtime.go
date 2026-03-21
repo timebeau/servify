@@ -49,7 +49,6 @@ type Runtime struct {
 	VoiceCoordinator         *voicedelivery.Coordinator
 	VoiceProtocolRegistry    *voiceprotocol.Registry
 	CustomerHandlerService   customerdelivery.HandlerService
-	CustomerService          *services.CustomerService
 	AgentHandlerService      agentdelivery.HandlerService
 	TicketHandlerService     ticketdelivery.HandlerService
 	TicketReaderService      *ticketdelivery.ReaderServiceAdapter
@@ -64,7 +63,6 @@ type Runtime struct {
 	SLAService               *services.SLAService
 	ShiftService             *services.ShiftService
 	AutomationHandlerService automationdelivery.HandlerService
-	AutomationService        *services.AutomationService
 	KnowledgeDocHandler      knowledgedelivery.HandlerService
 	KnowledgeDocService      *services.KnowledgeDocService
 	SuggestionService        *services.SuggestionService
@@ -126,20 +124,20 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	_ = rt.VoiceProtocolRegistry.RegisterMedia(voicedelivery.NewSRTPAdapter())
 
 	rt.SLAService = services.NewSLAService(db, logger)
-	rt.AutomationService = services.NewAutomationService(db, logger)
-	rt.AutomationHandlerService = services.NewAutomationHandlerAdapter(rt.AutomationService)
-	rt.AutomationService.SetEventBus(bus)
-	rt.SLAService.SetAutomationService(rt.AutomationService)
+	automationService := services.NewAutomationService(db, logger)
+	rt.AutomationHandlerService = services.NewAutomationHandlerAdapter(automationService)
+	automationService.SetEventBus(bus)
+	rt.SLAService.SetAutomationService(automationService)
 
-	rt.CustomerService = services.NewCustomerService(db, logger)
-	rt.CustomerHandlerService = customerdelivery.NewHandlerServiceAdapter(rt.CustomerService)
+	customerService := services.NewCustomerService(db, logger)
+	rt.CustomerHandlerService = customerdelivery.NewHandlerServiceAdapter(customerService)
 	agentAssembly := services.BuildAgentServiceAssembly(db, logger)
 	rt.AgentHandlerService = agentAssembly.Service
 	go agentAssembly.Maintenance.Start()
 
 	ticketService := services.NewTicketService(db, logger, rt.SLAService)
 	ticketService.SetEventBus(bus)
-	ticketService.SetAutomationService(rt.AutomationService)
+	ticketService.SetAutomationService(automationService)
 
 	transferService := services.NewSessionTransferService(db, logger, rt.AIService, agentAssembly.Service, rt.WSHub)
 	transferService.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingService, bus))
@@ -209,7 +207,6 @@ func (rt *Runtime) RouterDependencies() Dependencies {
 		SLAService:               rt.SLAService,
 		ShiftService:             rt.ShiftService,
 		AutomationHandlerService: rt.AutomationHandlerService,
-		AutomationService:        rt.AutomationService,
 		KnowledgeDocHandler:      rt.KnowledgeDocHandler,
 		SuggestionService:        rt.SuggestionService,
 		GamificationService:      rt.GamificationService,

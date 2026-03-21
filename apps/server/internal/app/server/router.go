@@ -48,7 +48,6 @@ type Dependencies struct {
 	SLAService               *services.SLAService
 	ShiftService             *services.ShiftService
 	AutomationHandlerService automationdelivery.HandlerService
-	AutomationService        *services.AutomationService
 	KnowledgeDocHandler      knowledgedelivery.HandlerService
 	SuggestionService        *services.SuggestionService
 	GamificationService      *services.GamificationService
