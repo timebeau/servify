@@ -135,7 +135,9 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 
 	rt.CustomerService = services.NewCustomerService(db, logger)
 	rt.CustomerHandlerService = customerdelivery.NewHandlerServiceAdapter(rt.CustomerService)
-	rt.AgentService = services.NewAgentService(db, logger)
+	rt.AgentService = services.NewAgentServiceWithOptions(db, logger, services.AgentServiceOptions{
+		StartRuntimeMaintenance: true,
+	})
 	rt.AgentHandlerService = rt.AgentService
 
 	ticketService := services.NewTicketService(db, logger, rt.SLAService)

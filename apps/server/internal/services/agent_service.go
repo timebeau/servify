@@ -27,8 +27,16 @@ type AgentService struct {
 	module       *agentapp.Service
 }
 
+type AgentServiceOptions struct {
+	StartRuntimeMaintenance bool
+}
+
 // NewAgentService 创建人工客服服务。
 func NewAgentService(db *gorm.DB, logger *logrus.Logger) *AgentService {
+	return NewAgentServiceWithOptions(db, logger, AgentServiceOptions{})
+}
+
+func NewAgentServiceWithOptions(db *gorm.DB, logger *logrus.Logger, opts AgentServiceOptions) *AgentService {
 	if logger == nil {
 		logger = logrus.New()
 	}
@@ -41,7 +49,9 @@ func NewAgentService(db *gorm.DB, logger *logrus.Logger) *AgentService {
 		module: agentapp.NewService(repo, registry),
 	}
 
-	go newAgentRuntimeMaintenance(logger, service.module, service.syncLegacyRuntime).Start()
+	if opts.StartRuntimeMaintenance {
+		go newAgentRuntimeMaintenance(logger, service.module, service.syncLegacyRuntime).Start()
+	}
 	return service
 }
 
