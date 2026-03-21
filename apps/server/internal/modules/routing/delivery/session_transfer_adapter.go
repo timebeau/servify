@@ -37,6 +37,18 @@ func (a *SessionTransferAdapter) AddToWaitingQueue(
 	return mapWaitingRecord(entry), nil
 }
 
+func (a *SessionTransferAdapter) GetTransferHistory(ctx context.Context, sessionID string) ([]models.TransferRecord, error) {
+	items, err := a.service.GetTransferHistory(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]models.TransferRecord, 0, len(items))
+	for _, item := range items {
+		out = append(out, mapTransferRecord(item))
+	}
+	return out, nil
+}
+
 func (a *SessionTransferAdapter) ListWaitingRecords(ctx context.Context, status string, limit int) ([]models.WaitingRecord, error) {
 	items, err := a.service.ListWaitingEntries(ctx, status, limit)
 	if err != nil {
@@ -126,4 +138,17 @@ func cloneTimePtr(in *time.Time) *time.Time {
 	}
 	t := *in
 	return &t
+}
+
+func mapTransferRecord(item routingapp.TransferRecordDTO) models.TransferRecord {
+	return models.TransferRecord{
+		SessionID:      item.SessionID,
+		FromAgentID:    item.FromAgentID,
+		ToAgentID:      item.ToAgentID,
+		Reason:         item.Reason,
+		Notes:          item.Notes,
+		SessionSummary: item.SessionSummary,
+		TransferredAt:  item.TransferredAt,
+		CreatedAt:      item.TransferredAt,
+	}
 }

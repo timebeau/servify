@@ -50,6 +50,16 @@ type AssignmentDTO struct {
 	AssignedAt  time.Time `json:"assigned_at"`
 }
 
+type TransferRecordDTO struct {
+	SessionID      string    `json:"session_id"`
+	FromAgentID    *uint     `json:"from_agent_id,omitempty"`
+	ToAgentID      *uint     `json:"to_agent_id,omitempty"`
+	Reason         string    `json:"reason,omitempty"`
+	Notes          string    `json:"notes,omitempty"`
+	SessionSummary string    `json:"session_summary,omitempty"`
+	TransferredAt  time.Time `json:"transferred_at"`
+}
+
 type QueueEntryDTO struct {
 	SessionID    string     `json:"session_id"`
 	Reason       string     `json:"reason,omitempty"`
@@ -70,6 +80,18 @@ func MapAssignment(item domain.Assignment) AssignmentDTO {
 		Reason:      item.Reason,
 		Notes:       item.Notes,
 		AssignedAt:  item.AssignedAt,
+	}
+}
+
+func MapTransferRecord(item domain.TransferRecord) TransferRecordDTO {
+	return TransferRecordDTO{
+		SessionID:      item.SessionID,
+		FromAgentID:    item.FromAgentID,
+		ToAgentID:      item.ToAgentID,
+		Reason:         item.Reason,
+		Notes:          item.Notes,
+		SessionSummary: item.SessionSummary,
+		TransferredAt:  item.TransferredAt,
 	}
 }
 

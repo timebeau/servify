@@ -53,6 +53,21 @@ func (s *Service) AssignAgent(ctx context.Context, cmd AssignAgentCommand) (*Ass
 	return &dto, nil
 }
 
+func (s *Service) GetTransferHistory(ctx context.Context, sessionID string) ([]TransferRecordDTO, error) {
+	if strings.TrimSpace(sessionID) == "" {
+		return nil, fmt.Errorf("session_id required")
+	}
+	items, err := s.repo.ListAssignments(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]TransferRecordDTO, 0, len(items))
+	for _, item := range items {
+		out = append(out, MapTransferRecord(item))
+	}
+	return out, nil
+}
+
 func (s *Service) AddToWaitingQueue(ctx context.Context, cmd AddToWaitingQueueCommand) (*QueueEntryDTO, error) {
 	if strings.TrimSpace(cmd.SessionID) == "" {
 		return nil, fmt.Errorf("session_id required")

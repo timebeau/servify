@@ -483,6 +483,9 @@ func (s *SessionTransferService) notifyWaiting(sessionID string, message string)
 
 // GetTransferHistory 获取转接历史
 func (s *SessionTransferService) GetTransferHistory(ctx context.Context, sessionID string) ([]models.TransferRecord, error) {
+	if s.routing != nil {
+		return s.routing.GetTransferHistory(ctx, sessionID)
+	}
 	var records []models.TransferRecord
 	err := s.db.Where("session_id = ?", sessionID).
 		Order("transferred_at DESC").

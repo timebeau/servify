@@ -10,8 +10,13 @@ import (
 	"servify/apps/server/internal/platform/eventbus"
 )
 
+func uintPtr(v uint) *uint {
+	return &v
+}
+
 type stubRoutingRepo struct {
 	assignments map[string]*domain.Assignment
+	transferLog []domain.TransferRecord
 	queue       map[string]*domain.QueueEntry
 	err         error
 }
@@ -25,7 +30,28 @@ func (s *stubRoutingRepo) CreateAssignment(ctx context.Context, assignment *doma
 	}
 	cp := *assignment
 	s.assignments[assignment.SessionID] = &cp
+	s.transferLog = append(s.transferLog, domain.TransferRecord{
+		SessionID:     assignment.SessionID,
+		FromAgentID:   assignment.FromAgentID,
+		ToAgentID:     uintPtr(assignment.ToAgentID),
+		Reason:        assignment.Reason,
+		Notes:         assignment.Notes,
+		TransferredAt: assignment.AssignedAt,
+	})
 	return nil
+}
+
+func (s *stubRoutingRepo) ListAssignments(ctx context.Context, sessionID string) ([]domain.TransferRecord, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	out := make([]domain.TransferRecord, 0, len(s.transferLog))
+	for _, item := range s.transferLog {
+		if item.SessionID == sessionID {
+			out = append(out, item)
+		}
+	}
+	return out, nil
 }
 
 func (s *stubRoutingRepo) CreateQueueEntry(ctx context.Context, entry *domain.QueueEntry) error {
@@ -213,5 +239,23 @@ func TestServiceMarkWaitingTransferred(t *testing.T) {
 	}
 	if got.Status != string(domain.QueueStatusTransferred) || got.AssignedTo == nil || *got.AssignedTo != 9 {
 		t.Fatalf("unexpected transferred entry: %+v", got)
+	}
+}
+
+func TestServiceGetTransferHistory(t *testing.T) {
+	repo := &stubRoutingRepo{
+		transferLog: []domain.TransferRecord{
+			{SessionID: "sess-1", Reason: "handoff"},
+			{SessionID: "sess-2", Reason: "other"},
+		},
+	}
+	svc := NewService(repo, nil)
+
+	got, err := svc.GetTransferHistory(context.Background(), "sess-1")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(got) != 1 || got[0].SessionID != "sess-1" || got[0].Reason != "handoff" {
+		t.Fatalf("unexpected transfer history: %+v", got)
 	}
 }

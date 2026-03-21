@@ -33,6 +33,21 @@ func (r *GormRepository) CreateAssignment(ctx context.Context, assignment *domai
 	return nil
 }
 
+func (r *GormRepository) ListAssignments(ctx context.Context, sessionID string) ([]domain.TransferRecord, error) {
+	var items []models.TransferRecord
+	if err := r.db.WithContext(ctx).
+		Where("session_id = ?", sessionID).
+		Order("transferred_at DESC").
+		Find(&items).Error; err != nil {
+		return nil, err
+	}
+	out := make([]domain.TransferRecord, 0, len(items))
+	for _, item := range items {
+		out = append(out, mapTransferRecord(item))
+	}
+	return out, nil
+}
+
 func (r *GormRepository) CreateQueueEntry(ctx context.Context, entry *domain.QueueEntry) error {
 	if entry == nil {
 		return fmt.Errorf("queue entry required")
@@ -122,6 +137,18 @@ func mapTransferRecordModel(item domain.Assignment) models.TransferRecord {
 		Notes:         item.Notes,
 		TransferredAt: item.AssignedAt,
 		CreatedAt:     item.AssignedAt,
+	}
+}
+
+func mapTransferRecord(model models.TransferRecord) domain.TransferRecord {
+	return domain.TransferRecord{
+		SessionID:      model.SessionID,
+		FromAgentID:    model.FromAgentID,
+		ToAgentID:      model.ToAgentID,
+		Reason:         model.Reason,
+		Notes:          model.Notes,
+		SessionSummary: model.SessionSummary,
+		TransferredAt:  model.TransferredAt,
 	}
 }
 
