@@ -47,6 +47,11 @@
   - handler 已开始收口到 `modules/ai/delivery.HandlerService`
   - 结论：迁移重点是继续压缩 legacy `AIServiceInterface` 的 handler 可见面，只保留 runtime 兼容用途
 
+- `legacy handler-only capabilities`
+  - `satisfaction`、`csat public`、`macro`、`app integration`、`custom field`、`shift`、`suggestion`、`gamification` 等能力尚未模块化
+  - 这批 handler 现在已改为依赖 `handlers` 包内定义的最小接口，而不再把 `*services.*` concrete type 暴露到 `app/server` runtime/router surface
+  - 结论：虽然还不属于 `services -> modules` 迁移完成项，但已完成一轮“装配面收口”，可减少 concrete legacy service 在顶层 runtime 的扩散
+
 - `customer`
   - `services/CustomerService` 已经是 `modules/customer/application.Service` 的轻量 facade
   - HTTP handler 只消费请求/响应 DTO 与兼容方法，核心业务已经下沉到 module application + infra repository
@@ -121,6 +126,7 @@
 - 旧 service 中仍混有 runtime 状态与 side effects，导致无法简单替换
 - `ai` 路径下存在多个“看起来都像主实现”的对象，容易继续分叉
 - `routing` 与 `conversation` 仍强依赖旧 websocket / session runtime
+- 若不继续守护，未模块化但较薄的 legacy handler service 仍可能重新把 concrete type 扩散回 `app/server` runtime/router
 
 ## 下一步建议
 
@@ -196,5 +202,6 @@
 - `scripts/check-module-boundaries.sh`
   - 校验 `ticket` / `agent` / `analytics` / `customer` / `automation` / `knowledge` / `routing` / `ai` 的 handler constructor 必须依赖 `modules/*/delivery.HandlerService`
   - 校验 router/runtime 对这八个模块的注入类型必须停留在 handler-facing contract，并校验 `conversation` 的 websocket persistence 入口必须走 module delivery adapter
+  - 校验 `satisfaction` / `macro` / `app integration` / `custom field` / `shift` / `suggestion` / `gamification` 等薄 handler 依赖必须停留在 handler-local contract，避免 `app/server` 顶层装配回退暴露 concrete legacy service
   - 校验 `workspace` / `websocket transfer` 等新增收窄点必须依赖 `WorkspaceOverviewReader`、`SessionTransferRuntime` 等接口，并禁止 `app/server` runtime/router 回退暴露若干 concrete legacy service
   - 目的：先锁住已完成迁移的入口，避免回退到 handler 直连具体旧 service

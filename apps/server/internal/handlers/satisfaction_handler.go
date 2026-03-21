@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
 	"time"
 
+	"servify/apps/server/internal/models"
 	"servify/apps/server/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -14,12 +16,26 @@ import (
 
 // SatisfactionHandler 客户满意度处理器
 type SatisfactionHandler struct {
-	satisfactionService *services.SatisfactionService
+	satisfactionService SatisfactionService
 	logger              *logrus.Logger
 }
 
+type SatisfactionService interface {
+	CreateSatisfaction(ctx context.Context, req *services.SatisfactionCreateRequest) (*models.CustomerSatisfaction, error)
+	GetSatisfaction(ctx context.Context, id uint) (*models.CustomerSatisfaction, error)
+	ListSatisfactions(ctx context.Context, req *services.SatisfactionListRequest) ([]models.CustomerSatisfaction, int64, error)
+	ListSurveys(ctx context.Context, req *services.SatisfactionSurveyListRequest) ([]models.SatisfactionSurvey, int64, error)
+	ResendSurvey(ctx context.Context, id uint) (*models.SatisfactionSurvey, error)
+	GetSatisfactionByTicket(ctx context.Context, ticketID uint) (*models.CustomerSatisfaction, error)
+	GetSatisfactionStats(ctx context.Context, dateFrom, dateTo *time.Time) (*services.SatisfactionStatsResponse, error)
+	UpdateSatisfaction(ctx context.Context, id uint, comment string) (*models.CustomerSatisfaction, error)
+	DeleteSatisfaction(ctx context.Context, id uint) error
+	GetSurveyPreviewByToken(ctx context.Context, token string) (*services.SatisfactionSurveyPreview, error)
+	RespondSurvey(ctx context.Context, token string, rating int, comment string) (*models.CustomerSatisfaction, error)
+}
+
 // NewSatisfactionHandler 创建满意度处理器
-func NewSatisfactionHandler(satisfactionService *services.SatisfactionService, logger *logrus.Logger) *SatisfactionHandler {
+func NewSatisfactionHandler(satisfactionService SatisfactionService, logger *logrus.Logger) *SatisfactionHandler {
 	return &SatisfactionHandler{
 		satisfactionService: satisfactionService,
 		logger:              logger,

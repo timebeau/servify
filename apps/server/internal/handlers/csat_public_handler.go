@@ -11,11 +11,11 @@ import (
 
 // CSATSurveyHandler 处理无需登录的 CSAT 调查答复
 type CSATSurveyHandler struct {
-	service *services.SatisfactionService
+	service SatisfactionService
 }
 
 // NewCSATSurveyHandler 创建公共调查处理器
-func NewCSATSurveyHandler(service *services.SatisfactionService) *CSATSurveyHandler {
+func NewCSATSurveyHandler(service SatisfactionService) *CSATSurveyHandler {
 	return &CSATSurveyHandler{service: service}
 }
 

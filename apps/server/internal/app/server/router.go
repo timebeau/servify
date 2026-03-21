@@ -39,18 +39,18 @@ type Dependencies struct {
 	TicketHandlerService     ticketdelivery.HandlerService
 	TicketReaderService      *ticketdelivery.ReaderServiceAdapter
 	TransferHandlerService   routingdelivery.HandlerService
-	SatisfactionService      *services.SatisfactionService
+	SatisfactionService      handlers.SatisfactionService
 	WorkspaceService         services.WorkspaceOverviewReader
-	MacroService             *services.MacroService
-	AppIntegrationService    *services.AppIntegrationService
-	CustomFieldService       *services.CustomFieldService
+	MacroService             handlers.MacroService
+	AppIntegrationService    handlers.AppMarketService
+	CustomFieldService       handlers.CustomFieldService
 	StatisticsHandlerService analyticsdelivery.HandlerService
 	SLAService               *services.SLAService
-	ShiftService             *services.ShiftService
+	ShiftService             handlers.ShiftService
 	AutomationHandlerService automationdelivery.HandlerService
 	KnowledgeDocHandler      knowledgedelivery.HandlerService
-	SuggestionService        *services.SuggestionService
-	GamificationService      *services.GamificationService
+	SuggestionService        handlers.SuggestionService
+	GamificationService      handlers.GamificationService
 }
 
 // BuildRouter assembles the HTTP routes and middleware around already-wired services.

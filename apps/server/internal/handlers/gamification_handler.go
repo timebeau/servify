@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"time"
@@ -11,10 +12,14 @@ import (
 )
 
 type GamificationHandler struct {
-	service *services.GamificationService
+	service GamificationService
 }
 
-func NewGamificationHandler(service *services.GamificationService) *GamificationHandler {
+type GamificationService interface {
+	GetLeaderboard(ctx context.Context, req *services.LeaderboardRequest) (*services.LeaderboardResponse, error)
+}
+
+func NewGamificationHandler(service GamificationService) *GamificationHandler {
 	return &GamificationHandler{service: service}
 }
 

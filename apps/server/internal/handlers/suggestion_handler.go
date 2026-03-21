@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
@@ -10,10 +11,14 @@ import (
 )
 
 type SuggestionHandler struct {
-	service *services.SuggestionService
+	service SuggestionService
 }
 
-func NewSuggestionHandler(service *services.SuggestionService) *SuggestionHandler {
+type SuggestionService interface {
+	Suggest(ctx context.Context, req *services.SuggestionRequest) (*services.SuggestionResponse, error)
+}
+
+func NewSuggestionHandler(service SuggestionService) *SuggestionHandler {
 	return &SuggestionHandler{service: service}
 }
 

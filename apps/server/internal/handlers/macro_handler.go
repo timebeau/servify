@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
+	"servify/apps/server/internal/models"
 	"servify/apps/server/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -13,10 +15,18 @@ import (
 //
 //nolint:revive
 type MacroHandler struct {
-	service *services.MacroService
+	service MacroService
 }
 
-func NewMacroHandler(service *services.MacroService) *MacroHandler {
+type MacroService interface {
+	List(ctx context.Context) ([]models.Macro, error)
+	Create(ctx context.Context, req *services.MacroCreateRequest) (*models.Macro, error)
+	Update(ctx context.Context, id uint, req *services.MacroUpdateRequest) (*models.Macro, error)
+	Delete(ctx context.Context, id uint) error
+	ApplyToTicket(ctx context.Context, macroID, ticketID, actorID uint) (*models.TicketComment, error)
+}
+
+func NewMacroHandler(service MacroService) *MacroHandler {
 	return &MacroHandler{service: service}
 }
 

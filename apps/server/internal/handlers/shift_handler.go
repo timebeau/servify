@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
+	"servify/apps/server/internal/models"
 	"servify/apps/server/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -11,11 +13,19 @@ import (
 
 // ShiftHandler 班次管理处理器
 type ShiftHandler struct {
-	shiftService *services.ShiftService
+	shiftService ShiftService
+}
+
+type ShiftService interface {
+	CreateShift(ctx context.Context, req *services.ShiftCreateRequest) (*models.ShiftSchedule, error)
+	ListShifts(ctx context.Context, req *services.ShiftListRequest) ([]models.ShiftSchedule, int64, error)
+	UpdateShift(ctx context.Context, id uint, req *services.ShiftUpdateRequest) (*models.ShiftSchedule, error)
+	DeleteShift(ctx context.Context, id uint) error
+	GetShiftStats(ctx context.Context) (*services.ShiftStatsResponse, error)
 }
 
 // NewShiftHandler 创建班次处理器
-func NewShiftHandler(shiftService *services.ShiftService) *ShiftHandler {
+func NewShiftHandler(shiftService ShiftService) *ShiftHandler {
 	return &ShiftHandler{shiftService: shiftService}
 }
 

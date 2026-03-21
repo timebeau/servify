@@ -1,19 +1,29 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
+	"servify/apps/server/internal/models"
 	"servify/apps/server/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
 
 type CustomFieldHandler struct {
-	service *services.CustomFieldService
+	service CustomFieldService
 }
 
-func NewCustomFieldHandler(service *services.CustomFieldService) *CustomFieldHandler {
+type CustomFieldService interface {
+	List(ctx context.Context, resource string, activeOnly bool) ([]models.CustomField, error)
+	Get(ctx context.Context, id uint) (*models.CustomField, error)
+	Create(ctx context.Context, req *services.CustomFieldCreateRequest) (*models.CustomField, error)
+	Update(ctx context.Context, id uint, req *services.CustomFieldUpdateRequest) (*models.CustomField, error)
+	Delete(ctx context.Context, id uint) error
+}
+
+func NewCustomFieldHandler(service CustomFieldService) *CustomFieldHandler {
 	return &CustomFieldHandler{service: service}
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"servify/apps/server/internal/config"
+	"servify/apps/server/internal/handlers"
 	agentdelivery "servify/apps/server/internal/modules/agent/delivery"
 	aidelivery "servify/apps/server/internal/modules/ai/delivery"
 	analyticsdelivery "servify/apps/server/internal/modules/analytics/delivery"
@@ -53,18 +54,18 @@ type Runtime struct {
 	TicketHandlerService     ticketdelivery.HandlerService
 	TicketReaderService      *ticketdelivery.ReaderServiceAdapter
 	TransferHandlerService   routingdelivery.HandlerService
-	SatisfactionService      *services.SatisfactionService
+	SatisfactionService      handlers.SatisfactionService
 	WorkspaceService         services.WorkspaceOverviewReader
-	MacroService             *services.MacroService
-	AppIntegrationService    *services.AppIntegrationService
-	CustomFieldService       *services.CustomFieldService
+	MacroService             handlers.MacroService
+	AppIntegrationService    handlers.AppMarketService
+	CustomFieldService       handlers.CustomFieldService
 	StatisticsHandlerService analyticsdelivery.HandlerService
 	SLAService               *services.SLAService
-	ShiftService             *services.ShiftService
+	ShiftService             handlers.ShiftService
 	AutomationHandlerService automationdelivery.HandlerService
 	KnowledgeDocHandler      knowledgedelivery.HandlerService
-	SuggestionService        *services.SuggestionService
-	GamificationService      *services.GamificationService
+	SuggestionService        handlers.SuggestionService
+	GamificationService      handlers.GamificationService
 }
 
 // BuildRuntime wires the current modular-monolith runtime behind an explicit assembly boundary.
@@ -148,8 +149,9 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	statisticsService.SetEventBus(bus)
 	rt.StatisticsHandlerService = statisticsService
 
-	rt.SatisfactionService = services.NewSatisfactionService(db, logger)
-	ticketService.SetSatisfactionService(rt.SatisfactionService)
+	satisfactionService := services.NewSatisfactionService(db, logger)
+	rt.SatisfactionService = satisfactionService
+	ticketService.SetSatisfactionService(satisfactionService)
 
 	rt.ShiftService = services.NewShiftService(db, logger)
 	rt.WorkspaceService = services.NewWorkspaceService(db, agentAssembly.Service)

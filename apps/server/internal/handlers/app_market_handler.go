@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
@@ -11,11 +12,18 @@ import (
 
 // AppMarketHandler 应用市场管理
 type AppMarketHandler struct {
-	service *services.AppIntegrationService
+	service AppMarketService
+}
+
+type AppMarketService interface {
+	List(ctx context.Context, req *services.AppIntegrationListRequest) ([]*services.AppIntegration, int64, error)
+	Create(ctx context.Context, req *services.AppIntegrationCreateRequest) (*services.AppIntegration, error)
+	Update(ctx context.Context, id uint, req *services.AppIntegrationUpdateRequest) (*services.AppIntegration, error)
+	Delete(ctx context.Context, id uint) error
 }
 
 // NewAppMarketHandler 创建处理器
-func NewAppMarketHandler(service *services.AppIntegrationService) *AppMarketHandler {
+func NewAppMarketHandler(service AppMarketService) *AppMarketHandler {
 	return &AppMarketHandler{service: service}
 }
 
