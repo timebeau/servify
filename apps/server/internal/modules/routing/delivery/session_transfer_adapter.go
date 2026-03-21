@@ -53,13 +53,19 @@ func (a *SessionTransferAdapter) AssignAgent(ctx context.Context, tx *gorm.DB, c
 
 func (a *SessionTransferAdapter) AddToWaitingQueue(
 	ctx context.Context,
+	tx *gorm.DB,
 	sessionID string,
 	reason string,
 	targetSkills []string,
 	priority string,
 	notes string,
 ) (*models.WaitingRecord, error) {
-	entry, err := a.service.AddToWaitingQueue(ctx, routingapp.AddToWaitingQueueCommand{
+	svc := a.service
+	if tx != nil {
+		svc = routingapp.NewService(routinginfra.NewGormRepository(tx), a.publisher)
+	}
+
+	entry, err := svc.AddToWaitingQueue(ctx, routingapp.AddToWaitingQueueCommand{
 		SessionID:    sessionID,
 		Reason:       reason,
 		TargetSkills: targetSkills,
@@ -104,8 +110,13 @@ func (a *SessionTransferAdapter) GetWaitingRecord(ctx context.Context, sessionID
 	return mapWaitingRecord(entry), nil
 }
 
-func (a *SessionTransferAdapter) CancelWaiting(ctx context.Context, sessionID string, reason string) (*models.WaitingRecord, error) {
-	entry, err := a.service.CancelWaiting(ctx, routingapp.CancelWaitingCommand{
+func (a *SessionTransferAdapter) CancelWaiting(ctx context.Context, tx *gorm.DB, sessionID string, reason string) (*models.WaitingRecord, error) {
+	svc := a.service
+	if tx != nil {
+		svc = routingapp.NewService(routinginfra.NewGormRepository(tx), a.publisher)
+	}
+
+	entry, err := svc.CancelWaiting(ctx, routingapp.CancelWaitingCommand{
 		SessionID: sessionID,
 		Reason:    reason,
 	})

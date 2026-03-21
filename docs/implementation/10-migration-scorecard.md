@@ -25,7 +25,7 @@
 | `ticket` | `modules/ticket/delivery.HandlerService` | `ticketdelivery.NewHandlerServiceAdapter(...)` | compatibility facade + orchestration side effects | `stabilized` | handler/router/runtime 已收口，边界脚本已覆盖 |
 | `agent` | `modules/agent/delivery.HandlerService` | `services.AgentService` as contract impl | compatibility facade + runtime state holder | `stabilized` | 运行态状态仍在 legacy service，但 HTTP 入口已锁定 |
 | `analytics` | `modules/analytics/delivery.HandlerService` | `services.StatisticsService` as contract impl | compatibility facade + event bus glue | `stabilized` | DTO 已抽到 module contract，handler 不再直连 concrete service |
-| `routing / session transfer` | `modules/routing/delivery.HandlerService` | `services.SessionTransferService` as contract impl | compatibility facade + runtime glue | `stabilized` | waiting queue 与 transfer record 写入已统一走 module，主流程仍保留 session/ticket/ws 协调 |
+| `routing / session transfer` | `modules/routing/delivery.HandlerService` | `services.SessionTransferService` as contract impl | compatibility facade + runtime glue | `stabilized` | waiting queue 新增/取消/转态同步与 transfer record 写入已统一走 module，主流程仍保留 session/ticket/ws 协调 |
 | `conversation / websocket runtime` | n/a | `modules/conversation/delivery.WebSocketMessageWriter` | runtime connection hub | `stabilized` | 主 runtime 与 lightweight realtime runtime 都已走 adapter 注入 |
 | `ai` | `modules/ai/delivery.HandlerService` | `AIAssembly.RuntimeService` | runtime compatibility surface for websocket/router/transfer | `stabilized` | handler 主路径已切到 orchestrated enhanced AI |
 | `customer` | `modules/customer/delivery.HandlerService` | `services.CustomerService` as contract impl | compatibility facade + DTO mapping | `contracted` | handler/router 已收口，runtime 仍保留 legacy facade |

@@ -104,6 +104,52 @@ func TestSessionTransferService_ToHuman_NoAgents_GoesWaiting(t *testing.T) {
 	}
 }
 
+func TestSessionTransferService_ToHuman_NoAgents_GoesWaitingViaRoutingAdapter(t *testing.T) {
+	db := newTestDBForSessionTransfer(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.WarnLevel)
+
+	if err := db.Create(&models.User{ID: 1, Username: "u1", Name: "u1", Email: "u1@example.com", Role: "customer"}).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	if err := db.Create(&models.Session{ID: "s-routing-wait", UserID: 1, Status: "active", Platform: "web", StartedAt: time.Now(), CreatedAt: time.Now(), UpdatedAt: time.Now()}).Error; err != nil {
+		t.Fatalf("seed session: %v", err)
+	}
+
+	agentSvc := NewAgentService(db, logger)
+	transferSvc := NewSessionTransferService(db, logger, stubAIForTransfer{}, agentSvc, nil)
+	bus := eventbus.NewInMemoryBus()
+	routingSvc := routingapp.NewService(routinginfra.NewGormRepository(db), bus)
+	transferSvc.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingSvc, bus))
+
+	res, err := transferSvc.TransferToHuman(context.Background(), &TransferRequest{
+		SessionID:    "s-routing-wait",
+		Reason:       "need help",
+		TargetSkills: []string{"billing"},
+		Priority:     "high",
+		Notes:        "vip",
+	})
+	if err != nil {
+		t.Fatalf("TransferToHuman: %v", err)
+	}
+	if !res.IsWaiting {
+		t.Fatalf("expected waiting result: %+v", res)
+	}
+
+	var waiting models.WaitingRecord
+	if err := db.Where("session_id = ? AND status = ?", "s-routing-wait", "waiting").First(&waiting).Error; err != nil {
+		t.Fatalf("expected waiting record: %v", err)
+	}
+	if waiting.Reason != "need help" || waiting.Priority != "high" || waiting.Notes != "vip" {
+		t.Fatalf("unexpected waiting record: %+v", waiting)
+	}
+
+	var message models.Message
+	if err := db.Where("session_id = ? AND type = ?", "s-routing-wait", "system").First(&message).Error; err != nil {
+		t.Fatalf("expected waiting message: %v", err)
+	}
+}
+
 func TestSessionTransferService_ToHuman_AssignsAgent_RecordsTransfer(t *testing.T) {
 	db := newTestDBForSessionTransfer(t)
 	logger := logrus.New()
@@ -224,5 +270,42 @@ func TestSessionTransferService_ToHuman_AssignsAgent_RecordsTransferViaRoutingAd
 	}
 	if tr.ToAgentID == nil || *tr.ToAgentID != 2 || tr.SessionSummary != "summary" || tr.Notes != "priority customer" {
 		t.Fatalf("unexpected transfer record: %+v", tr)
+	}
+}
+
+func TestSessionTransferService_CancelWaitingRecord_ViaRoutingAdapter(t *testing.T) {
+	db := newTestDBForSessionTransfer(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.WarnLevel)
+
+	if err := db.Create(&models.User{ID: 1, Username: "u1", Name: "u1", Email: "u1@example.com", Role: "customer"}).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	if err := db.Create(&models.WaitingRecord{
+		SessionID:    "s-cancel",
+		Reason:       "need help",
+		Status:       "waiting",
+		QueuedAt:     time.Now(),
+		TargetSkills: "billing",
+		CreatedAt:    time.Now(),
+	}).Error; err != nil {
+		t.Fatalf("seed waiting record: %v", err)
+	}
+
+	transferSvc := NewSessionTransferService(db, logger, stubAIForTransfer{}, NewAgentService(db, logger), nil)
+	bus := eventbus.NewInMemoryBus()
+	routingSvc := routingapp.NewService(routinginfra.NewGormRepository(db), bus)
+	transferSvc.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingSvc, bus))
+
+	if err := transferSvc.CancelWaitingRecord(context.Background(), "s-cancel", 1, "user_left"); err != nil {
+		t.Fatalf("CancelWaitingRecord: %v", err)
+	}
+
+	var waiting models.WaitingRecord
+	if err := db.Where("session_id = ?", "s-cancel").First(&waiting).Error; err != nil {
+		t.Fatalf("load waiting record: %v", err)
+	}
+	if waiting.Status != "cancelled" || waiting.Notes != "user_left" {
+		t.Fatalf("unexpected waiting record after cancel: %+v", waiting)
 	}
 }

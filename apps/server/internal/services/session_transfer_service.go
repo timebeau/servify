@@ -271,41 +271,7 @@ func (s *SessionTransferService) addToWaitingQueue(ctx context.Context, session 
 		}, nil
 	}
 
-	// 会话保持 active，等待队列由 WaitingRecord 表达
-	if err := s.db.Model(&models.Session{}).
-		Where("id = ?", session.ID).
-		Updates(map[string]interface{}{
-			"status":   "active",
-			"agent_id": nil,
-			"ended_at": nil,
-		}).Error; err != nil {
-		return nil, fmt.Errorf("failed to ensure session active: %w", err)
-	}
-
 	var waitingRecord *models.WaitingRecord
-	if s.routing != nil {
-		createdRecord, err := s.routing.AddToWaitingQueue(ctx, session.ID, req.Reason, req.TargetSkills, req.Priority, req.Notes)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create waiting record: %w", err)
-		}
-		waitingRecord = createdRecord
-	} else {
-		waitingRecord = &models.WaitingRecord{
-			SessionID:    session.ID,
-			Reason:       req.Reason,
-			TargetSkills: strings.Join(req.TargetSkills, ","),
-			Priority:     req.Priority,
-			Notes:        req.Notes,
-			Status:       "waiting",
-			QueuedAt:     time.Now(),
-		}
-
-		if err := s.db.Create(waitingRecord).Error; err != nil {
-			return nil, fmt.Errorf("failed to create waiting record: %w", err)
-		}
-	}
-
-	// 发送等待消息给用户
 	waitingMessage := &models.Message{
 		SessionID: session.ID,
 		UserID:    session.UserID,
@@ -313,8 +279,47 @@ func (s *SessionTransferService) addToWaitingQueue(ctx context.Context, session 
 		Type:      "system",
 		Sender:    "system",
 	}
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		// 会话保持 active，等待队列由 WaitingRecord 表达
+		if err := tx.Model(&models.Session{}).
+			Where("id = ?", session.ID).
+			Updates(map[string]interface{}{
+				"status":   "active",
+				"agent_id": nil,
+				"ended_at": nil,
+			}).Error; err != nil {
+			return fmt.Errorf("failed to ensure session active: %w", err)
+		}
 
-	s.db.Create(waitingMessage)
+		if s.routing != nil {
+			createdRecord, err := s.routing.AddToWaitingQueue(ctx, tx, session.ID, req.Reason, req.TargetSkills, req.Priority, req.Notes)
+			if err != nil {
+				return fmt.Errorf("failed to create waiting record: %w", err)
+			}
+			waitingRecord = createdRecord
+		} else {
+			waitingRecord = &models.WaitingRecord{
+				SessionID:    session.ID,
+				Reason:       req.Reason,
+				TargetSkills: strings.Join(req.TargetSkills, ","),
+				Priority:     req.Priority,
+				Notes:        req.Notes,
+				Status:       "waiting",
+				QueuedAt:     time.Now(),
+			}
+
+			if err := tx.Create(waitingRecord).Error; err != nil {
+				return fmt.Errorf("failed to create waiting record: %w", err)
+			}
+		}
+
+		if err := tx.Create(waitingMessage).Error; err != nil {
+			return fmt.Errorf("create waiting message: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
 
 	// 发送实时通知
 	s.notifyWaiting(session.ID, waitingMessage.Content)
@@ -361,8 +366,6 @@ func (s *SessionTransferService) ProcessWaitingQueue(ctx context.Context) error 
 			s.logger.Errorf("Failed to transfer waiting session %s: %v", record.SessionID, err)
 			continue
 		}
-
-		s.syncWaitingTransferred(ctx, record.SessionID, agent.UserID, time.Now())
 
 		s.logger.Infof("Successfully transferred waiting session %s to agent %d",
 			result.SessionID, result.NewAgentID)
@@ -544,7 +547,7 @@ func (s *SessionTransferService) CancelWaitingRecord(ctx context.Context, sessio
 	now := time.Now()
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		if s.routing != nil {
-			if _, err := s.routing.CancelWaiting(ctx, sessionID, reason); err != nil {
+			if _, err := s.routing.CancelWaiting(ctx, tx, sessionID, reason); err != nil {
 				if err == gorm.ErrRecordNotFound {
 					return nil
 				}
