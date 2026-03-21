@@ -65,8 +65,7 @@ func (s *SessionTransferService) TransferToHuman(ctx context.Context, req *Trans
 	}
 
 	// 若已在等待队列中，直接返回（避免重复入队）
-	var existing models.WaitingRecord
-	if err := s.db.Where("session_id = ? AND status = ?", session.ID, "waiting").First(&existing).Error; err == nil {
+	if existing, err := s.getActiveWaitingRecord(ctx, session.ID); err == nil {
 		return &TransferResult{
 			Success:   true,
 			SessionID: session.ID,
@@ -256,8 +255,7 @@ func (s *SessionTransferService) executeTransfer(ctx context.Context, session *m
 // addToWaitingQueue 添加到等待队列
 func (s *SessionTransferService) addToWaitingQueue(ctx context.Context, session *models.Session, req *TransferRequest) (*TransferResult, error) {
 	// 若已在等待队列中，直接返回（避免重复入队）
-	var existing models.WaitingRecord
-	if err := s.db.Where("session_id = ? AND status = ?", session.ID, "waiting").First(&existing).Error; err == nil {
+	if existing, err := s.getActiveWaitingRecord(ctx, session.ID); err == nil {
 		return &TransferResult{
 			Success:   true,
 			SessionID: session.ID,
@@ -396,6 +394,25 @@ func (s *SessionTransferService) loadWaitingQueue(ctx context.Context, limit int
 		return nil, fmt.Errorf("failed to get waiting records: %w", err)
 	}
 	return waitingRecords, nil
+}
+
+func (s *SessionTransferService) getActiveWaitingRecord(ctx context.Context, sessionID string) (*models.WaitingRecord, error) {
+	if s.routing != nil {
+		record, err := s.routing.GetWaitingRecord(ctx, sessionID)
+		if err != nil {
+			return nil, err
+		}
+		if record.Status != "waiting" {
+			return nil, gorm.ErrRecordNotFound
+		}
+		return record, nil
+	}
+
+	var existing models.WaitingRecord
+	if err := s.db.Where("session_id = ? AND status = ?", sessionID, "waiting").First(&existing).Error; err != nil {
+		return nil, err
+	}
+	return &existing, nil
 }
 
 // generateSessionSummary 生成会话摘要

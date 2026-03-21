@@ -110,6 +110,18 @@ func (s *Service) ListWaitingEntries(ctx context.Context, status string, limit i
 	return out, nil
 }
 
+func (s *Service) GetWaitingEntry(ctx context.Context, sessionID string) (*QueueEntryDTO, error) {
+	if strings.TrimSpace(sessionID) == "" {
+		return nil, fmt.Errorf("session_id required")
+	}
+	item, err := s.repo.GetQueueEntry(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	dto := MapQueueEntry(*item)
+	return &dto, nil
+}
+
 func (s *Service) MarkWaitingTransferred(ctx context.Context, cmd MarkWaitingTransferredCommand) (*QueueEntryDTO, error) {
 	if strings.TrimSpace(cmd.SessionID) == "" {
 		return nil, fmt.Errorf("session_id required")

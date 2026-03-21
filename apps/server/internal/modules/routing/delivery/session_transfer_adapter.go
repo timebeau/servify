@@ -49,6 +49,14 @@ func (a *SessionTransferAdapter) ListWaitingRecords(ctx context.Context, status 
 	return out, nil
 }
 
+func (a *SessionTransferAdapter) GetWaitingRecord(ctx context.Context, sessionID string) (*models.WaitingRecord, error) {
+	entry, err := a.service.GetWaitingEntry(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return mapWaitingRecord(entry), nil
+}
+
 func (a *SessionTransferAdapter) CancelWaiting(ctx context.Context, sessionID string, reason string) (*models.WaitingRecord, error) {
 	entry, err := a.service.CancelWaiting(ctx, routingapp.CancelWaitingCommand{
 		SessionID: sessionID,
