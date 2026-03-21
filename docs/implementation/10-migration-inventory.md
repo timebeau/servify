@@ -196,4 +196,5 @@
 - `scripts/check-module-boundaries.sh`
   - 校验 `ticket` / `agent` / `analytics` / `customer` / `automation` / `knowledge` / `routing` / `ai` 的 handler constructor 必须依赖 `modules/*/delivery.HandlerService`
   - 校验 router/runtime 对这八个模块的注入类型必须停留在 handler-facing contract，并校验 `conversation` 的 websocket persistence 入口必须走 module delivery adapter
+  - 校验 `workspace` / `websocket transfer` 等新增收窄点必须依赖 `WorkspaceOverviewReader`、`SessionTransferRuntime` 等接口，并禁止 `app/server` runtime/router 回退暴露若干 concrete legacy service
   - 目的：先锁住已完成迁移的入口，避免回退到 handler 直连具体旧 service

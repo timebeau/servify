@@ -28,3 +28,18 @@ require|apps/server/internal/app/server/runtime.go|SetConversationMessageWriter\
 require|apps/server/internal/app/server/realtime_runtime.go|SetConversationMessageWriter\(conversationdelivery\.NewWebSocketMessageAdapter\(conversationService\)\)|Realtime runtime must wire conversation websocket persistence through the module delivery adapter.
 require|apps/server/internal/app/server/ai_runtime.go|Service[[:space:]]+aidelivery\.HandlerService|AI assembly must expose the handler-facing AI contract.
 require|apps/server/internal/app/server/ai_runtime.go|RuntimeService[[:space:]]+services\.AIServiceInterface|AI assembly must keep a separate runtime AIServiceInterface for non-handler callers.
+require|apps/server/internal/app/server/runtime.go|WorkspaceService[[:space:]]+services\.WorkspaceOverviewReader|Runtime must expose workspace via WorkspaceOverviewReader.
+require|apps/server/internal/app/server/router.go|WorkspaceService[[:space:]]+services\.WorkspaceOverviewReader|Router dependencies must expose workspace via WorkspaceOverviewReader.
+require|apps/server/internal/services/websocket.go|transferService[[:space:]]+SessionTransferRuntime|WebSocket hub must store the session transfer runtime interface.
+require|apps/server/internal/services/websocket.go|func \(h \*WebSocketHub\) SetSessionTransferService\(svc SessionTransferRuntime\)|WebSocket hub must accept the session transfer runtime interface.
+require|apps/server/internal/handlers/workspace_handler.go|service[[:space:]]+services\.WorkspaceOverviewReader|Workspace handler must store WorkspaceOverviewReader.
+require|apps/server/internal/handlers/workspace_handler.go|func NewWorkspaceHandler\(service services\.WorkspaceOverviewReader\)|Workspace handler constructor must accept WorkspaceOverviewReader.
+forbid|apps/server/internal/app/server/runtime.go|CustomerService[[:space:]]+\*services\.CustomerService|Runtime must not expose concrete CustomerService.
+forbid|apps/server/internal/app/server/runtime.go|AutomationService[[:space:]]+\*services\.AutomationService|Runtime must not expose concrete AutomationService.
+forbid|apps/server/internal/app/server/runtime.go|StatisticsService[[:space:]]+\*services\.StatisticsService|Runtime must not expose concrete StatisticsService.
+forbid|apps/server/internal/app/server/runtime.go|KnowledgeDocService[[:space:]]+\*services\.KnowledgeDocService|Runtime must not expose concrete KnowledgeDocService.
+forbid|apps/server/internal/app/server/runtime.go|TransferService[[:space:]]+\*services\.SessionTransferService|Runtime must not expose concrete SessionTransferService.
+forbid|apps/server/internal/app/server/router.go|AutomationService[[:space:]]+\*services\.AutomationService|Router dependencies must not expose concrete AutomationService.
+forbid|apps/server/internal/app/server/router.go|TransferService[[:space:]]+\*services\.SessionTransferService|Router dependencies must not expose concrete SessionTransferService.
+forbid|apps/server/internal/handlers/workspace_handler.go|service[[:space:]]+\*services\.WorkspaceService|Workspace handler must not depend on concrete WorkspaceService.
+forbid|apps/server/internal/services/websocket.go|transferService[[:space:]]+\*SessionTransferService|WebSocket hub must not store concrete SessionTransferService.

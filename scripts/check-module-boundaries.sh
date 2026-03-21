@@ -87,6 +87,9 @@ while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
     require)
       require_pattern "$a" "$b" "$c"
       ;;
+    forbid)
+      forbid_pattern "$a" "$b" "$c"
+      ;;
     *)
       echo "Unknown rule kind in $RULES_FILE: $kind"
       has_error=1
