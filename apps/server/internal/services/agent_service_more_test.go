@@ -152,7 +152,7 @@ func TestAgentService_AgentGoOffline(t *testing.T) {
 	}
 
 	// 验证不在在线列表中
-	if _, ok := svc.onlineAgents.Load(1); ok {
+	if _, ok := svc.GetOnlineAgent(1); ok {
 		t.Error("agent should not be in online agents list")
 	}
 }

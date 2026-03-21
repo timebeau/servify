@@ -101,13 +101,12 @@ func (s *SessionTransferService) TransferToAgent(ctx context.Context, sessionID 
 	}
 
 	// 检查目标客服是否可用
-	agentInfo, ok := s.agentService.onlineAgents.Load(targetAgentID)
+	agentInfo, ok := s.agentService.GetOnlineAgent(targetAgentID)
 	if !ok {
 		return nil, fmt.Errorf("target agent is not online")
 	}
 
-	info := agentInfo.(*AgentInfo)
-	if info.CurrentLoad >= info.MaxConcurrent {
+	if agentInfo.CurrentLoad >= agentInfo.MaxConcurrent {
 		return nil, fmt.Errorf("target agent is at maximum capacity")
 	}
 

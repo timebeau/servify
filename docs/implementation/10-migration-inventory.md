@@ -16,7 +16,7 @@
   - `services/AgentService` 已明显成为兼容层
   - 核心读写已走 `modules/agent/application.Service`
   - handler-facing DTO 与 transfer runtime contract 已回收到 `modules/agent/delivery`
-  - 但仍保留 `onlineAgents`、`agentQueues`、后台同步等 legacy runtime 状态
+  - `agentQueues` 已移除；剩余在线客服兼容缓存已隔离为独立 runtime cache，但后台同步仍在 legacy service
   - 当前规则：HTTP handler 应依赖 `modules/agent/delivery.HandlerService`
   - 结论：属于“module 已落地，但 runtime 兼容状态尚未收口”的类型
 
@@ -160,7 +160,7 @@
   - 允许保留：旧调用方兼容入口、event bus / automation / satisfaction 等 side effect 组装、module command/orchestrator 的装配
   - 不应新增：新的 HTTP handler 直接依赖、新业务规则主入口、绕过 `modules/ticket/delivery.HandlerService` 的写路径
 - `services/AgentService`
-  - 允许保留：旧调用方兼容入口、在线客服运行时状态、队列与后台同步逻辑
+  - 允许保留：旧调用方兼容入口、在线客服运行时状态缓存、后台同步逻辑
   - 不应新增：新的 HTTP handler 直接依赖、脱离 `modules/agent/application.Service` 的核心业务写路径
 - `services/StatisticsService`
   - 允许保留：旧调用方兼容入口、event bus 订阅注册、DTO 映射、统计后台任务调度

@@ -53,13 +53,12 @@ func TestAgentService_AssignSessionToAgent_Success(t *testing.T) {
 	}
 
 	// Verify agent load increased
-	agentInfo, ok := svc.onlineAgents.Load(agent.ID)
+	agentInfo, ok := svc.GetOnlineAgent(agent.ID)
 	if !ok {
 		t.Fatal("agent not found in online agents")
 	}
-	info := agentInfo.(*AgentInfo)
-	if info.CurrentLoad != 1 {
-		t.Errorf("expected CurrentLoad 1, got %d", info.CurrentLoad)
+	if agentInfo.CurrentLoad != 1 {
+		t.Errorf("expected CurrentLoad 1, got %d", agentInfo.CurrentLoad)
 	}
 }
 
@@ -176,13 +175,12 @@ func TestAgentService_ReleaseSessionFromAgent_Success(t *testing.T) {
 	}
 
 	// Verify agent load decreased
-	agentInfo, ok := svc.onlineAgents.Load(agent.ID)
+	agentInfo, ok := svc.GetOnlineAgent(agent.ID)
 	if !ok {
 		t.Fatal("agent not found in online agents")
 	}
-	info := agentInfo.(*AgentInfo)
-	if info.CurrentLoad != 0 {
-		t.Errorf("expected CurrentLoad 0, got %d", info.CurrentLoad)
+	if agentInfo.CurrentLoad != 0 {
+		t.Errorf("expected CurrentLoad 0, got %d", agentInfo.CurrentLoad)
 	}
 }
 
@@ -214,7 +212,7 @@ func TestAgentService_ReleaseSessionFromAgent_AgentNotOnline(t *testing.T) {
 	}
 	db.Create(session)
 
-	// ReleaseSessionFromAgent updates database even if agent is not in onlineAgents map
+	// ReleaseSessionFromAgent updates database even if agent is not in online runtime
 	err := svc.ReleaseSessionFromAgent(context.Background(), session.ID, agent.ID)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

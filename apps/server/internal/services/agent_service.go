@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"strings"
-	"sync"
 	"time"
 
 	"servify/apps/server/internal/models"
@@ -19,14 +18,13 @@ import (
 //
 // 它目前同时承担两类职责：
 // 1. 作为 HTTP handler 的兼容 contract 实现
-// 2. 维护尚未迁出的 runtime 状态同步逻辑（onlineAgents、agentQueues）
+// 2. 维护尚未迁出的 runtime 状态同步逻辑（onlineAgents）
 //
 // 后续迁移中，HTTP 层应只依赖 modules/agent/delivery.HandlerService，而不是直接依赖此具体类型。
 type AgentService struct {
 	db           *gorm.DB
 	logger       *logrus.Logger
-	onlineAgents sync.Map // map[uint]*AgentInfo
-	agentQueues  sync.Map // map[uint]chan *models.Session
+	runtimeCache agentRuntimeCache
 	module       *agentapp.Service
 }
 
@@ -93,9 +91,6 @@ func (s *AgentService) AgentGoOffline(ctx context.Context, userID uint) error {
 		return err
 	}
 	s.syncLegacyRuntime(ctx)
-	if queue, ok := s.agentQueues.LoadAndDelete(userID); ok {
-		close(queue.(chan *models.Session))
-	}
 	s.logger.Infof("Agent %d went offline", userID)
 	return nil
 }
@@ -143,6 +138,10 @@ func (s *AgentService) GetOnlineAgents(ctx context.Context) []*AgentInfo {
 		out = append(out, mapRuntimeToLegacy(&copy))
 	}
 	return out
+}
+
+func (s *AgentService) GetOnlineAgent(userID uint) (*AgentInfo, bool) {
+	return s.runtimeCache.Load(userID)
 }
 
 func (s *AgentService) GetAgentStats(ctx context.Context, agentID *uint) (*AgentStats, error) {
@@ -210,30 +209,11 @@ func (s *AgentService) syncLegacyRuntime(ctx context.Context) {
 	active := make(map[uint]struct{}, len(runtimes))
 	for _, runtime := range runtimes {
 		active[runtime.UserID] = struct{}{}
-		s.onlineAgents.Store(runtime.UserID, mapRuntimeToLegacy(&runtime))
-		if _, ok := s.agentQueues.Load(runtime.UserID); !ok {
-			queueSize := runtime.MaxChatConcurrency * 2
-			if queueSize <= 0 {
-				queueSize = 10
-			}
-			s.agentQueues.Store(runtime.UserID, make(chan *models.Session, queueSize))
-		}
+		s.runtimeCache.Store(runtime.UserID, mapRuntimeToLegacy(&runtime))
 	}
-	var stale []uint
-	s.onlineAgents.Range(func(key, value any) bool {
-		userID, ok := key.(uint)
-		if ok {
-			if _, exists := active[userID]; !exists {
-				stale = append(stale, userID)
-			}
-		}
-		return true
-	})
+	stale := s.runtimeCache.CollectStale(active)
 	for _, userID := range stale {
-		s.onlineAgents.Delete(userID)
-		if queue, ok := s.agentQueues.LoadAndDelete(userID); ok {
-			close(queue.(chan *models.Session))
-		}
+		s.runtimeCache.Delete(userID)
 	}
 }
 
