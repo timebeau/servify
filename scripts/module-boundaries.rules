@@ -38,6 +38,8 @@ require|apps/server/internal/app/server/realtime_runtime.go|SetConversationMessa
 require|apps/server/internal/app/server/ai_runtime.go|Service[[:space:]]+aidelivery\.HandlerService|AI assembly must expose the handler-facing AI contract.
 require|apps/server/internal/app/server/ai_runtime.go|RuntimeService[[:space:]]+services\.AIServiceInterface|AI assembly must keep a separate runtime AIServiceInterface for non-handler callers.
 forbid|apps/server/internal/app/server/ai_runtime.go|LegacyService[[:space:]]+\*services\.AIService|AI assembly must not expose the legacy concrete AI service.
+require|apps/server/internal/app/server/runtime.go|KnowledgeDocHandler[[:space:]]+knowledgedelivery\.HandlerService|Runtime must expose knowledge via knowledgedelivery.HandlerService.
+require|apps/server/internal/app/server/runtime.go|Knowledg[e]?DocHandler[[:space:]]*=.*knowledgedelivery\.NewHandlerService\(db\)|Runtime must assemble knowledge handlers directly from module delivery.
 require|apps/server/internal/app/server/runtime.go|WorkspaceService[[:space:]]+services\.WorkspaceOverviewReader|Runtime must expose workspace via WorkspaceOverviewReader.
 require|apps/server/internal/app/server/router.go|WorkspaceService[[:space:]]+services\.WorkspaceOverviewReader|Router dependencies must expose workspace via WorkspaceOverviewReader.
 require|apps/server/internal/app/server/runtime.go|MessageRouter[[:space:]]+services\.MessageRouterRuntime|Runtime must expose message router via services.MessageRouterRuntime.
@@ -75,6 +77,7 @@ forbid|apps/server/internal/app/server/runtime.go|CustomerService[[:space:]]+\*s
 forbid|apps/server/internal/app/server/runtime.go|AutomationService[[:space:]]+\*services\.AutomationService|Runtime must not expose concrete AutomationService.
 forbid|apps/server/internal/app/server/runtime.go|StatisticsService[[:space:]]+\*services\.StatisticsService|Runtime must not expose concrete StatisticsService.
 forbid|apps/server/internal/app/server/runtime.go|KnowledgeDocService[[:space:]]+\*services\.KnowledgeDocService|Runtime must not expose concrete KnowledgeDocService.
+forbid|apps/server/internal/app/server/runtime.go|NewKnowledgeDocService\(db\)|Runtime must not assemble knowledge handlers through services.NewKnowledgeDocService.
 forbid|apps/server/internal/app/server/runtime.go|TransferService[[:space:]]+\*services\.SessionTransferService|Runtime must not expose concrete SessionTransferService.
 forbid|apps/server/internal/app/server/runtime.go|MessageRouter[[:space:]]+\*services\.MessageRouter|Runtime must not expose concrete MessageRouter.
 forbid|apps/server/internal/app/server/router.go|AutomationService[[:space:]]+\*services\.AutomationService|Router dependencies must not expose concrete AutomationService.

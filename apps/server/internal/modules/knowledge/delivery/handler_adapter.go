@@ -2,36 +2,133 @@ package delivery
 
 import (
 	"context"
+	"fmt"
+	"strconv"
+	"strings"
 
 	"servify/apps/server/internal/models"
+	knowledgeapp "servify/apps/server/internal/modules/knowledge/application"
+	knowledgedomain "servify/apps/server/internal/modules/knowledge/domain"
+	knowledgeinfra "servify/apps/server/internal/modules/knowledge/infra"
 	"servify/apps/server/internal/services"
+
+	"gorm.io/gorm"
 )
 
-// HandlerServiceAdapter bridges the legacy knowledge service to the handler-facing contract.
+// HandlerServiceAdapter exposes module-backed knowledge operations to HTTP handlers.
 type HandlerServiceAdapter struct {
-	service *services.KnowledgeDocService
+	service *knowledgeapp.Service
 }
 
-func NewHandlerServiceAdapter(service *services.KnowledgeDocService) *HandlerServiceAdapter {
+func NewHandlerService(db *gorm.DB) *HandlerServiceAdapter {
+	return NewHandlerServiceAdapter(knowledgeapp.NewService(
+		knowledgeinfra.NewGormDocumentRepository(db),
+		knowledgeinfra.NewNoopIndexJobRepository(),
+		nil,
+	))
+}
+
+func NewHandlerServiceAdapter(service *knowledgeapp.Service) *HandlerServiceAdapter {
 	return &HandlerServiceAdapter{service: service}
 }
 
 func (a *HandlerServiceAdapter) List(ctx context.Context, req *services.KnowledgeDocListRequest) ([]models.KnowledgeDoc, int64, error) {
-	return a.service.List(ctx, req)
+	filter := knowledgeapp.ListDocumentsFilter{}
+	if req != nil {
+		filter.Page = req.Page
+		filter.PageSize = req.PageSize
+		filter.Category = req.Category
+		filter.Search = req.Search
+	}
+	docs, total, err := a.service.ListDocuments(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]models.KnowledgeDoc, 0, len(docs))
+	for _, doc := range docs {
+		model, err := knowledgeDocFromDomain(&doc)
+		if err != nil {
+			return nil, 0, err
+		}
+		out = append(out, *model)
+	}
+	return out, total, nil
 }
 
 func (a *HandlerServiceAdapter) Get(ctx context.Context, id uint) (*models.KnowledgeDoc, error) {
-	return a.service.Get(ctx, id)
+	doc, err := a.service.GetDocument(ctx, strconv.FormatUint(uint64(id), 10))
+	if err != nil {
+		return nil, err
+	}
+	return knowledgeDocFromDomain(doc)
 }
 
 func (a *HandlerServiceAdapter) Create(ctx context.Context, req *services.KnowledgeDocCreateRequest) (*models.KnowledgeDoc, error) {
-	return a.service.Create(ctx, req)
+	if req == nil {
+		return nil, fmt.Errorf("request required")
+	}
+	doc, err := a.service.CreateDocument(ctx, knowledgeapp.CreateDocumentRequest{
+		Title:    req.Title,
+		Content:  req.Content,
+		Category: req.Category,
+		Tags:     req.Tags,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return knowledgeDocFromDomain(doc)
 }
 
 func (a *HandlerServiceAdapter) Update(ctx context.Context, id uint, req *services.KnowledgeDocUpdateRequest) (*models.KnowledgeDoc, error) {
-	return a.service.Update(ctx, id, req)
+	if req == nil {
+		return nil, fmt.Errorf("request required")
+	}
+	doc, err := a.service.UpdateDocument(ctx, strconv.FormatUint(uint64(id), 10), knowledgeapp.UpdateDocumentRequest{
+		Title:    req.Title,
+		Content:  req.Content,
+		Category: req.Category,
+		Tags:     req.Tags,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return knowledgeDocFromDomain(doc)
 }
 
 func (a *HandlerServiceAdapter) Delete(ctx context.Context, id uint) error {
-	return a.service.Delete(ctx, id)
+	return a.service.DeleteDocument(ctx, strconv.FormatUint(uint64(id), 10))
+}
+
+func knowledgeDocFromDomain(doc *knowledgedomain.Document) (*models.KnowledgeDoc, error) {
+	if doc == nil {
+		return nil, nil
+	}
+	id, err := strconv.ParseUint(doc.ID, 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("invalid document id: %w", err)
+	}
+	return &models.KnowledgeDoc{
+		ID:        uint(id),
+		Title:     doc.Title,
+		Content:   doc.Content,
+		Category:  doc.Category,
+		Tags:      joinTagsCSV(doc.Tags),
+		CreatedAt: doc.CreatedAt,
+		UpdatedAt: doc.UpdatedAt,
+	}, nil
+}
+
+func joinTagsCSV(tags []string) string {
+	if len(tags) == 0 {
+		return ""
+	}
+	out := make([]string, 0, len(tags))
+	for _, t := range tags {
+		t = strings.TrimSpace(t)
+		if t == "" {
+			continue
+		}
+		out = append(out, t)
+	}
+	return strings.Join(out, ",")
 }

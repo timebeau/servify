@@ -82,8 +82,8 @@
 - `knowledge`
   - 已存在 `modules/knowledge/application`，但此前缺少 Gorm repository 与 handler-facing delivery contract
   - 旧 `services/KnowledgeDocService` 主要承接 CRUD 与 tag/category DTO，适合改成 module facade
-  - `app/server` runtime 已不再对外暴露 `*services.KnowledgeDocService` 字段，仅保留 handler-facing contract 与局部 wiring
-  - 结论：先补 module 落地层和 handler contract，再把 runtime 中的 provider/indexing 接口留待后续收口
+  - `app/server` runtime 已不再对外暴露 `*services.KnowledgeDocService` 字段，且 knowledge handler 装配已直接切到 `modules/knowledge/delivery.NewHandlerService(db)`，不再经由 legacy facade 中转
+  - 结论：handler 主路径已直接贴近 module；后续重点只剩 provider/indexing runtime 收口
 
 ## 按迁移成熟度分组
 

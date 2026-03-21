@@ -30,7 +30,7 @@
 | `ai` | `modules/ai/delivery.HandlerService` | `AIAssembly.RuntimeService` | runtime compatibility surface for websocket/router/transfer | `stabilized` | handler 主路径已切到 orchestrated enhanced AI；assembly 不再暴露 legacy concrete AI service |
 | `customer` | `modules/customer/delivery.HandlerService` | `services.CustomerService` as contract impl | compatibility facade + DTO mapping | `contracted` | handler/router 已收口，runtime 仍保留 legacy facade |
 | `automation` | `modules/automation/delivery.HandlerService` | `services.AutomationService` as contract impl | compatibility facade + event bus glue | `contracted` | handler/router 已收口，runtime 仍保留 subscriber / event bus glue |
-| `knowledge` | `modules/knowledge/delivery.HandlerService` | `services.KnowledgeDocService` as contract impl | compatibility facade + module assembly | `contracted` | handler/router 已收口，index job runtime 仍未接入 |
+| `knowledge` | `modules/knowledge/delivery.HandlerService` | `modules/knowledge/delivery.NewHandlerService(db)` | compatibility facade retained for old callers | `contracted` | handler/router/runtime 的 handler 主路径已直接走 module delivery；index job runtime 仍未接入 |
 | `voice` | already module coordinator | module coordinator | not primarily legacy | `mixed` | 已较模块化，但不属于本轮 `services -> modules` 的典型迁移样式 |
 
 ## 当前结论
