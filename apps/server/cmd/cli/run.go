@@ -17,6 +17,7 @@ import (
 	"servify/apps/server/internal/config"
 	"servify/apps/server/internal/handlers"
 	"servify/apps/server/internal/middleware"
+	aidelivery "servify/apps/server/internal/modules/ai/delivery"
 	"servify/apps/server/internal/platform/llm/openai"
 	"servify/apps/server/internal/services"
 
@@ -57,7 +58,7 @@ func run(cmd *cobra.Command, args []string) {
 
 	openAIProvider := openai.NewProvider(cfg.AI.OpenAI.APIKey, cfg.AI.OpenAI.BaseURL)
 	aiService := services.NewOrchestratedAIService(openAIProvider, nil)
-	runtime := appserver.BuildRealtimeRuntime(cfg, app.Logger, db, aiService)
+	runtime := appserver.BuildRealtimeRuntime(cfg, app.Logger, db, aiService, aidelivery.NewHandlerServiceAdapter(aiService))
 	if err := runtime.Start(); err != nil {
 		logrus.Fatalf("Failed to start message router: %v", err)
 	}

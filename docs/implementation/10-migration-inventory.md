@@ -45,6 +45,7 @@
   - 同时存在旧 `services/AIService`、`EnhancedAIService`、`OrchestratedAIService`
   - `OrchestratedAIService` 已是 `modules/ai/application.QueryOrchestrator` 的适配层
   - handler 已开始收口到 `modules/ai/delivery.HandlerService`
+  - `AIAssembly` 已去掉未消费的 `LegacyService *services.AIService` 暴露，仅保留 handler-facing contract、runtime-facing `AIServiceInterface` 与 WeKnora state
   - 结论：迁移重点是继续压缩 legacy `AIServiceInterface` 的 handler 可见面，只保留 runtime 兼容用途
 
 - `legacy handler-only capabilities`

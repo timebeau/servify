@@ -24,7 +24,6 @@ type AIAssemblyOptions struct {
 type AIAssembly struct {
 	Service        aidelivery.HandlerService
 	RuntimeService services.AIServiceInterface
-	LegacyService  *services.AIService
 	WeKnoraClient  weknora.WeKnoraInterface
 	WeKnoraHealthy bool
 }
@@ -47,7 +46,6 @@ func BuildAIAssembly(cfg *config.Config, logger *logrus.Logger, opts AIAssemblyO
 	assembly := &AIAssembly{
 		Service:        aidelivery.NewHandlerServiceAdapter(defaultService),
 		RuntimeService: defaultService,
-		LegacyService:  baseAI,
 	}
 	if !cfg.WeKnora.Enabled {
 		return assembly, nil

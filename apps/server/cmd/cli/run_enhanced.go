@@ -65,7 +65,8 @@ func run(cmd *cobra.Command, args []string) {
 		logrus.Fatalf("❌ Failed to initialize AI assembly: %v", err)
 	}
 	weKnoraClient := aiAssembly.WeKnoraClient
-	aiService := aiAssembly.Service
+	aiService := aiAssembly.RuntimeService
+	aiHandlerService := aiAssembly.Service
 	if aiAssembly.WeKnoraHealthy {
 		logrus.Info("✅ Enhanced AI service with WeKnora initialized")
 	} else if cfg.WeKnora.Enabled {
@@ -74,7 +75,7 @@ func run(cmd *cobra.Command, args []string) {
 		logrus.Info("✅ Standard AI service initialized")
 	}
 
-	runtime := appserver.BuildRealtimeRuntime(cfg, app.Logger, db, aiService)
+	runtime := appserver.BuildRealtimeRuntime(cfg, app.Logger, db, aiService, aiHandlerService)
 	logrus.Info("🔌 Starting background services...")
 	if err := runtime.Start(); err != nil {
 		logrus.Fatalf("❌ Failed to start message router: %v", err)
@@ -160,13 +161,13 @@ func setupEnhancedRouter(
 	})
 
 	// 健康检查
-	healthHandler := handlers.NewEnhancedHealthHandler(cfg, runtime.AIService)
+	healthHandler := handlers.NewEnhancedHealthHandler(cfg, runtime.AIHandlerService)
 	router.GET("/health", healthHandler.Health)
 	router.GET("/ready", healthHandler.Ready)
 
 	// 监控端点
 	if cfg.Monitoring.Enabled {
-		router.GET(cfg.Monitoring.MetricsPath, handlers.NewMetricsHandler(runtime.RealtimeGateway, runtime.RTCGateway, runtime.AIService, runtime.MessageRouter, db).GetMetrics)
+		router.GET(cfg.Monitoring.MetricsPath, handlers.NewMetricsHandler(runtime.RealtimeGateway, runtime.RTCGateway, runtime.AIHandlerService, db).GetMetrics)
 	}
 
 	// API 路由组
@@ -187,7 +188,7 @@ func setupEnhancedRouter(
 		api.GET("/messages/platforms", messageHandler.GetPlatformStats)
 
 		// AI 相关 API
-		aiHandler := handlers.NewAIHandler(runtime.AIService)
+		aiHandler := handlers.NewAIHandler(runtime.AIHandlerService)
 		aiAPI := api.Group("/ai")
 		{
 			aiAPI.POST("/query", aiHandler.ProcessQuery)
@@ -210,7 +211,7 @@ func setupEnhancedRouter(
 
 		// 文件上传 API（如果启用）必须放在相同作用域下，复用 api 组
 		if cfg.Upload.Enabled {
-			uploadHandler := handlers.NewUploadHandler(cfg, runtime.AIService)
+			uploadHandler := handlers.NewUploadHandler(cfg, runtime.AIHandlerService)
 			api.POST("/upload", uploadHandler.UploadFile)
 			api.GET("/upload/status/:id", uploadHandler.GetUploadStatus)
 		}

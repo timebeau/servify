@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"servify/apps/server/internal/config"
+	aidelivery "servify/apps/server/internal/modules/ai/delivery"
 	conversationapp "servify/apps/server/internal/modules/conversation/application"
 	conversationdelivery "servify/apps/server/internal/modules/conversation/delivery"
 	conversationinfra "servify/apps/server/internal/modules/conversation/infra"
@@ -16,18 +17,19 @@ import (
 
 // RealtimeRuntime assembles realtime and AI-facing primitives used by lightweight runtimes.
 type RealtimeRuntime struct {
-	Config          *config.Config
-	Logger          *logrus.Logger
-	DB              *gorm.DB
-	AIService       services.AIServiceInterface
-	WSHub           *services.WebSocketHub
-	WebRTCService   *services.WebRTCService
-	RealtimeGateway realtimeplatform.RealtimeGateway
-	RTCGateway      realtimeplatform.RTCGateway
-	MessageRouter   services.MessageRouterRuntime
+	Config           *config.Config
+	Logger           *logrus.Logger
+	DB               *gorm.DB
+	AIService        services.AIServiceInterface
+	AIHandlerService aidelivery.HandlerService
+	WSHub            *services.WebSocketHub
+	WebRTCService    *services.WebRTCService
+	RealtimeGateway  realtimeplatform.RealtimeGateway
+	RTCGateway       realtimeplatform.RTCGateway
+	MessageRouter    services.MessageRouterRuntime
 }
 
-func BuildRealtimeRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, ai services.AIServiceInterface) *RealtimeRuntime {
+func BuildRealtimeRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, ai services.AIServiceInterface, handlerAI aidelivery.HandlerService) *RealtimeRuntime {
 	wsHub := services.NewWebSocketHub()
 	if db != nil {
 		wsHub.SetDB(db)
@@ -39,15 +41,16 @@ func BuildRealtimeRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB
 
 	webrtcService := services.NewWebRTCService(cfg.WebRTC.STUNServer, wsHub)
 	return &RealtimeRuntime{
-		Config:          cfg,
-		Logger:          logger,
-		DB:              db,
-		AIService:       ai,
-		WSHub:           wsHub,
-		WebRTCService:   webrtcService,
-		RealtimeGateway: realtimeplatform.NewWebSocketAdapter(wsHub),
-		RTCGateway:      realtimeplatform.NewWebRTCAdapter(webrtcService),
-		MessageRouter:   services.NewMessageRouter(ai, wsHub, db),
+		Config:           cfg,
+		Logger:           logger,
+		DB:               db,
+		AIService:        ai,
+		AIHandlerService: handlerAI,
+		WSHub:            wsHub,
+		WebRTCService:    webrtcService,
+		RealtimeGateway:  realtimeplatform.NewWebSocketAdapter(wsHub),
+		RTCGateway:       realtimeplatform.NewWebRTCAdapter(webrtcService),
+		MessageRouter:    services.NewMessageRouter(ai, wsHub, db),
 	}
 }
 
