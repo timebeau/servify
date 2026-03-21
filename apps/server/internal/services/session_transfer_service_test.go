@@ -12,6 +12,7 @@ import (
 	routingapp "servify/apps/server/internal/modules/routing/application"
 	routingdelivery "servify/apps/server/internal/modules/routing/delivery"
 	routinginfra "servify/apps/server/internal/modules/routing/infra"
+	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
 	"servify/apps/server/internal/platform/eventbus"
 
 	"github.com/sirupsen/logrus"
@@ -121,6 +122,7 @@ func TestSessionTransferService_ToHuman_NoAgents_GoesWaitingViaRoutingAdapter(t 
 	bus := eventbus.NewInMemoryBus()
 	routingSvc := routingapp.NewService(routinginfra.NewGormRepository(db), bus)
 	transferSvc.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingSvc, bus))
+	transferSvc.SetTicketRuntime(ticketdelivery.NewRuntimeAdapter(bus))
 
 	res, err := transferSvc.TransferToHuman(context.Background(), &TransferRequest{
 		SessionID:    "s-routing-wait",
@@ -238,7 +240,11 @@ func TestSessionTransferService_ToHuman_AssignsAgent_RecordsTransferViaRoutingAd
 	if err := db.Create(&models.Agent{UserID: 2, Status: "offline", MaxConcurrent: 5, CurrentLoad: 0}).Error; err != nil {
 		t.Fatalf("seed agent: %v", err)
 	}
-	if err := db.Create(&models.Session{ID: "s3", UserID: 1, Status: "active", Platform: "web", StartedAt: time.Now(), CreatedAt: time.Now(), UpdatedAt: time.Now()}).Error; err != nil {
+	ticketID := uint(43)
+	if err := db.Create(&models.Ticket{ID: ticketID, Title: "t-routing", Description: "d", CustomerID: 1, Status: "open", Priority: "normal", Source: "web", CreatedAt: time.Now(), UpdatedAt: time.Now()}).Error; err != nil {
+		t.Fatalf("seed ticket: %v", err)
+	}
+	if err := db.Create(&models.Session{ID: "s3", UserID: 1, TicketID: &ticketID, Status: "active", Platform: "web", StartedAt: time.Now(), CreatedAt: time.Now(), UpdatedAt: time.Now()}).Error; err != nil {
 		t.Fatalf("seed session: %v", err)
 	}
 
@@ -270,6 +276,14 @@ func TestSessionTransferService_ToHuman_AssignsAgent_RecordsTransferViaRoutingAd
 	}
 	if tr.ToAgentID == nil || *tr.ToAgentID != 2 || tr.SessionSummary != "summary" || tr.Notes != "priority customer" {
 		t.Fatalf("unexpected transfer record: %+v", tr)
+	}
+
+	var ticket models.Ticket
+	if err := db.First(&ticket, "id = ?", ticketID).Error; err != nil {
+		t.Fatalf("load ticket: %v", err)
+	}
+	if ticket.AgentID == nil || *ticket.AgentID != 2 || ticket.Status != "assigned" {
+		t.Fatalf("unexpected ticket after transfer: %+v", ticket)
 	}
 }
 

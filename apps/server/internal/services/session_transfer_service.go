@@ -9,6 +9,7 @@ import (
 	"servify/apps/server/internal/models"
 	routingcontract "servify/apps/server/internal/modules/routing/contract"
 	routingdelivery "servify/apps/server/internal/modules/routing/delivery"
+	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
 
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
@@ -22,6 +23,7 @@ type SessionTransferService struct {
 	agentService *AgentService
 	wsHub        *WebSocketHub
 	routing      routingdelivery.RuntimeService
+	tickets      ticketdelivery.RuntimeService
 }
 
 // NewSessionTransferService 创建会话转接服务
@@ -160,34 +162,40 @@ func (s *SessionTransferService) executeTransfer(ctx context.Context, session *m
 
 		// 若会话关联了工单，则同步工单的指派（与会话转接保持一致）
 		if session.TicketID != nil && *session.TicketID != 0 {
-			var ticket models.Ticket
-			if err := tx.Select("id", "agent_id", "status").First(&ticket, "id = ?", *session.TicketID).Error; err != nil {
-				if err != gorm.ErrRecordNotFound {
-					return fmt.Errorf("load ticket: %w", err)
-				}
-			} else {
-				updates := map[string]interface{}{
-					"agent_id": targetAgentID,
-				}
-				fromStatus := ticket.Status
-				toStatus := fromStatus
-				if fromStatus == "open" || fromStatus == "" {
-					toStatus = "assigned"
-					updates["status"] = toStatus
-				}
-				if err := tx.Model(&models.Ticket{}).Where("id = ?", ticket.ID).Updates(updates).Error; err != nil {
+			if s.tickets != nil {
+				if err := s.tickets.SyncTransferAssignment(ctx, tx, *session.TicketID, targetAgentID, targetAgentID); err != nil && err != gorm.ErrRecordNotFound {
 					return fmt.Errorf("update ticket: %w", err)
 				}
+			} else {
+				var ticket models.Ticket
+				if err := tx.Select("id", "agent_id", "status").First(&ticket, "id = ?", *session.TicketID).Error; err != nil {
+					if err != gorm.ErrRecordNotFound {
+						return fmt.Errorf("load ticket: %w", err)
+					}
+				} else {
+					updates := map[string]interface{}{
+						"agent_id": targetAgentID,
+					}
+					fromStatus := ticket.Status
+					toStatus := fromStatus
+					if fromStatus == "open" || fromStatus == "" {
+						toStatus = "assigned"
+						updates["status"] = toStatus
+					}
+					if err := tx.Model(&models.Ticket{}).Where("id = ?", ticket.ID).Updates(updates).Error; err != nil {
+						return fmt.Errorf("update ticket: %w", err)
+					}
 
-				// Best-effort 记录状态变更（不影响主流程）
-				_ = tx.Create(&models.TicketStatus{
-					TicketID:   ticket.ID,
-					UserID:     targetAgentID,
-					FromStatus: fromStatus,
-					ToStatus:   toStatus,
-					Reason:     fmt.Sprintf("会话转接同步指派至客服 %d", targetAgentID),
-					CreatedAt:  transferAt,
-				}).Error
+					// Best-effort 记录状态变更（不影响主流程）
+					_ = tx.Create(&models.TicketStatus{
+						TicketID:   ticket.ID,
+						UserID:     targetAgentID,
+						FromStatus: fromStatus,
+						ToStatus:   toStatus,
+						Reason:     fmt.Sprintf("会话转接同步指派至客服 %d", targetAgentID),
+						CreatedAt:  transferAt,
+					}).Error
+				}
 			}
 		}
 
@@ -582,6 +590,10 @@ func (s *SessionTransferService) CancelWaitingRecord(ctx context.Context, sessio
 
 func (s *SessionTransferService) SetRoutingAdapter(adapter routingdelivery.RuntimeService) {
 	s.routing = adapter
+}
+
+func (s *SessionTransferService) SetTicketRuntime(adapter ticketdelivery.RuntimeService) {
+	s.tickets = adapter
 }
 
 // AutoTransferCheck 自动转接检查
