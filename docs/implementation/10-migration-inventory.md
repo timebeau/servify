@@ -27,7 +27,7 @@
 
 - `routing / session transfer`
   - `services/SessionTransferService` 已注入 `modules/routing/delivery.SessionTransferAdapter`
-  - waiting queue 的读取、新增、查询、取消、转已收口到 routing module 状态机
+  - waiting queue 的读取、新增、查询、取消、转态同步，以及 transfer record 写入已收口到 routing module 状态机
   - 但主流程仍强依赖 `gorm.DB`、`AgentService`、`WebSocketHub` 和旧会话模型
   - 结论：属于“局部接入 module adapter，但主流程仍是 legacy service”的高风险混合区
 
@@ -170,7 +170,7 @@
   - 不应新增：新的 HTTP handler 直接依赖、绕过 `modules/knowledge/application.Service` 的文档 CRUD 主入口
 - `services/SessionTransferService`
   - 允许保留：旧调用方兼容入口、AgentService/WebSocketHub/AIService 协调、转接实时通知与 legacy transfer orchestration
-  - 不应新增：新的 HTTP handler 直接依赖、等待队列之外继续扩散 routing 读写规则
+  - 不应新增：新的 HTTP handler 直接依赖、绕过 routing module 的 waiting/transfer record 读写规则
 - `services/WebSocketHub`
   - 允许保留：连接管理、广播、协议消息分发、对 AI/transfer 的 runtime glue
   - 不应新增：新的 conversation 私有持久化接口、绕过 `modules/conversation/delivery.WebSocketMessageWriter` 的消息落库路径

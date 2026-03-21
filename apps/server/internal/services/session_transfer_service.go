@@ -135,7 +135,6 @@ func (s *SessionTransferService) executeTransfer(ctx context.Context, session *m
 
 	transferMessageContent := s.buildTransferMessage(reason, notes)
 
-	// 创建转接记录
 	transferRecord := &models.TransferRecord{
 		SessionID:      session.ID,
 		FromAgentID:    fromAgentID,
@@ -215,7 +214,21 @@ func (s *SessionTransferService) executeTransfer(ctx context.Context, session *m
 			return fmt.Errorf("create transfer message: %w", err)
 		}
 
-		if err := tx.Create(transferRecord).Error; err != nil {
+		if s.routing != nil {
+			createdRecord, err := s.routing.AssignAgent(ctx, tx, routingdelivery.AssignAgentCommand{
+				SessionID:      session.ID,
+				AgentID:        targetAgentID,
+				FromAgentID:    fromAgentID,
+				Reason:         reason,
+				Notes:          notes,
+				SessionSummary: summary,
+				AssignedAt:     transferAt,
+			})
+			if err != nil {
+				return fmt.Errorf("create transfer record: %w", err)
+			}
+			transferRecord = createdRecord
+		} else if err := tx.Create(transferRecord).Error; err != nil {
 			return fmt.Errorf("create transfer record: %w", err)
 		}
 

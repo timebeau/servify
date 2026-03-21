@@ -11,12 +11,13 @@ const (
 )
 
 type Assignment struct {
-	SessionID   string
-	FromAgentID *uint
-	ToAgentID   uint
-	Reason      string
-	Notes       string
-	AssignedAt  time.Time
+	SessionID      string
+	FromAgentID    *uint
+	ToAgentID      uint
+	Reason         string
+	Notes          string
+	SessionSummary string
+	AssignedAt     time.Time
 }
 
 type QueueEntry struct {

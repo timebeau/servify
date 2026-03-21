@@ -6,14 +6,49 @@ import (
 
 	"servify/apps/server/internal/models"
 	routingapp "servify/apps/server/internal/modules/routing/application"
+	routinginfra "servify/apps/server/internal/modules/routing/infra"
+
+	"gorm.io/gorm"
 )
 
 type SessionTransferAdapter struct {
-	service *routingapp.Service
+	service   *routingapp.Service
+	publisher routingapp.EventPublisher
 }
 
-func NewSessionTransferAdapter(service *routingapp.Service) *SessionTransferAdapter {
-	return &SessionTransferAdapter{service: service}
+func NewSessionTransferAdapter(service *routingapp.Service, publisher routingapp.EventPublisher) *SessionTransferAdapter {
+	return &SessionTransferAdapter{service: service, publisher: publisher}
+}
+
+func (a *SessionTransferAdapter) AssignAgent(ctx context.Context, tx *gorm.DB, cmd AssignAgentCommand) (*models.TransferRecord, error) {
+	svc := a.service
+	if tx != nil {
+		svc = routingapp.NewService(routinginfra.NewGormRepository(tx), a.publisher)
+	}
+
+	item, err := svc.AssignAgent(ctx, routingapp.AssignAgentCommand{
+		SessionID:      cmd.SessionID,
+		AgentID:        cmd.AgentID,
+		FromAgentID:    cmd.FromAgentID,
+		Reason:         cmd.Reason,
+		Notes:          cmd.Notes,
+		SessionSummary: cmd.SessionSummary,
+		AssignedAt:     cmd.AssignedAt,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.TransferRecord{
+		SessionID:      item.SessionID,
+		FromAgentID:    item.FromAgentID,
+		ToAgentID:      uintPtr(item.ToAgentID),
+		Reason:         item.Reason,
+		Notes:          item.Notes,
+		SessionSummary: item.SessionSummary,
+		TransferredAt:  item.AssignedAt,
+		CreatedAt:      item.AssignedAt,
+	}, nil
 }
 
 func (a *SessionTransferAdapter) AddToWaitingQueue(
@@ -151,4 +186,8 @@ func mapTransferRecord(item routingapp.TransferRecordDTO) models.TransferRecord 
 		TransferredAt:  item.TransferredAt,
 		CreatedAt:      item.TransferredAt,
 	}
+}
+
+func uintPtr(v uint) *uint {
+	return &v
 }

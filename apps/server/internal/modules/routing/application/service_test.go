@@ -31,12 +31,13 @@ func (s *stubRoutingRepo) CreateAssignment(ctx context.Context, assignment *doma
 	cp := *assignment
 	s.assignments[assignment.SessionID] = &cp
 	s.transferLog = append(s.transferLog, domain.TransferRecord{
-		SessionID:     assignment.SessionID,
-		FromAgentID:   assignment.FromAgentID,
-		ToAgentID:     uintPtr(assignment.ToAgentID),
-		Reason:        assignment.Reason,
-		Notes:         assignment.Notes,
-		TransferredAt: assignment.AssignedAt,
+		SessionID:      assignment.SessionID,
+		FromAgentID:    assignment.FromAgentID,
+		ToAgentID:      uintPtr(assignment.ToAgentID),
+		Reason:         assignment.Reason,
+		Notes:          assignment.Notes,
+		SessionSummary: assignment.SessionSummary,
+		TransferredAt:  assignment.AssignedAt,
 	})
 	return nil
 }
@@ -139,15 +140,17 @@ func TestServiceAssignAgentPublishesEvents(t *testing.T) {
 
 	fromAgentID := uint(1)
 	got, err := svc.AssignAgent(context.Background(), AssignAgentCommand{
-		SessionID:   "sess-1",
-		AgentID:     9,
-		FromAgentID: &fromAgentID,
-		Reason:      "handoff",
+		SessionID:      "sess-1",
+		AgentID:        9,
+		FromAgentID:    &fromAgentID,
+		Reason:         "handoff",
+		SessionSummary: "summary",
+		AssignedAt:     now,
 	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if got.ToAgentID != 9 || got.FromAgentID == nil || *got.FromAgentID != 1 {
+	if got.ToAgentID != 9 || got.FromAgentID == nil || *got.FromAgentID != 1 || got.SessionSummary != "summary" || !got.AssignedAt.Equal(now) {
 		t.Fatalf("unexpected assignment dto: %+v", got)
 	}
 	if len(pub.events) != 2 || pub.events[0].Name() != RoutingAgentAssignedEventName || pub.events[1].Name() != RoutingTransferCompletedEventName {

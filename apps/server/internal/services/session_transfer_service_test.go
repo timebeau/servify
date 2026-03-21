@@ -9,6 +9,11 @@ import (
 	"testing"
 	"time"
 
+	routingapp "servify/apps/server/internal/modules/routing/application"
+	routingdelivery "servify/apps/server/internal/modules/routing/delivery"
+	routinginfra "servify/apps/server/internal/modules/routing/infra"
+	"servify/apps/server/internal/platform/eventbus"
+
 	"github.com/sirupsen/logrus"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -170,5 +175,54 @@ func TestSessionTransferService_ToHuman_AssignsAgent_RecordsTransfer(t *testing.
 	}
 	if ticket.Status != "assigned" {
 		t.Fatalf("expected ticket status assigned; got %s", ticket.Status)
+	}
+}
+
+func TestSessionTransferService_ToHuman_AssignsAgent_RecordsTransferViaRoutingAdapter(t *testing.T) {
+	db := newTestDBForSessionTransfer(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.WarnLevel)
+
+	if err := db.Create(&models.User{ID: 1, Username: "u1", Name: "u1", Email: "u1@example.com", Role: "customer"}).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	if err := db.Create(&models.User{ID: 2, Username: "a1", Name: "a1", Email: "a1@example.com", Role: "agent"}).Error; err != nil {
+		t.Fatalf("seed agent user: %v", err)
+	}
+	if err := db.Create(&models.Agent{UserID: 2, Status: "offline", MaxConcurrent: 5, CurrentLoad: 0}).Error; err != nil {
+		t.Fatalf("seed agent: %v", err)
+	}
+	if err := db.Create(&models.Session{ID: "s3", UserID: 1, Status: "active", Platform: "web", StartedAt: time.Now(), CreatedAt: time.Now(), UpdatedAt: time.Now()}).Error; err != nil {
+		t.Fatalf("seed session: %v", err)
+	}
+
+	agentSvc := NewAgentService(db, logger)
+	if err := agentSvc.AgentGoOnline(context.Background(), 2); err != nil {
+		t.Fatalf("AgentGoOnline: %v", err)
+	}
+
+	transferSvc := NewSessionTransferService(db, logger, stubAIForTransfer{}, agentSvc, nil)
+	bus := eventbus.NewInMemoryBus()
+	routingSvc := routingapp.NewService(routinginfra.NewGormRepository(db), bus)
+	transferSvc.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingSvc, bus))
+
+	res, err := transferSvc.TransferToHuman(context.Background(), &TransferRequest{
+		SessionID: "s3",
+		Reason:    "need help",
+		Notes:     "priority customer",
+	})
+	if err != nil {
+		t.Fatalf("TransferToHuman: %v", err)
+	}
+	if res.IsWaiting || res.NewAgentID != 2 || res.Summary != "summary" {
+		t.Fatalf("expected assigned to agent 2: %+v", res)
+	}
+
+	var tr models.TransferRecord
+	if err := db.Where("session_id = ?", "s3").First(&tr).Error; err != nil {
+		t.Fatalf("expected transfer record: %v", err)
+	}
+	if tr.ToAgentID == nil || *tr.ToAgentID != 2 || tr.SessionSummary != "summary" || tr.Notes != "priority customer" {
+		t.Fatalf("unexpected transfer record: %+v", tr)
 	}
 }

@@ -37,12 +37,16 @@ func (s *Service) AssignAgent(ctx context.Context, cmd AssignAgentCommand) (*Ass
 		return nil, fmt.Errorf("agent_id required")
 	}
 	item := &domain.Assignment{
-		SessionID:   cmd.SessionID,
-		FromAgentID: cmd.FromAgentID,
-		ToAgentID:   cmd.AgentID,
-		Reason:      strings.TrimSpace(cmd.Reason),
-		Notes:       strings.TrimSpace(cmd.Notes),
-		AssignedAt:  s.now(),
+		SessionID:      cmd.SessionID,
+		FromAgentID:    cmd.FromAgentID,
+		ToAgentID:      cmd.AgentID,
+		Reason:         strings.TrimSpace(cmd.Reason),
+		Notes:          strings.TrimSpace(cmd.Notes),
+		SessionSummary: strings.TrimSpace(cmd.SessionSummary),
+		AssignedAt:     cmd.AssignedAt,
+	}
+	if item.AssignedAt.IsZero() {
+		item.AssignedAt = s.now()
 	}
 	if err := s.repo.CreateAssignment(ctx, item); err != nil {
 		return nil, err

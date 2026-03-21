@@ -130,13 +130,14 @@ func (r *GormRepository) MarkQueueEntryTransferred(ctx context.Context, sessionI
 
 func mapTransferRecordModel(item domain.Assignment) models.TransferRecord {
 	return models.TransferRecord{
-		SessionID:     item.SessionID,
-		FromAgentID:   item.FromAgentID,
-		ToAgentID:     uintPtr(item.ToAgentID),
-		Reason:        item.Reason,
-		Notes:         item.Notes,
-		TransferredAt: item.AssignedAt,
-		CreatedAt:     item.AssignedAt,
+		SessionID:      item.SessionID,
+		FromAgentID:    item.FromAgentID,
+		ToAgentID:      uintPtr(item.ToAgentID),
+		Reason:         item.Reason,
+		Notes:          item.Notes,
+		SessionSummary: item.SessionSummary,
+		TransferredAt:  item.AssignedAt,
+		CreatedAt:      item.AssignedAt,
 	}
 }
 

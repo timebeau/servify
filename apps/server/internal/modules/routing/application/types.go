@@ -15,11 +15,13 @@ type RequestHumanHandoffCommand struct {
 }
 
 type AssignAgentCommand struct {
-	SessionID   string
-	AgentID     uint
-	FromAgentID *uint
-	Reason      string
-	Notes       string
+	SessionID      string
+	AgentID        uint
+	FromAgentID    *uint
+	Reason         string
+	Notes          string
+	SessionSummary string
+	AssignedAt     time.Time
 }
 
 type AddToWaitingQueueCommand struct {
@@ -42,12 +44,13 @@ type MarkWaitingTransferredCommand struct {
 }
 
 type AssignmentDTO struct {
-	SessionID   string    `json:"session_id"`
-	FromAgentID *uint     `json:"from_agent_id,omitempty"`
-	ToAgentID   uint      `json:"to_agent_id"`
-	Reason      string    `json:"reason,omitempty"`
-	Notes       string    `json:"notes,omitempty"`
-	AssignedAt  time.Time `json:"assigned_at"`
+	SessionID      string    `json:"session_id"`
+	FromAgentID    *uint     `json:"from_agent_id,omitempty"`
+	ToAgentID      uint      `json:"to_agent_id"`
+	Reason         string    `json:"reason,omitempty"`
+	Notes          string    `json:"notes,omitempty"`
+	SessionSummary string    `json:"session_summary,omitempty"`
+	AssignedAt     time.Time `json:"assigned_at"`
 }
 
 type TransferRecordDTO struct {
@@ -74,12 +77,13 @@ type QueueEntryDTO struct {
 
 func MapAssignment(item domain.Assignment) AssignmentDTO {
 	return AssignmentDTO{
-		SessionID:   item.SessionID,
-		FromAgentID: item.FromAgentID,
-		ToAgentID:   item.ToAgentID,
-		Reason:      item.Reason,
-		Notes:       item.Notes,
-		AssignedAt:  item.AssignedAt,
+		SessionID:      item.SessionID,
+		FromAgentID:    item.FromAgentID,
+		ToAgentID:      item.ToAgentID,
+		Reason:         item.Reason,
+		Notes:          item.Notes,
+		SessionSummary: item.SessionSummary,
+		AssignedAt:     item.AssignedAt,
 	}
 }
 
