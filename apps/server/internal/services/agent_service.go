@@ -21,10 +21,11 @@ import (
 //
 // 后续迁移中，HTTP 层应只依赖 modules/agent/delivery.HandlerService，而不是直接依赖此具体类型。
 type AgentService struct {
-	db           *gorm.DB
-	logger       *logrus.Logger
-	runtimeCache agentRuntimeCache
-	module       *agentapp.Service
+	db            *gorm.DB
+	logger        *logrus.Logger
+	runtimeCache  agentRuntimeCache
+	legacyRuntime *agentLegacyRuntimeAdapter
+	module        *agentapp.Service
 }
 
 type AgentServiceOptions struct {
@@ -44,10 +45,12 @@ func NewAgentServiceWithOptions(db *gorm.DB, logger *logrus.Logger, opts AgentSe
 	repo := agentinfra.NewGormRepository(db)
 	registry := agentinfra.NewInMemoryRegistry()
 	service := &AgentService{
-		db:     db,
-		logger: logger,
-		module: agentapp.NewService(repo, registry),
+		db:           db,
+		logger:       logger,
+		module:       agentapp.NewService(repo, registry),
+		runtimeCache: agentRuntimeCache{},
 	}
+	service.legacyRuntime = newAgentLegacyRuntimeAdapter(&service.runtimeCache)
 
 	if opts.StartRuntimeMaintenance {
 		go newAgentRuntimeMaintenance(logger, service.module, service.syncLegacyRuntime).Start()
@@ -150,7 +153,7 @@ func (s *AgentService) GetOnlineAgents(ctx context.Context) []*AgentInfo {
 }
 
 func (s *AgentService) GetOnlineAgent(userID uint) (*AgentInfo, bool) {
-	return s.runtimeCache.Load(userID)
+	return s.legacyRuntime.GetOnlineAgent(userID)
 }
 
 func (s *AgentService) GetAgentStats(ctx context.Context, agentID *uint) (*AgentStats, error) {
@@ -190,16 +193,7 @@ func (s *AgentService) ApplySessionTransfer(sessionID string, fromAgentID *uint,
 }
 
 func (s *AgentService) syncLegacyRuntime(ctx context.Context) {
-	runtimes := s.module.GetOnlineAgents(ctx)
-	active := make(map[uint]struct{}, len(runtimes))
-	for _, runtime := range runtimes {
-		active[runtime.UserID] = struct{}{}
-		s.runtimeCache.Store(runtime.UserID, mapRuntimeToLegacy(&runtime))
-	}
-	stale := s.runtimeCache.CollectStale(active)
-	for _, userID := range stale {
-		s.runtimeCache.Delete(userID)
-	}
+	s.legacyRuntime.Sync(ctx, s.module)
 }
 
 func mapRuntimeToLegacy(runtime *agentapp.AgentRuntimeDTO) *AgentInfo {
