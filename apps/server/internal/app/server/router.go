@@ -36,7 +36,6 @@ type Dependencies struct {
 	VoiceProtocolRegistry    *voiceprotocol.Registry
 	CustomerHandlerService   customerdelivery.HandlerService
 	AgentHandlerService      agentdelivery.HandlerService
-	AgentService             *services.AgentService
 	TicketHandlerService     ticketdelivery.HandlerService
 	TicketReaderService      *ticketdelivery.ReaderServiceAdapter
 	TransferHandlerService   routingdelivery.HandlerService

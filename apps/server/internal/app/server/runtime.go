@@ -51,7 +51,6 @@ type Runtime struct {
 	CustomerHandlerService   customerdelivery.HandlerService
 	CustomerService          *services.CustomerService
 	AgentHandlerService      agentdelivery.HandlerService
-	AgentService             *services.AgentService
 	TicketHandlerService     ticketdelivery.HandlerService
 	TicketReaderService      *ticketdelivery.ReaderServiceAdapter
 	TransferHandlerService   routingdelivery.HandlerService
@@ -136,15 +135,14 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	rt.CustomerService = services.NewCustomerService(db, logger)
 	rt.CustomerHandlerService = customerdelivery.NewHandlerServiceAdapter(rt.CustomerService)
 	agentAssembly := services.BuildAgentServiceAssembly(db, logger)
-	rt.AgentService = agentAssembly.Service
-	rt.AgentHandlerService = rt.AgentService
+	rt.AgentHandlerService = agentAssembly.Service
 	go agentAssembly.Maintenance.Start()
 
 	ticketService := services.NewTicketService(db, logger, rt.SLAService)
 	ticketService.SetEventBus(bus)
 	ticketService.SetAutomationService(rt.AutomationService)
 
-	rt.TransferService = services.NewSessionTransferService(db, logger, rt.AIService, rt.AgentService, rt.WSHub)
+	rt.TransferService = services.NewSessionTransferService(db, logger, rt.AIService, agentAssembly.Service, rt.WSHub)
 	rt.TransferService.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingService, bus))
 	rt.TransferService.SetTicketRuntime(ticketdelivery.NewRuntimeAdapter(bus))
 	rt.TransferService.SetConversationRuntime(conversationdelivery.NewRuntimeAdapter(bus))
@@ -159,7 +157,7 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	ticketService.SetSatisfactionService(rt.SatisfactionService)
 
 	rt.ShiftService = services.NewShiftService(db, logger)
-	rt.WorkspaceService = services.NewWorkspaceService(db, rt.AgentService)
+	rt.WorkspaceService = services.NewWorkspaceService(db, agentAssembly.Service)
 	rt.MacroService = services.NewMacroService(db)
 	rt.AppIntegrationService = services.NewAppIntegrationService(db, logger)
 	rt.CustomFieldService = services.NewCustomFieldService(db)
@@ -200,7 +198,6 @@ func (rt *Runtime) RouterDependencies() Dependencies {
 		VoiceProtocolRegistry:    rt.VoiceProtocolRegistry,
 		CustomerHandlerService:   rt.CustomerHandlerService,
 		AgentHandlerService:      rt.AgentHandlerService,
-		AgentService:             rt.AgentService,
 		TicketHandlerService:     rt.TicketHandlerService,
 		TicketReaderService:      rt.TicketReaderService,
 		TransferHandlerService:   rt.TransferHandlerService,
