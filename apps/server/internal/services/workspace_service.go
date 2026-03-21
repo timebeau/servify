@@ -13,10 +13,14 @@ import (
 // WorkspaceService 汇总全渠道代理工作台数据
 type WorkspaceService struct {
 	db           *gorm.DB
-	agentService *AgentService
+	agentService workspaceAgentReader
 }
 
-func NewWorkspaceService(db *gorm.DB, agentService *AgentService) *WorkspaceService {
+type workspaceAgentReader interface {
+	GetOnlineAgents(ctx context.Context) []*AgentInfo
+}
+
+func NewWorkspaceService(db *gorm.DB, agentService workspaceAgentReader) *WorkspaceService {
 	return &WorkspaceService{
 		db:           db,
 		agentService: agentService,

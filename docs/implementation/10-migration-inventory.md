@@ -17,6 +17,7 @@
   - 核心读写已走 `modules/agent/application.Service`
   - handler-facing DTO 与 transfer runtime contract 已回收到 `modules/agent/delivery`
   - `agentQueues` 已移除；剩余在线客服兼容缓存回填、后台清理调度与 service 装配已拆成独立 runtime helper/adapter/assembly，且后台任务只在 server runtime 装配点显式启动
+  - `workspace` / `session transfer` 等下游 service 已改为依赖窄接口，而不再直接绑定 `*AgentService`
   - 当前规则：HTTP handler 应依赖 `modules/agent/delivery.HandlerService`
   - 结论：属于“module 已落地，但 runtime 兼容状态尚未收口”的类型
 

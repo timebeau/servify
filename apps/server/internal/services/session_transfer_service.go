@@ -22,7 +22,7 @@ type SessionTransferService struct {
 	db           *gorm.DB
 	logger       *logrus.Logger
 	aiService    AIServiceInterface
-	agentService *AgentService
+	agentService sessionTransferAgentRuntime
 	wsHub        *WebSocketHub
 	routing      routingdelivery.RuntimeService
 	tickets      ticketdelivery.RuntimeService
@@ -30,12 +30,18 @@ type SessionTransferService struct {
 	agents       agentdelivery.RuntimeService
 }
 
+type sessionTransferAgentRuntime interface {
+	FindAvailableAgent(ctx context.Context, skills []string, priority string) (*AgentInfo, error)
+	GetOnlineAgent(userID uint) (*AgentInfo, bool)
+	ApplySessionTransfer(sessionID string, fromAgentID *uint, toAgentID uint)
+}
+
 // NewSessionTransferService 创建会话转接服务
 func NewSessionTransferService(
 	db *gorm.DB,
 	logger *logrus.Logger,
 	aiService AIServiceInterface,
-	agentService *AgentService,
+	agentService sessionTransferAgentRuntime,
 	wsHub *WebSocketHub,
 ) *SessionTransferService {
 	if logger == nil {
