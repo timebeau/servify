@@ -22,8 +22,7 @@ type RealtimeRuntime struct {
 	DB               *gorm.DB
 	AIService        services.AIServiceInterface
 	AIHandlerService aidelivery.HandlerService
-	WSHub            *services.WebSocketHub
-	WebRTCService    *services.WebRTCService
+	wsRuntime        websocketRunner
 	RealtimeGateway  realtimeplatform.RealtimeGateway
 	RTCGateway       realtimeplatform.RTCGateway
 	MessageRouter    services.MessageRouterRuntime
@@ -46,8 +45,7 @@ func BuildRealtimeRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB
 		DB:               db,
 		AIService:        ai,
 		AIHandlerService: handlerAI,
-		WSHub:            wsHub,
-		WebRTCService:    webrtcService,
+		wsRuntime:        wsHub,
 		RealtimeGateway:  realtimeplatform.NewWebSocketAdapter(wsHub),
 		RTCGateway:       realtimeplatform.NewWebRTCAdapter(webrtcService),
 		MessageRouter:    services.NewMessageRouter(ai, wsHub, db),
@@ -55,7 +53,9 @@ func BuildRealtimeRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB
 }
 
 func (rt *RealtimeRuntime) Start() error {
-	go rt.WSHub.Run()
+	if rt.wsRuntime != nil {
+		go rt.wsRuntime.Run()
+	}
 	return rt.MessageRouter.Start()
 }
 

@@ -58,6 +58,10 @@
   - 现已抽出 `services.MessageRouterRuntime`，`app/server` 与 `handlers.MessageHandler` 不再暴露 concrete `*services.MessageRouter`
   - `MetricsHandler` 的无用 message router 注入已移除
 
+- `realtime runtime internals`
+  - `WebSocketHub` / `WebRTCService` 属于运行态装配细节，不应继续作为 `Runtime` / `RealtimeRuntime` 的公开 concrete 字段暴露
+  - 现已收口为内部 `Run()` 启动依赖与 gateway adapter 装配细节，外部只保留 `RealtimeGateway` / `RTCGateway` / `MessageRouterRuntime`
+
 - `sla`
   - `SLAHandler` 早已在内部按最小方法集工作，但此前 `app/server` 顶层装配仍暴露 `*services.SLAService`
   - 现已把 handler contract 显式提升为 `handlers.SLAService` / `handlers.SLATicketReader`

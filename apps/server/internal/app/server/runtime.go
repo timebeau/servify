@@ -43,7 +43,7 @@ type Runtime struct {
 
 	AIService                services.AIServiceInterface
 	AIHandlerService         aidelivery.HandlerService
-	WSHub                    *services.WebSocketHub
+	wsRuntime                websocketRunner
 	RealtimeGateway          realtimeplatform.RealtimeGateway
 	RTCGateway               realtimeplatform.RTCGateway
 	MessageRouter            services.MessageRouterRuntime
@@ -68,6 +68,10 @@ type Runtime struct {
 	GamificationService      handlers.GamificationService
 }
 
+type websocketRunner interface {
+	Run()
+}
+
 // BuildRuntime wires the current modular-monolith runtime behind an explicit assembly boundary.
 func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus eventbus.Bus) (*Runtime, error) {
 	rt := &Runtime{
@@ -84,22 +88,23 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	rt.AIService = aiAssembly.RuntimeService
 	rt.AIHandlerService = aiAssembly.Service
 
-	rt.WSHub = services.NewWebSocketHub()
-	rt.RealtimeGateway = realtimeplatform.NewWebSocketAdapter(rt.WSHub)
-	rt.WSHub.SetDB(db)
+	wsHub := services.NewWebSocketHub()
+	rt.wsRuntime = wsHub
+	rt.RealtimeGateway = realtimeplatform.NewWebSocketAdapter(wsHub)
+	wsHub.SetDB(db)
 
 	conversationRepo := conversationinfra.NewGormRepository(db)
 	conversationService := conversationapp.NewService(conversationRepo, bus)
-	rt.WSHub.SetConversationMessageWriter(conversationdelivery.NewWebSocketMessageAdapter(conversationService))
+	wsHub.SetConversationMessageWriter(conversationdelivery.NewWebSocketMessageAdapter(conversationService))
 
 	routingRepo := routinginfra.NewGormRepository(db)
 	routingService := routingapp.NewService(routingRepo, bus)
 
-	webrtcService := services.NewWebRTCService(cfg.WebRTC.STUNServer, rt.WSHub)
+	webrtcService := services.NewWebRTCService(cfg.WebRTC.STUNServer, wsHub)
 	rt.RTCGateway = realtimeplatform.NewWebRTCAdapter(webrtcService)
 
-	rt.MessageRouter = services.NewMessageRouter(rt.AIService, rt.WSHub, db)
-	rt.WSHub.SetAIService(rt.AIService)
+	rt.MessageRouter = services.NewMessageRouter(rt.AIService, wsHub, db)
+	wsHub.SetAIService(rt.AIService)
 
 	voiceService := voiceapp.NewService(voiceinfra.NewInMemoryRepository(), bus)
 	recordingService := voiceapp.NewRecordingService(
@@ -139,7 +144,7 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	ticketService.SetEventBus(bus)
 	ticketService.SetAutomationService(automationService)
 
-	transferService := services.NewSessionTransferService(db, logger, rt.AIService, agentAssembly.Service, rt.WSHub)
+	transferService := services.NewSessionTransferService(db, logger, rt.AIService, agentAssembly.Service, wsHub)
 	transferService.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingService, bus))
 	transferService.SetTicketRuntime(ticketdelivery.NewRuntimeAdapter(bus))
 	transferService.SetConversationRuntime(conversationdelivery.NewRuntimeAdapter(bus))
@@ -166,12 +171,14 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	rt.TicketHandlerService = ticketdelivery.NewHandlerServiceAdapter(db, ticketService.ModuleCommandService(), ticketService.Orchestrator())
 	rt.TicketReaderService = ticketdelivery.NewReaderServiceAdapter(db)
 
-	rt.WSHub.SetSessionTransferService(transferService)
+	wsHub.SetSessionTransferService(transferService)
 	return rt, nil
 }
 
 func (rt *Runtime) Start() error {
-	go rt.WSHub.Run()
+	if rt.wsRuntime != nil {
+		go rt.wsRuntime.Run()
+	}
 	return rt.MessageRouter.Start()
 }
 
