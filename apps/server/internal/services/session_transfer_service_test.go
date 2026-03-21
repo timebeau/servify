@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	conversationdelivery "servify/apps/server/internal/modules/conversation/delivery"
 	routingapp "servify/apps/server/internal/modules/routing/application"
 	routingdelivery "servify/apps/server/internal/modules/routing/delivery"
 	routinginfra "servify/apps/server/internal/modules/routing/infra"
@@ -123,6 +124,7 @@ func TestSessionTransferService_ToHuman_NoAgents_GoesWaitingViaRoutingAdapter(t 
 	routingSvc := routingapp.NewService(routinginfra.NewGormRepository(db), bus)
 	transferSvc.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingSvc, bus))
 	transferSvc.SetTicketRuntime(ticketdelivery.NewRuntimeAdapter(bus))
+	transferSvc.SetConversationRuntime(conversationdelivery.NewRuntimeAdapter(bus))
 
 	res, err := transferSvc.TransferToHuman(context.Background(), &TransferRequest{
 		SessionID:    "s-routing-wait",
@@ -276,6 +278,14 @@ func TestSessionTransferService_ToHuman_AssignsAgent_RecordsTransferViaRoutingAd
 	}
 	if tr.ToAgentID == nil || *tr.ToAgentID != 2 || tr.SessionSummary != "summary" || tr.Notes != "priority customer" {
 		t.Fatalf("unexpected transfer record: %+v", tr)
+	}
+
+	var sess models.Session
+	if err := db.First(&sess, "id = ?", "s3").Error; err != nil {
+		t.Fatalf("load session: %v", err)
+	}
+	if sess.AgentID == nil || *sess.AgentID != 2 || sess.Status != "active" || sess.EndedAt != nil {
+		t.Fatalf("unexpected session after transfer: %+v", sess)
 	}
 
 	var ticket models.Ticket

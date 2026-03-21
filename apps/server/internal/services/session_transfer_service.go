@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"servify/apps/server/internal/models"
+	conversationdelivery "servify/apps/server/internal/modules/conversation/delivery"
 	routingcontract "servify/apps/server/internal/modules/routing/contract"
 	routingdelivery "servify/apps/server/internal/modules/routing/delivery"
 	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
@@ -24,6 +25,7 @@ type SessionTransferService struct {
 	wsHub        *WebSocketHub
 	routing      routingdelivery.RuntimeService
 	tickets      ticketdelivery.RuntimeService
+	conversation conversationdelivery.RuntimeService
 }
 
 // NewSessionTransferService 创建会话转接服务
@@ -150,7 +152,11 @@ func (s *SessionTransferService) executeTransfer(ctx context.Context, session *m
 	// 原子化：会话指派 + 工时负载 + 记录/消息
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
 		// 更新会话：active/ended；是否分配由 agent_id 判断
-		if err := tx.Model(&models.Session{}).
+		if s.conversation != nil {
+			if err := s.conversation.SyncTransferAssignment(ctx, tx, session.ID, session.UserID, targetAgentID); err != nil {
+				return fmt.Errorf("update session: %w", err)
+			}
+		} else if err := tx.Model(&models.Session{}).
 			Where("id = ?", session.ID).
 			Updates(map[string]interface{}{
 				"agent_id": targetAgentID,
@@ -594,6 +600,10 @@ func (s *SessionTransferService) SetRoutingAdapter(adapter routingdelivery.Runti
 
 func (s *SessionTransferService) SetTicketRuntime(adapter ticketdelivery.RuntimeService) {
 	s.tickets = adapter
+}
+
+func (s *SessionTransferService) SetConversationRuntime(adapter conversationdelivery.RuntimeService) {
+	s.conversation = adapter
 }
 
 // AutoTransferCheck 自动转接检查
