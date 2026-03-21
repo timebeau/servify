@@ -39,9 +39,8 @@ type Dependencies struct {
 	TicketHandlerService     ticketdelivery.HandlerService
 	TicketReaderService      *ticketdelivery.ReaderServiceAdapter
 	TransferHandlerService   routingdelivery.HandlerService
-	TransferService          *services.SessionTransferService
 	SatisfactionService      *services.SatisfactionService
-	WorkspaceService         *services.WorkspaceService
+	WorkspaceService         services.WorkspaceOverviewReader
 	MacroService             *services.MacroService
 	AppIntegrationService    *services.AppIntegrationService
 	CustomFieldService       *services.CustomFieldService

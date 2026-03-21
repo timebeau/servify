@@ -54,9 +54,8 @@ type Runtime struct {
 	TicketHandlerService     ticketdelivery.HandlerService
 	TicketReaderService      *ticketdelivery.ReaderServiceAdapter
 	TransferHandlerService   routingdelivery.HandlerService
-	TransferService          *services.SessionTransferService
 	SatisfactionService      *services.SatisfactionService
-	WorkspaceService         *services.WorkspaceService
+	WorkspaceService         services.WorkspaceOverviewReader
 	MacroService             *services.MacroService
 	AppIntegrationService    *services.AppIntegrationService
 	CustomFieldService       *services.CustomFieldService
@@ -142,12 +141,12 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	ticketService.SetEventBus(bus)
 	ticketService.SetAutomationService(rt.AutomationService)
 
-	rt.TransferService = services.NewSessionTransferService(db, logger, rt.AIService, agentAssembly.Service, rt.WSHub)
-	rt.TransferService.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingService, bus))
-	rt.TransferService.SetTicketRuntime(ticketdelivery.NewRuntimeAdapter(bus))
-	rt.TransferService.SetConversationRuntime(conversationdelivery.NewRuntimeAdapter(bus))
-	rt.TransferService.SetAgentRuntime(agentdelivery.NewTransferRuntimeAdapter())
-	rt.TransferHandlerService = rt.TransferService
+	transferService := services.NewSessionTransferService(db, logger, rt.AIService, agentAssembly.Service, rt.WSHub)
+	transferService.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingService, bus))
+	transferService.SetTicketRuntime(ticketdelivery.NewRuntimeAdapter(bus))
+	transferService.SetConversationRuntime(conversationdelivery.NewRuntimeAdapter(bus))
+	transferService.SetAgentRuntime(agentdelivery.NewTransferRuntimeAdapter())
+	rt.TransferHandlerService = transferService
 
 	rt.StatisticsService = services.NewStatisticsService(db, logger)
 	rt.StatisticsService.SetEventBus(bus)
@@ -168,7 +167,7 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	rt.TicketHandlerService = ticketdelivery.NewHandlerServiceAdapter(db, ticketService.ModuleCommandService(), ticketService.Orchestrator())
 	rt.TicketReaderService = ticketdelivery.NewReaderServiceAdapter(db)
 
-	rt.WSHub.SetSessionTransferService(rt.TransferService)
+	rt.WSHub.SetSessionTransferService(transferService)
 	return rt, nil
 }
 
@@ -201,7 +200,6 @@ func (rt *Runtime) RouterDependencies() Dependencies {
 		TicketHandlerService:     rt.TicketHandlerService,
 		TicketReaderService:      rt.TicketReaderService,
 		TransferHandlerService:   rt.TransferHandlerService,
-		TransferService:          rt.TransferService,
 		SatisfactionService:      rt.SatisfactionService,
 		WorkspaceService:         rt.WorkspaceService,
 		MacroService:             rt.MacroService,

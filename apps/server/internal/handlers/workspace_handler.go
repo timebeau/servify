@@ -11,10 +11,10 @@ import (
 
 // WorkspaceHandler 全渠道工作台
 type WorkspaceHandler struct {
-	service *services.WorkspaceService
+	service services.WorkspaceOverviewReader
 }
 
-func NewWorkspaceHandler(service *services.WorkspaceService) *WorkspaceHandler {
+func NewWorkspaceHandler(service services.WorkspaceOverviewReader) *WorkspaceHandler {
 	return &WorkspaceHandler{service: service}
 }
 

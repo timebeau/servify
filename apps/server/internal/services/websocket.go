@@ -41,7 +41,7 @@ type WebSocketHub struct {
 	// 可选：用于直接在WS层调用AI服务（未设置时则仅广播）
 	aiService AIServiceInterface
 	// 可选：用于触发“转人工”流程（未设置则仅返回提示）
-	transferService *SessionTransferService
+	transferService SessionTransferRuntime
 	// 可选：用于将文本消息落库（如未设置则仅记录日志）
 	db *gorm.DB
 	// 优先使用 conversation 模块适配器持久化消息
@@ -71,7 +71,7 @@ func (h *WebSocketHub) SetAIService(ai AIServiceInterface) {
 }
 
 // SetSessionTransferService 为 WebSocketHub 注入会话转接服务（可选）
-func (h *WebSocketHub) SetSessionTransferService(svc *SessionTransferService) {
+func (h *WebSocketHub) SetSessionTransferService(svc SessionTransferRuntime) {
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 	h.transferService = svc

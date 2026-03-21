@@ -36,6 +36,10 @@ type sessionTransferAgentRuntime interface {
 	ApplySessionTransfer(sessionID string, fromAgentID *uint, toAgentID uint)
 }
 
+type SessionTransferRuntime interface {
+	TransferToHuman(ctx context.Context, req *TransferRequest) (*TransferResult, error)
+}
+
 // NewSessionTransferService 创建会话转接服务
 func NewSessionTransferService(
 	db *gorm.DB,

@@ -16,6 +16,10 @@ type WorkspaceService struct {
 	agentService workspaceAgentReader
 }
 
+type WorkspaceOverviewReader interface {
+	GetOverview(ctx context.Context, limit int) (*WorkspaceOverview, error)
+}
+
 type workspaceAgentReader interface {
 	GetOnlineAgents(ctx context.Context) []*AgentInfo
 }
