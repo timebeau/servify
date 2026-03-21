@@ -7,7 +7,6 @@ import (
 	"servify/apps/server/internal/models"
 	agentapp "servify/apps/server/internal/modules/agent/application"
 	agentdelivery "servify/apps/server/internal/modules/agent/delivery"
-	agentinfra "servify/apps/server/internal/modules/agent/infra"
 
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
@@ -23,37 +22,30 @@ import (
 type AgentService struct {
 	db            *gorm.DB
 	logger        *logrus.Logger
-	runtimeCache  agentRuntimeCache
 	legacyRuntime *agentLegacyRuntimeAdapter
 	module        *agentapp.Service
 }
 
-type AgentServiceOptions struct {
-	StartRuntimeMaintenance bool
-}
-
 // NewAgentService 创建人工客服服务。
 func NewAgentService(db *gorm.DB, logger *logrus.Logger) *AgentService {
-	return NewAgentServiceWithOptions(db, logger, AgentServiceOptions{})
+	return BuildAgentServiceAssembly(db, logger).Service
 }
 
-func NewAgentServiceWithOptions(db *gorm.DB, logger *logrus.Logger, opts AgentServiceOptions) *AgentService {
+func NewAgentServiceWithDependencies(deps AgentServiceDependencies) *AgentService {
+	logger := deps.Logger
 	if logger == nil {
 		logger = logrus.New()
 	}
 
-	repo := agentinfra.NewGormRepository(db)
-	registry := agentinfra.NewInMemoryRegistry()
 	service := &AgentService{
-		db:           db,
-		logger:       logger,
-		module:       agentapp.NewService(repo, registry),
-		runtimeCache: agentRuntimeCache{},
+		db:            deps.DB,
+		logger:        logger,
+		module:        deps.Module,
+		legacyRuntime: deps.LegacyRuntime,
 	}
-	service.legacyRuntime = newAgentLegacyRuntimeAdapter(&service.runtimeCache)
-
-	if opts.StartRuntimeMaintenance {
-		go newAgentRuntimeMaintenance(logger, service.module, service.syncLegacyRuntime).Start()
+	if service.legacyRuntime == nil {
+		cache := &agentRuntimeCache{}
+		service.legacyRuntime = newAgentLegacyRuntimeAdapter(cache)
 	}
 	return service
 }
