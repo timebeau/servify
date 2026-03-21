@@ -60,7 +60,7 @@ type Runtime struct {
 	AppIntegrationService    handlers.AppMarketService
 	CustomFieldService       handlers.CustomFieldService
 	StatisticsHandlerService analyticsdelivery.HandlerService
-	SLAService               *services.SLAService
+	SLAService               handlers.SLAService
 	ShiftService             handlers.ShiftService
 	AutomationHandlerService automationdelivery.HandlerService
 	KnowledgeDocHandler      knowledgedelivery.HandlerService
@@ -122,11 +122,12 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	_ = rt.VoiceProtocolRegistry.RegisterMedia(voicedelivery.NewRTPAdapter())
 	_ = rt.VoiceProtocolRegistry.RegisterMedia(voicedelivery.NewSRTPAdapter())
 
-	rt.SLAService = services.NewSLAService(db, logger)
+	slaService := services.NewSLAService(db, logger)
+	rt.SLAService = slaService
 	automationService := services.NewAutomationService(db, logger)
 	rt.AutomationHandlerService = services.NewAutomationHandlerAdapter(automationService)
 	automationService.SetEventBus(bus)
-	rt.SLAService.SetAutomationService(automationService)
+	slaService.SetAutomationService(automationService)
 
 	customerService := services.NewCustomerService(db, logger)
 	rt.CustomerHandlerService = customerdelivery.NewHandlerServiceAdapter(customerService)
@@ -134,7 +135,7 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	rt.AgentHandlerService = agentAssembly.Service
 	go agentAssembly.Maintenance.Start()
 
-	ticketService := services.NewTicketService(db, logger, rt.SLAService)
+	ticketService := services.NewTicketService(db, logger, slaService)
 	ticketService.SetEventBus(bus)
 	ticketService.SetAutomationService(automationService)
 

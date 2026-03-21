@@ -57,6 +57,11 @@
   - 现已抽出 `services.MessageRouterRuntime`，`app/server` 与 `handlers.MessageHandler` 不再暴露 concrete `*services.MessageRouter`
   - `MetricsHandler` 的无用 message router 注入已移除
 
+- `sla`
+  - `SLAHandler` 早已在内部按最小方法集工作，但此前 `app/server` 顶层装配仍暴露 `*services.SLAService`
+  - 现已把 handler contract 显式提升为 `handlers.SLAService` / `handlers.SLATicketReader`
+  - `ticketdelivery.ReaderServiceAdapter` 直接复用为工单读取依赖，顶层 runtime/router 不再暴露 concrete `*services.SLAService`
+
 - `customer`
   - `services/CustomerService` 已经是 `modules/customer/application.Service` 的轻量 facade
   - HTTP handler 只消费请求/响应 DTO 与兼容方法，核心业务已经下沉到 module application + infra repository

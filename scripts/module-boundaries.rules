@@ -19,6 +19,7 @@ handler|CSAT public|apps/server/internal/handlers/csat_public_handler.go|service
 handler|Shift|apps/server/internal/handlers/shift_handler.go|shiftService|ShiftService|func NewShiftHandler\(shiftService ShiftService\)|\*services\.ShiftService
 handler|Suggestion|apps/server/internal/handlers/suggestion_handler.go|service|SuggestionService|func NewSuggestionHandler\(service SuggestionService\)|\*services\.SuggestionService
 handler|Gamification|apps/server/internal/handlers/gamification_handler.go|service|GamificationService|func NewGamificationHandler\(service GamificationService\)|\*services\.GamificationService
+handler|SLA|apps/server/internal/handlers/sla_handler.go|slaService|SLAService|func NewSLAHandler\(slaService SLAService, ticketService SLATicketReader\)|\*services\.SLAService
 
 runtime|customer handlers|CustomerHandlerService|customerdelivery\.HandlerService
 runtime|automation handlers|AutomationHandlerService|automationdelivery\.HandlerService
@@ -55,12 +56,17 @@ require|apps/server/internal/app/server/runtime.go|SuggestionService[[:space:]]+
 require|apps/server/internal/app/server/router.go|SuggestionService[[:space:]]+handlers\.SuggestionService|Router dependencies must expose suggestions via handlers.SuggestionService.
 require|apps/server/internal/app/server/runtime.go|GamificationService[[:space:]]+handlers\.GamificationService|Runtime must expose gamification via handlers.GamificationService.
 require|apps/server/internal/app/server/router.go|GamificationService[[:space:]]+handlers\.GamificationService|Router dependencies must expose gamification via handlers.GamificationService.
+require|apps/server/internal/app/server/runtime.go|SLAService[[:space:]]+handlers\.SLAService|Runtime must expose SLA via handlers.SLAService.
+require|apps/server/internal/app/server/router.go|SLAService[[:space:]]+handlers\.SLAService|Router dependencies must expose SLA via handlers.SLAService.
 require|apps/server/internal/services/websocket.go|transferService[[:space:]]+SessionTransferRuntime|WebSocket hub must store the session transfer runtime interface.
 require|apps/server/internal/services/websocket.go|func \(h \*WebSocketHub\) SetSessionTransferService\(svc SessionTransferRuntime\)|WebSocket hub must accept the session transfer runtime interface.
 require|apps/server/internal/handlers/workspace_handler.go|service[[:space:]]+services\.WorkspaceOverviewReader|Workspace handler must store WorkspaceOverviewReader.
 require|apps/server/internal/handlers/workspace_handler.go|func NewWorkspaceHandler\(service services\.WorkspaceOverviewReader\)|Workspace handler constructor must accept WorkspaceOverviewReader.
 require|apps/server/internal/handlers/handlers.go|messageRouter[[:space:]]+services\.MessageRouterRuntime|Message handler must store services.MessageRouterRuntime.
 require|apps/server/internal/handlers/handlers.go|func NewMessageHandler\(messageRouter services\.MessageRouterRuntime\)|Message handler constructor must accept services.MessageRouterRuntime.
+require|apps/server/internal/handlers/sla_handler.go|slaService[[:space:]]+SLAService|SLA handler must store the exported SLAService contract.
+require|apps/server/internal/handlers/sla_handler.go|ticketService[[:space:]]+SLATicketReader|SLA handler must store the exported SLATicketReader contract.
+require|apps/server/internal/handlers/sla_handler.go|func NewSLAHandler\(slaService SLAService, ticketService SLATicketReader\)|SLA handler constructor must accept exported SLA contracts.
 forbid|apps/server/internal/app/server/runtime.go|CustomerService[[:space:]]+\*services\.CustomerService|Runtime must not expose concrete CustomerService.
 forbid|apps/server/internal/app/server/runtime.go|AutomationService[[:space:]]+\*services\.AutomationService|Runtime must not expose concrete AutomationService.
 forbid|apps/server/internal/app/server/runtime.go|StatisticsService[[:space:]]+\*services\.StatisticsService|Runtime must not expose concrete StatisticsService.
@@ -84,7 +90,11 @@ forbid|apps/server/internal/app/server/runtime.go|SuggestionService[[:space:]]+\
 forbid|apps/server/internal/app/server/router.go|SuggestionService[[:space:]]+\*services\.SuggestionService|Router dependencies must not expose concrete SuggestionService.
 forbid|apps/server/internal/app/server/runtime.go|GamificationService[[:space:]]+\*services\.GamificationService|Runtime must not expose concrete GamificationService.
 forbid|apps/server/internal/app/server/router.go|GamificationService[[:space:]]+\*services\.GamificationService|Router dependencies must not expose concrete GamificationService.
+forbid|apps/server/internal/app/server/runtime.go|SLAService[[:space:]]+\*services\.SLAService|Runtime must not expose concrete SLAService.
+forbid|apps/server/internal/app/server/router.go|SLAService[[:space:]]+\*services\.SLAService|Router dependencies must not expose concrete SLAService.
 forbid|apps/server/internal/handlers/workspace_handler.go|service[[:space:]]+\*services\.WorkspaceService|Workspace handler must not depend on concrete WorkspaceService.
 forbid|apps/server/internal/services/websocket.go|transferService[[:space:]]+\*SessionTransferService|WebSocket hub must not store concrete SessionTransferService.
 forbid|apps/server/internal/app/server/realtime_runtime.go|MessageRouter[[:space:]]+\*services\.MessageRouter|Realtime runtime must not expose concrete MessageRouter.
 forbid|apps/server/internal/handlers/handlers.go|messageRouter[[:space:]]+\*services\.MessageRouter|Message handler must not depend on concrete MessageRouter.
+forbid|apps/server/internal/handlers/sla_handler.go|slaService[[:space:]]+slaHandlerSLAService|SLA handler must not keep private slaHandlerSLAService wiring.
+forbid|apps/server/internal/handlers/sla_handler.go|ticketService[[:space:]]+slaHandlerTicketService|SLA handler must not keep private slaHandlerTicketService wiring.

@@ -16,15 +16,15 @@ import (
 // @Summary SLA配置管理
 // @Tags SLA
 type SLAHandler struct {
-	slaService    slaHandlerSLAService
-	ticketService slaHandlerTicketService
+	slaService    SLAService
+	ticketService SLATicketReader
 }
 
-type slaHandlerTicketService interface {
+type SLATicketReader interface {
 	GetTicketByID(ctx context.Context, ticketID uint) (*models.Ticket, error)
 }
 
-type slaHandlerSLAService interface {
+type SLAService interface {
 	CreateSLAConfig(ctx context.Context, req *services.SLAConfigCreateRequest) (*models.SLAConfig, error)
 	GetSLAConfig(ctx context.Context, id uint) (*models.SLAConfig, error)
 	ListSLAConfigs(ctx context.Context, req *services.SLAConfigListRequest) ([]models.SLAConfig, int64, error)
@@ -38,7 +38,7 @@ type slaHandlerSLAService interface {
 }
 
 // NewSLAHandler 创建SLA处理器
-func NewSLAHandler(slaService slaHandlerSLAService, ticketService slaHandlerTicketService) *SLAHandler {
+func NewSLAHandler(slaService SLAService, ticketService SLATicketReader) *SLAHandler {
 	return &SLAHandler{
 		slaService:    slaService,
 		ticketService: ticketService,
