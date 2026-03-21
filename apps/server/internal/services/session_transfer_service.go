@@ -21,7 +21,7 @@ type SessionTransferService struct {
 	aiService    AIServiceInterface
 	agentService *AgentService
 	wsHub        *WebSocketHub
-	routing      *routingdelivery.SessionTransferAdapter
+	routing      routingdelivery.RuntimeService
 }
 
 // NewSessionTransferService 创建会话转接服务
@@ -569,7 +569,7 @@ func (s *SessionTransferService) CancelWaitingRecord(ctx context.Context, sessio
 	})
 }
 
-func (s *SessionTransferService) SetRoutingAdapter(adapter *routingdelivery.SessionTransferAdapter) {
+func (s *SessionTransferService) SetRoutingAdapter(adapter routingdelivery.RuntimeService) {
 	s.routing = adapter
 }
 
