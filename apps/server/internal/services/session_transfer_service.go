@@ -219,19 +219,12 @@ func (s *SessionTransferService) executeTransfer(ctx context.Context, session *m
 			return fmt.Errorf("create transfer record: %w", err)
 		}
 
-		// 若会话此前在等待队列中，则标记为已分配
-		_ = tx.Model(&models.WaitingRecord{}).
-			Where("session_id = ? AND status = ?", session.ID, "waiting").
-			Updates(map[string]interface{}{
-				"status":      "transferred",
-				"assigned_at": transferAt,
-				"assigned_to": targetAgentID,
-			}).Error
-
 		return nil
 	}); err != nil {
 		return nil, err
 	}
+
+	s.syncWaitingTransferred(ctx, session.ID, targetAgentID, transferAt)
 
 	// 更新内存状态（在线客服负载/会话映射），避免与 DB 状态长期漂移
 	if s.agentService != nil {
@@ -394,6 +387,23 @@ func (s *SessionTransferService) loadWaitingQueue(ctx context.Context, limit int
 		return nil, fmt.Errorf("failed to get waiting records: %w", err)
 	}
 	return waitingRecords, nil
+}
+
+func (s *SessionTransferService) syncWaitingTransferred(ctx context.Context, sessionID string, agentID uint, assignedAt time.Time) {
+	if s.routing != nil {
+		if _, err := s.routing.MarkWaitingTransferred(ctx, sessionID, agentID, assignedAt); err != nil && err != gorm.ErrRecordNotFound {
+			s.logger.Warnf("Failed to sync waiting status for session %s through routing module: %v", sessionID, err)
+		}
+		return
+	}
+
+	_ = s.db.Model(&models.WaitingRecord{}).
+		Where("session_id = ? AND status = ?", sessionID, "waiting").
+		Updates(map[string]interface{}{
+			"status":      "transferred",
+			"assigned_at": assignedAt,
+			"assigned_to": agentID,
+		}).Error
 }
 
 func (s *SessionTransferService) getActiveWaitingRecord(ctx context.Context, sessionID string) (*models.WaitingRecord, error) {
