@@ -309,3 +309,72 @@ func TestSessionTransferService_CancelWaitingRecord_ViaRoutingAdapter(t *testing
 		t.Fatalf("unexpected waiting record after cancel: %+v", waiting)
 	}
 }
+
+func TestSessionTransferService_ProcessWaitingQueue_TransfersWaitingViaRoutingAdapter(t *testing.T) {
+	db := newTestDBForSessionTransfer(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.WarnLevel)
+
+	if err := db.Create(&models.User{ID: 1, Username: "u1", Name: "u1", Email: "u1@example.com", Role: "customer"}).Error; err != nil {
+		t.Fatalf("seed customer: %v", err)
+	}
+	if err := db.Create(&models.User{ID: 2, Username: "a1", Name: "a1", Email: "a1@example.com", Role: "agent"}).Error; err != nil {
+		t.Fatalf("seed agent user: %v", err)
+	}
+	if err := db.Create(&models.Agent{UserID: 2, Status: "offline", MaxConcurrent: 5, CurrentLoad: 0}).Error; err != nil {
+		t.Fatalf("seed agent: %v", err)
+	}
+	if err := db.Create(&models.Session{
+		ID:        "s-process-wait",
+		UserID:    1,
+		Status:    "active",
+		Platform:  "web",
+		StartedAt: time.Now(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}).Error; err != nil {
+		t.Fatalf("seed session: %v", err)
+	}
+	if err := db.Create(&models.WaitingRecord{
+		SessionID:    "s-process-wait",
+		Reason:       "need help",
+		Notes:        "from queue",
+		Priority:     "high",
+		Status:       "waiting",
+		QueuedAt:     time.Now(),
+		TargetSkills: "billing",
+		CreatedAt:    time.Now(),
+	}).Error; err != nil {
+		t.Fatalf("seed waiting record: %v", err)
+	}
+
+	agentSvc := NewAgentService(db, logger)
+	if err := agentSvc.AgentGoOnline(context.Background(), 2); err != nil {
+		t.Fatalf("AgentGoOnline: %v", err)
+	}
+
+	transferSvc := NewSessionTransferService(db, logger, stubAIForTransfer{}, agentSvc, nil)
+	bus := eventbus.NewInMemoryBus()
+	routingSvc := routingapp.NewService(routinginfra.NewGormRepository(db), bus)
+	transferSvc.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingSvc, bus))
+
+	if err := transferSvc.ProcessWaitingQueue(context.Background()); err != nil {
+		t.Fatalf("ProcessWaitingQueue: %v", err)
+	}
+
+	var waiting models.WaitingRecord
+	if err := db.Where("session_id = ?", "s-process-wait").First(&waiting).Error; err != nil {
+		t.Fatalf("load waiting record: %v", err)
+	}
+	if waiting.Status != "transferred" || waiting.AssignedTo == nil || *waiting.AssignedTo != 2 || waiting.AssignedAt == nil {
+		t.Fatalf("unexpected waiting record after transfer: %+v", waiting)
+	}
+
+	var tr models.TransferRecord
+	if err := db.Where("session_id = ?", "s-process-wait").First(&tr).Error; err != nil {
+		t.Fatalf("load transfer record: %v", err)
+	}
+	if tr.ToAgentID == nil || *tr.ToAgentID != 2 {
+		t.Fatalf("unexpected transfer record: %+v", tr)
+	}
+}

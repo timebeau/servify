@@ -28,6 +28,7 @@
 - `routing / session transfer`
   - `services/SessionTransferService` 已注入 `modules/routing/delivery.SessionTransferAdapter`
   - waiting queue 的读取、新增、取消、查询、转态同步，以及 transfer record 写入已收口到 routing module 状态机
+  - waiting -> transferred 与 transfer record 写入已纳入同一事务，不再依赖事务后的补写同步
   - 但主流程仍强依赖 `gorm.DB`、`AgentService`、`WebSocketHub` 和旧会话模型
   - 结论：属于“局部接入 module adapter，但主流程仍是 legacy service”的高风险混合区
 

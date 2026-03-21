@@ -126,8 +126,13 @@ func (a *SessionTransferAdapter) CancelWaiting(ctx context.Context, tx *gorm.DB,
 	return mapWaitingRecord(entry), nil
 }
 
-func (a *SessionTransferAdapter) MarkWaitingTransferred(ctx context.Context, sessionID string, agentID uint, assignedAt time.Time) (*models.WaitingRecord, error) {
-	entry, err := a.service.MarkWaitingTransferred(ctx, routingapp.MarkWaitingTransferredCommand{
+func (a *SessionTransferAdapter) MarkWaitingTransferred(ctx context.Context, tx *gorm.DB, sessionID string, agentID uint, assignedAt time.Time) (*models.WaitingRecord, error) {
+	svc := a.service
+	if tx != nil {
+		svc = routingapp.NewService(routinginfra.NewGormRepository(tx), a.publisher)
+	}
+
+	entry, err := svc.MarkWaitingTransferred(ctx, routingapp.MarkWaitingTransferredCommand{
 		SessionID:  sessionID,
 		AssignedTo: agentID,
 		AssignedAt: assignedAt,
