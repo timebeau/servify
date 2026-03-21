@@ -24,7 +24,7 @@ type RealtimeRuntime struct {
 	WebRTCService   *services.WebRTCService
 	RealtimeGateway realtimeplatform.RealtimeGateway
 	RTCGateway      realtimeplatform.RTCGateway
-	MessageRouter   *services.MessageRouter
+	MessageRouter   services.MessageRouterRuntime
 }
 
 func BuildRealtimeRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, ai services.AIServiceInterface) *RealtimeRuntime {

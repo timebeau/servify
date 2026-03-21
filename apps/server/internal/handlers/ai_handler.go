@@ -17,7 +17,6 @@ import (
 	svrmetrics "servify/apps/server/internal/metrics"
 	aidelivery "servify/apps/server/internal/modules/ai/delivery"
 	"servify/apps/server/internal/platform/realtime"
-	"servify/apps/server/internal/services"
 	"servify/apps/server/internal/version"
 
 	"github.com/gin-gonic/gin"
@@ -234,14 +233,13 @@ type MetricsHandler struct {
 	wsHub         realtime.RealtimeGateway
 	webrtcService realtime.RTCGateway
 	aiService     aidelivery.HandlerService
-	messageRouter *services.MessageRouter
 	startedAt     time.Time
 	db            *gorm.DB
 }
 
 // NewMetricsHandler 创建指标处理器
-func NewMetricsHandler(wsHub realtime.RealtimeGateway, webrtc realtime.RTCGateway, ai aidelivery.HandlerService, router *services.MessageRouter, db *gorm.DB) *MetricsHandler {
-	return &MetricsHandler{wsHub: wsHub, webrtcService: webrtc, aiService: ai, messageRouter: router, startedAt: time.Now(), db: db}
+func NewMetricsHandler(wsHub realtime.RealtimeGateway, webrtc realtime.RTCGateway, ai aidelivery.HandlerService, db *gorm.DB) *MetricsHandler {
+	return &MetricsHandler{wsHub: wsHub, webrtcService: webrtc, aiService: ai, startedAt: time.Now(), db: db}
 }
 
 // GetMetrics 获取系统指标（Prometheus 格式）

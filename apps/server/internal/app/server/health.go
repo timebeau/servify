@@ -16,7 +16,6 @@ func registerHealthRoutes(r routeRegistrar, deps Dependencies) {
 			deps.RealtimeGateway,
 			deps.RTCGateway,
 			deps.AIHandlerService,
-			deps.MessageRouter,
 			deps.DB,
 		).GetMetrics)
 	}

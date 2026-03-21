@@ -40,6 +40,7 @@
 - `automation` 已完成 handler-facing contract 收口，但 runtime 仍保留 event bus subscriber 与旧兼容 facade
 - `knowledge` 已完成 handler-facing contract 收口，但索引任务与 provider 集成仍未纳入 runtime 主路径
 - 一批尚未模块化的薄 handler 能力已完成 `app/server` 装配面收口：`satisfaction`、`macro`、`app integration`、`custom field`、`shift`、`suggestion`、`gamification`
+- `message router` 已完成 runtime/router/handler 装配面收口，保留 concrete 生命周期实现于 `services.MessageRouter`
 - 上述 `stabilized` 条目都已进入 `scripts/module-boundaries.rules`
 - 旧 `services/*` 仍然存在，但对这些能力来说，已不再是 HTTP 默认入口
 - 下一阶段重点不再是“再找一个模块收口”，而是：

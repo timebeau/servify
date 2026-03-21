@@ -19,6 +19,12 @@ type MessageRouter struct {
 	mutex     sync.RWMutex
 }
 
+type MessageRouterRuntime interface {
+	Start() error
+	Stop() error
+	GetPlatformStats() map[string]interface{}
+}
+
 type PlatformAdapter interface {
 	SendMessage(chatID, message string) error
 	ReceiveMessage() <-chan UnifiedMessage

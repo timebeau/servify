@@ -31,7 +31,7 @@ type Dependencies struct {
 	AIHandlerService         aidelivery.HandlerService
 	RealtimeGateway          realtimeplatform.RealtimeGateway
 	RTCGateway               realtimeplatform.RTCGateway
-	MessageRouter            *services.MessageRouter
+	MessageRouter            services.MessageRouterRuntime
 	VoiceCoordinator         *voicedelivery.Coordinator
 	VoiceProtocolRegistry    *voiceprotocol.Registry
 	CustomerHandlerService   customerdelivery.HandlerService

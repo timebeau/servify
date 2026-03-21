@@ -82,10 +82,10 @@ func (h *WebRTCHandler) GetConnections(c *gin.Context) {
 }
 
 type MessageHandler struct {
-	messageRouter *services.MessageRouter
+	messageRouter services.MessageRouterRuntime
 }
 
-func NewMessageHandler(messageRouter *services.MessageRouter) *MessageHandler {
+func NewMessageHandler(messageRouter services.MessageRouterRuntime) *MessageHandler {
 	return &MessageHandler{
 		messageRouter: messageRouter,
 	}

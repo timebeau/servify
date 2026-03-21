@@ -52,6 +52,11 @@
   - 这批 handler 现在已改为依赖 `handlers` 包内定义的最小接口，而不再把 `*services.*` concrete type 暴露到 `app/server` runtime/router surface
   - 结论：虽然还不属于 `services -> modules` 迁移完成项，但已完成一轮“装配面收口”，可减少 concrete legacy service 在顶层 runtime 的扩散
 
+- `message router`
+  - 轻量 runtime 与主 runtime 都还需要 `Start/Stop` 生命周期，但 HTTP 层只关心平台统计读取
+  - 现已抽出 `services.MessageRouterRuntime`，`app/server` 与 `handlers.MessageHandler` 不再暴露 concrete `*services.MessageRouter`
+  - `MetricsHandler` 的无用 message router 注入已移除
+
 - `customer`
   - `services/CustomerService` 已经是 `modules/customer/application.Service` 的轻量 facade
   - HTTP handler 只消费请求/响应 DTO 与兼容方法，核心业务已经下沉到 module application + infra repository

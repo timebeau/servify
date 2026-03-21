@@ -38,6 +38,9 @@ require|apps/server/internal/app/server/ai_runtime.go|Service[[:space:]]+aideliv
 require|apps/server/internal/app/server/ai_runtime.go|RuntimeService[[:space:]]+services\.AIServiceInterface|AI assembly must keep a separate runtime AIServiceInterface for non-handler callers.
 require|apps/server/internal/app/server/runtime.go|WorkspaceService[[:space:]]+services\.WorkspaceOverviewReader|Runtime must expose workspace via WorkspaceOverviewReader.
 require|apps/server/internal/app/server/router.go|WorkspaceService[[:space:]]+services\.WorkspaceOverviewReader|Router dependencies must expose workspace via WorkspaceOverviewReader.
+require|apps/server/internal/app/server/runtime.go|MessageRouter[[:space:]]+services\.MessageRouterRuntime|Runtime must expose message router via services.MessageRouterRuntime.
+require|apps/server/internal/app/server/router.go|MessageRouter[[:space:]]+services\.MessageRouterRuntime|Router dependencies must expose message router via services.MessageRouterRuntime.
+require|apps/server/internal/app/server/realtime_runtime.go|MessageRouter[[:space:]]+services\.MessageRouterRuntime|Realtime runtime must expose message router via services.MessageRouterRuntime.
 require|apps/server/internal/app/server/runtime.go|SatisfactionService[[:space:]]+handlers\.SatisfactionService|Runtime must expose satisfaction via handlers.SatisfactionService.
 require|apps/server/internal/app/server/router.go|SatisfactionService[[:space:]]+handlers\.SatisfactionService|Router dependencies must expose satisfaction via handlers.SatisfactionService.
 require|apps/server/internal/app/server/runtime.go|MacroService[[:space:]]+handlers\.MacroService|Runtime must expose macros via handlers.MacroService.
@@ -56,13 +59,17 @@ require|apps/server/internal/services/websocket.go|transferService[[:space:]]+Se
 require|apps/server/internal/services/websocket.go|func \(h \*WebSocketHub\) SetSessionTransferService\(svc SessionTransferRuntime\)|WebSocket hub must accept the session transfer runtime interface.
 require|apps/server/internal/handlers/workspace_handler.go|service[[:space:]]+services\.WorkspaceOverviewReader|Workspace handler must store WorkspaceOverviewReader.
 require|apps/server/internal/handlers/workspace_handler.go|func NewWorkspaceHandler\(service services\.WorkspaceOverviewReader\)|Workspace handler constructor must accept WorkspaceOverviewReader.
+require|apps/server/internal/handlers/handlers.go|messageRouter[[:space:]]+services\.MessageRouterRuntime|Message handler must store services.MessageRouterRuntime.
+require|apps/server/internal/handlers/handlers.go|func NewMessageHandler\(messageRouter services\.MessageRouterRuntime\)|Message handler constructor must accept services.MessageRouterRuntime.
 forbid|apps/server/internal/app/server/runtime.go|CustomerService[[:space:]]+\*services\.CustomerService|Runtime must not expose concrete CustomerService.
 forbid|apps/server/internal/app/server/runtime.go|AutomationService[[:space:]]+\*services\.AutomationService|Runtime must not expose concrete AutomationService.
 forbid|apps/server/internal/app/server/runtime.go|StatisticsService[[:space:]]+\*services\.StatisticsService|Runtime must not expose concrete StatisticsService.
 forbid|apps/server/internal/app/server/runtime.go|KnowledgeDocService[[:space:]]+\*services\.KnowledgeDocService|Runtime must not expose concrete KnowledgeDocService.
 forbid|apps/server/internal/app/server/runtime.go|TransferService[[:space:]]+\*services\.SessionTransferService|Runtime must not expose concrete SessionTransferService.
+forbid|apps/server/internal/app/server/runtime.go|MessageRouter[[:space:]]+\*services\.MessageRouter|Runtime must not expose concrete MessageRouter.
 forbid|apps/server/internal/app/server/router.go|AutomationService[[:space:]]+\*services\.AutomationService|Router dependencies must not expose concrete AutomationService.
 forbid|apps/server/internal/app/server/router.go|TransferService[[:space:]]+\*services\.SessionTransferService|Router dependencies must not expose concrete SessionTransferService.
+forbid|apps/server/internal/app/server/router.go|MessageRouter[[:space:]]+\*services\.MessageRouter|Router dependencies must not expose concrete MessageRouter.
 forbid|apps/server/internal/app/server/runtime.go|SatisfactionService[[:space:]]+\*services\.SatisfactionService|Runtime must not expose concrete SatisfactionService.
 forbid|apps/server/internal/app/server/router.go|SatisfactionService[[:space:]]+\*services\.SatisfactionService|Router dependencies must not expose concrete SatisfactionService.
 forbid|apps/server/internal/app/server/runtime.go|MacroService[[:space:]]+\*services\.MacroService|Runtime must not expose concrete MacroService.
@@ -79,3 +86,5 @@ forbid|apps/server/internal/app/server/runtime.go|GamificationService[[:space:]]
 forbid|apps/server/internal/app/server/router.go|GamificationService[[:space:]]+\*services\.GamificationService|Router dependencies must not expose concrete GamificationService.
 forbid|apps/server/internal/handlers/workspace_handler.go|service[[:space:]]+\*services\.WorkspaceService|Workspace handler must not depend on concrete WorkspaceService.
 forbid|apps/server/internal/services/websocket.go|transferService[[:space:]]+\*SessionTransferService|WebSocket hub must not store concrete SessionTransferService.
+forbid|apps/server/internal/app/server/realtime_runtime.go|MessageRouter[[:space:]]+\*services\.MessageRouter|Realtime runtime must not expose concrete MessageRouter.
+forbid|apps/server/internal/handlers/handlers.go|messageRouter[[:space:]]+\*services\.MessageRouter|Message handler must not depend on concrete MessageRouter.
