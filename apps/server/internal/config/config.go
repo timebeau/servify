@@ -206,15 +206,16 @@ type UploadConfig struct {
 }
 
 func Load() *Config {
-	var config Config
+	// Start with default config to ensure all fields have valid defaults
+	config := GetDefaultConfig()
 	// Viper unmarshalling uses mapstructure tags by default; explicitly decode via our `yaml` tags
 	// to keep config files consistent (e.g. `stun_server`, `max_open_conns`, etc.).
-	if err := viper.Unmarshal(&config, func(dc *mapstructure.DecoderConfig) {
+	if err := viper.Unmarshal(config, func(dc *mapstructure.DecoderConfig) {
 		dc.TagName = "yaml"
 	}); err != nil {
 		panic(err)
 	}
-	return &config
+	return config
 }
 
 // GetDefaultConfig 返回默认配置
