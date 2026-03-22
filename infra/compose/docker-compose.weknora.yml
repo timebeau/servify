@@ -49,7 +49,7 @@ services:
       - redis
 
     networks:
-      - servify_network
+      - servify-network
 
     restart: unless-stopped
 
@@ -76,54 +76,18 @@ services:
     ports:
       - "5432:5432"
     networks:
-      - servify_network
+      - servify-network
 
   # Servify 主服务（增强版）
   servify:
-    build:
-      context: .
-      dockerfile: Dockerfile
     environment:
-      # 服务监听（与 server flags/env 对齐）
-      - SERVIFY_HOST=0.0.0.0
-      - SERVIFY_PORT=8080
-
-      # 数据库（server/migrate 支持 DB_* 覆盖）
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_USER=postgres
-      - DB_PASSWORD=password
-      - DB_NAME=servify
-
-      # 可选：直接提供 DSN（设置后优先生效）
-      # - DB_DSN=host=postgres user=postgres password=password dbname=servify port=5432 sslmode=disable TimeZone=UTC
-
-      # OpenAI（可选）
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
-
       # WeKnora 集成配置
-      # WeKnora 配置（通过挂载 config.weknora.yml 更稳妥；此处仅示例环境变量）
       - WEKNORA_ENABLED=true
       - WEKNORA_BASE_URL=http://weknora:9000
-      - WEKNORA_API_KEY=${WEKNORA_API_KEY:-default-api-key}
-      - WEKNORA_TENANT_ID=${WEKNORA_TENANT_ID:-default-tenant}
-      - WEKNORA_KB_ID=${WEKNORA_KB_ID:-default-kb}
-
-      # 降级配置
-      - FALLBACK_ENABLED=true
-      - CIRCUIT_BREAKER_ENABLED=true
-
     depends_on:
       - postgres
       - redis
       - weknora
-
-    volumes:
-      # 将 weknora 版配置作为默认配置文件注入（可选）
-      - ./config.weknora.yml:/root/config.yml:ro
-    networks:
-      - servify_network
 
   # 可选：本地 Embedding 服务（如果不使用 OpenAI）
   embedding-service:
@@ -138,7 +102,7 @@ services:
     volumes:
       - embedding_models:/models
     networks:
-      - servify_network
+      - servify-network
     profiles:
       - local-embedding  # 可选服务
 
@@ -155,7 +119,7 @@ services:
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
     networks:
-      - servify_network
+      - servify-network
     profiles:
       - with-elasticsearch  # 可选服务
 
@@ -168,5 +132,5 @@ volumes:
   elasticsearch_data:
 
 networks:
-  servify_network:
+  servify-network:
     driver: bridge
