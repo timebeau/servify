@@ -23,7 +23,7 @@ type SessionTransferService struct {
 	logger       *logrus.Logger
 	aiService    AIServiceInterface
 	agentService sessionTransferAgentRuntime
-	wsHub        *WebSocketHub
+	notifier     sessionTransferNotifier
 	routing      routingdelivery.RuntimeService
 	tickets      ticketdelivery.RuntimeService
 	conversation conversationdelivery.RuntimeService
@@ -40,13 +40,17 @@ type SessionTransferRuntime interface {
 	TransferToHuman(ctx context.Context, req *TransferRequest) (*TransferResult, error)
 }
 
+type sessionTransferNotifier interface {
+	SendToSession(sessionID string, message WebSocketMessage)
+}
+
 // NewSessionTransferService 创建会话转接服务
 func NewSessionTransferService(
 	db *gorm.DB,
 	logger *logrus.Logger,
 	aiService AIServiceInterface,
 	agentService sessionTransferAgentRuntime,
-	wsHub *WebSocketHub,
+	notifier sessionTransferNotifier,
 ) *SessionTransferService {
 	if logger == nil {
 		logger = logrus.New()
@@ -57,7 +61,7 @@ func NewSessionTransferService(
 		logger:       logger,
 		aiService:    aiService,
 		agentService: agentService,
-		wsHub:        wsHub,
+		notifier:     notifier,
 	}
 }
 
@@ -507,8 +511,8 @@ func (s *SessionTransferService) buildTransferMessage(reason, notes string) stri
 // notifyTransfer 发送转接通知
 func (s *SessionTransferService) notifyTransfer(sessionID string, agentID uint, message string) {
 	// 发送给用户
-	if s.wsHub != nil {
-		s.wsHub.SendToSession(sessionID, WebSocketMessage{
+	if s.notifier != nil {
+		s.notifier.SendToSession(sessionID, WebSocketMessage{
 			Type: "transfer_notification",
 			Data: map[string]interface{}{
 				"message":   message,
@@ -521,8 +525,8 @@ func (s *SessionTransferService) notifyTransfer(sessionID string, agentID uint, 
 
 // notifyWaiting 发送等待通知
 func (s *SessionTransferService) notifyWaiting(sessionID string, message string) {
-	if s.wsHub != nil {
-		s.wsHub.SendToSession(sessionID, WebSocketMessage{
+	if s.notifier != nil {
+		s.notifier.SendToSession(sessionID, WebSocketMessage{
 			Type: "waiting_notification",
 			Data: map[string]interface{}{
 				"message":   message,

@@ -38,7 +38,8 @@
   - waiting -> transferred 与 transfer record 写入已纳入同一事务，不再依赖事务后的补写同步
   - 会话转接触发的 ticket assignment 同步已改走 `modules/ticket/delivery` runtime adapter，不再直接写 `Ticket` / `TicketStatus`
   - agent load 调整已改走 `modules/agent/delivery` runtime adapter，原先由 handler contract 反向依赖 `services` 引起的 import cycle 已被移除
-  - 但主流程仍强依赖 `gorm.DB`、`AgentService`、`WebSocketHub` 和旧会话模型
+  - websocket 通知依赖已收窄为 `sessionTransferNotifier`，不再把 `WebSocketHub` 作为 service 内部 concrete 字段保存
+  - 但主流程仍强依赖 `gorm.DB`、`AgentService` 和旧会话模型
   - 结论：属于“局部接入 module adapter，但主流程仍是 legacy service”的高风险混合区
 
 - `ai`
@@ -203,7 +204,7 @@
   - 允许保留：旧调用方兼容入口、DTO 映射、`modules/knowledge/application.Service` 与 repository 的兼容装配
   - 不应新增：新的 HTTP handler 直接依赖、绕过 `modules/knowledge/application.Service` 的文档 CRUD 主入口
 - `services/SessionTransferService`
-  - 允许保留：旧调用方兼容入口、AgentService/WebSocketHub/AIService 协调、转接实时通知与 legacy transfer orchestration
+  - 允许保留：旧调用方兼容入口、AgentService/通知接口/AIService 协调、转接实时通知与 legacy transfer orchestration
   - 不应新增：新的 HTTP handler 直接依赖、绕过 routing module 的 waiting/transfer record 读写规则
 - `services/WebSocketHub`
   - 允许保留：连接管理、广播、协议消息分发、对 AI/transfer 的 runtime glue
