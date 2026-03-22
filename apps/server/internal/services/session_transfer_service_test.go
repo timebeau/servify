@@ -340,7 +340,8 @@ func TestSessionTransferService_CancelWaitingRecord_ViaRoutingAdapter(t *testing
 		NewAgentService(db, logger),
 		nil,
 		SessionTransferAdapters{
-			Routing: routingdelivery.NewSessionTransferAdapter(routingSvc, bus),
+			Routing:      routingdelivery.NewSessionTransferAdapter(routingSvc, bus),
+			Conversation: conversationdelivery.NewRuntimeAdapter(db, bus),
 		},
 	)
 
@@ -354,6 +355,14 @@ func TestSessionTransferService_CancelWaitingRecord_ViaRoutingAdapter(t *testing
 	}
 	if waiting.Status != "cancelled" || waiting.Notes != "user_left" {
 		t.Fatalf("unexpected waiting record after cancel: %+v", waiting)
+	}
+
+	var message models.Message
+	if err := db.Where("session_id = ? AND type = ?", "s-cancel", "system").First(&message).Error; err != nil {
+		t.Fatalf("load cancel message: %v", err)
+	}
+	if !strings.Contains(message.Content, "user_left") {
+		t.Fatalf("unexpected cancel message: %+v", message)
 	}
 }
 

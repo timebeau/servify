@@ -36,6 +36,7 @@
   - transfer / waiting 的系统消息写入已改走 `modules/conversation/delivery` runtime adapter，不再直接写 `Message`
   - waiting queue 的读取、新增、取消、查询、转态同步，以及 transfer record 写入已收口到 routing module 状态机
   - waiting -> transferred 与 transfer record 写入已纳入同一事务，不再依赖事务后的补写同步
+  - 取消 waiting queue 时的系统消息写入也已切到 `modules/conversation/delivery` runtime adapter，减少 legacy `Message` 直写分支
   - 会话转接触发的 ticket assignment 同步已改走 `modules/ticket/delivery` runtime adapter，不再直接写 `Ticket` / `TicketStatus`
   - agent load 调整已改走 `modules/agent/delivery` runtime adapter，原先由 handler contract 反向依赖 `services` 引起的 import cycle 已被移除
   - websocket 通知依赖已收窄为 `sessionTransferNotifier`，不再把 `WebSocketHub` 作为 service 内部 concrete 字段保存

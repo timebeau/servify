@@ -505,6 +505,21 @@ func (s *SessionTransferService) appendWaitingSystemMessage(ctx context.Context,
 	return tx.Create(message).Error
 }
 
+func (s *SessionTransferService) appendCancellationSystemMessage(ctx context.Context, tx *gorm.DB, sessionID string, operatorID uint, reason string, createdAt time.Time) error {
+	content := fmt.Sprintf("已取消人工客服等待队列（原因：%s）", reason)
+	if s.conversation != nil {
+		return s.conversation.AppendSystemMessage(ctx, tx, sessionID, content, createdAt)
+	}
+	return tx.Create(&models.Message{
+		SessionID: sessionID,
+		UserID:    operatorID,
+		Content:   content,
+		Type:      "system",
+		Sender:    "system",
+		CreatedAt: createdAt,
+	}).Error
+}
+
 func (s *SessionTransferService) getActiveWaitingRecord(ctx context.Context, sessionID string) (*models.WaitingRecord, error) {
 	if s.routing != nil {
 		record, err := s.routing.GetWaitingRecord(ctx, sessionID)
@@ -670,15 +685,7 @@ func (s *SessionTransferService) CancelWaitingRecord(ctx context.Context, sessio
 		}
 
 		// 记录系统消息（可选，不影响主流程）
-		msg := &models.Message{
-			SessionID: sessionID,
-			UserID:    operatorID,
-			Content:   fmt.Sprintf("已取消人工客服等待队列（原因：%s）", reason),
-			Type:      "system",
-			Sender:    "system",
-			CreatedAt: now,
-		}
-		_ = tx.Create(msg).Error
+		_ = s.appendCancellationSystemMessage(ctx, tx, sessionID, operatorID, reason, now)
 		return nil
 	})
 }
