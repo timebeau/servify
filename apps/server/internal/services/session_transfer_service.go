@@ -188,123 +188,37 @@ func (s *SessionTransferService) executeTransfer(ctx context.Context, session *c
 
 	// 原子化：会话指派 + 工时负载 + 记录/消息
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
-		// 更新会话：active/ended；是否分配由 agent_id 判断
-		if s.conversation != nil {
-			if err := s.conversation.SyncTransferAssignment(ctx, tx, session.ID, session.CustomerID, targetAgentID); err != nil {
-				return fmt.Errorf("update session: %w", err)
-			}
-		} else if err := tx.Model(&models.Session{}).
-			Where("id = ?", session.ID).
-			Updates(map[string]interface{}{
-				"agent_id": targetAgentID,
-				"status":   "active",
-				"ended_at": nil,
-			}).Error; err != nil {
+		if err := s.syncTransferSession(ctx, tx, session, targetAgentID); err != nil {
 			return fmt.Errorf("update session: %w", err)
 		}
 
-		// 若会话关联了工单，则同步工单的指派（与会话转接保持一致）
-		if session.TicketID != nil && *session.TicketID != 0 {
-			if s.tickets != nil {
-				if err := s.tickets.SyncTransferAssignment(ctx, tx, *session.TicketID, targetAgentID, targetAgentID); err != nil && err != gorm.ErrRecordNotFound {
-					return fmt.Errorf("update ticket: %w", err)
-				}
-			} else {
-				var ticket models.Ticket
-				if err := tx.Select("id", "agent_id", "status").First(&ticket, "id = ?", *session.TicketID).Error; err != nil {
-					if err != gorm.ErrRecordNotFound {
-						return fmt.Errorf("load ticket: %w", err)
-					}
-				} else {
-					updates := map[string]interface{}{
-						"agent_id": targetAgentID,
-					}
-					fromStatus := ticket.Status
-					toStatus := fromStatus
-					if fromStatus == "open" || fromStatus == "" {
-						toStatus = "assigned"
-						updates["status"] = toStatus
-					}
-					if err := tx.Model(&models.Ticket{}).Where("id = ?", ticket.ID).Updates(updates).Error; err != nil {
-						return fmt.Errorf("update ticket: %w", err)
-					}
-
-					// Best-effort 记录状态变更（不影响主流程）
-					_ = tx.Create(&models.TicketStatus{
-						TicketID:   ticket.ID,
-						UserID:     targetAgentID,
-						FromStatus: fromStatus,
-						ToStatus:   toStatus,
-						Reason:     fmt.Sprintf("会话转接同步指派至客服 %d", targetAgentID),
-						CreatedAt:  transferAt,
-					}).Error
-				}
-			}
+		if err := s.syncTransferTicket(ctx, tx, session, targetAgentID, transferAt); err != nil {
+			return fmt.Errorf("update ticket: %w", err)
 		}
 
-		// 负载：转移需要先减后加（最佳努力不低于 0）
-		if s.agents != nil {
-			if err := s.agents.SyncTransferLoad(ctx, tx, fromAgentID, targetAgentID); err != nil {
-				return fmt.Errorf("sync agent load: %w", err)
-			}
-		} else {
-			if fromAgentID != nil && *fromAgentID != targetAgentID {
-				if err := tx.Exec(`UPDATE agents SET current_load = CASE WHEN current_load > 0 THEN current_load - 1 ELSE 0 END WHERE user_id = ?`, *fromAgentID).Error; err != nil {
-					return fmt.Errorf("decrement from agent load: %w", err)
-				}
-			}
-			if err := tx.Exec(`UPDATE agents SET current_load = current_load + 1 WHERE user_id = ?`, targetAgentID).Error; err != nil {
-				return fmt.Errorf("increment target agent load: %w", err)
-			}
+		if err := s.syncTransferAgentLoad(ctx, tx, fromAgentID, targetAgentID); err != nil {
+			return fmt.Errorf("sync agent load: %w", err)
 		}
 
-		if s.conversation != nil {
-			if err := s.conversation.AppendSystemMessage(ctx, tx, session.ID, transferMessageContent, transferAt); err != nil {
-				return fmt.Errorf("create transfer message: %w", err)
-			}
-		} else {
-			transferMessage := &models.Message{
-				SessionID: session.ID,
-				UserID:    targetAgentID,
-				Content:   transferMessageContent,
-				Type:      "system",
-				Sender:    "system",
-				CreatedAt: transferAt,
-			}
-			if err := tx.Create(transferMessage).Error; err != nil {
-				return fmt.Errorf("create transfer message: %w", err)
-			}
+		if err := s.appendTransferSystemMessage(ctx, tx, session.ID, targetAgentID, transferMessageContent, transferAt); err != nil {
+			return fmt.Errorf("create transfer message: %w", err)
 		}
 
-		if s.routing != nil {
-			createdRecord, err := s.routing.AssignAgent(ctx, tx, routingdelivery.AssignAgentCommand{
-				SessionID:      session.ID,
-				AgentID:        targetAgentID,
-				FromAgentID:    fromAgentID,
-				Reason:         reason,
-				Notes:          notes,
-				SessionSummary: summary,
-				AssignedAt:     transferAt,
-			})
-			if err != nil {
-				return fmt.Errorf("create transfer record: %w", err)
-			}
-			transferRecord = createdRecord
-		} else if err := tx.Create(transferRecord).Error; err != nil {
+		createdRecord, err := s.createTransferRecord(ctx, tx, routingdelivery.AssignAgentCommand{
+			SessionID:      session.ID,
+			AgentID:        targetAgentID,
+			FromAgentID:    fromAgentID,
+			Reason:         reason,
+			Notes:          notes,
+			SessionSummary: summary,
+			AssignedAt:     transferAt,
+		}, transferRecord)
+		if err != nil {
 			return fmt.Errorf("create transfer record: %w", err)
 		}
+		transferRecord = createdRecord
 
-		if s.routing != nil {
-			if _, err := s.routing.MarkWaitingTransferred(ctx, tx, session.ID, targetAgentID, transferAt); err != nil && err != gorm.ErrRecordNotFound {
-				return fmt.Errorf("sync waiting record: %w", err)
-			}
-		} else if err := tx.Model(&models.WaitingRecord{}).
-			Where("session_id = ? AND status = ?", session.ID, "waiting").
-			Updates(map[string]interface{}{
-				"status":      "transferred",
-				"assigned_at": transferAt,
-				"assigned_to": targetAgentID,
-			}).Error; err != nil {
+		if err := s.markWaitingTransferred(ctx, tx, session.ID, targetAgentID, transferAt); err != nil {
 			return fmt.Errorf("sync waiting record: %w", err)
 		}
 
@@ -354,48 +268,17 @@ func (s *SessionTransferService) addToWaitingQueue(ctx context.Context, session 
 		Sender:    "system",
 	}
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
-		// 会话保持 active，等待队列由 WaitingRecord 表达
-		if s.conversation != nil {
-			if err := s.conversation.SyncWaitingAssignment(ctx, tx, session.ID, session.CustomerID); err != nil {
-				return fmt.Errorf("failed to ensure session active: %w", err)
-			}
-		} else if err := tx.Model(&models.Session{}).
-			Where("id = ?", session.ID).
-			Updates(map[string]interface{}{
-				"status":   "active",
-				"agent_id": nil,
-				"ended_at": nil,
-			}).Error; err != nil {
+		if err := s.ensureWaitingSessionState(ctx, tx, session); err != nil {
 			return fmt.Errorf("failed to ensure session active: %w", err)
 		}
 
-		if s.routing != nil {
-			createdRecord, err := s.routing.AddToWaitingQueue(ctx, tx, session.ID, req.Reason, req.TargetSkills, req.Priority, req.Notes)
-			if err != nil {
-				return fmt.Errorf("failed to create waiting record: %w", err)
-			}
-			waitingRecord = createdRecord
-		} else {
-			waitingRecord = &models.WaitingRecord{
-				SessionID:    session.ID,
-				Reason:       req.Reason,
-				TargetSkills: strings.Join(req.TargetSkills, ","),
-				Priority:     req.Priority,
-				Notes:        req.Notes,
-				Status:       "waiting",
-				QueuedAt:     time.Now(),
-			}
-
-			if err := tx.Create(waitingRecord).Error; err != nil {
-				return fmt.Errorf("failed to create waiting record: %w", err)
-			}
+		createdRecord, err := s.createWaitingRecord(ctx, tx, session.ID, req)
+		if err != nil {
+			return fmt.Errorf("failed to create waiting record: %w", err)
 		}
+		waitingRecord = createdRecord
 
-		if s.conversation != nil {
-			if err := s.conversation.AppendSystemMessage(ctx, tx, session.ID, waitingMessage.Content, waitingMessage.CreatedAt); err != nil {
-				return fmt.Errorf("create waiting message: %w", err)
-			}
-		} else if err := tx.Create(waitingMessage).Error; err != nil {
+		if err := s.appendWaitingSystemMessage(ctx, tx, waitingMessage); err != nil {
 			return fmt.Errorf("create waiting message: %w", err)
 		}
 		return nil
@@ -473,6 +356,153 @@ func (s *SessionTransferService) loadWaitingQueue(ctx context.Context, limit int
 		return nil, fmt.Errorf("failed to get waiting records: %w", err)
 	}
 	return waitingRecords, nil
+}
+
+func (s *SessionTransferService) syncTransferSession(ctx context.Context, tx *gorm.DB, session *conversationdelivery.TransferSession, targetAgentID uint) error {
+	if s.conversation != nil {
+		return s.conversation.SyncTransferAssignment(ctx, tx, session.ID, session.CustomerID, targetAgentID)
+	}
+	return tx.Model(&models.Session{}).
+		Where("id = ?", session.ID).
+		Updates(map[string]interface{}{
+			"agent_id": targetAgentID,
+			"status":   "active",
+			"ended_at": nil,
+		}).Error
+}
+
+func (s *SessionTransferService) syncTransferTicket(ctx context.Context, tx *gorm.DB, session *conversationdelivery.TransferSession, targetAgentID uint, transferAt time.Time) error {
+	if session.TicketID == nil || *session.TicketID == 0 {
+		return nil
+	}
+	if s.tickets != nil {
+		err := s.tickets.SyncTransferAssignment(ctx, tx, *session.TicketID, targetAgentID, targetAgentID)
+		if err == gorm.ErrRecordNotFound {
+			return nil
+		}
+		return err
+	}
+
+	var ticket models.Ticket
+	if err := tx.Select("id", "agent_id", "status").First(&ticket, "id = ?", *session.TicketID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil
+		}
+		return err
+	}
+
+	updates := map[string]interface{}{"agent_id": targetAgentID}
+	fromStatus := ticket.Status
+	toStatus := fromStatus
+	if fromStatus == "open" || fromStatus == "" {
+		toStatus = "assigned"
+		updates["status"] = toStatus
+	}
+	if err := tx.Model(&models.Ticket{}).Where("id = ?", ticket.ID).Updates(updates).Error; err != nil {
+		return err
+	}
+
+	_ = tx.Create(&models.TicketStatus{
+		TicketID:   ticket.ID,
+		UserID:     targetAgentID,
+		FromStatus: fromStatus,
+		ToStatus:   toStatus,
+		Reason:     fmt.Sprintf("会话转接同步指派至客服 %d", targetAgentID),
+		CreatedAt:  transferAt,
+	}).Error
+	return nil
+}
+
+func (s *SessionTransferService) syncTransferAgentLoad(ctx context.Context, tx *gorm.DB, fromAgentID *uint, targetAgentID uint) error {
+	if s.agents != nil {
+		return s.agents.SyncTransferLoad(ctx, tx, fromAgentID, targetAgentID)
+	}
+	if fromAgentID != nil && *fromAgentID != targetAgentID {
+		if err := tx.Exec(`UPDATE agents SET current_load = CASE WHEN current_load > 0 THEN current_load - 1 ELSE 0 END WHERE user_id = ?`, *fromAgentID).Error; err != nil {
+			return err
+		}
+	}
+	return tx.Exec(`UPDATE agents SET current_load = current_load + 1 WHERE user_id = ?`, targetAgentID).Error
+}
+
+func (s *SessionTransferService) appendTransferSystemMessage(ctx context.Context, tx *gorm.DB, sessionID string, targetAgentID uint, content string, createdAt time.Time) error {
+	if s.conversation != nil {
+		return s.conversation.AppendSystemMessage(ctx, tx, sessionID, content, createdAt)
+	}
+	return tx.Create(&models.Message{
+		SessionID: sessionID,
+		UserID:    targetAgentID,
+		Content:   content,
+		Type:      "system",
+		Sender:    "system",
+		CreatedAt: createdAt,
+	}).Error
+}
+
+func (s *SessionTransferService) createTransferRecord(ctx context.Context, tx *gorm.DB, cmd routingdelivery.AssignAgentCommand, fallback *models.TransferRecord) (*models.TransferRecord, error) {
+	if s.routing != nil {
+		return s.routing.AssignAgent(ctx, tx, cmd)
+	}
+	if err := tx.Create(fallback).Error; err != nil {
+		return nil, err
+	}
+	return fallback, nil
+}
+
+func (s *SessionTransferService) markWaitingTransferred(ctx context.Context, tx *gorm.DB, sessionID string, targetAgentID uint, transferAt time.Time) error {
+	if s.routing != nil {
+		_, err := s.routing.MarkWaitingTransferred(ctx, tx, sessionID, targetAgentID, transferAt)
+		if err == gorm.ErrRecordNotFound {
+			return nil
+		}
+		return err
+	}
+	return tx.Model(&models.WaitingRecord{}).
+		Where("session_id = ? AND status = ?", sessionID, "waiting").
+		Updates(map[string]interface{}{
+			"status":      "transferred",
+			"assigned_at": transferAt,
+			"assigned_to": targetAgentID,
+		}).Error
+}
+
+func (s *SessionTransferService) ensureWaitingSessionState(ctx context.Context, tx *gorm.DB, session *conversationdelivery.TransferSession) error {
+	if s.conversation != nil {
+		return s.conversation.SyncWaitingAssignment(ctx, tx, session.ID, session.CustomerID)
+	}
+	return tx.Model(&models.Session{}).
+		Where("id = ?", session.ID).
+		Updates(map[string]interface{}{
+			"status":   "active",
+			"agent_id": nil,
+			"ended_at": nil,
+		}).Error
+}
+
+func (s *SessionTransferService) createWaitingRecord(ctx context.Context, tx *gorm.DB, sessionID string, req *TransferRequest) (*models.WaitingRecord, error) {
+	if s.routing != nil {
+		return s.routing.AddToWaitingQueue(ctx, tx, sessionID, req.Reason, req.TargetSkills, req.Priority, req.Notes)
+	}
+	record := &models.WaitingRecord{
+		SessionID:    sessionID,
+		Reason:       req.Reason,
+		TargetSkills: strings.Join(req.TargetSkills, ","),
+		Priority:     req.Priority,
+		Notes:        req.Notes,
+		Status:       "waiting",
+		QueuedAt:     time.Now(),
+	}
+	if err := tx.Create(record).Error; err != nil {
+		return nil, err
+	}
+	return record, nil
+}
+
+func (s *SessionTransferService) appendWaitingSystemMessage(ctx context.Context, tx *gorm.DB, message *models.Message) error {
+	if s.conversation != nil {
+		return s.conversation.AppendSystemMessage(ctx, tx, message.SessionID, message.Content, message.CreatedAt)
+	}
+	return tx.Create(message).Error
 }
 
 func (s *SessionTransferService) getActiveWaitingRecord(ctx context.Context, sessionID string) (*models.WaitingRecord, error) {

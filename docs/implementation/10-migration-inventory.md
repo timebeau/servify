@@ -43,6 +43,7 @@
   - 加入等待队列时的会话 active/unassigned 同步也已切到 `modules/conversation/delivery.RuntimeService.SyncWaitingAssignment(...)`
   - `app/server` 主运行时已改用 `NewSessionTransferServiceWithAdapters(...)` 一次性装配 routing/ticket/conversation/agent runtime adapters，减少可变 setter 装配面
   - 旧的 setter 式 adapter 注入已从活跃代码路径移除，默认装配方式固定为显式构造
+  - 转接主流程内剩余的 adapter/fallback 分支已收口到私有 helper，`executeTransfer` / `addToWaitingQueue` 现主要保留流程编排职责
   - 但主流程仍强依赖 `gorm.DB`、`AgentService` 和旧会话模型
   - 结论：属于“局部接入 module adapter，但主流程仍是 legacy service”的高风险混合区
 
