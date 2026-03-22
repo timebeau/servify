@@ -53,7 +53,7 @@ func OpenDatabase(cfg *config.Config, opts DatabaseOptions) (*gorm.DB, error) {
 		level = logger.Warn
 	}
 	db, err := gorm.Open(postgres.Open(BuildPostgresDSN(cfg, opts)), &gorm.Config{
-		Logger:                                logger.Default.LogMode(level),
+		Logger:                                   logger.Default.LogMode(level),
 		DisableForeignKeyConstraintWhenMigrating: true,
 	})
 	if err != nil {
