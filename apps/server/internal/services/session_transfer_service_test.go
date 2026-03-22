@@ -331,10 +331,18 @@ func TestSessionTransferService_CancelWaitingRecord_ViaRoutingAdapter(t *testing
 		t.Fatalf("seed waiting record: %v", err)
 	}
 
-	transferSvc := NewSessionTransferService(db, logger, stubAIForTransfer{}, NewAgentService(db, logger), nil)
 	bus := eventbus.NewInMemoryBus()
 	routingSvc := routingapp.NewService(routinginfra.NewGormRepository(db), bus)
-	transferSvc.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingSvc, bus))
+	transferSvc := NewSessionTransferServiceWithAdapters(
+		db,
+		logger,
+		stubAIForTransfer{},
+		NewAgentService(db, logger),
+		nil,
+		SessionTransferAdapters{
+			Routing: routingdelivery.NewSessionTransferAdapter(routingSvc, bus),
+		},
+	)
 
 	if err := transferSvc.CancelWaitingRecord(context.Background(), "s-cancel", 1, "user_left"); err != nil {
 		t.Fatalf("CancelWaitingRecord: %v", err)
@@ -392,10 +400,18 @@ func TestSessionTransferService_ProcessWaitingQueue_TransfersWaitingViaRoutingAd
 		t.Fatalf("AgentGoOnline: %v", err)
 	}
 
-	transferSvc := NewSessionTransferService(db, logger, stubAIForTransfer{}, agentSvc, nil)
 	bus := eventbus.NewInMemoryBus()
 	routingSvc := routingapp.NewService(routinginfra.NewGormRepository(db), bus)
-	transferSvc.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingSvc, bus))
+	transferSvc := NewSessionTransferServiceWithAdapters(
+		db,
+		logger,
+		stubAIForTransfer{},
+		agentSvc,
+		nil,
+		SessionTransferAdapters{
+			Routing: routingdelivery.NewSessionTransferAdapter(routingSvc, bus),
+		},
+	)
 
 	if err := transferSvc.ProcessWaitingQueue(context.Background()); err != nil {
 		t.Fatalf("ProcessWaitingQueue: %v", err)
