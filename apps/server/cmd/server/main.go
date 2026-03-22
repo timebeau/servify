@@ -117,8 +117,8 @@ func main() {
 		appLogger.Fatalf("Failed to start runtime: %v", err)
 	}
 
-	app.RegisterWorker(appworker.NewStatisticsWorker(runtime.StatisticsService, time.Hour))
-	app.RegisterWorker(appworker.NewSLAMonitorWorker(runtime.SLAService, 5*time.Minute))
+	app.RegisterWorker(appworker.NewStatisticsWorker(runtime.StatisticsServiceForWorker(), time.Hour))
+	app.RegisterWorker(appworker.NewSLAMonitorWorker(runtime.SLAServiceForWorker(), 5*time.Minute))
 	if err := app.StartWorkers(); err != nil {
 		appLogger.Fatalf("Failed to start workers: %v", err)
 	}

@@ -60,9 +60,12 @@ type Runtime struct {
 	AppIntegrationService    handlers.AppMarketService
 	CustomFieldService       handlers.CustomFieldService
 	StatisticsHandlerService analyticsdelivery.HandlerService
-	StatisticsService        *services.StatisticsService
-	SLAService               *services.SLAService
+	SLAService               handlers.SLAService
 	ShiftService             handlers.ShiftService
+
+	// Private fields for worker access only
+	statisticsService *services.StatisticsService
+	slaService        *services.SLAService
 	AutomationHandlerService automationdelivery.HandlerService
 	KnowledgeDocHandler      knowledgedelivery.HandlerService
 	SuggestionService        handlers.SuggestionService
@@ -130,6 +133,7 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 
 	slaService := services.NewSLAService(db, logger)
 	rt.SLAService = slaService
+	rt.slaService = slaService
 	automationService := services.NewAutomationService(db, logger)
 	rt.AutomationHandlerService = automationdelivery.NewHandlerService(db)
 	automationService.SetEventBus(bus)
@@ -162,7 +166,7 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	statisticsService := services.NewStatisticsService(db, logger)
 	statisticsService.SetEventBus(bus)
 	rt.StatisticsHandlerService = statisticsService
-	rt.StatisticsService = statisticsService
+	rt.statisticsService = statisticsService
 
 	satisfactionService := services.NewSatisfactionService(db, logger)
 	rt.SatisfactionService = satisfactionService
@@ -195,6 +199,16 @@ func (rt *Runtime) Stop(context.Context) error {
 		return nil
 	}
 	return rt.MessageRouter.Stop()
+}
+
+// StatisticsServiceForWorker returns the concrete statistics service for worker use.
+func (rt *Runtime) StatisticsServiceForWorker() *services.StatisticsService {
+	return rt.statisticsService
+}
+
+// SLAServiceForWorker returns the concrete SLA service for worker use.
+func (rt *Runtime) SLAServiceForWorker() *services.SLAService {
+	return rt.slaService
 }
 
 func (rt *Runtime) RouterDependencies() Dependencies {
