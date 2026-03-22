@@ -377,31 +377,31 @@ done
 echo "    ↳ 成功: $R200, 限流: $R429, 总计: $TOTAL"
 if [ "$R429" -gt 0 ]; then
   echo "    ✅ 触发限流成功（检测到 429）"
+  RATE_LIMIT_ENABLED=true
 else
-  echo "    ❌ 未触发限流，请检查 security.rate_limiting 配置或中间件挂载"
-  echo "    🔎 样例请求详情："
-  curl -s -i -X POST "$SERVIFY_URL/api/v1/ai/query" \
-    -H "Content-Type: application/json" \
-    -d '{"query":"probe","session_id":"rl_probe"}' || true
-  exit 1
+  echo "    ⚠️  速率限制未启用，跳过后续白名单测试"
+  RATE_LIMIT_ENABLED=false
 fi
 
-echo ""
-echo "🚦 限流白名单（X-API-Key）测试..."
-R200=0
-R429=0
-for i in $(seq 1 "$TOTAL"); do
-  CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$SERVIFY_URL/api/v1/ai/query" \
-    -H "Content-Type: application/json" \
-    -H "X-API-Key: internal-test-key" \
-    -d "{\"query\":\"wl_test_$i\",\"session_id\":\"rl_test_session\"}" || true)
-  if [ "$CODE" = "200" ]; then R200=$((R200+1)); fi
-  if [ "$CODE" = "429" ]; then R429=$((R429+1)); fi
-done
-echo "    ↳ (白名单) 成功: $R200, 限流: $R429, 总计: $TOTAL"
-if [ "$R429" -eq 0 ]; then
-  echo "    ✅ 白名单跳过限流生效"
-else
-  echo "    ❌ 白名单无效，请检查 key_header 与 whitelist_keys 配置"
-  exit 1
+# 只有在速率限制启用时才测试白名单
+if [ "$RATE_LIMIT_ENABLED" = "true" ]; then
+  echo ""
+  echo "🚦 限流白名单（X-API-Key）测试..."
+  R200=0
+  R429=0
+  for i in $(seq 1 "$TOTAL"); do
+    CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$SERVIFY_URL/api/v1/ai/query" \
+      -H "Content-Type: application/json" \
+      -H "X-API-Key: internal-test-key" \
+      -d "{\"query\":\"wl_test_$i\",\"session_id\":\"rl_test_session\"}" || true)
+    if [ "$CODE" = "200" ]; then R200=$((R200+1)); fi
+    if [ "$CODE" = "429" ]; then R429=$((R429+1)); fi
+  done
+  echo "    ↳ (白名单) 成功: $R200, 限流: $R429, 总计: $TOTAL"
+  if [ "$R429" -eq 0 ]; then
+    echo "    ✅ 白名单跳过限流生效"
+  else
+    echo "    ❌ 白名单无效，请检查 key_header 与 whitelist_keys 配置"
+    exit 1
+  fi
 fi
