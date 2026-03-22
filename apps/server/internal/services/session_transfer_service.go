@@ -392,6 +392,22 @@ func (s *SessionTransferService) listTransferHistory(ctx context.Context, sessio
 	return records, nil
 }
 
+func (s *SessionTransferService) loadWaitingRecord(ctx context.Context, sessionID string) (*models.WaitingRecord, error) {
+	if s.routing != nil {
+		record, err := s.routing.GetWaitingRecord(ctx, sessionID)
+		if err != nil {
+			return nil, err
+		}
+		return record, nil
+	}
+
+	var record models.WaitingRecord
+	if err := s.db.Where("session_id = ?", sessionID).Order("queued_at DESC").First(&record).Error; err != nil {
+		return nil, err
+	}
+	return &record, nil
+}
+
 func (s *SessionTransferService) syncTransferSession(ctx context.Context, tx *gorm.DB, session *conversationdelivery.TransferSession, targetAgentID uint) error {
 	if s.conversation != nil {
 		return s.conversation.SyncTransferAssignment(ctx, tx, session.ID, session.CustomerID, targetAgentID)
@@ -555,22 +571,14 @@ func (s *SessionTransferService) appendCancellationSystemMessage(ctx context.Con
 }
 
 func (s *SessionTransferService) getActiveWaitingRecord(ctx context.Context, sessionID string) (*models.WaitingRecord, error) {
-	if s.routing != nil {
-		record, err := s.routing.GetWaitingRecord(ctx, sessionID)
-		if err != nil {
-			return nil, err
-		}
-		if record.Status != "waiting" {
-			return nil, gorm.ErrRecordNotFound
-		}
-		return record, nil
-	}
-
-	var existing models.WaitingRecord
-	if err := s.db.Where("session_id = ? AND status = ?", sessionID, "waiting").First(&existing).Error; err != nil {
+	record, err := s.loadWaitingRecord(ctx, sessionID)
+	if err != nil {
 		return nil, err
 	}
-	return &existing, nil
+	if record.Status != "waiting" {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return record, nil
 }
 
 // generateSessionSummary 生成会话摘要

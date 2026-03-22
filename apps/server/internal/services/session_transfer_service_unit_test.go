@@ -164,3 +164,21 @@ func TestSessionTransferService_ListTransferHistory_WrapsRoutingError(t *testing
 		t.Fatalf("expected wrapped message, got %v", err)
 	}
 }
+
+func TestSessionTransferService_GetActiveWaitingRecord_NonWaitingIsNotFound(t *testing.T) {
+	svc := NewSessionTransferServiceWithAdapters(nil, nil, stubAIForTransferUnit{}, nil, nil, SessionTransferAdapters{
+		Routing: stubRoutingRuntime{
+			getWaitingRecord: func(ctx context.Context, sessionID string) (*models.WaitingRecord, error) {
+				if sessionID != "s-waiting" {
+					t.Fatalf("unexpected session id: %s", sessionID)
+				}
+				return &models.WaitingRecord{SessionID: sessionID, Status: "cancelled"}, nil
+			},
+		},
+	})
+
+	_, err := svc.getActiveWaitingRecord(context.Background(), "s-waiting")
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("expected ErrRecordNotFound, got %v", err)
+	}
+}
