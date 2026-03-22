@@ -1,8 +1,6 @@
 # WeKnora 集成开发环境
 # 使用方法: docker-compose -f docker-compose.yml -f docker-compose.weknora.yml up -d
 
-version: '3.8'
-
 services:
   # WeKnora 主服务
   weknora:
