@@ -326,9 +326,9 @@ func GetDefaultConfig() *Config {
 				AllowedHeaders: []string{"*"},
 			},
 			RateLimiting: RateLimitingConfig{
-				Enabled:           true,
-				RequestsPerMinute: 60,
-				Burst:             10,
+				Enabled:           false,
+				RequestsPerMinute: 300,
+				Burst:             50,
 			},
 		},
 		Portal: PortalConfig{
