@@ -62,14 +62,14 @@ type Runtime struct {
 	StatisticsHandlerService analyticsdelivery.HandlerService
 	SLAService               handlers.SLAService
 	ShiftService             handlers.ShiftService
-
-	// Private fields for worker access only
-	statisticsService *services.StatisticsService
-	slaService        *services.SLAService
 	AutomationHandlerService automationdelivery.HandlerService
 	KnowledgeDocHandler      knowledgedelivery.HandlerService
 	SuggestionService        handlers.SuggestionService
 	GamificationService      handlers.GamificationService
+
+	// Private fields for worker access only
+	statisticsService *services.StatisticsService
+	slaService        *services.SLAService
 }
 
 type websocketRunner interface {

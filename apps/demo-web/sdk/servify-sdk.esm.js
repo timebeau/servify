@@ -166,6 +166,9 @@ var eventemitter3 = { exports: {} };
 })(eventemitter3);
 var eventemitter3Exports = eventemitter3.exports;
 const EventEmitter = /* @__PURE__ */ getDefaultExportFromCjs(eventemitter3Exports);
+function isStructuredApiResponse(value) {
+  return typeof value === "object" && value !== null && "success" in value;
+}
 class ApiClient {
   constructor(options) {
     __publicField2(this, "options");
@@ -194,17 +197,18 @@ class ApiClient {
       });
       clearTimeout(timeoutId);
       const result = await response.json();
+      const structuredResult = isStructuredApiResponse(result) ? result : void 0;
       this.log(`响应:`, result);
       if (!response.ok) {
         return {
           success: false,
-          error: result.error || `HTTP ${response.status}: ${response.statusText}`
+          error: (structuredResult == null ? void 0 : structuredResult.error) || `HTTP ${response.status}: ${response.statusText}`
         };
       }
       return {
         success: true,
-        data: result.data || result,
-        message: result.message
+        data: (structuredResult == null ? void 0 : structuredResult.data) ?? result,
+        message: structuredResult == null ? void 0 : structuredResult.message
       };
     } catch (error) {
       this.log(`请求失败:`, error);
@@ -308,10 +312,14 @@ class ApiClient {
         }
       });
       const result = await response.json();
+      const structuredResult = isStructuredApiResponse(result) ? result : void 0;
       if (!response.ok) {
-        return { success: false, error: result.error || "Upload failed" };
+        return { success: false, error: (structuredResult == null ? void 0 : structuredResult.error) || "Upload failed" };
       }
-      return { success: true, data: result.data || result };
+      return {
+        success: true,
+        data: (structuredResult == null ? void 0 : structuredResult.data) ?? result
+      };
     } catch (error) {
       return {
         success: false,
@@ -339,7 +347,7 @@ class ApiClient {
   }
   log(...args) {
     if (this.options.debug) {
-      console.log("[ServifyAPI]", ...args);
+      console.warn("[ServifyAPI]", ...args);
     }
   }
 }
@@ -357,6 +365,31 @@ class ServifyError extends Error {
     this.retryable = options.retryable ?? false;
   }
 }
+const DEFAULT_RECONNECT_POLICY = {
+  maxAttempts: 5,
+  baseDelayMs: 1e3,
+  backoffFactor: 2,
+  maxDelayMs: 3e4
+};
+function normalizeReconnectPolicy(policy, legacy) {
+  return {
+    maxAttempts: (policy == null ? void 0 : policy.maxAttempts) ?? (legacy == null ? void 0 : legacy.reconnectAttempts) ?? DEFAULT_RECONNECT_POLICY.maxAttempts,
+    baseDelayMs: (policy == null ? void 0 : policy.baseDelayMs) ?? (legacy == null ? void 0 : legacy.reconnectDelay) ?? DEFAULT_RECONNECT_POLICY.baseDelayMs,
+    backoffFactor: (policy == null ? void 0 : policy.backoffFactor) ?? DEFAULT_RECONNECT_POLICY.backoffFactor,
+    maxDelayMs: (policy == null ? void 0 : policy.maxDelayMs) ?? DEFAULT_RECONNECT_POLICY.maxDelayMs
+  };
+}
+function computeReconnectDelay(policy, attempt) {
+  const exponent = Math.max(attempt - 1, 0);
+  const delay = policy.baseDelayMs * Math.pow(policy.backoffFactor ?? 2, exponent);
+  return Math.min(delay, policy.maxDelayMs ?? delay);
+}
+function shouldReconnect(decision, policy) {
+  if (decision.isManualClose) {
+    return false;
+  }
+  return decision.attempt < policy.maxAttempts;
+}
 class WebSocketManager extends EventEmitter {
   constructor(options) {
     super();
@@ -369,24 +402,24 @@ class WebSocketManager extends EventEmitter {
     __publicField2(this, "subscribers", /* @__PURE__ */ new Set());
     __publicField2(this, "kind", "websocket");
     __publicField2(this, "state", "idle");
+    const reconnectPolicy = normalizeReconnectPolicy(options.reconnectPolicy, {
+      reconnectAttempts: options.reconnectAttempts,
+      reconnectDelay: options.reconnectDelay
+    });
     this.options = {
       protocols: [],
       reconnectAttempts: 5,
       reconnectDelay: 1e3,
       heartbeatInterval: 3e4,
       debug: false,
-      reconnectPolicy: {
-        maxAttempts: options.reconnectAttempts ?? 5,
-        baseDelayMs: options.reconnectDelay ?? 1e3,
-        backoffFactor: 2,
-        maxDelayMs: 3e4
-      },
+      reconnectPolicy,
       authProvider: options.authProvider,
       onTokenRefreshRequired: options.onTokenRefreshRequired ?? (async () => void 0),
       ...options
     };
   }
-  connect(_options) {
+  async connect(_options) {
+    const connectionUrl = await this.resolveConnectionUrl();
     return new Promise((resolve, reject) => {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         this.state = "connected";
@@ -395,9 +428,9 @@ class WebSocketManager extends EventEmitter {
       }
       this.isManualClose = false;
       this.state = "connecting";
-      this.log("正在连接 WebSocket...", this.options.url);
+      this.log("正在连接 WebSocket...", connectionUrl);
       try {
-        this.ws = new WebSocket(this.options.url, this.options.protocols);
+        this.ws = new WebSocket(connectionUrl, this.options.protocols);
       } catch (error) {
         this.state = "error";
         reject(error);
@@ -425,7 +458,13 @@ class WebSocketManager extends EventEmitter {
         this.stopHeartbeat();
         this.state = this.isManualClose ? "closed" : "idle";
         this.emit("disconnected", event.reason || "连接关闭");
-        if (!this.isManualClose && this.reconnectAttempts < this.options.reconnectPolicy.maxAttempts) {
+        if (shouldReconnect(
+          {
+            attempt: this.reconnectAttempts,
+            isManualClose: this.isManualClose
+          },
+          this.options.reconnectPolicy
+        )) {
           this.state = "reconnecting";
           this.scheduleReconnect();
         }
@@ -491,7 +530,6 @@ class WebSocketManager extends EventEmitter {
     };
   }
   handleMessage(message) {
-    var _a;
     this.log("收到消息:", message);
     for (const subscriber of this.subscribers) {
       subscriber(message);
@@ -504,17 +542,20 @@ class WebSocketManager extends EventEmitter {
         this.emit("session_updated", message.data);
         break;
       case "agent_status":
-        if (message.data.type === "assigned") {
-          this.emit("agent_assigned", message.data.agent);
-        } else if (message.data.type === "typing") {
-          this.emit("agent_typing", message.data.typing);
+        if (typeof message.data === "object" && message.data !== null) {
+          const agentStatus = message.data;
+          if (agentStatus.type === "assigned" && agentStatus.agent) {
+            this.emit("agent_assigned", agentStatus.agent);
+          } else if (agentStatus.type === "typing" && typeof agentStatus.typing === "boolean") {
+            this.emit("agent_typing", agentStatus.typing);
+          }
         }
         break;
       case "error":
-        this.emit("error", new Error(message.data.message || "Unknown error"));
+        this.emit("error", new Error(this.extractMessageText(message.data) || "Unknown error"));
         break;
       case "system":
-        if (((_a = message.data) == null ? void 0 : _a.type) === "pong") {
+        if (typeof message.data === "object" && message.data !== null && "type" in message.data && message.data.type === "pong") {
           this.log("收到心跳响应");
         }
         break;
@@ -525,12 +566,7 @@ class WebSocketManager extends EventEmitter {
   scheduleReconnect() {
     this.reconnectAttempts++;
     this.emit("reconnecting", this.reconnectAttempts);
-    const factor = this.options.reconnectPolicy.backoffFactor ?? 2;
-    const maxDelay = this.options.reconnectPolicy.maxDelayMs ?? 3e4;
-    const delay = Math.min(
-      this.options.reconnectPolicy.baseDelayMs * Math.pow(factor, this.reconnectAttempts - 1),
-      maxDelay
-    );
+    const delay = computeReconnectDelay(this.options.reconnectPolicy, this.reconnectAttempts);
     this.log(`${delay}ms 后重连 (第 ${this.reconnectAttempts}/${this.options.reconnectPolicy.maxAttempts} 次)`);
     this.reconnectTimer = setTimeout(() => {
       this.connect().catch(() => {
@@ -556,9 +592,63 @@ class WebSocketManager extends EventEmitter {
   }
   log(...args) {
     if (this.options.debug) {
-      console.log("[ServifyWS]", ...args);
+      console.warn("[ServifyWS]", ...args);
     }
   }
+  async resolveConnectionUrl() {
+    const token = await this.resolveAuthToken(this.options.authProvider);
+    if (!token) {
+      return this.options.url;
+    }
+    const url = new URL(this.options.url);
+    url.searchParams.set("access_token", token);
+    return url.toString();
+  }
+  async resolveAuthToken(authProvider) {
+    if (!authProvider) {
+      return null;
+    }
+    const currentToken = await authProvider.getToken();
+    if (currentToken == null ? void 0 : currentToken.accessToken) {
+      return currentToken.accessToken;
+    }
+    if (!authProvider.refreshToken) {
+      return null;
+    }
+    await this.options.onTokenRefreshRequired();
+    const refreshedToken = await authProvider.refreshToken();
+    if (refreshedToken == null ? void 0 : refreshedToken.accessToken) {
+      return refreshedToken.accessToken;
+    }
+    throw new ServifyError("Authentication refresh required", {
+      code: "auth_refresh_required",
+      retryable: false,
+      details: { url: this.options.url }
+    });
+  }
+  extractMessageText(data) {
+    if (typeof data === "object" && data !== null && "message" in data && typeof data.message === "string") {
+      return data.message;
+    }
+    return null;
+  }
+}
+function negotiateCapabilities(available, requested) {
+  const granted = [];
+  const rejected = [];
+  for (const request of requested) {
+    const descriptor = available.find((entry) => entry.name === request.name);
+    if (!descriptor) {
+      rejected.push({ request, reason: "unsupported" });
+      continue;
+    }
+    if (!descriptor.enabled) {
+      rejected.push({ request, reason: "disabled", descriptor });
+      continue;
+    }
+    granted.push({ ...descriptor });
+  }
+  return { granted, rejected };
 }
 class StaticCapabilitySet {
   constructor(entries) {
@@ -573,6 +663,9 @@ class StaticCapabilitySet {
   }
   get(name) {
     return this.entries.find((entry) => entry.name === name);
+  }
+  negotiate(requested) {
+    return negotiateCapabilities(this.entries, requested);
   }
 }
 function createWebCapabilitySet() {
@@ -659,6 +752,9 @@ class ServifySDK extends EventEmitter {
       url: `${wsUrl}?customer_id=${this.currentCustomer.id}`,
       reconnectAttempts: this.config.reconnectAttempts,
       reconnectDelay: this.config.reconnectDelay,
+      reconnectPolicy: this.config.reconnectPolicy,
+      authProvider: this.config.authProvider,
+      onTokenRefreshRequired: this.config.onTokenRefreshRequired,
       debug: this.config.debug
     });
     this.ws.on("connected", () => this.emit("connected"));
@@ -877,7 +973,7 @@ class ServifySDK extends EventEmitter {
   // 私有方法：日志输出
   log(...args) {
     if (this.config.debug) {
-      console.log("[ServifySDK]", ...args);
+      console.warn("[ServifySDK]", ...args);
     }
   }
 }
@@ -899,6 +995,18 @@ class VanillaServifySDK {
     this.sdk.on("agent_typing", (isTyping) => this.triggerCallback("agentTyping", isTyping));
     this.sdk.on("error", (error) => this.triggerCallback("error", error));
     this.sdk.on("ticket_created", (ticket) => this.triggerCallback("ticketCreated", ticket));
+  }
+  normalizePriority(priority) {
+    if (priority === "low" || priority === "normal" || priority === "high" || priority === "urgent") {
+      return priority;
+    }
+    return void 0;
+  }
+  normalizeMessageType(type) {
+    if (type === "image" || type === "file") {
+      return type;
+    }
+    return "text";
   }
   /**
    * 初始化 SDK
@@ -923,7 +1031,7 @@ class VanillaServifySDK {
    */
   async startChat(options) {
     return this.sdk.startChat({
-      priority: options == null ? void 0 : options.priority,
+      priority: this.normalizePriority(options == null ? void 0 : options.priority),
       message: options == null ? void 0 : options.message
     });
   }
@@ -931,7 +1039,7 @@ class VanillaServifySDK {
    * 发送消息
    */
   async sendMessage(content, type = "text") {
-    return this.sdk.sendMessage(content, { type });
+    return this.sdk.sendMessage(content, { type: this.normalizeMessageType(type) });
   }
   /**
    * 结束会话
@@ -962,7 +1070,7 @@ class VanillaServifySDK {
   async createTicket(data) {
     return this.sdk.createTicket({
       ...data,
-      priority: data.priority
+      priority: this.normalizePriority(data.priority)
     });
   }
   /**
@@ -1039,7 +1147,7 @@ class VanillaServifySDK {
         try {
           callback(...args);
         } catch (error) {
-          console.error(`Error in ${event} callback:`, error);
+          console.warn(`Error in ${event} callback:`, error);
         }
       });
     }
