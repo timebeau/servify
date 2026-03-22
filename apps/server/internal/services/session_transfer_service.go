@@ -332,7 +332,11 @@ func (s *SessionTransferService) addToWaitingQueue(ctx context.Context, session 
 	}
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
 		// 会话保持 active，等待队列由 WaitingRecord 表达
-		if err := tx.Model(&models.Session{}).
+		if s.conversation != nil {
+			if err := s.conversation.SyncWaitingAssignment(ctx, tx, session.ID, session.CustomerID); err != nil {
+				return fmt.Errorf("failed to ensure session active: %w", err)
+			}
+		} else if err := tx.Model(&models.Session{}).
 			Where("id = ?", session.ID).
 			Updates(map[string]interface{}{
 				"status":   "active",

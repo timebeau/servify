@@ -73,6 +73,33 @@ func (a *RuntimeAdapter) SyncTransferAssignment(ctx context.Context, tx *gorm.DB
 	return conversationinfra.NewGormRepository(tx).UpdateConversation(ctx, item)
 }
 
+func (a *RuntimeAdapter) SyncWaitingAssignment(ctx context.Context, tx *gorm.DB, sessionID string, customerID uint) error {
+	now := a.now()
+	item := &conversationdomain.Conversation{
+		ID:         sessionID,
+		CustomerID: uintPtr(customerID),
+		Status:     conversationdomain.ConversationStatusActive,
+		Channel: conversationdomain.ChannelBinding{
+			Channel:   "web",
+			SessionID: sessionID,
+		},
+		Participants: []conversationdomain.Participant{
+			{
+				ID:     buildParticipantID("customer", customerID),
+				UserID: uintPtr(customerID),
+				Role:   conversationdomain.ParticipantRoleCustomer,
+			},
+			{
+				ID:   buildParticipantID("agent", 0),
+				Role: conversationdomain.ParticipantRoleAgent,
+			},
+		},
+		StartedAt:     now,
+		LastMessageAt: &now,
+	}
+	return conversationinfra.NewGormRepository(tx).UpdateConversation(ctx, item)
+}
+
 func (a *RuntimeAdapter) AppendSystemMessage(ctx context.Context, tx *gorm.DB, sessionID string, content string, createdAt time.Time) error {
 	repo := conversationinfra.NewGormRepository(tx)
 	conversation, err := repo.GetConversation(ctx, sessionID)

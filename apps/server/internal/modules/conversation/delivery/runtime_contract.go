@@ -21,5 +21,6 @@ type TransferSession struct {
 type RuntimeService interface {
 	LoadTransferSession(ctx context.Context, sessionID string) (*TransferSession, error)
 	SyncTransferAssignment(ctx context.Context, tx *gorm.DB, sessionID string, customerID uint, agentID uint) error
+	SyncWaitingAssignment(ctx context.Context, tx *gorm.DB, sessionID string, customerID uint) error
 	AppendSystemMessage(ctx context.Context, tx *gorm.DB, sessionID string, content string, createdAt time.Time) error
 }
