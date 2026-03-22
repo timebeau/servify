@@ -3,16 +3,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Servify - 智能客服与远程协助</title>
-  <meta name="description" content="Servify：智能客服系统，支持 AI 问答、多渠道接入与 WebRTC 远程协助。" />
-  <meta property="og:title" content="Servify - 智能客服与远程协助" />
-  <meta property="og:description" content="集成 AI 智能问答、多渠道接入与 WebRTC 远程协助，打造极致客户体验。" />
+  <title>Servify - 智能客服与工单系统</title>
+  <meta name="description" content="Servify：模块化客服与工单系统，支持 AI 问答、多渠道接入与实时会话。" />
+  <meta property="og:title" content="Servify - 智能客服与工单系统" />
+  <meta property="og:description" content="集成 AI 智能问答、多渠道接入与实时会话，打造极致客户体验。" />
   <meta property="og:type" content="website" />
   <meta property="og:image" content="./assets/img/hero-ill.svg" />
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="icon" href="./assets/img/logo.svg" type="image/svg+xml" />
   <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml" />
   <link rel="stylesheet" href="./assets/css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
   <header class="site-header">
@@ -22,104 +24,482 @@
         <span class="brand-text">Servify</span>
       </div>
       <nav class="nav">
-        <a href="#features">功能</a>
-        <a href="#ai">AI 能力</a>
-        <a href="#rtc">远程协助</a>
-        <a href="#contact">联系</a>
+        <a href="#features">核心功能</a>
+        <a href="#architecture">系统架构</a>
+        <a href="#modules">业务模块</a>
+        <a href="#docs">文档</a>
+        <a href="https://github.com/Toconvo/servify" target="_blank" rel="noopener">GitHub</a>
       </nav>
     </div>
   </header>
 
   <main>
+    <!-- Hero Section -->
     <section class="hero">
       <div class="container hero-wrap">
         <div class="hero-copy">
-          <h1>更快，更聪明的客服系统</h1>
-          <p>集成 AI 智能问答、多渠道接入与 WebRTC 远程协助，打造极致客户体验。</p>
+          <div class="hero-badge">v0.1 模块化架构</div>
+          <h1>面向未来的<br><span>智能客服系统</span></h1>
+          <p class="subtitle">模块化单体架构，支持 AI 问答、多渠道接入、实时会话与语音能力。灵活演进，易于扩展。</p>
           <div class="cta">
-            <a class="btn primary" href="/sdk-demo.html">在线体验</a>
-            <a class="btn" href="https://github.com/Toconvo/servify" target="_blank" rel="noopener">GitHub</a>
+            <a class="btn primary" href="https://docs.servify.cloud" target="_blank" rel="noopener">查看文档</a>
+            <a class="btn secondary" href="/sdk-demo.html">在线体验</a>
           </div>
           <div class="meta">
-            <span>开源 · 易集成 · 可观测</span>
+            <span class="meta-item">开源免费</span>
+            <span class="meta-item">模块化设计</span>
+            <span class="meta-item">云原生架构</span>
           </div>
         </div>
         <div class="hero-ill">
-          <img src="./assets/img/hero-ill.svg" alt="Illustration" />
+          <img src="./assets/img/hero-ill.svg" alt="Servify Illustration" />
         </div>
       </div>
     </section>
 
+    <!-- Stats Section -->
+    <section class="stats">
+      <div class="container stats-wrap">
+        <div class="stat-item">
+          <div class="stat-value">5+</div>
+          <div class="stat-label">核心业务模块</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">AI</div>
+          <div class="stat-label">智能问答引擎</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">RTC</div>
+          <div class="stat-label">实时通信</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">OTel</div>
+          <div class="stat-label">可观测性</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Section -->
     <section id="features" class="section">
       <div class="container">
-        <h2>核心功能</h2>
+        <div class="section-header">
+          <span class="section-tag">核心能力</span>
+          <h2>为什么选择 Servify</h2>
+          <p>模块化架构设计，每个业务能力独立演进，支持从单体到微服务的平滑过渡</p>
+        </div>
         <div class="grid features">
           <div class="card">
-            <h3>多渠道接入</h3>
-            <p>统一接入 Web/微信/Telegram 等渠道，消息路由与工单联动。</p>
+            <div class="card-icon"><i data-lucide="clipboard-list"></i></div>
+            <h3>工单系统</h3>
+            <p>完整的工单生命周期管理，支持自定义字段、状态流转、SLA 策略与事务边界。</p>
           </div>
           <div class="card">
-            <h3>AI 智能问答</h3>
-            <p>基于知识库的回答引擎，支持企业知识库（WeKnora）与降级策略。</p>
+            <div class="card-icon"><i data-lucide="message-circle"></i></div>
+            <h3>实时会话</h3>
+            <p>WebSocket 长连接支持，消息持久化，最近会话历史快速读取。</p>
           </div>
           <div class="card">
-            <h3>WebRTC 远程协助</h3>
-            <p>屏幕共享与实时控制，技术支持场景响应更高效。</p>
+            <div class="card-icon"><i data-lucide="git-branch"></i></div>
+            <h3>智能路由</h3>
+            <p>人工接管、排队管理、技能组匹配、会话转接，灵活的分配策略。</p>
           </div>
           <div class="card">
+            <div class="card-icon"><i data-lucide="cpu"></i></div>
+            <h3>AI 集成</h3>
+            <p>统一 LLM Provider 抽象，支持多模型切换，知识库检索与降级保护。</p>
+          </div>
+          <div class="card">
+            <div class="card-icon"><i data-lucide="database"></i></div>
+            <h3>知识库管理</h3>
+            <p>企业知识库集成，支持文档管理、索引任务与多 Provider 适配。</p>
+          </div>
+          <div class="card">
+            <div class="card-icon"><i data-lucide="activity"></i></div>
             <h3>可观测性</h3>
-            <p>Prometheus 指标与 OTel 追踪，支持自建观测栈。</p>
+            <p>OpenTelemetry 追踪，Prometheus 指标，结构化日志，完整的运营诊断能力。</p>
           </div>
         </div>
       </div>
     </section>
 
-    <section id="ai" class="section alt">
-      <div class="container two-col">
-        <div>
-          <h2>更聪明的 AI 能力</h2>
-          <ul class="list">
-            <li>企业知识库（WeKnora）集成，混合检索</li>
-            <li>降级与熔断保护，稳定性优先</li>
-            <li>SDK 事件上报，端到端监控</li>
-          </ul>
+    <!-- Architecture Section -->
+    <section id="architecture" class="section architecture">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag">系统架构</span>
+          <h2>模块化单体架构</h2>
+          <p>清晰的业务边界，平台能力独立抽象，支持渐进式演进</p>
         </div>
-        <div class="img-col">
-          <img src="./assets/img/ai-ill.svg" alt="AI" />
+        <div class="arch-diagram">
+          <div class="mermaid">
+flowchart TB
+    subgraph SDK["SDK & Channels"]
+        WEB["Web SDK<br/>Vanilla/React/Vue"]
+        API["Future API/App SDK"]
+        CH["Channel Adapters<br/>微信/Telegram"]
+    end
+
+    subgraph DL["Delivery Layer"]
+        GIN["Gin Router<br/>HTTP/WebSocket"]
+    end
+
+    subgraph BM["Business Modules"]
+        TICKET["ticket<br/>工单系统"]
+        CONV["conversation<br/>实时会话"]
+        ROUTE["routing<br/>智能路由"]
+        AGENT["agent<br/>客服管理"]
+        CUST["customer<br/>客户管理"]
+        AI["ai<br/>AI编排"]
+        KNOW["knowledge<br/>知识库"]
+        VOICE["voice<br/>语音能力"]
+        AUTO["automation<br/>自动化"]
+    end
+
+    subgraph PL["Platform Layer"]
+        BUS["Event Bus"]
+        AUTH["Auth"]
+        CFG["Config"]
+        TRC["Tracing"]
+    end
+
+    subgraph PV["Providers"]
+        LLM["LLM Provider<br/>OpenAI/Claude"]
+        KP["Knowledge Provider<br/>WeKnora/向量库"]
+        SIP["SIP/WebRTC<br/>Adapter"]
+    end
+
+    WEB --> GIN
+    API --> GIN
+    CH --> GIN
+
+    GIN --> TICKET
+    GIN --> CONV
+    GIN --> ROUTE
+    GIN --> AGENT
+    GIN --> CUST
+
+    CONV --> AI
+    AI --> LLM
+    AI --> KP
+    ROUTE --> AGENT
+
+    TICKET --> BUS
+    CONV --> BUS
+    ROUTE --> BUS
+    BUS --> AUTO
+
+    classDef sdkStyle fill:#4f46e5,stroke:#4338ca,color:#fff
+    classDef dlStyle fill:#6366f1,stroke:#4f46e5,color:#fff
+    classDef bmStyle fill:#0ea5e9,stroke:#0284c7,color:#fff
+    classDef plStyle fill:#f59e0b,stroke:#d97706,color:#fff
+    classDef pvStyle fill:#64748b,stroke:#475569,color:#fff
+
+    class WEB,API,CH sdkStyle
+    class GIN dlStyle
+    class TICKET,CONV,ROUTE,AGENT,CUST,AI,KNOW,VOICE,AUTO bmStyle
+    class BUS,AUTH,CFG,TRC plStyle
+    class LLM,KP,SIP pvStyle
+          </div>
         </div>
       </div>
     </section>
 
-    <section id="rtc" class="section">
-      <div class="container two-col">
-        <div class="img-col">
-          <img src="./assets/img/rtc-ill.svg" alt="RTC" />
+    <!-- Modules Section -->
+    <section id="modules" class="section alt">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag">业务模块</span>
+          <h2>模块化演进路线</h2>
+          <p>清晰的模块边界，渐进式迁移，支持从单体到微服务的平滑演进</p>
         </div>
+
+        <!-- Phase 1: Completed -->
+        <div class="phase-block">
+          <div class="phase-header">
+            <div class="phase-indicator done"></div>
+            <h3>第一阶段 - 核心业务模块</h3>
+            <span class="phase-status done">已完成</span>
+          </div>
+          <div class="modules-expanded">
+            <div class="module-card done">
+              <div class="module-header">
+                <i data-lucide="clipboard-list"></i>
+                <div>
+                  <h4>ticket</h4>
+                  <span class="module-badge completed">v0.1</span>
+                </div>
+              </div>
+              <p>工单生命周期管理、状态流转、SLA 策略、事务边界</p>
+            </div>
+            <div class="module-card done">
+              <div class="module-header">
+                <i data-lucide="message-circle"></i>
+                <div>
+                  <h4>conversation</h4>
+                  <span class="module-badge completed">v0.1</span>
+                </div>
+              </div>
+              <p>WebSocket 长连接、消息持久化、会话历史</p>
+            </div>
+            <div class="module-card done">
+              <div class="module-header">
+                <i data-lucide="git-branch"></i>
+                <div>
+                  <h4>routing</h4>
+                  <span class="module-badge completed">v0.1</span>
+                </div>
+              </div>
+              <p>人工接管、排队管理、技能组匹配、会话转接</p>
+            </div>
+            <div class="module-card done">
+              <div class="module-header">
+                <i data-lucide="cpu"></i>
+                <div>
+                  <h4>ai</h4>
+                  <span class="module-badge completed">v0.1</span>
+                </div>
+              </div>
+              <p>Query Orchestrator、LLM Provider、Prompt Builder</p>
+            </div>
+            <div class="module-card done">
+              <div class="module-header">
+                <i data-lucide="database"></i>
+                <div>
+                  <h4>knowledge</h4>
+                  <span class="module-badge completed">v0.1</span>
+                </div>
+              </div>
+              <p>文档管理、索引任务、Knowledge Provider 抽象</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase 2: In Progress -->
+        <div class="phase-block">
+          <div class="phase-header">
+            <div class="phase-indicator wip"></div>
+            <h3>第二阶段 - 扩展业务模块</h3>
+            <span class="phase-status wip">进行中</span>
+          </div>
+          <div class="modules-expanded">
+            <div class="module-card wip">
+              <div class="module-header">
+                <i data-lucide="users"></i>
+                <div>
+                  <h4>agent</h4>
+                  <span class="module-badge progress">开发中</span>
+                </div>
+              </div>
+              <p>客服档案、在线状态、并发负载管理</p>
+            </div>
+            <div class="module-card">
+              <div class="module-header">
+                <i data-lucide="user-circle"></i>
+                <div>
+                  <h4>customer</h4>
+                  <span class="module-badge pending">待开始</span>
+                </div>
+              </div>
+              <p>客户档案、标签、备注、活动轨迹</p>
+            </div>
+            <div class="module-card">
+              <div class="module-header">
+                <i data-lucide="workflow"></i>
+                <div>
+                  <h4>automation</h4>
+                  <span class="module-badge pending">待开始</span>
+                </div>
+              </div>
+              <p>基于事件总线的自动化执行引擎</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase 3: Planned -->
+        <div class="phase-block">
+          <div class="phase-header">
+            <div class="phase-indicator pending"></div>
+            <h3>第三阶段 - 增强能力</h3>
+            <span class="phase-status pending">规划中</span>
+          </div>
+          <div class="modules-expanded">
+            <div class="module-card">
+              <div class="module-header">
+                <i data-lucide="bar-chart-3"></i>
+                <div>
+                  <h4>analytics</h4>
+                  <span class="module-badge pending">待开始</span>
+                </div>
+              </div>
+              <p>统计读模型、增量聚合、数据看板</p>
+            </div>
+            <div class="module-card">
+              <div class="module-header">
+                <i data-lucide="phone"></i>
+                <div>
+                  <h4>voice</h4>
+                  <span class="module-badge pending">待开始</span>
+                </div>
+              </div>
+              <p>呼叫会话、媒体会话、录音转写、SIP 适配</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AI Section -->
+    <section id="ai" class="section">
+      <div class="container two-col">
         <div>
-          <h2>原生 WebRTC 远程协助</h2>
+          <span class="section-tag">AI 能力</span>
+          <h2>智能问答引擎</h2>
+          <p class="subtitle">统一 LLM Provider 抽象，支持多模型切换与知识库检索</p>
           <ul class="list">
-            <li>低门槛：浏览器原生，无需插件</li>
-            <li>高效率：P2P 传输，低延迟</li>
-            <li>安全：细粒度权限控制</li>
+            <li>Query Orchestrator 统一编排层</li>
+            <li>Prompt Builder 与 Guardrails</li>
+            <li>Knowledge Provider 检索集成</li>
+            <li>降级与熔断保护机制</li>
           </ul>
         </div>
+        <div class="img-col">
+          <img src="./assets/img/ai-ill.svg" alt="AI Architecture" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Realtime Section -->
+    <section id="rtc" class="section alt">
+      <div class="container two-col reverse">
+        <div>
+          <span class="section-tag">实时通信</span>
+          <h2>WebSocket & WebRTC</h2>
+          <p class="subtitle">浏览器原生支持，低延迟 P2P 传输</p>
+          <ul class="list">
+            <li>WebSocket 长连接，消息实时推送</li>
+            <li>WebRTC 屏幕共享与远程协助</li>
+            <li>端到端监控与事件上报</li>
+            <li>SIP 协议适配器（语音能力）</li>
+          </ul>
+        </div>
+        <div class="img-col">
+          <img src="./assets/img/rtc-ill.svg" alt="Realtime Communication" />
+        </div>
+      </div>
+    </section>
+
+    <!-- SDK Section -->
+    <section id="docs" class="section">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag">开发者友好</span>
+          <h2>多端 SDK 支持</h2>
+          <p>统一的核心合约，跨端 Transport 实现</p>
+        </div>
+        <div class="grid features">
+          <div class="card">
+            <div class="card-icon"><i data-lucide="globe"></i></div>
+            <h3>Web SDK</h3>
+            <p>Vanilla JS、React、Vue 三种绑定，开箱即用。</p>
+          </div>
+          <div class="card">
+            <div class="card-icon"><i data-lucide="radio"></i></div>
+            <h3>Transport</h3>
+            <p>WebSocket、HTTP 双 Transport，自动重连与降级。</p>
+          </div>
+          <div class="card">
+            <div class="card-icon"><i data-lucide="box"></i></div>
+            <h3>Core Contract</h3>
+            <p>跨端统一接口，消息类型、事件模型一致。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+      <div class="container">
+        <h2>开始使用 Servify</h2>
+        <p>开源免费，快速部署，灵活扩展</p>
+        <a class="btn" href="https://github.com/Toconvo/servify" target="_blank" rel="noopener">
+          GitHub 仓库 →
+        </a>
       </div>
     </section>
   </main>
 
-  <footer class="site-footer" id="contact">
-    <div class="container footer-wrap">
-      <div>© <span id="y"></span> Servify. All rights reserved.</div>
-      <div class="links">
-        <a href="https://github.com/Toconvo/servify" target="_blank" rel="noopener">GitHub</a>
-        <a href="/ws-demo.html">WS Demo</a>
-        <a href="/sdk-demo.html">SDK Demo</a>
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-wrap">
+        <div class="footer-links">
+          <a href="https://github.com/Toconvo/servify" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://docs.servify.cloud" target="_blank" rel="noopener">文档</a>
+          <a href="/sdk-demo.html">SDK Demo</a>
+          <a href="/ws-demo.html">WS Demo</a>
+        </div>
+        <div style="color: var(--gray-light);">
+          © <span id="y"></span> Servify
+        </div>
+      </div>
+      <div class="footer-bottom">
+        模块化客服与工单系统 · 开源 · 易集成 · 可观测
       </div>
     </div>
   </footer>
-  <script src="./assets/js/main.js"></script>
+
+  <script>
+    // Set current year
+    document.getElementById('y').textContent = new Date().getFullYear();
+
+    // Initialize Lucide icons
+    lucide.createIcons();
+
+    // Initialize Mermaid
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        darkMode: true,
+        background: '#1e293b',
+        primaryColor: '#4f46e5',
+        primaryTextColor: '#fff',
+        primaryBorderColor: '#4338ca',
+        lineColor: '#ffffff',
+        secondaryColor: '#8b5cf6',
+        tertiaryColor: '#10b981',
+        fontSize: '14px'
+      },
+      flowchart: {
+        useMaxWidth: true,
+        htmlLabels: true,
+        curve: 'basis'
+      }
+    });
+
+    // Header scroll effect
+    const header = document.querySelector('.site-header');
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 50) {
+        header.classList.add('scrolled');
+      } else {
+        header.classList.remove('scrolled');
+      }
+    });
+
+    // Intersection Observer for fade-in animations
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1 });
+
+    // Observe all cards and sections
+    document.querySelectorAll('.card, .module-card, .stat-item').forEach(el => {
+      el.classList.add('fade-in');
+      observer.observe(el);
+    });
+  </script>
 </body>
-<script>
-  document.getElementById('y').textContent = new Date().getFullYear();
-</script>
 </html>
