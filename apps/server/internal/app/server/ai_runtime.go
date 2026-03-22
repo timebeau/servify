@@ -7,6 +7,7 @@ import (
 
 	"servify/apps/server/internal/config"
 	aidelivery "servify/apps/server/internal/modules/ai/delivery"
+	"servify/apps/server/internal/platform/knowledgeprovider"
 	weknorakp "servify/apps/server/internal/platform/knowledgeprovider/weknora"
 	"servify/apps/server/internal/platform/llm/openai"
 	"servify/apps/server/internal/services"
@@ -26,6 +27,13 @@ type AIAssembly struct {
 	RuntimeService services.AIServiceInterface
 	WeKnoraClient  weknora.WeKnoraInterface
 	WeKnoraHealthy bool
+}
+
+func (a *AIAssembly) KnowledgeProvider(cfg *config.Config) knowledgeprovider.KnowledgeProvider {
+	if a == nil || cfg == nil || !a.WeKnoraHealthy || a.WeKnoraClient == nil {
+		return nil
+	}
+	return weknorakp.NewProvider(a.WeKnoraClient, cfg.WeKnora.KnowledgeBaseID)
 }
 
 func BuildAIAssembly(cfg *config.Config, logger *logrus.Logger, opts AIAssemblyOptions) (*AIAssembly, error) {

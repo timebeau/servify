@@ -10,6 +10,7 @@ import (
 	knowledgeapp "servify/apps/server/internal/modules/knowledge/application"
 	knowledgedomain "servify/apps/server/internal/modules/knowledge/domain"
 	knowledgeinfra "servify/apps/server/internal/modules/knowledge/infra"
+	"servify/apps/server/internal/platform/knowledgeprovider"
 	"servify/apps/server/internal/services"
 
 	"gorm.io/gorm"
@@ -21,11 +22,19 @@ type HandlerServiceAdapter struct {
 }
 
 func NewHandlerService(db *gorm.DB) *HandlerServiceAdapter {
-	return NewHandlerServiceAdapter(knowledgeapp.NewService(
+	return NewHandlerServiceWithProvider(db, nil)
+}
+
+func NewHandlerServiceWithProvider(db *gorm.DB, provider knowledgeprovider.KnowledgeProvider) *HandlerServiceAdapter {
+	return NewHandlerServiceAdapter(NewService(db, provider))
+}
+
+func NewService(db *gorm.DB, provider knowledgeprovider.KnowledgeProvider) *knowledgeapp.Service {
+	return knowledgeapp.NewService(
 		knowledgeinfra.NewGormDocumentRepository(db),
-		knowledgeinfra.NewNoopIndexJobRepository(),
-		nil,
-	))
+		knowledgeinfra.NewGormIndexJobRepository(db),
+		provider,
+	)
 }
 
 func NewHandlerServiceAdapter(service *knowledgeapp.Service) *HandlerServiceAdapter {

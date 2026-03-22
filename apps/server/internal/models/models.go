@@ -235,6 +235,17 @@ type KnowledgeDoc struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// 知识库索引任务
+type KnowledgeIndexJob struct {
+	ID          string     `gorm:"primaryKey" json:"id"`
+	DocumentID  uint       `gorm:"index;not null" json:"document_id"`
+	Status      string     `gorm:"index;not null" json:"status"`
+	Error       string     `gorm:"type:text" json:"error"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
+}
+
 // WebRTC 连接信息
 type WebRTCConnection struct {
 	ID             string    `gorm:"primaryKey" json:"id"`

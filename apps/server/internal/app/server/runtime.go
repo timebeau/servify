@@ -163,7 +163,7 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	rt.MacroService = services.NewMacroService(db)
 	rt.AppIntegrationService = services.NewAppIntegrationService(db, logger)
 	rt.CustomFieldService = services.NewCustomFieldService(db)
-	rt.KnowledgeDocHandler = knowledgedelivery.NewHandlerService(db)
+	rt.KnowledgeDocHandler = knowledgedelivery.NewHandlerServiceWithProvider(db, aiAssembly.KnowledgeProvider(cfg))
 	rt.SuggestionService = services.NewSuggestionService(db)
 	rt.GamificationService = services.NewGamificationService(db)
 	rt.TicketHandlerService = ticketdelivery.NewHandlerServiceAdapter(db, ticketService.ModuleCommandService(), ticketService.Orchestrator())

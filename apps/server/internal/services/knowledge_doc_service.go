@@ -23,7 +23,7 @@ func NewKnowledgeDocService(db *gorm.DB) *KnowledgeDocService {
 	return &KnowledgeDocService{
 		module: knowledgeapp.NewService(
 			knowledgeinfra.NewGormDocumentRepository(db),
-			knowledgeinfra.NewNoopIndexJobRepository(),
+			knowledgeinfra.NewGormIndexJobRepository(db),
 			nil,
 		),
 	}

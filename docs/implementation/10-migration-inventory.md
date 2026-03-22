@@ -82,8 +82,9 @@
 - `knowledge`
   - 已存在 `modules/knowledge/application`，但此前缺少 Gorm repository 与 handler-facing delivery contract
   - 旧 `services/KnowledgeDocService` 主要承接 CRUD 与 tag/category DTO，适合改成 module facade
-  - `app/server` runtime 已不再对外暴露 `*services.KnowledgeDocService` 字段，且 knowledge handler 装配已直接切到 `modules/knowledge/delivery.NewHandlerService(db)`，不再经由 legacy facade 中转
-  - 结论：handler 主路径已直接贴近 module；后续重点只剩 provider/indexing runtime 收口
+  - `app/server` runtime 已不再对外暴露 `*services.KnowledgeDocService` 字段，knowledge handler 装配已直接切到 `modules/knowledge/delivery.NewHandlerServiceWithProvider(db, ...)`，不再经由 legacy facade 中转
+  - `modules/knowledge/infra` 已补齐 `KnowledgeIndexJob` 的 Gorm 持久化仓储，module delivery 也已支持按 runtime 注入 provider
+  - 结论：knowledge 的 handler/runtime 主路径都已贴近 module；legacy facade 仅保留历史调用兼容
 
 ## 按迁移成熟度分组
 
@@ -171,6 +172,7 @@
   - 旧 `services/AutomationService` 定位：兼容 facade + event bus subscriber + module application 装配
 - `knowledge`
   - HTTP handler 入口：`modules/knowledge/delivery.HandlerService`
+  - runtime 装配入口：`modules/knowledge/delivery.NewHandlerServiceWithProvider(db, ...)`
   - 旧 `services/KnowledgeDocService` 定位：兼容 facade + module application / repository 装配
 - `routing / session transfer`
   - HTTP handler 入口：`modules/routing/delivery.HandlerService`
@@ -200,7 +202,7 @@
   - 允许保留：旧调用方兼容入口、event bus subscriber 注册、测试辅助方法、`modules/automation/application.Service` 的装配
   - 不应新增：新的 HTTP handler 直接依赖、绕过 `modules/automation/application.Service` 的触发器和执行记录主入口
 - `services/KnowledgeDocService`
-  - 允许保留：旧调用方兼容入口、DTO 映射、`modules/knowledge/application.Service` 与 repository 的装配
+  - 允许保留：旧调用方兼容入口、DTO 映射、`modules/knowledge/application.Service` 与 repository 的兼容装配
   - 不应新增：新的 HTTP handler 直接依赖、绕过 `modules/knowledge/application.Service` 的文档 CRUD 主入口
 - `services/SessionTransferService`
   - 允许保留：旧调用方兼容入口、AgentService/WebSocketHub/AIService 协调、转接实时通知与 legacy transfer orchestration
@@ -216,7 +218,7 @@
 
 - `scripts/check-module-boundaries.sh`
   - 校验 `ticket` / `agent` / `analytics` / `customer` / `automation` / `knowledge` / `routing` / `ai` 的 handler constructor 必须依赖 `modules/*/delivery.HandlerService`
-  - 校验 router/runtime 对这八个模块的注入类型必须停留在 handler-facing contract，并校验 `conversation` 的 websocket persistence 入口必须走 module delivery adapter
+  - 校验 router/runtime 对这八个模块的注入类型必须停留在 handler-facing contract，并校验 `knowledge` runtime 必须直接通过 module delivery 装配，以及 `conversation` 的 websocket persistence 入口必须走 module delivery adapter
   - 校验 `satisfaction` / `macro` / `app integration` / `custom field` / `shift` / `suggestion` / `gamification` 等薄 handler 依赖必须停留在 handler-local contract，避免 `app/server` 顶层装配回退暴露 concrete legacy service
   - 校验 `workspace` / `websocket transfer` 等新增收窄点必须依赖 `WorkspaceOverviewReader`、`SessionTransferRuntime` 等接口，并禁止 `app/server` runtime/router 回退暴露若干 concrete legacy service
   - 目的：先锁住已完成迁移的入口，避免回退到 handler 直连具体旧 service

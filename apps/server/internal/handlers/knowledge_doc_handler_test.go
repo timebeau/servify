@@ -17,7 +17,7 @@ import (
 	"gorm.io/gorm"
 
 	"servify/apps/server/internal/models"
-	"servify/apps/server/internal/services"
+	knowledgedelivery "servify/apps/server/internal/modules/knowledge/delivery"
 )
 
 func newTestDBForKnowledgeDocs(t *testing.T) *gorm.DB {
@@ -30,7 +30,7 @@ func newTestDBForKnowledgeDocs(t *testing.T) *gorm.DB {
 	}
 	sqlDB, _ := db.DB()
 	sqlDB.SetMaxOpenConns(1)
-	if err := db.AutoMigrate(&models.KnowledgeDoc{}); err != nil {
+	if err := db.AutoMigrate(&models.KnowledgeDoc{}, &models.KnowledgeIndexJob{}); err != nil {
 		t.Fatalf("automigrate: %v", err)
 	}
 	return db
@@ -39,7 +39,7 @@ func newTestDBForKnowledgeDocs(t *testing.T) *gorm.DB {
 func TestKnowledgeDocHandler_AdminCRUD_And_PublicList(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	db := newTestDBForKnowledgeDocs(t)
-	svc := services.NewKnowledgeDocService(db)
+	svc := knowledgedelivery.NewHandlerService(db)
 	h := NewKnowledgeDocHandler(svc)
 
 	r := gin.New()

@@ -113,6 +113,61 @@ func (r *GormDocumentRepository) List(ctx context.Context, filter knowledgeapp.L
 	return out, total, nil
 }
 
+type GormIndexJobRepository struct {
+	db *gorm.DB
+}
+
+func NewGormIndexJobRepository(db *gorm.DB) *GormIndexJobRepository {
+	return &GormIndexJobRepository{db: db}
+}
+
+func (r *GormIndexJobRepository) Create(ctx context.Context, job *domain.IndexJob) error {
+	if job == nil {
+		return fmt.Errorf("index job required")
+	}
+	model, err := indexJobModelFromDomain(job)
+	if err != nil {
+		return err
+	}
+	if err := r.db.WithContext(ctx).Create(model).Error; err != nil {
+		return err
+	}
+	job.ID = model.ID
+	return nil
+}
+
+func (r *GormIndexJobRepository) Update(ctx context.Context, job *domain.IndexJob) error {
+	if job == nil {
+		return fmt.Errorf("index job required")
+	}
+	model, err := indexJobModelFromDomain(job)
+	if err != nil {
+		return err
+	}
+	result := r.db.WithContext(ctx).Model(&models.KnowledgeIndexJob{}).Where("id = ?", model.ID).Updates(map[string]interface{}{
+		"document_id":  model.DocumentID,
+		"status":       model.Status,
+		"error":        model.Error,
+		"updated_at":   model.UpdatedAt,
+		"completed_at": model.CompletedAt,
+	})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *GormIndexJobRepository) Get(ctx context.Context, id string) (*domain.IndexJob, error) {
+	var model models.KnowledgeIndexJob
+	if err := r.db.WithContext(ctx).First(&model, "id = ?", strings.TrimSpace(id)).Error; err != nil {
+		return nil, err
+	}
+	return indexJobFromModel(model), nil
+}
+
 type NoopIndexJobRepository struct{}
 
 func NewNoopIndexJobRepository() *NoopIndexJobRepository {
@@ -146,6 +201,37 @@ func documentFromModel(model models.KnowledgeDoc) *domain.Document {
 		Tags:      splitTags(model.Tags),
 		CreatedAt: model.CreatedAt,
 		UpdatedAt: model.UpdatedAt,
+	}
+}
+
+func indexJobModelFromDomain(job *domain.IndexJob) (*models.KnowledgeIndexJob, error) {
+	if job == nil {
+		return nil, fmt.Errorf("index job required")
+	}
+	documentID, err := parseDocumentID(job.DocumentID)
+	if err != nil {
+		return nil, err
+	}
+	return &models.KnowledgeIndexJob{
+		ID:          strings.TrimSpace(job.ID),
+		DocumentID:  documentID,
+		Status:      string(job.Status),
+		Error:       job.Error,
+		CreatedAt:   job.CreatedAt,
+		UpdatedAt:   job.UpdatedAt,
+		CompletedAt: job.CompletedAt,
+	}, nil
+}
+
+func indexJobFromModel(model models.KnowledgeIndexJob) *domain.IndexJob {
+	return &domain.IndexJob{
+		ID:          model.ID,
+		DocumentID:  strconv.FormatUint(uint64(model.DocumentID), 10),
+		Status:      domain.IndexJobStatus(model.Status),
+		Error:       model.Error,
+		CreatedAt:   model.CreatedAt,
+		UpdatedAt:   model.UpdatedAt,
+		CompletedAt: model.CompletedAt,
 	}
 }
 

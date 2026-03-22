@@ -26,6 +26,7 @@ func MigrationModels() []interface{} {
 		&models.CustomField{},
 		&models.TicketCustomFieldValue{},
 		&models.KnowledgeDoc{},
+		&models.KnowledgeIndexJob{},
 		&models.WebRTCConnection{},
 		&models.DailyStats{},
 		&models.SLAConfig{},

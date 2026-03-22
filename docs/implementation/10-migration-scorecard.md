@@ -30,7 +30,7 @@
 | `ai` | `modules/ai/delivery.HandlerService` | `AIAssembly.RuntimeService` | runtime compatibility surface for websocket/router/transfer | `stabilized` | handler 主路径已切到 orchestrated enhanced AI；assembly 不再暴露 legacy concrete AI service |
 | `customer` | `modules/customer/delivery.HandlerService` | `modules/customer/delivery.NewHandlerService(db)` | compatibility facade + DTO mapping for old callers | `contracted` | handler/router/runtime 的 handler 主路径已直接走 module delivery |
 | `automation` | `modules/automation/delivery.HandlerService` | `modules/automation/delivery.NewHandlerService(db)` | compatibility facade + event bus glue | `contracted` | handler/router/runtime 的 handler 主路径已直接走 module delivery；subscriber 仍在 legacy service |
-| `knowledge` | `modules/knowledge/delivery.HandlerService` | `modules/knowledge/delivery.NewHandlerService(db)` | compatibility facade retained for old callers | `contracted` | handler/router/runtime 的 handler 主路径已直接走 module delivery；index job runtime 仍未接入 |
+| `knowledge` | `modules/knowledge/delivery.HandlerService` | `modules/knowledge/delivery.NewHandlerServiceWithProvider(db, ...)` | compatibility facade retained for old callers | `stabilized` | handler/router/runtime 的主路径已走 module delivery；index job 仓储与 WeKnora provider 装配已纳入 runtime 主路径，并进入边界脚本守护 |
 | `voice` | already module coordinator | module coordinator | not primarily legacy | `mixed` | 已较模块化，但不属于本轮 `services -> modules` 的典型迁移样式 |
 
 ## 当前结论
@@ -38,7 +38,7 @@
 - `ticket`、`agent`、`analytics`、`routing`、`conversation runtime`、`ai` 已具备持续守护条件
 - `customer` 已完成 handler-facing contract 收口，但 runtime 仍保留 legacy facade
 - `automation` 已完成 handler-facing contract 收口，但 runtime 仍保留 event bus subscriber 与旧兼容 facade
-- `knowledge` 已完成 handler-facing contract 收口，但索引任务与 provider 集成仍未纳入 runtime 主路径
+- `knowledge` 已完成 handler/runtime 收口，索引任务仓储与 provider 集成已纳入 module delivery 主路径
 - 一批尚未模块化的薄 handler 能力已完成 `app/server` 装配面收口：`satisfaction`、`macro`、`app integration`、`custom field`、`shift`、`suggestion`、`gamification`
 - `message router` 已完成 runtime/router/handler 装配面收口，保留 concrete 生命周期实现于 `services.MessageRouter`
 - `sla` 已完成 handler/runtime/router 的装配面收口，但 service 本体仍保留 automation glue 与 runtime 组装职责
