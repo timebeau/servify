@@ -259,33 +259,6 @@ jobs:
           chmod +x scripts/check-module-boundaries.sh
           ./scripts/check-module-boundaries.sh
 
-  website-worker-checks:
-    name: Website Worker Checks
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: apps/website-worker/package-lock.json
-
-      - name: Install worker dependencies
-        run: npm -C apps/website-worker ci --no-audit --no-fund
-
-      - name: Verify worker lockfile is committed
-        run: git diff --exit-code -- apps/website-worker/package-lock.json
-
-      - name: Type check worker
-        run: npm -C apps/website-worker run types
-
   smoke-checks:
     name: Smoke Checks
     runs-on: ubuntu-latest
@@ -368,67 +341,6 @@ jobs:
       - name: Compose down
         if: always()
         run: docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.weknora.yml down -v
-
-  deploy-website-worker:
-    name: Deploy Website Worker
-    runs-on: ubuntu-latest
-    needs:
-      - go-checks
-      - sdk-checks
-      - docs-checks
-      - website-worker-checks
-    if: github.ref == 'refs/heads/main'
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Check secrets
-        id: gate
-        run: |
-          if [ -z "${CLOUDFLARE_API_TOKEN}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID}" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Checkout
-        if: steps.gate.outputs.skip == 'false'
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Detect website changes
-        if: steps.gate.outputs.skip == 'false'
-        id: detect
-        run: |
-          before="${{ github.event.before }}"
-          after="${{ github.sha }}"
-          if [ -z "$before" ]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if git diff --name-only "$before" "$after" | grep -E '^(apps/website/|apps/website-worker/)'; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Setup Node
-        if: steps.gate.outputs.skip == 'false' && steps.detect.outputs.changed == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install worker dependencies
-        if: steps.gate.outputs.skip == 'false' && steps.detect.outputs.changed == 'true'
-        run: npm -C apps/website-worker install --no-audit --no-fund
-
-      - name: Deploy to Cloudflare Workers
-        if: steps.gate.outputs.skip == 'false' && steps.detect.outputs.changed == 'true'
-        run: npx wrangler deploy --config apps/website-worker/wrangler.toml
 
   deploy-website-pages:
     name: Deploy Website Pages
