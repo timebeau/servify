@@ -5,9 +5,22 @@ import (
 	"strconv"
 
 	agentdelivery "servify/apps/server/internal/modules/agent/delivery"
+	"servify/apps/server/internal/models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+)
+
+// Swag model aliases for API documentation
+type (
+	// AgentCreateRequest is an alias for agentdelivery.AgentCreateRequest
+	AgentCreateRequest = agentdelivery.AgentCreateRequest
+	// AgentInfo is an alias for agentdelivery.AgentInfo
+	AgentInfo = agentdelivery.AgentInfo
+	// AgentStats is an alias for agentdelivery.AgentStats
+	AgentStats = agentdelivery.AgentStats
+	// Agent is an alias for models.Agent
+	Agent = models.Agent
 )
 
 // AgentHandler 客服管理处理器
@@ -30,7 +43,7 @@ func NewAgentHandler(agentService agentdelivery.HandlerService, logger *logrus.L
 // @Tags 客服管理
 // @Accept json
 // @Produce json
-// @Param agent body agentdelivery.AgentCreateRequest true "客服信息"
+// @Param agent body AgentCreateRequest true "客服信息"
 // @Success 201 {object} models.Agent
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
@@ -223,7 +236,7 @@ func (h *AgentHandler) AgentGoOffline(c *gin.Context) {
 // @Tags 客服管理
 // @Accept json
 // @Produce json
-// @Success 200 {array} agentdelivery.AgentInfo
+// @Success 200 {array} AgentInfo
 // @Failure 500 {object} ErrorResponse
 // @Router /api/agents/online [get]
 func (h *AgentHandler) GetOnlineAgents(c *gin.Context) {
@@ -400,7 +413,7 @@ func (h *AgentHandler) GetAgentStats(c *gin.Context) {
 // @Produce json
 // @Param skills query []string false "所需技能"
 // @Param priority query string false "优先级"
-// @Success 200 {object} agentdelivery.AgentInfo
+// @Success 200 {object} AgentInfo
 // @Failure 404 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
 // @Router /api/agents/find-available [get]
