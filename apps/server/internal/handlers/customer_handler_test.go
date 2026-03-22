@@ -16,7 +16,7 @@ import (
 	"gorm.io/gorm"
 
 	"servify/apps/server/internal/models"
-	"servify/apps/server/internal/services"
+	customerdelivery "servify/apps/server/internal/modules/customer/delivery"
 )
 
 func newTestDBForCustomers(t *testing.T) *gorm.DB {
@@ -53,7 +53,7 @@ func TestCustomerHandler_Create_Get_Update_List(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.WarnLevel)
 
-	svc := services.NewCustomerService(db, logger)
+	svc := customerdelivery.NewHandlerService(db)
 	h := NewCustomerHandler(svc, logger)
 
 	r := gin.New()
@@ -121,7 +121,7 @@ func TestCustomerHandler_GetCustomerActivity(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.WarnLevel)
 
-	svc := services.NewCustomerService(db, logger)
+	svc := customerdelivery.NewHandlerService(db)
 	h := NewCustomerHandler(svc, logger)
 
 	r := gin.New()
@@ -149,7 +149,7 @@ func TestCustomerHandler_AddCustomerNote(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.WarnLevel)
 
-	svc := services.NewCustomerService(db, logger)
+	svc := customerdelivery.NewHandlerService(db)
 	h := NewCustomerHandler(svc, logger)
 
 	r := gin.New()
@@ -186,7 +186,7 @@ func TestCustomerHandler_UpdateCustomerTags(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.WarnLevel)
 
-	svc := services.NewCustomerService(db, logger)
+	svc := customerdelivery.NewHandlerService(db)
 	h := NewCustomerHandler(svc, logger)
 
 	r := gin.New()
@@ -218,7 +218,7 @@ func TestCustomerHandler_GetCustomerStats(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.WarnLevel)
 
-	svc := services.NewCustomerService(db, logger)
+	svc := customerdelivery.NewHandlerService(db)
 	h := NewCustomerHandler(svc, logger)
 
 	r := gin.New()

@@ -104,16 +104,14 @@
 
 - `routing / session transfer`
 - `conversation` 相关 websocket/runtime 路径
-- `customer`
 
 这些模块的共同特点：
 
 - module 已存在
 - 但核心运行时仍由旧 service 或旧 runtime struct 主导
 - 需要先画清 runtime 职责边界，再做 handler/adapter 收口
-- `customer` 的 handler 已可先行收口，但 runtime 仍保留旧 facade 用于兼容 DTO 和构造装配
 - `automation` 的 handler 已可先行收口，但 runtime 仍需要旧 service 持有 event bus subscriber
-- `knowledge` 的 handler 已可先行收口，但 indexing/provider 尚未进入统一 runtime 装配
+- `conversation` 与 `routing` 仍是下一轮最重的运行态迁移区域
 
 ### C. 多实现并存，需要先确定默认主路径
 

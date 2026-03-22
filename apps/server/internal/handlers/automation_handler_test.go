@@ -19,7 +19,8 @@ import (
 	"gorm.io/gorm"
 
 	"servify/apps/server/internal/models"
-	"servify/apps/server/internal/services"
+	automationapp "servify/apps/server/internal/modules/automation/application"
+	automationdelivery "servify/apps/server/internal/modules/automation/delivery"
 )
 
 func newTestDBForAutomations(t *testing.T) *gorm.DB {
@@ -43,7 +44,7 @@ func TestAutomationHandler_BatchRun_And_RunsList(t *testing.T) {
 	db := newTestDBForAutomations(t)
 	logger := logrus.New()
 	logger.SetLevel(logrus.WarnLevel)
-	svc := services.NewAutomationService(db, logger)
+	svc := automationdelivery.NewHandlerService(db)
 	h := NewAutomationHandler(svc)
 
 	// seed ticket
@@ -62,13 +63,13 @@ func TestAutomationHandler_BatchRun_And_RunsList(t *testing.T) {
 	}
 
 	// seed trigger: if ticket.priority == normal => set priority high + add_tag urgent
-	trig, err := svc.CreateTrigger(context.Background(), &services.AutomationTriggerRequest{
+	trig, err := svc.CreateTrigger(context.Background(), &automationapp.TriggerRequest{
 		Name:  "p-up",
 		Event: "ticket_updated",
-		Conditions: []services.TriggerCondition{
+		Conditions: []automationapp.TriggerCondition{
 			{Field: "ticket.priority", Op: "eq", Value: "normal"},
 		},
-		Actions: []services.TriggerAction{
+		Actions: []automationapp.TriggerAction{
 			{Type: "set_priority", Params: map[string]interface{}{"priority": "high"}},
 			{Type: "add_tag", Params: map[string]interface{}{"tag": "urgent"}},
 		},
@@ -94,7 +95,7 @@ func TestAutomationHandler_BatchRun_And_RunsList(t *testing.T) {
 	if w1.Code != http.StatusOK {
 		t.Fatalf("dry-run status=%d body=%s", w1.Code, w1.Body.String())
 	}
-	var dryResp services.AutomationBatchRunResponse
+	var dryResp automationapp.BatchRunResponse
 	if err := json.Unmarshal(w1.Body.Bytes(), &dryResp); err != nil {
 		t.Fatalf("unmarshal dry: %v body=%s", err, w1.Body.String())
 	}
