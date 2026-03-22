@@ -433,34 +433,51 @@ func (s *SessionTransferService) syncTransferTicket(ctx context.Context, tx *gor
 		return err
 	}
 
-	var ticket models.Ticket
-	if err := tx.Select("id", "agent_id", "status").First(&ticket, "id = ?", *session.TicketID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil
-		}
+	ticket, err := s.loadTransferTicket(tx, *session.TicketID)
+	if err == gorm.ErrRecordNotFound {
+		return nil
+	}
+	if err != nil {
 		return err
 	}
 
+	updates, fromStatus, toStatus := buildTransferTicketUpdate(targetAgentID, ticket.Status)
+	if err := tx.Model(&models.Ticket{}).Where("id = ?", ticket.ID).Updates(updates).Error; err != nil {
+		return err
+	}
+
+	s.appendTransferTicketStatus(tx, ticket.ID, targetAgentID, fromStatus, toStatus, transferAt)
+	return nil
+}
+
+func (s *SessionTransferService) loadTransferTicket(tx *gorm.DB, ticketID uint) (*models.Ticket, error) {
+	var ticket models.Ticket
+	if err := tx.Select("id", "agent_id", "status").First(&ticket, "id = ?", ticketID).Error; err != nil {
+		return nil, err
+	}
+	return &ticket, nil
+}
+
+func buildTransferTicketUpdate(targetAgentID uint, currentStatus string) (map[string]interface{}, string, string) {
 	updates := map[string]interface{}{"agent_id": targetAgentID}
-	fromStatus := ticket.Status
+	fromStatus := currentStatus
 	toStatus := fromStatus
 	if fromStatus == "open" || fromStatus == "" {
 		toStatus = "assigned"
 		updates["status"] = toStatus
 	}
-	if err := tx.Model(&models.Ticket{}).Where("id = ?", ticket.ID).Updates(updates).Error; err != nil {
-		return err
-	}
+	return updates, fromStatus, toStatus
+}
 
+func (s *SessionTransferService) appendTransferTicketStatus(tx *gorm.DB, ticketID uint, targetAgentID uint, fromStatus string, toStatus string, transferAt time.Time) {
 	_ = tx.Create(&models.TicketStatus{
-		TicketID:   ticket.ID,
+		TicketID:   ticketID,
 		UserID:     targetAgentID,
 		FromStatus: fromStatus,
 		ToStatus:   toStatus,
 		Reason:     fmt.Sprintf("会话转接同步指派至客服 %d", targetAgentID),
 		CreatedAt:  transferAt,
 	}).Error
-	return nil
 }
 
 func (s *SessionTransferService) syncTransferAgentLoad(ctx context.Context, tx *gorm.DB, fromAgentID *uint, targetAgentID uint) error {
