@@ -85,7 +85,7 @@ type Ticket struct {
 	// 关联关系
 	Customer          User                     `gorm:"foreignKey:CustomerID" json:"customer,omitempty"`
 	Agent             *User                    `gorm:"foreignKey:AgentID" json:"agent,omitempty"`
-	Session           *Session                 `gorm:"foreignKey:SessionID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE,Enable:false" json:"session,omitempty"`
+	Session           *Session                 `gorm:"foreignKey:SessionID" json:"session,omitempty"`
 	Comments          []TicketComment          `gorm:"foreignKey:TicketID" json:"comments,omitempty"`
 	Attachments       []TicketFile             `gorm:"foreignKey:TicketID" json:"attachments,omitempty"`
 	StatusHistory     []TicketStatus           `gorm:"foreignKey:TicketID" json:"status_history,omitempty"`
@@ -178,7 +178,7 @@ type Session struct {
 
 	User     User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
 	Agent    *User     `gorm:"foreignKey:AgentID" json:"agent,omitempty"`
-	Ticket   *Ticket   `gorm:"foreignKey:TicketID;constraint:OnDelete:SET NULL,OnUpdate:CASCADE,Enable:false" json:"ticket,omitempty"`
+	Ticket   *Ticket   `gorm:"foreignKey:TicketID" json:"ticket,omitempty"`
 	Messages []Message `gorm:"foreignKey:SessionID" json:"messages,omitempty"`
 }
 
