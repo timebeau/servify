@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"servify/apps/server/internal/models"
 	conversationdomain "servify/apps/server/internal/modules/conversation/domain"
 	conversationinfra "servify/apps/server/internal/modules/conversation/infra"
 	"servify/apps/server/internal/platform/eventbus"
@@ -14,11 +15,34 @@ import (
 
 type RuntimeAdapter struct {
 	publisher eventbus.Bus
+	db        *gorm.DB
 	now       func() time.Time
 }
 
-func NewRuntimeAdapter(publisher eventbus.Bus) *RuntimeAdapter {
-	return &RuntimeAdapter{publisher: publisher, now: time.Now}
+func NewRuntimeAdapter(db *gorm.DB, publisher eventbus.Bus) *RuntimeAdapter {
+	return &RuntimeAdapter{publisher: publisher, db: db, now: time.Now}
+}
+
+func (a *RuntimeAdapter) LoadTransferSession(ctx context.Context, sessionID string) (*TransferSession, error) {
+	if a.db == nil {
+		return nil, gorm.ErrInvalidDB
+	}
+	var model models.Session
+	if err := a.db.WithContext(ctx).
+		Preload("User").
+		First(&model, "id = ?", sessionID).Error; err != nil {
+		return nil, err
+	}
+	return &TransferSession{
+		ID:           model.ID,
+		CustomerID:   model.UserID,
+		AgentID:      model.AgentID,
+		TicketID:     model.TicketID,
+		Status:       model.Status,
+		Platform:     model.Platform,
+		UserName:     model.User.Name,
+		UserUsername: model.User.Username,
+	}, nil
 }
 
 func (a *RuntimeAdapter) SyncTransferAssignment(ctx context.Context, tx *gorm.DB, sessionID string, customerID uint, agentID uint) error {

@@ -72,6 +72,8 @@ require|apps/server/internal/services/websocket.go|transferService[[:space:]]+Se
 require|apps/server/internal/services/websocket.go|func \(h \*WebSocketHub\) SetSessionTransferService\(svc SessionTransferRuntime\)|WebSocket hub must accept the session transfer runtime interface.
 require|apps/server/internal/services/session_transfer_service.go|notifier[[:space:]]+sessionTransferNotifier|Session transfer service must store the websocket notifier interface instead of concrete hub.
 require|apps/server/internal/services/session_transfer_service.go|func NewSessionTransferService\([[:space:][:print:]\r\n]*notifier sessionTransferNotifier,[[:space:][:print:]\r\n]*\)|Session transfer constructor must accept the websocket notifier interface.
+require|apps/server/internal/modules/conversation/delivery/runtime_contract.go|LoadTransferSession\(ctx context\.Context, sessionID string\) \(\*TransferSession, error\)|Conversation runtime contract must expose transfer session loading.
+require|apps/server/internal/app/server/runtime.go|SetConversationRuntime\(conversationdelivery\.NewRuntimeAdapter\(db, bus\)\)|Main runtime must wire session transfer conversation runtime with DB-backed adapter.
 require|apps/server/internal/handlers/workspace_handler.go|service[[:space:]]+services\.WorkspaceOverviewReader|Workspace handler must store WorkspaceOverviewReader.
 require|apps/server/internal/handlers/workspace_handler.go|func NewWorkspaceHandler\(service services\.WorkspaceOverviewReader\)|Workspace handler constructor must accept WorkspaceOverviewReader.
 require|apps/server/internal/handlers/handlers.go|messageRouter[[:space:]]+services\.MessageRouterRuntime|Message handler must store services.MessageRouterRuntime.

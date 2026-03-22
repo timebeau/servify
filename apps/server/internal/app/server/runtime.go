@@ -146,7 +146,7 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	transferService := services.NewSessionTransferService(db, logger, rt.AIService, agentAssembly.Service, wsHub)
 	transferService.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingService, bus))
 	transferService.SetTicketRuntime(ticketdelivery.NewRuntimeAdapter(bus))
-	transferService.SetConversationRuntime(conversationdelivery.NewRuntimeAdapter(bus))
+	transferService.SetConversationRuntime(conversationdelivery.NewRuntimeAdapter(db, bus))
 	transferService.SetAgentRuntime(agentdelivery.NewTransferRuntimeAdapter())
 	rt.TransferHandlerService = transferService
 

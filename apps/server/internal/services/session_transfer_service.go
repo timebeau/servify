@@ -70,9 +70,8 @@ type TransferResult = routingcontract.TransferResult
 
 // TransferToHuman 转接到人工客服
 func (s *SessionTransferService) TransferToHuman(ctx context.Context, req *TransferRequest) (*TransferResult, error) {
-	// 获取会话信息
-	var session models.Session
-	if err := s.db.Preload("User").Preload("Messages").First(&session, "id = ?", req.SessionID).Error; err != nil {
+	session, err := s.loadTransferSession(ctx, req.SessionID)
+	if err != nil {
 		return nil, fmt.Errorf("session not found: %w", err)
 	}
 
@@ -99,18 +98,18 @@ func (s *SessionTransferService) TransferToHuman(ctx context.Context, req *Trans
 	agent, err := s.agentService.FindAvailableAgent(ctx, req.TargetSkills, req.Priority)
 	if err != nil {
 		// 没有可用客服，加入等待队列
-		return s.addToWaitingQueue(ctx, &session, req)
+		return s.addToWaitingQueue(ctx, session, req)
 	}
 
 	// 执行转接
-	return s.executeTransfer(ctx, &session, agent.UserID, req.Reason, req.Notes)
+	return s.executeTransfer(ctx, session, agent.UserID, req.Reason, req.Notes)
 }
 
 // TransferToAgent 转接到指定客服
 func (s *SessionTransferService) TransferToAgent(ctx context.Context, sessionID string, targetAgentID uint, reason string) (*TransferResult, error) {
 	// 获取会话信息
-	var session models.Session
-	if err := s.db.Preload("User").First(&session, "id = ?", sessionID).Error; err != nil {
+	session, err := s.loadTransferSession(ctx, sessionID)
+	if err != nil {
 		return nil, fmt.Errorf("session not found: %w", err)
 	}
 
@@ -125,11 +124,11 @@ func (s *SessionTransferService) TransferToAgent(ctx context.Context, sessionID 
 	}
 
 	// 执行转接
-	return s.executeTransfer(ctx, &session, targetAgentID, reason, "")
+	return s.executeTransfer(ctx, session, targetAgentID, reason, "")
 }
 
 // executeTransfer 执行转接
-func (s *SessionTransferService) executeTransfer(ctx context.Context, session *models.Session, targetAgentID uint, reason, notes string) (*TransferResult, error) {
+func (s *SessionTransferService) executeTransfer(ctx context.Context, session *conversationdelivery.TransferSession, targetAgentID uint, reason, notes string) (*TransferResult, error) {
 	if session.Status == "ended" {
 		return nil, fmt.Errorf("session already ended")
 	}
@@ -168,7 +167,7 @@ func (s *SessionTransferService) executeTransfer(ctx context.Context, session *m
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
 		// 更新会话：active/ended；是否分配由 agent_id 判断
 		if s.conversation != nil {
-			if err := s.conversation.SyncTransferAssignment(ctx, tx, session.ID, session.UserID, targetAgentID); err != nil {
+			if err := s.conversation.SyncTransferAssignment(ctx, tx, session.ID, session.CustomerID, targetAgentID); err != nil {
 				return fmt.Errorf("update session: %w", err)
 			}
 		} else if err := tx.Model(&models.Session{}).
@@ -311,7 +310,7 @@ func (s *SessionTransferService) executeTransfer(ctx context.Context, session *m
 }
 
 // addToWaitingQueue 添加到等待队列
-func (s *SessionTransferService) addToWaitingQueue(ctx context.Context, session *models.Session, req *TransferRequest) (*TransferResult, error) {
+func (s *SessionTransferService) addToWaitingQueue(ctx context.Context, session *conversationdelivery.TransferSession, req *TransferRequest) (*TransferResult, error) {
 	// 若已在等待队列中，直接返回（避免重复入队）
 	if existing, err := s.getActiveWaitingRecord(ctx, session.ID); err == nil {
 		return &TransferResult{
@@ -326,7 +325,7 @@ func (s *SessionTransferService) addToWaitingQueue(ctx context.Context, session 
 	var waitingRecord *models.WaitingRecord
 	waitingMessage := &models.Message{
 		SessionID: session.ID,
-		UserID:    session.UserID,
+		UserID:    session.CustomerID,
 		Content:   "您的会话已加入人工客服等待队列，我们会尽快为您安排客服。请耐心等待。",
 		Type:      "system",
 		Sender:    "system",
@@ -411,13 +410,13 @@ func (s *SessionTransferService) ProcessWaitingQueue(ctx context.Context) error 
 		}
 
 		// 获取会话信息
-		var session models.Session
-		if err := s.db.First(&session, "id = ?", record.SessionID).Error; err != nil {
+		session, err := s.loadTransferSession(ctx, record.SessionID)
+		if err != nil {
 			continue
 		}
 
 		// 执行转接
-		result, err := s.executeTransfer(ctx, &session, agent.UserID, record.Reason, record.Notes)
+		result, err := s.executeTransfer(ctx, session, agent.UserID, record.Reason, record.Notes)
 		if err != nil {
 			s.logger.Errorf("Failed to transfer waiting session %s: %v", record.SessionID, err)
 			continue
@@ -469,7 +468,7 @@ func (s *SessionTransferService) getActiveWaitingRecord(ctx context.Context, ses
 }
 
 // generateSessionSummary 生成会话摘要
-func (s *SessionTransferService) generateSessionSummary(session *models.Session) (string, error) {
+func (s *SessionTransferService) generateSessionSummary(session *conversationdelivery.TransferSession) (string, error) {
 	// 获取会话消息
 	var messages []models.Message
 	if err := s.db.Where("session_id = ?", session.ID).
@@ -480,9 +479,12 @@ func (s *SessionTransferService) generateSessionSummary(session *models.Session)
 
 	// 如果消息太少，返回简单摘要
 	if len(messages) < 3 {
-		userLabel := session.User.Username
+		userLabel := session.UserUsername
 		if userLabel == "" {
-			userLabel = fmt.Sprintf("ID=%d", session.UserID)
+			userLabel = session.UserName
+		}
+		if userLabel == "" {
+			userLabel = fmt.Sprintf("ID=%d", session.CustomerID)
 		}
 		return fmt.Sprintf("用户%s的简短会话，共%d条消息", userLabel, len(messages)), nil
 	}
@@ -634,6 +636,30 @@ func (s *SessionTransferService) SetTicketRuntime(adapter ticketdelivery.Runtime
 
 func (s *SessionTransferService) SetConversationRuntime(adapter conversationdelivery.RuntimeService) {
 	s.conversation = adapter
+}
+
+func (s *SessionTransferService) loadTransferSession(ctx context.Context, sessionID string) (*conversationdelivery.TransferSession, error) {
+	if s.conversation != nil {
+		session, err := s.conversation.LoadTransferSession(ctx, sessionID)
+		if err == nil {
+			return session, nil
+		}
+	}
+
+	var model models.Session
+	if err := s.db.WithContext(ctx).Preload("User").First(&model, "id = ?", sessionID).Error; err != nil {
+		return nil, err
+	}
+	return &conversationdelivery.TransferSession{
+		ID:           model.ID,
+		CustomerID:   model.UserID,
+		AgentID:      model.AgentID,
+		TicketID:     model.TicketID,
+		Status:       model.Status,
+		Platform:     model.Platform,
+		UserName:     model.User.Name,
+		UserUsername: model.User.Username,
+	}, nil
 }
 
 func (s *SessionTransferService) SetAgentRuntime(adapter agentdelivery.RuntimeService) {

@@ -39,6 +39,7 @@
   - 会话转接触发的 ticket assignment 同步已改走 `modules/ticket/delivery` runtime adapter，不再直接写 `Ticket` / `TicketStatus`
   - agent load 调整已改走 `modules/agent/delivery` runtime adapter，原先由 handler contract 反向依赖 `services` 引起的 import cycle 已被移除
   - websocket 通知依赖已收窄为 `sessionTransferNotifier`，不再把 `WebSocketHub` 作为 service 内部 concrete 字段保存
+  - 会话读取入口已切到 `modules/conversation/delivery.RuntimeService.LoadTransferSession(...)`，`SessionTransferService` 不再在主流程里直接预加载 `Session`
   - 但主流程仍强依赖 `gorm.DB`、`AgentService` 和旧会话模型
   - 结论：属于“局部接入 module adapter，但主流程仍是 legacy service”的高风险混合区
 
