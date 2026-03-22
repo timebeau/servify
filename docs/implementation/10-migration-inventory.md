@@ -41,6 +41,7 @@
   - agent load 调整已改走 `modules/agent/delivery` runtime adapter，原先由 handler contract 反向依赖 `services` 引起的 import cycle 已被移除
   - websocket 通知依赖已收窄为 `sessionTransferNotifier`，不再把 `WebSocketHub` 作为 service 内部 concrete 字段保存
   - 会话读取入口已切到 `modules/conversation/delivery.RuntimeService.LoadTransferSession(...)`，`SessionTransferService` 不再在主流程里直接预加载 `Session`
+  - 默认装配下 `LoadTransferSession(...)` 的 adapter 错误会直接上抛，不再静默回退到 legacy DB 查询，避免掩盖 conversation runtime 故障
   - 加入等待队列时的会话 active/unassigned 同步也已切到 `modules/conversation/delivery.RuntimeService.SyncWaitingAssignment(...)`
   - `app/server` 主运行时已改用 `NewSessionTransferServiceWithAdapters(...)` 一次性装配 routing/ticket/conversation/agent runtime adapters，减少可变 setter 装配面
   - 旧的 setter 式 adapter 注入已从活跃代码路径移除，默认装配方式固定为显式构造

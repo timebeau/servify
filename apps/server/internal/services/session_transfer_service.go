@@ -692,10 +692,7 @@ func (s *SessionTransferService) CancelWaitingRecord(ctx context.Context, sessio
 
 func (s *SessionTransferService) loadTransferSession(ctx context.Context, sessionID string) (*conversationdelivery.TransferSession, error) {
 	if s.conversation != nil {
-		session, err := s.conversation.LoadTransferSession(ctx, sessionID)
-		if err == nil {
-			return session, nil
-		}
+		return s.conversation.LoadTransferSession(ctx, sessionID)
 	}
 
 	var model models.Session
