@@ -1,4 +1,4 @@
-# 数据库初始化脚本
+-- 数据库初始化脚本
 
 -- 创建 pgvector 扩展
 CREATE EXTENSION IF NOT EXISTS vector;
