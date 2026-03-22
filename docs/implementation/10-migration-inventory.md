@@ -76,8 +76,8 @@
 - `automation`
   - `services/AutomationService` 已经把核心触发器与执行查询下沉到 `modules/automation/application.Service`
   - legacy service 主要保留 event bus subscriber 注册、测试兼容 helper 与 module 装配
-  - `app/server` runtime/router 已不再对外暴露 `*services.AutomationService` 字段，仅保留 handler-facing contract 与局部 wiring
-  - 结论：适合先定义 handler-facing contract，并保留 runtime/event bus glue 在旧 service
+  - `app/server` runtime/router 已不再对外暴露 `*services.AutomationService` 字段，且 automation handler 装配已直接切到 `modules/automation/delivery.NewHandlerService(db)`
+  - 结论：handler 主路径已直接贴近 module；旧 service 主要只保留 event bus subscriber 与测试兼容 glue
 
 - `knowledge`
   - 已存在 `modules/knowledge/application`，但此前缺少 Gorm repository 与 handler-facing delivery contract

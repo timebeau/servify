@@ -130,7 +130,7 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	slaService := services.NewSLAService(db, logger)
 	rt.SLAService = slaService
 	automationService := services.NewAutomationService(db, logger)
-	rt.AutomationHandlerService = services.NewAutomationHandlerAdapter(automationService)
+	rt.AutomationHandlerService = automationdelivery.NewHandlerService(db)
 	automationService.SetEventBus(bus)
 	slaService.SetAutomationService(automationService)
 
