@@ -120,13 +120,14 @@ func TestSessionTransferService_ToHuman_NoAgents_GoesWaitingViaRoutingAdapter(t 
 	}
 
 	agentSvc := NewAgentService(db, logger)
-	transferSvc := NewSessionTransferService(db, logger, stubAIForTransfer{}, agentSvc, nil)
 	bus := eventbus.NewInMemoryBus()
 	routingSvc := routingapp.NewService(routinginfra.NewGormRepository(db), bus)
-	transferSvc.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingSvc, bus))
-	transferSvc.SetConversationRuntime(conversationdelivery.NewRuntimeAdapter(db, bus))
-	transferSvc.SetTicketRuntime(ticketdelivery.NewRuntimeAdapter(bus))
-	transferSvc.SetAgentRuntime(agentdelivery.NewTransferRuntimeAdapter())
+	transferSvc := NewSessionTransferServiceWithAdapters(db, logger, stubAIForTransfer{}, agentSvc, nil, SessionTransferAdapters{
+		Routing:      routingdelivery.NewSessionTransferAdapter(routingSvc, bus),
+		Tickets:      ticketdelivery.NewRuntimeAdapter(bus),
+		Conversation: conversationdelivery.NewRuntimeAdapter(db, bus),
+		Agents:       agentdelivery.NewTransferRuntimeAdapter(),
+	})
 
 	res, err := transferSvc.TransferToHuman(context.Background(), &TransferRequest{
 		SessionID:    "s-routing-wait",
@@ -257,13 +258,14 @@ func TestSessionTransferService_ToHuman_AssignsAgent_RecordsTransferViaRoutingAd
 		t.Fatalf("AgentGoOnline: %v", err)
 	}
 
-	transferSvc := NewSessionTransferService(db, logger, stubAIForTransfer{}, agentSvc, nil)
 	bus := eventbus.NewInMemoryBus()
 	routingSvc := routingapp.NewService(routinginfra.NewGormRepository(db), bus)
-	transferSvc.SetRoutingAdapter(routingdelivery.NewSessionTransferAdapter(routingSvc, bus))
-	transferSvc.SetConversationRuntime(conversationdelivery.NewRuntimeAdapter(db, bus))
-	transferSvc.SetTicketRuntime(ticketdelivery.NewRuntimeAdapter(bus))
-	transferSvc.SetAgentRuntime(agentdelivery.NewTransferRuntimeAdapter())
+	transferSvc := NewSessionTransferServiceWithAdapters(db, logger, stubAIForTransfer{}, agentSvc, nil, SessionTransferAdapters{
+		Routing:      routingdelivery.NewSessionTransferAdapter(routingSvc, bus),
+		Tickets:      ticketdelivery.NewRuntimeAdapter(bus),
+		Conversation: conversationdelivery.NewRuntimeAdapter(db, bus),
+		Agents:       agentdelivery.NewTransferRuntimeAdapter(),
+	})
 
 	res, err := transferSvc.TransferToHuman(context.Background(), &TransferRequest{
 		SessionID: "s3",

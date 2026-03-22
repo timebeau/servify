@@ -44,6 +44,13 @@ type sessionTransferNotifier interface {
 	SendToSession(sessionID string, message WebSocketMessage)
 }
 
+type SessionTransferAdapters struct {
+	Routing      routingdelivery.RuntimeService
+	Tickets      ticketdelivery.RuntimeService
+	Conversation conversationdelivery.RuntimeService
+	Agents       agentdelivery.RuntimeService
+}
+
 // NewSessionTransferService 创建会话转接服务
 func NewSessionTransferService(
 	db *gorm.DB,
@@ -63,6 +70,22 @@ func NewSessionTransferService(
 		agentService: agentService,
 		notifier:     notifier,
 	}
+}
+
+func NewSessionTransferServiceWithAdapters(
+	db *gorm.DB,
+	logger *logrus.Logger,
+	aiService AIServiceInterface,
+	agentService sessionTransferAgentRuntime,
+	notifier sessionTransferNotifier,
+	adapters SessionTransferAdapters,
+) *SessionTransferService {
+	svc := NewSessionTransferService(db, logger, aiService, agentService, notifier)
+	svc.routing = adapters.Routing
+	svc.tickets = adapters.Tickets
+	svc.conversation = adapters.Conversation
+	svc.agents = adapters.Agents
+	return svc
 }
 
 type TransferRequest = routingcontract.TransferRequest

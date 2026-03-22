@@ -74,7 +74,8 @@ require|apps/server/internal/services/session_transfer_service.go|notifier[[:spa
 require|apps/server/internal/services/session_transfer_service.go|func NewSessionTransferService\([[:space:][:print:]\r\n]*notifier sessionTransferNotifier,[[:space:][:print:]\r\n]*\)|Session transfer constructor must accept the websocket notifier interface.
 require|apps/server/internal/modules/conversation/delivery/runtime_contract.go|LoadTransferSession\(ctx context\.Context, sessionID string\) \(\*TransferSession, error\)|Conversation runtime contract must expose transfer session loading.
 require|apps/server/internal/modules/conversation/delivery/runtime_contract.go|SyncWaitingAssignment\(ctx context\.Context, tx \*gorm\.DB, sessionID string, customerID uint\) error|Conversation runtime contract must expose waiting assignment syncing.
-require|apps/server/internal/app/server/runtime.go|SetConversationRuntime\(conversationdelivery\.NewRuntimeAdapter\(db, bus\)\)|Main runtime must wire session transfer conversation runtime with DB-backed adapter.
+require|apps/server/internal/app/server/runtime.go|Conversation:[[:space:]]+conversationdelivery\.NewRuntimeAdapter\(db, bus\)|Main runtime must wire session transfer conversation runtime with DB-backed adapter.
+require|apps/server/internal/app/server/runtime.go|NewSessionTransferServiceWithAdapters\(|Main runtime must assemble session transfer through the explicit adapter constructor.
 require|apps/server/internal/handlers/workspace_handler.go|service[[:space:]]+services\.WorkspaceOverviewReader|Workspace handler must store WorkspaceOverviewReader.
 require|apps/server/internal/handlers/workspace_handler.go|func NewWorkspaceHandler\(service services\.WorkspaceOverviewReader\)|Workspace handler constructor must accept WorkspaceOverviewReader.
 require|apps/server/internal/handlers/handlers.go|messageRouter[[:space:]]+services\.MessageRouterRuntime|Message handler must store services.MessageRouterRuntime.
