@@ -8,7 +8,7 @@
 
 **开源智能客服与工单系统** — 模块化单体架构，AI 协同，多渠道接入
 
-[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://go.dev/)
+[![Go Version](https://img.shields.io/badge/Go-1.21%2B-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/Toconvo/servify/ci.yml?branch=main&label=CI)](https://github.com/Toconvo/servify/actions)
 [![GitHub Stars](https://img.shields.io/github/stars/Toconvo/servify?style=social)](https://github.com/Toconvo/servify)
@@ -225,7 +225,7 @@ flowchart LR
 
 ### 📋 环境要求
 
-- **Go** 1.21+
+- **Go** 1.21+（项目要求）- 本地开发使用 go1.26.0
 - **PostgreSQL** 12+
 - **Node.js** 20+（仅 Web/文档/站点相关任务需要）
 - 可选：**Docker** / **Docker Compose**
