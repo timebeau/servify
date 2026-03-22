@@ -62,12 +62,12 @@ func TestConfig_SecurityDefaults(t *testing.T) {
 	if cfg.JWT.Secret == "" {
 		t.Error("expected JWT secret to be set")
 	}
-	// 注意：RBAC默认未启用，只检查CORS和RateLimiting
+	// 注意：RBAC默认未启用，只检查CORS（RateLimiting默认禁用）
 	if !cfg.Security.CORS.Enabled {
 		t.Error("expected CORS to be enabled")
 	}
-	if !cfg.Security.RateLimiting.Enabled {
-		t.Error("expected rate limiting to be enabled")
+	if cfg.Security.RateLimiting.Enabled {
+		t.Error("expected rate limiting to be disabled by default")
 	}
 }
 
@@ -151,11 +151,12 @@ func TestConfig_RBACRoles(t *testing.T) {
 func TestConfig_RateLimiting(t *testing.T) {
 	cfg := GetDefaultConfig()
 
-	if cfg.Security.RateLimiting.Enabled == false {
-		t.Error("expected rate limiting to be enabled")
+	// Rate limiting is disabled by default for integration tests
+	if cfg.Security.RateLimiting.Enabled {
+		t.Error("expected rate limiting to be disabled by default")
 	}
 	if cfg.Security.RateLimiting.RequestsPerMinute == 0 {
-		t.Error("expected requests per minute to be set")
+		t.Error("expected requests per minute to be set even when disabled")
 	}
 }
 
