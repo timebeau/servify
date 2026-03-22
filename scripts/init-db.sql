@@ -69,10 +69,11 @@ CREATE TRIGGER update_mappings_updated_at
     BEFORE UPDATE ON servify_weknora_mappings
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- 创建一些示例数据（开发环境）
-INSERT INTO knowledge_docs (title, content, category, tags, created_at, updated_at)
-VALUES
-    ('产品安装指南', '本指南详细介绍了产品的安装步骤...', '技术支持', '安装,指南,技术', NOW(), NOW()),
-    ('常见问题解答', '以下是用户最常遇到的问题及解决方案...', '常见问题', '问题,解答,FAQ', NOW(), NOW()),
-    ('API 使用文档', 'REST API 接口说明和使用示例...', '开发文档', 'API,开发,文档', NOW(), NOW())
-ON CONFLICT DO NOTHING;
+-- Note: Sample data for knowledge_docs should be inserted via API after tables are created by AutoMigrate
+-- The following is commented out because knowledge_docs table is created by GORM AutoMigrate
+-- INSERT INTO knowledge_docs (title, content, category, tags, created_at, updated_at)
+-- VALUES
+--     ('产品安装指南', '本指南详细介绍了产品的安装步骤...', '技术支持', '安装,指南,技术', NOW(), NOW()),
+--     ('常见问题解答', '以下是用户最常遇到的问题及解决方案...', '常见问题', '问题,解答,FAQ', NOW(), NOW()),
+--     ('API 使用文档', 'REST API 接口说明和使用示例...', '开发文档', 'API,开发,文档', NOW(), NOW())
+-- ON CONFLICT DO NOTHING;
