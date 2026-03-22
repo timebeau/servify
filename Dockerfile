@@ -3,7 +3,8 @@ FROM golang:1.21-alpine AS builder
 WORKDIR /app
 # Build uses module in apps/server
 WORKDIR /app/apps/server
-COPY apps/server/go.mod apps/server/go.mod
+COPY apps/server/go.mod .
+COPY apps/server/go.sum .
 RUN go mod download
 
 WORKDIR /app
