@@ -14,6 +14,7 @@ import (
 	"servify/apps/server/internal/platform/eventbus"
 
 	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
 
@@ -90,13 +91,27 @@ func main() {
 		appLogger.Warnf("init tracing: %v", err)
 	}
 
-	db, err := appbootstrap.OpenDatabase(cfg, appbootstrap.DatabaseOptions{
-		DSN:           dsn,
-		LogLevel:      logger.Info,
-		EnableTracing: cfg.Monitoring.Tracing.Enabled,
-	})
+	// Open database with retry logic for container startup
+	var db *gorm.DB
+	maxRetries := 10
+	retryDelay := 2 * time.Second
+
+	for i := 0; i < maxRetries; i++ {
+		db, err = appbootstrap.OpenDatabase(cfg, appbootstrap.DatabaseOptions{
+			DSN:           dsn,
+			LogLevel:      logger.Info,
+			EnableTracing: cfg.Monitoring.Tracing.Enabled,
+		})
+		if err == nil {
+			break
+		}
+		if i < maxRetries-1 {
+			appLogger.Warnf("Failed to connect to database (attempt %d/%d): %v, retrying in %v...", i+1, maxRetries, err, retryDelay)
+			time.Sleep(retryDelay)
+		}
+	}
 	if err != nil {
-		appLogger.Fatalf("Failed to connect to database: %v", err)
+		appLogger.Fatalf("Failed to connect to database after %d attempts: %v", maxRetries, err)
 	}
 	app.DB = db
 
