@@ -7,6 +7,7 @@ export default defineUserConfig({
   lang: 'zh-CN',
   title: 'Servify Docs',
   description: 'Servify architecture, implementation backlogs, and integration guides',
+  base: '/servify/',
   bundler: viteBundler(),
   head: [
     ['meta', { name: 'theme-color', content: '#0f172a' }],
