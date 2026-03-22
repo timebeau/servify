@@ -4,24 +4,48 @@ import (
 	"net/http"
 	"strconv"
 
-	agentdelivery "servify/apps/server/internal/modules/agent/delivery"
 	"servify/apps/server/internal/models"
+	agentdelivery "servify/apps/server/internal/modules/agent/delivery"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
 
-// Swag model aliases for API documentation
-type (
-	// AgentCreateRequest is an alias for agentdelivery.AgentCreateRequest
-	AgentCreateRequest = agentdelivery.AgentCreateRequest
-	// AgentInfo is an alias for agentdelivery.AgentInfo
-	AgentInfo = agentdelivery.AgentInfo
-	// AgentStats is an alias for agentdelivery.AgentStats
-	AgentStats = agentdelivery.AgentStats
-	// Agent is an alias for models.Agent
-	Agent = models.Agent
-)
+// Swag model definitions for API documentation
+// These types are duplicated from agentdelivery package for swag to discover them
+
+// AgentCreateRequest represents a request to create a new agent
+type AgentCreateRequest struct {
+	UserID        uint   `json:"user_id" binding:"required" example:"1"`
+	Department    string `json:"department" example:"sales"`
+	Skills        string `json:"skills" example:"tech,support"`
+	MaxConcurrent int    `json:"max_concurrent" example:"5"`
+}
+
+// AgentInfo represents agent information for API responses
+type AgentInfo struct {
+	UserID          uint     `json:"user_id" example:"1"`
+	Username        string   `json:"username" example:"john_doe"`
+	Name            string   `json:"name" example:"John Doe"`
+	Department      string   `json:"department" example:"sales"`
+	Skills          []string `json:"skills" example:"tech,support"`
+	Status          string   `json:"status" example:"online"`
+	MaxConcurrent   int      `json:"max_concurrent" example:"5"`
+	CurrentLoad     int      `json:"current_load" example:"2"`
+	Rating          float64  `json:"rating" example:"4.8"`
+	AvgResponseTime int      `json:"avg_response_time" example:"120"`
+	LastActivity    string   `json:"last_activity" example:"2024-01-01T12:00:00Z"`
+	ConnectedAt     string   `json:"connected_at" example:"2024-01-01T10:00:00Z"`
+}
+
+// AgentStats represents agent statistics
+type AgentStats struct {
+	Total           int64   `json:"total" example:"10"`
+	Online          int64   `json:"online" example:"5"`
+	Busy            int64   `json:"busy" example:"3"`
+	AvgResponseTime int64   `json:"avg_response_time" example:"120"`
+	AvgRating       float64 `json:"avg_rating" example:"4.5"`
+}
 
 // AgentHandler 客服管理处理器
 type AgentHandler struct {
@@ -380,7 +404,7 @@ func (h *AgentHandler) ReleaseSession(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param agent_id query int false "特定客服ID，用于获取单个客服的统计"
-// @Success 200 {object} agentdelivery.AgentStats
+// @Success 200 {object} AgentStats
 // @Failure 500 {object} ErrorResponse
 // @Router /api/agents/stats [get]
 func (h *AgentHandler) GetAgentStats(c *gin.Context) {
