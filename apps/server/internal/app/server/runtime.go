@@ -60,7 +60,8 @@ type Runtime struct {
 	AppIntegrationService    handlers.AppMarketService
 	CustomFieldService       handlers.CustomFieldService
 	StatisticsHandlerService analyticsdelivery.HandlerService
-	SLAService               handlers.SLAService
+	StatisticsService        *services.StatisticsService
+	SLAService               *services.SLAService
 	ShiftService             handlers.ShiftService
 	AutomationHandlerService automationdelivery.HandlerService
 	KnowledgeDocHandler      knowledgedelivery.HandlerService
@@ -161,6 +162,7 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	statisticsService := services.NewStatisticsService(db, logger)
 	statisticsService.SetEventBus(bus)
 	rt.StatisticsHandlerService = statisticsService
+	rt.StatisticsService = statisticsService
 
 	satisfactionService := services.NewSatisfactionService(db, logger)
 	rt.SatisfactionService = satisfactionService

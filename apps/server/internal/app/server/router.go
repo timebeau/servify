@@ -45,7 +45,7 @@ type Dependencies struct {
 	AppIntegrationService    handlers.AppMarketService
 	CustomFieldService       handlers.CustomFieldService
 	StatisticsHandlerService analyticsdelivery.HandlerService
-	SLAService               handlers.SLAService
+	SLAService               *services.SLAService
 	ShiftService             handlers.ShiftService
 	AutomationHandlerService automationdelivery.HandlerService
 	KnowledgeDocHandler      knowledgedelivery.HandlerService
