@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Servify - 智能客服与工单系统</title>
+  <title>Servify - 开源智能客服与工单系统</title>
   <meta name="description" content="Servify：模块化客服与工单系统，支持 AI 问答、多渠道接入与实时会话。" />
-  <meta property="og:title" content="Servify - 智能客服与工单系统" />
+  <meta property="og:title" content="Servify - 开源智能客服与工单系统" />
   <meta property="og:description" content="集成 AI 智能问答、多渠道接入与实时会话，打造极致客户体验。" />
   <meta property="og:type" content="website" />
   <meta property="og:image" content="./assets/img/hero-ill.svg" />
@@ -25,8 +25,8 @@
       </div>
       <nav class="nav">
         <a href="#features">核心功能</a>
+        <a href="#quickstart">快速开始</a>
         <a href="#architecture">系统架构</a>
-        <a href="#modules">业务模块</a>
         <a href="#docs">文档</a>
         <a href="https://github.com/Toconvo/servify" target="_blank" rel="noopener">GitHub</a>
       </nav>
@@ -39,16 +39,18 @@
       <div class="container hero-wrap">
         <div class="hero-copy">
           <div class="hero-badge">v0.1 模块化架构</div>
-          <h1>面向未来的<br><span>智能客服系统</span></h1>
-          <p class="subtitle">模块化单体架构，支持 AI 问答、多渠道接入、实时会话与语音能力。灵活演进，易于扩展。</p>
+          <h1>开源智能<br><span>客服与工单系统</span></h1>
+          <p class="subtitle">模块化单体架构，支持 AI 智能问答、多渠道接入、实时会话与语音能力。企业级可观测性，灵活演进，易于扩展。</p>
           <div class="cta">
             <a class="btn primary" href="https://docs.servify.cloud" target="_blank" rel="noopener">查看文档</a>
-            <a class="btn secondary" href="/sdk-demo.html">在线体验</a>
+            <a class="btn secondary" href="https://github.com/Toconvo/servify" target="_blank" rel="noopener">GitHub &rarr;</a>
           </div>
-          <div class="meta">
-            <span class="meta-item">开源免费</span>
-            <span class="meta-item">模块化设计</span>
-            <span class="meta-item">云原生架构</span>
+          <div class="tech-badges">
+            <span class="tech-badge">Go 1.23</span>
+            <span class="tech-badge">Gin</span>
+            <span class="tech-badge">WebSocket</span>
+            <span class="tech-badge">OTel</span>
+            <span class="tech-badge">OpenAI</span>
           </div>
         </div>
         <div class="hero-ill">
@@ -61,20 +63,53 @@
     <section class="stats">
       <div class="container stats-wrap">
         <div class="stat-item">
-          <div class="stat-value">5+</div>
-          <div class="stat-label">核心业务模块</div>
+          <div class="stat-value">8+</div>
+          <div class="stat-label">业务模块</div>
         </div>
         <div class="stat-item">
           <div class="stat-value">AI</div>
-          <div class="stat-label">智能问答引擎</div>
+          <div class="stat-label">智能问答</div>
         </div>
         <div class="stat-item">
-          <div class="stat-value">RTC</div>
+          <div class="stat-value">WS</div>
           <div class="stat-label">实时通信</div>
         </div>
         <div class="stat-item">
-          <div class="stat-value">OTel</div>
-          <div class="stat-label">可观测性</div>
+          <div class="stat-value">100%</div>
+          <div class="stat-label">开源免费</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Use Cases Section -->
+    <section class="section alt">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag">应用场景</span>
+          <h2>适用于多种业务场景</h2>
+          <p>灵活的模块化设计，满足不同规模企业的客服需求</p>
+        </div>
+        <div class="grid features">
+          <div class="card">
+            <div class="card-icon"><i data-lucide="store"></i></div>
+            <h3>电商客服</h3>
+            <p>订单咨询、售后处理、智能推荐，7×24小时在线服务。</p>
+          </div>
+          <div class="card">
+            <div class="card-icon"><i data-lucide="building-2"></i></div>
+            <h3>SaaS 企业</h3>
+            <p>工单流转、客户分层、SLA 管理，提升客户满意度。</p>
+          </div>
+          <div class="card">
+            <div class="card-icon"><i data-lucide="graduation-cap"></i></div>
+            <h3>在线教育</h3>
+            <p>学员答疑、课程咨询、实时互动，降低运营成本。</p>
+          </div>
+          <div class="card">
+            <div class="card-icon"><i data-lucide="puzzle"></i></div>
+            <h3>系统集成</h3>
+            <p>开放 API，轻松集成到现有系统，支持私有化部署。</p>
+          </div>
         </div>
       </div>
     </section>
@@ -106,7 +141,7 @@
           <div class="card">
             <div class="card-icon"><i data-lucide="cpu"></i></div>
             <h3>AI 集成</h3>
-            <p>统一 LLM Provider 抽象，支持多模型切换，知识库检索与降级保护。</p>
+            <p>统一 LLM Provider 抽象，支持 OpenAI、Claude 等多模型切换。</p>
           </div>
           <div class="card">
             <div class="card-icon"><i data-lucide="database"></i></div>
@@ -117,6 +152,60 @@
             <div class="card-icon"><i data-lucide="activity"></i></div>
             <h3>可观测性</h3>
             <p>OpenTelemetry 追踪，Prometheus 指标，结构化日志，完整的运营诊断能力。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick Start Section -->
+    <section id="quickstart" class="section alt">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag">快速开始</span>
+          <h2>5 分钟部署完成</h2>
+          <p>最小化依赖，开箱即用</p>
+        </div>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">Terminal</span>
+            <button class="copy-btn" onclick="copyCode(this)">
+              <i data-lucide="copy"></i> 复制
+            </button>
+          </div>
+          <pre><code># 1. 克隆仓库
+git clone https://github.com/Toconvo/servify.git
+cd servify
+
+# 2. 启动服务（依赖 Docker）
+docker-compose up -d
+
+# 3. 访问控制台
+open http://localhost:8080
+
+# 4. 配置 AI（可选）
+export OPENAI_API_KEY=your_key_here</code></pre>
+        </div>
+        <div class="quickstart-steps">
+          <div class="step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <h4>克隆代码</h4>
+              <p>从 GitHub 获取最新代码</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <h4>启动服务</h4>
+              <p>使用 Docker Compose 一键启动</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <h4>开始使用</h4>
+              <p>访问控制台，体验完整功能</p>
+            </div>
           </div>
         </div>
       </div>
@@ -356,10 +445,11 @@ flowchart TB
           <h2>智能问答引擎</h2>
           <p class="subtitle">统一 LLM Provider 抽象，支持多模型切换与知识库检索</p>
           <ul class="list">
-            <li>Query Orchestrator 统一编排层</li>
-            <li>Prompt Builder 与 Guardrails</li>
-            <li>Knowledge Provider 检索集成</li>
-            <li>降级与熔断保护机制</li>
+            <li><i data-lucide="check"></i> Query Orchestrator 统一编排层</li>
+            <li><i data-lucide="check"></i> Prompt Builder 与 Guardrails</li>
+            <li><i data-lucide="check"></i> Knowledge Provider 检索集成</li>
+            <li><i data-lucide="check"></i> 降级与熔断保护机制</li>
+            <li><i data-lucide="check"></i> 支持 OpenAI、Claude、DeepSeek</li>
           </ul>
         </div>
         <div class="img-col">
@@ -376,10 +466,10 @@ flowchart TB
           <h2>WebSocket & WebRTC</h2>
           <p class="subtitle">浏览器原生支持，低延迟 P2P 传输</p>
           <ul class="list">
-            <li>WebSocket 长连接，消息实时推送</li>
-            <li>WebRTC 屏幕共享与远程协助</li>
-            <li>端到端监控与事件上报</li>
-            <li>SIP 协议适配器（语音能力）</li>
+            <li><i data-lucide="check"></i> WebSocket 长连接，消息实时推送</li>
+            <li><i data-lucide="check"></i> WebRTC 屏幕共享与远程协助</li>
+            <li><i data-lucide="check"></i> 端到端监控与事件上报</li>
+            <li><i data-lucide="check"></i> SIP 协议适配器（语音能力）</li>
           </ul>
         </div>
         <div class="img-col">
@@ -416,14 +506,80 @@ flowchart TB
       </div>
     </section>
 
+    <!-- Tech Stack Section -->
+    <section class="section alt">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag">技术栈</span>
+          <h2>云原生技术架构</h2>
+          <p>采用成熟稳定的技术栈，确保系统可靠性与可维护性</p>
+        </div>
+        <div class="tech-grid">
+          <div class="tech-item">
+            <h4>后端框架</h4>
+            <div class="tech-tags">
+              <span>Go 1.23</span>
+              <span>Gin</span>
+              <span>GORM</span>
+            </div>
+          </div>
+          <div class="tech-item">
+            <h4>实时通信</h4>
+            <div class="tech-tags">
+              <span>WebSocket</span>
+              <span>WebRTC</span>
+              <span>SIP</span>
+            </div>
+          </div>
+          <div class="tech-item">
+            <h4>AI 能力</h4>
+            <div class="tech-tags">
+              <span>OpenAI</span>
+              <span>Claude</span>
+              <span>DeepSeek</span>
+            </div>
+          </div>
+          <div class="tech-item">
+            <h4>可观测性</h4>
+            <div class="tech-tags">
+              <span>OpenTelemetry</span>
+              <span>Prometheus</span>
+              <span>Grafana</span>
+            </div>
+          </div>
+          <div class="tech-item">
+            <h4>数据存储</h4>
+            <div class="tech-tags">
+              <span>PostgreSQL</span>
+              <span>Redis</span>
+              <span>S3</span>
+            </div>
+          </div>
+          <div class="tech-item">
+            <h4>部署运维</h4>
+            <div class="tech-tags">
+              <span>Docker</span>
+              <span>Kubernetes</span>
+              <span>Helm</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- CTA Section -->
     <section class="cta-section">
       <div class="container">
         <h2>开始使用 Servify</h2>
-        <p>开源免费，快速部署，灵活扩展</p>
-        <a class="btn" href="https://github.com/Toconvo/servify" target="_blank" rel="noopener">
-          GitHub 仓库 →
-        </a>
+        <p>开源免费，自托管部署，数据完全掌控</p>
+        <div class="cta-buttons">
+          <a class="btn primary" href="https://github.com/Toconvo/servify" target="_blank" rel="noopener">
+            <i data-lucide="github"></i> GitHub 仓库
+          </a>
+          <a class="btn secondary" href="https://docs.servify.cloud" target="_blank" rel="noopener">
+            <i data-lucide="book-open"></i> 阅读文档
+          </a>
+        </div>
       </div>
     </section>
   </main>
@@ -500,6 +656,20 @@ flowchart TB
       el.classList.add('fade-in');
       observer.observe(el);
     });
+
+    // Copy code function
+    function copyCode(btn) {
+      const code = btn.closest('.code-block').querySelector('code').textContent;
+      navigator.clipboard.writeText(code).then(() => {
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i data-lucide="check"></i> 已复制';
+        lucide.createIcons();
+        setTimeout(() => {
+          btn.innerHTML = originalText;
+          lucide.createIcons();
+        }, 2000);
+      });
+    }
   </script>
 </body>
 </html>
