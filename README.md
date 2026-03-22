@@ -302,6 +302,30 @@ Jaeger 默认地址：`http://localhost:16686`
 - API/App SDK 当前只预留 contract 和目录，不做伪实现
 - SIP/渠道接入已建立平台层骨架，后续在 `voice` 模块上继续补业务语义
 
+## 官网部署
+
+Servify 官网托管在 Cloudflare Pages 上，通过 GitHub Actions 自动部署。
+
+### 首次设置
+
+1. **创建 Cloudflare Pages 项目**
+   - 登录 [Cloudflare Dashboard](https://dash.cloudflare.com)
+   - 进入 **Workers & Pages** → **Create application** → **Pages** → **Connect to Git**
+   - 选择 GitHub 仓库 `Toconvo/servify`
+   - 项目名称设为：`servify-website`
+   - 构建设置（静态站点无需构建）：
+     - 生产分支：`main`
+     - 构建命令：留空
+     - 构建输出目录：`apps/website`
+
+2. **配置自定义域名**
+   - 在 Pages 项目设置中添加 `www.servify.cloud` 和 `servify.cloud`
+   - Cloudflare 会自动配置 DNS 和 SSL 证书
+
+### 自动部署
+
+当 `apps/website/` 目录下的文件有变更时，CI 会自动触发部署到 Cloudflare Pages。
+
 ## CI 与文档发布
 
 - GitHub Actions 工作流：`.github/workflows/ci.yml`
