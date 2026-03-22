@@ -340,20 +340,35 @@ func (s *SessionTransferService) ProcessWaitingQueue(ctx context.Context) error 
 }
 
 func (s *SessionTransferService) loadWaitingQueue(ctx context.Context, limit int) ([]models.WaitingRecord, error) {
+	return s.listWaitingRecords(ctx, "waiting", limit)
+}
+
+func normalizeWaitingRecordQuery(status string, limit int) (string, int) {
+	if status == "" {
+		status = "waiting"
+	}
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	return status, limit
+}
+
+func (s *SessionTransferService) listWaitingRecords(ctx context.Context, status string, limit int) ([]models.WaitingRecord, error) {
+	status, limit = normalizeWaitingRecordQuery(status, limit)
 	if s.routing != nil {
-		records, err := s.routing.ListWaitingRecords(ctx, "waiting", limit)
+		records, err := s.routing.ListWaitingRecords(ctx, status, limit)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get waiting records: %w", err)
+			return nil, fmt.Errorf("failed to list waiting records: %w", err)
 		}
 		return records, nil
 	}
 
 	var waitingRecords []models.WaitingRecord
-	if err := s.db.Where("status = ?", "waiting").
+	if err := s.db.Where("status = ?", status).
 		Order("priority DESC, queued_at ASC").
 		Limit(limit).
 		Find(&waitingRecords).Error; err != nil {
-		return nil, fmt.Errorf("failed to get waiting records: %w", err)
+		return nil, fmt.Errorf("failed to list waiting records: %w", err)
 	}
 	return waitingRecords, nil
 }
@@ -629,23 +644,7 @@ func (s *SessionTransferService) GetTransferHistory(ctx context.Context, session
 
 // ListWaitingRecords 列出等待队列记录（默认 status=waiting）
 func (s *SessionTransferService) ListWaitingRecords(ctx context.Context, status string, limit int) ([]models.WaitingRecord, error) {
-	if s.routing != nil {
-		return s.routing.ListWaitingRecords(ctx, status, limit)
-	}
-	if status == "" {
-		status = "waiting"
-	}
-	if limit <= 0 || limit > 200 {
-		limit = 50
-	}
-	var records []models.WaitingRecord
-	if err := s.db.Where("status = ?", status).
-		Order("priority DESC, queued_at ASC").
-		Limit(limit).
-		Find(&records).Error; err != nil {
-		return nil, fmt.Errorf("failed to list waiting records: %w", err)
-	}
-	return records, nil
+	return s.listWaitingRecords(ctx, status, limit)
 }
 
 // CancelWaitingRecord 取消等待队列中的会话（幂等）

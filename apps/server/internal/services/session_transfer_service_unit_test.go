@@ -70,3 +70,27 @@ func TestSessionTransferService_LoadTransferSession_UsesConversationAdapterError
 		t.Fatalf("expected adapter error, got %v", err)
 	}
 }
+
+func TestNormalizeWaitingRecordQuery(t *testing.T) {
+	tests := []struct {
+		name         string
+		status       string
+		limit        int
+		wantStatus   string
+		wantLimit    int
+	}{
+		{name: "defaults", status: "", limit: 0, wantStatus: "waiting", wantLimit: 50},
+		{name: "caps large limit", status: "transferred", limit: 500, wantStatus: "transferred", wantLimit: 50},
+		{name: "keeps valid values", status: "cancelled", limit: 25, wantStatus: "cancelled", wantLimit: 25},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotStatus, gotLimit := normalizeWaitingRecordQuery(tt.status, tt.limit)
+			if gotStatus != tt.wantStatus || gotLimit != tt.wantLimit {
+				t.Fatalf("normalizeWaitingRecordQuery(%q, %d) = (%q, %d), want (%q, %d)",
+					tt.status, tt.limit, gotStatus, gotLimit, tt.wantStatus, tt.wantLimit)
+			}
+		})
+	}
+}
