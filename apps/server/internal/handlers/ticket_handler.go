@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
 	ticketcontract "servify/apps/server/internal/modules/ticket/contract"
+	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"

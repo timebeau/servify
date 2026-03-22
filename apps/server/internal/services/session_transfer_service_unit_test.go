@@ -73,11 +73,11 @@ func TestSessionTransferService_LoadTransferSession_UsesConversationAdapterError
 
 func TestNormalizeWaitingRecordQuery(t *testing.T) {
 	tests := []struct {
-		name         string
-		status       string
-		limit        int
-		wantStatus   string
-		wantLimit    int
+		name       string
+		status     string
+		limit      int
+		wantStatus string
+		wantLimit  int
 	}{
 		{name: "defaults", status: "", limit: 0, wantStatus: "waiting", wantLimit: 50},
 		{name: "caps large limit", status: "transferred", limit: 500, wantStatus: "transferred", wantLimit: 50},
