@@ -7,10 +7,6 @@ compatibility_date = "2025-01-01"
 directory = "../website"
 binding = "ASSETS"
 
-[vars]
-# Zone ID and routes configured via environment/secrets
-
-# Routes are configured via CLOUDFLARE_ZONE_ID environment variable during deployment
-# To deploy manually, set:
-# export CLOUDFLARE_ZONE_ID=your_zone_id
-# npx wrangler deploy --var CLOUDFLARE_ZONE_ID:your_zone_id
+# Custom domains (configured in Cloudflare dashboard)
+# These will be automatically picked up by wrangler deploy
+# custom_domains = ["www.servify.cloud", "servify.cloud"]
