@@ -19,6 +19,13 @@ import (
 	"gorm.io/gorm"
 
 	"servify/apps/server/internal/models"
+	agentdelivery "servify/apps/server/internal/modules/agent/delivery"
+	conversationdelivery "servify/apps/server/internal/modules/conversation/delivery"
+	routingapp "servify/apps/server/internal/modules/routing/application"
+	routingdelivery "servify/apps/server/internal/modules/routing/delivery"
+	routinginfra "servify/apps/server/internal/modules/routing/infra"
+	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
+	"servify/apps/server/internal/platform/eventbus"
 	"servify/apps/server/internal/services"
 )
 
@@ -80,7 +87,14 @@ func TestSessionTransferHandler_ListWaiting_And_Cancel(t *testing.T) {
 	}
 
 	agentSvc := services.NewAgentService(db, logger)
-	transferSvc := services.NewSessionTransferService(db, logger, stubAIForTransferHandler{}, agentSvc, nil)
+	bus := eventbus.NewInMemoryBus()
+	routingSvc := routingapp.NewService(routinginfra.NewGormRepository(db), bus)
+	transferSvc := services.NewSessionTransferServiceWithAdapters(db, logger, stubAIForTransferHandler{}, agentSvc, nil, services.SessionTransferAdapters{
+		Routing:      routingdelivery.NewSessionTransferAdapter(routingSvc, bus),
+		Tickets:      ticketdelivery.NewRuntimeAdapter(bus),
+		Conversation: conversationdelivery.NewRuntimeAdapter(db, bus),
+		Agents:       agentdelivery.NewTransferRuntimeAdapter(),
+	})
 	h := NewSessionTransferHandler(transferSvc, logger)
 
 	r := gin.New()
@@ -137,7 +151,11 @@ func TestSessionTransferHandler_TransferToHuman(t *testing.T) {
 	}
 
 	agentSvc := services.NewAgentService(db, logger)
-	transferSvc := services.NewSessionTransferService(db, logger, stubAIForTransferHandler{}, agentSvc, nil)
+	bus := eventbus.NewInMemoryBus()
+	routingSvc := routingapp.NewService(routinginfra.NewGormRepository(db), bus)
+	transferSvc := services.NewSessionTransferServiceWithAdapters(db, logger, stubAIForTransferHandler{}, agentSvc, nil, services.SessionTransferAdapters{
+		Routing: routingdelivery.NewSessionTransferAdapter(routingSvc, bus),
+	})
 	h := NewSessionTransferHandler(transferSvc, logger)
 
 	r := gin.New()
@@ -176,7 +194,14 @@ func TestSessionTransferHandler_GetTransferHistory(t *testing.T) {
 	}
 
 	agentSvc := services.NewAgentService(db, logger)
-	transferSvc := services.NewSessionTransferService(db, logger, stubAIForTransferHandler{}, agentSvc, nil)
+	bus := eventbus.NewInMemoryBus()
+	routingSvc := routingapp.NewService(routinginfra.NewGormRepository(db), bus)
+	transferSvc := services.NewSessionTransferServiceWithAdapters(db, logger, stubAIForTransferHandler{}, agentSvc, nil, services.SessionTransferAdapters{
+		Routing:      routingdelivery.NewSessionTransferAdapter(routingSvc, bus),
+		Tickets:      ticketdelivery.NewRuntimeAdapter(bus),
+		Conversation: conversationdelivery.NewRuntimeAdapter(db, bus),
+		Agents:       agentdelivery.NewTransferRuntimeAdapter(),
+	})
 	h := NewSessionTransferHandler(transferSvc, logger)
 
 	r := gin.New()
