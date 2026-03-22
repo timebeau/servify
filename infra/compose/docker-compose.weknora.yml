@@ -6,7 +6,8 @@ version: '3.8'
 services:
   # WeKnora 主服务
   weknora:
-    image: weknora/weknora:latest  # 需要根据实际镜像名调整
+    build:
+      context: ./weknora-mock
     container_name: servify_weknora
     ports:
       - "9000:9000"  # WeKnora API 端口
