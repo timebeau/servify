@@ -1,0 +1,11 @@
+tree 983114a4fd7f0f13ddc47278cb85b12bba664807
+parent 5ce914d7392ab0aefd735da14b36bd1c66b9dec1
+author cuihairu <chuihairu@gmail.com> 1774162209 +0800
+committer cuihairu <chuihairu@gmail.com> 1774162209 +0800
+
+fix: use printf instead of heredoc for weknora-mock Dockerfile
+
+Heredoc syntax was causing parse errors. Use printf with
+properly escaped strings instead.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
