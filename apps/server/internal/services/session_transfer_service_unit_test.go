@@ -3,11 +3,13 @@ package services
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
 	"servify/apps/server/internal/models"
 	conversationdelivery "servify/apps/server/internal/modules/conversation/delivery"
+	routingdelivery "servify/apps/server/internal/modules/routing/delivery"
 
 	"gorm.io/gorm"
 )
@@ -36,6 +38,12 @@ type stubConversationRuntime struct {
 	loadSession func(ctx context.Context, sessionID string) (*conversationdelivery.TransferSession, error)
 }
 
+type stubRoutingRuntime struct {
+	getTransferHistory func(ctx context.Context, sessionID string) ([]models.TransferRecord, error)
+	listWaitingRecords func(ctx context.Context, status string, limit int) ([]models.WaitingRecord, error)
+	getWaitingRecord   func(ctx context.Context, sessionID string) (*models.WaitingRecord, error)
+}
+
 func (s stubConversationRuntime) LoadTransferSession(ctx context.Context, sessionID string) (*conversationdelivery.TransferSession, error) {
 	return s.loadSession(ctx, sessionID)
 }
@@ -50,6 +58,43 @@ func (s stubConversationRuntime) SyncWaitingAssignment(ctx context.Context, tx *
 
 func (s stubConversationRuntime) AppendSystemMessage(ctx context.Context, tx *gorm.DB, sessionID string, content string, createdAt time.Time) error {
 	return nil
+}
+
+func (s stubRoutingRuntime) AddToWaitingQueue(ctx context.Context, tx *gorm.DB, sessionID string, reason string, targetSkills []string, priority string, notes string) (*models.WaitingRecord, error) {
+	return nil, nil
+}
+
+func (s stubRoutingRuntime) AssignAgent(ctx context.Context, tx *gorm.DB, cmd routingdelivery.AssignAgentCommand) (*models.TransferRecord, error) {
+	return nil, nil
+}
+
+func (s stubRoutingRuntime) GetTransferHistory(ctx context.Context, sessionID string) ([]models.TransferRecord, error) {
+	if s.getTransferHistory == nil {
+		return nil, nil
+	}
+	return s.getTransferHistory(ctx, sessionID)
+}
+
+func (s stubRoutingRuntime) ListWaitingRecords(ctx context.Context, status string, limit int) ([]models.WaitingRecord, error) {
+	if s.listWaitingRecords == nil {
+		return nil, nil
+	}
+	return s.listWaitingRecords(ctx, status, limit)
+}
+
+func (s stubRoutingRuntime) GetWaitingRecord(ctx context.Context, sessionID string) (*models.WaitingRecord, error) {
+	if s.getWaitingRecord == nil {
+		return nil, nil
+	}
+	return s.getWaitingRecord(ctx, sessionID)
+}
+
+func (s stubRoutingRuntime) CancelWaiting(ctx context.Context, tx *gorm.DB, sessionID string, reason string) (*models.WaitingRecord, error) {
+	return nil, nil
+}
+
+func (s stubRoutingRuntime) MarkWaitingTransferred(ctx context.Context, tx *gorm.DB, sessionID string, agentID uint, assignedAt time.Time) (*models.WaitingRecord, error) {
+	return nil, nil
 }
 
 func TestSessionTransferService_LoadTransferSession_UsesConversationAdapterError(t *testing.T) {
@@ -92,5 +137,30 @@ func TestNormalizeWaitingRecordQuery(t *testing.T) {
 					tt.status, tt.limit, gotStatus, gotLimit, tt.wantStatus, tt.wantLimit)
 			}
 		})
+	}
+}
+
+func TestSessionTransferService_ListTransferHistory_WrapsRoutingError(t *testing.T) {
+	expectedErr := errors.New("routing unavailable")
+	svc := NewSessionTransferServiceWithAdapters(nil, nil, stubAIForTransferUnit{}, nil, nil, SessionTransferAdapters{
+		Routing: stubRoutingRuntime{
+			getTransferHistory: func(ctx context.Context, sessionID string) ([]models.TransferRecord, error) {
+				if sessionID != "s-history" {
+					t.Fatalf("unexpected session id: %s", sessionID)
+				}
+				return nil, expectedErr
+			},
+		},
+	})
+
+	_, err := svc.listTransferHistory(context.Background(), "s-history")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Fatalf("expected wrapped routing error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "failed to get transfer history") {
+		t.Fatalf("expected wrapped message, got %v", err)
 	}
 }

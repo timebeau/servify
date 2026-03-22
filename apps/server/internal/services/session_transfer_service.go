@@ -373,6 +373,25 @@ func (s *SessionTransferService) listWaitingRecords(ctx context.Context, status 
 	return waitingRecords, nil
 }
 
+func (s *SessionTransferService) listTransferHistory(ctx context.Context, sessionID string) ([]models.TransferRecord, error) {
+	if s.routing != nil {
+		records, err := s.routing.GetTransferHistory(ctx, sessionID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get transfer history: %w", err)
+		}
+		return records, nil
+	}
+
+	var records []models.TransferRecord
+	if err := s.db.Where("session_id = ?", sessionID).
+		Order("transferred_at DESC").
+		Find(&records).Error; err != nil {
+		return nil, fmt.Errorf("failed to get transfer history: %w", err)
+	}
+
+	return records, nil
+}
+
 func (s *SessionTransferService) syncTransferSession(ctx context.Context, tx *gorm.DB, session *conversationdelivery.TransferSession, targetAgentID uint) error {
 	if s.conversation != nil {
 		return s.conversation.SyncTransferAssignment(ctx, tx, session.ID, session.CustomerID, targetAgentID)
@@ -627,19 +646,7 @@ func (s *SessionTransferService) notifyWaiting(sessionID string, message string)
 
 // GetTransferHistory 获取转接历史
 func (s *SessionTransferService) GetTransferHistory(ctx context.Context, sessionID string) ([]models.TransferRecord, error) {
-	if s.routing != nil {
-		return s.routing.GetTransferHistory(ctx, sessionID)
-	}
-	var records []models.TransferRecord
-	err := s.db.Where("session_id = ?", sessionID).
-		Order("transferred_at DESC").
-		Find(&records).Error
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to get transfer history: %w", err)
-	}
-
-	return records, nil
+	return s.listTransferHistory(ctx, sessionID)
 }
 
 // ListWaitingRecords 列出等待队列记录（默认 status=waiting）
