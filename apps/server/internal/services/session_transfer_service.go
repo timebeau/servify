@@ -653,18 +653,6 @@ func (s *SessionTransferService) CancelWaitingRecord(ctx context.Context, sessio
 	})
 }
 
-func (s *SessionTransferService) SetRoutingAdapter(adapter routingdelivery.RuntimeService) {
-	s.routing = adapter
-}
-
-func (s *SessionTransferService) SetTicketRuntime(adapter ticketdelivery.RuntimeService) {
-	s.tickets = adapter
-}
-
-func (s *SessionTransferService) SetConversationRuntime(adapter conversationdelivery.RuntimeService) {
-	s.conversation = adapter
-}
-
 func (s *SessionTransferService) loadTransferSession(ctx context.Context, sessionID string) (*conversationdelivery.TransferSession, error) {
 	if s.conversation != nil {
 		session, err := s.conversation.LoadTransferSession(ctx, sessionID)
@@ -687,10 +675,6 @@ func (s *SessionTransferService) loadTransferSession(ctx context.Context, sessio
 		UserName:     model.User.Name,
 		UserUsername: model.User.Username,
 	}, nil
-}
-
-func (s *SessionTransferService) SetAgentRuntime(adapter agentdelivery.RuntimeService) {
-	s.agents = adapter
 }
 
 // AutoTransferCheck 自动转接检查
