@@ -50,7 +50,7 @@ jobs:
         run: npm -C docs ci --no-audit --no-fund
 
       - name: Generate API docs
-        run: go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g apps/server/cmd/server/main.go -o docs/generated/api --parseDependency
+        run: go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g apps/server/cmd/server/main.go -o docs/generated/api
 
       - name: Build docs
         run: npm -C docs run build
