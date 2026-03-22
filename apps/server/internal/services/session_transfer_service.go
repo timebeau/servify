@@ -516,6 +516,36 @@ func (s *SessionTransferService) markWaitingTransferred(ctx context.Context, tx 
 		}).Error
 }
 
+func (s *SessionTransferService) cancelWaitingRecord(ctx context.Context, tx *gorm.DB, sessionID string, reason string) error {
+	if s.routing != nil {
+		_, err := s.routing.CancelWaiting(ctx, tx, sessionID, reason)
+		if err == gorm.ErrRecordNotFound {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("update waiting record: %w", err)
+		}
+		return nil
+	}
+
+	record, err := s.getActiveWaitingRecord(ctx, sessionID)
+	if err == gorm.ErrRecordNotFound {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("load waiting record: %w", err)
+	}
+
+	if err := tx.Model(&models.WaitingRecord{}).
+		Where("session_id = ? AND status = ?", record.SessionID, "waiting").
+		Updates(map[string]interface{}{
+			"status": "cancelled",
+		}).Error; err != nil {
+		return fmt.Errorf("update waiting record: %w", err)
+	}
+	return nil
+}
+
 func (s *SessionTransferService) ensureWaitingSessionState(ctx context.Context, tx *gorm.DB, session *conversationdelivery.TransferSession) error {
 	if s.conversation != nil {
 		return s.conversation.SyncWaitingAssignment(ctx, tx, session.ID, session.CustomerID)
@@ -673,29 +703,8 @@ func (s *SessionTransferService) CancelWaitingRecord(ctx context.Context, sessio
 
 	now := time.Now()
 	return s.db.Transaction(func(tx *gorm.DB) error {
-		if s.routing != nil {
-			if _, err := s.routing.CancelWaiting(ctx, tx, sessionID, reason); err != nil {
-				if err == gorm.ErrRecordNotFound {
-					return nil
-				}
-				return fmt.Errorf("update waiting record: %w", err)
-			}
-		} else {
-			var wr models.WaitingRecord
-			if err := tx.Where("session_id = ? AND status = ?", sessionID, "waiting").First(&wr).Error; err != nil {
-				if err == gorm.ErrRecordNotFound {
-					return nil
-				}
-				return fmt.Errorf("load waiting record: %w", err)
-			}
-
-			if err := tx.Model(&models.WaitingRecord{}).
-				Where("id = ?", wr.ID).
-				Updates(map[string]interface{}{
-					"status": "cancelled",
-				}).Error; err != nil {
-				return fmt.Errorf("update waiting record: %w", err)
-			}
+		if err := s.cancelWaitingRecord(ctx, tx, sessionID, reason); err != nil {
+			return err
 		}
 
 		// 记录系统消息（可选，不影响主流程）

@@ -48,6 +48,7 @@
   - waiting queue 的公开查询与后台处理读取现已统一复用同一条 service 内部查询路径，减少 adapter/fallback 与默认分页规则分叉
   - transfer history 的公开查询也已收口到同一条 service 内部 routing-first 入口，避免顶层重复分支继续扩散
   - 当前 waiting record 的读取与“仅 active waiting 才参与后续流程”的判定也已收口到统一 helper，固定 `ErrRecordNotFound` 语义
+  - waiting record 的取消更新逻辑也已抽成独立 helper，事务主流程继续向 orchestration 收敛
   - 转接主流程内剩余的 adapter/fallback 分支已收口到私有 helper，`executeTransfer` / `addToWaitingQueue` 现主要保留流程编排职责
   - 但主流程仍强依赖 `gorm.DB`、`AgentService` 和旧会话模型
   - 结论：属于“局部接入 module adapter，但主流程仍是 legacy service”的高风险混合区

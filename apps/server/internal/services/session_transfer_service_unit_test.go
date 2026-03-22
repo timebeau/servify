@@ -42,6 +42,7 @@ type stubRoutingRuntime struct {
 	getTransferHistory func(ctx context.Context, sessionID string) ([]models.TransferRecord, error)
 	listWaitingRecords func(ctx context.Context, status string, limit int) ([]models.WaitingRecord, error)
 	getWaitingRecord   func(ctx context.Context, sessionID string) (*models.WaitingRecord, error)
+	cancelWaiting     func(ctx context.Context, tx *gorm.DB, sessionID string, reason string) (*models.WaitingRecord, error)
 }
 
 func (s stubConversationRuntime) LoadTransferSession(ctx context.Context, sessionID string) (*conversationdelivery.TransferSession, error) {
@@ -90,7 +91,10 @@ func (s stubRoutingRuntime) GetWaitingRecord(ctx context.Context, sessionID stri
 }
 
 func (s stubRoutingRuntime) CancelWaiting(ctx context.Context, tx *gorm.DB, sessionID string, reason string) (*models.WaitingRecord, error) {
-	return nil, nil
+	if s.cancelWaiting == nil {
+		return nil, nil
+	}
+	return s.cancelWaiting(ctx, tx, sessionID, reason)
 }
 
 func (s stubRoutingRuntime) MarkWaitingTransferred(ctx context.Context, tx *gorm.DB, sessionID string, agentID uint, assignedAt time.Time) (*models.WaitingRecord, error) {
@@ -180,5 +184,30 @@ func TestSessionTransferService_GetActiveWaitingRecord_NonWaitingIsNotFound(t *t
 	_, err := svc.getActiveWaitingRecord(context.Background(), "s-waiting")
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		t.Fatalf("expected ErrRecordNotFound, got %v", err)
+	}
+}
+
+func TestSessionTransferService_CancelWaitingRecord_WrapsRoutingError(t *testing.T) {
+	expectedErr := errors.New("cancel failed")
+	svc := NewSessionTransferServiceWithAdapters(nil, nil, stubAIForTransferUnit{}, nil, nil, SessionTransferAdapters{
+		Routing: stubRoutingRuntime{
+			cancelWaiting: func(ctx context.Context, tx *gorm.DB, sessionID string, reason string) (*models.WaitingRecord, error) {
+				if sessionID != "s-cancel" || reason != "user_left" {
+					t.Fatalf("unexpected cancel inputs: %s %s", sessionID, reason)
+				}
+				return nil, expectedErr
+			},
+		},
+	})
+
+	err := svc.cancelWaitingRecord(context.Background(), nil, "s-cancel", "user_left")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !errors.Is(err, expectedErr) {
+		t.Fatalf("expected wrapped error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "update waiting record") {
+		t.Fatalf("expected wrapped message, got %v", err)
 	}
 }
