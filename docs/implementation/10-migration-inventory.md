@@ -70,8 +70,8 @@
 - `customer`
   - `services/CustomerService` 已经是 `modules/customer/application.Service` 的轻量 facade
   - HTTP handler 只消费请求/响应 DTO 与兼容方法，核心业务已经下沉到 module application + infra repository
-  - `app/server` runtime 已不再对外暴露 `*services.CustomerService` 字段，仅保留 handler-facing contract 与局部 wiring
-  - 结论：适合先定义 handler-facing contract，并把 router/runtime 注入切到 `modules/customer/delivery`
+  - `app/server` runtime 已不再对外暴露 `*services.CustomerService` 字段，且 customer handler 装配已直接切到 `modules/customer/delivery.NewHandlerService(db)`，不再经由 legacy facade 中转
+  - 结论：handler 主路径已直接贴近 module；旧 facade 主要只为历史调用者保留 DTO 兼容
 
 - `automation`
   - `services/AutomationService` 已经把核心触发器与执行查询下沉到 `modules/automation/application.Service`

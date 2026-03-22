@@ -38,6 +38,8 @@ require|apps/server/internal/app/server/realtime_runtime.go|SetConversationMessa
 require|apps/server/internal/app/server/ai_runtime.go|Service[[:space:]]+aidelivery\.HandlerService|AI assembly must expose the handler-facing AI contract.
 require|apps/server/internal/app/server/ai_runtime.go|RuntimeService[[:space:]]+services\.AIServiceInterface|AI assembly must keep a separate runtime AIServiceInterface for non-handler callers.
 forbid|apps/server/internal/app/server/ai_runtime.go|LegacyService[[:space:]]+\*services\.AIService|AI assembly must not expose the legacy concrete AI service.
+require|apps/server/internal/app/server/runtime.go|CustomerHandlerService[[:space:]]+customerdelivery\.HandlerService|Runtime must expose customer via customerdelivery.HandlerService.
+require|apps/server/internal/app/server/runtime.go|CustomerHandlerService[[:space:]]*=.*customerdelivery\.NewHandlerService\(db\)|Runtime must assemble customer handlers directly from module delivery.
 require|apps/server/internal/app/server/runtime.go|KnowledgeDocHandler[[:space:]]+knowledgedelivery\.HandlerService|Runtime must expose knowledge via knowledgedelivery.HandlerService.
 require|apps/server/internal/app/server/runtime.go|Knowledg[e]?DocHandler[[:space:]]*=.*knowledgedelivery\.NewHandlerService\(db\)|Runtime must assemble knowledge handlers directly from module delivery.
 require|apps/server/internal/app/server/runtime.go|WorkspaceService[[:space:]]+services\.WorkspaceOverviewReader|Runtime must expose workspace via WorkspaceOverviewReader.
@@ -74,6 +76,7 @@ require|apps/server/internal/handlers/sla_handler.go|slaService[[:space:]]+SLASe
 require|apps/server/internal/handlers/sla_handler.go|ticketService[[:space:]]+SLATicketReader|SLA handler must store the exported SLATicketReader contract.
 require|apps/server/internal/handlers/sla_handler.go|func NewSLAHandler\(slaService SLAService, ticketService SLATicketReader\)|SLA handler constructor must accept exported SLA contracts.
 forbid|apps/server/internal/app/server/runtime.go|CustomerService[[:space:]]+\*services\.CustomerService|Runtime must not expose concrete CustomerService.
+forbid|apps/server/internal/app/server/runtime.go|NewCustomerService\(db,[[:space:]]*logger\)|Runtime must not assemble customer handlers through services.NewCustomerService.
 forbid|apps/server/internal/app/server/runtime.go|AutomationService[[:space:]]+\*services\.AutomationService|Runtime must not expose concrete AutomationService.
 forbid|apps/server/internal/app/server/runtime.go|StatisticsService[[:space:]]+\*services\.StatisticsService|Runtime must not expose concrete StatisticsService.
 forbid|apps/server/internal/app/server/runtime.go|KnowledgeDocService[[:space:]]+\*services\.KnowledgeDocService|Runtime must not expose concrete KnowledgeDocService.

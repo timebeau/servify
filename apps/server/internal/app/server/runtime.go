@@ -134,8 +134,7 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	automationService.SetEventBus(bus)
 	slaService.SetAutomationService(automationService)
 
-	customerService := services.NewCustomerService(db, logger)
-	rt.CustomerHandlerService = customerdelivery.NewHandlerServiceAdapter(customerService)
+	rt.CustomerHandlerService = customerdelivery.NewHandlerService(db)
 	agentAssembly := services.BuildAgentServiceAssembly(db, logger)
 	rt.AgentHandlerService = agentAssembly.Service
 	go agentAssembly.Maintenance.Start()
