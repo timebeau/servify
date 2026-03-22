@@ -73,7 +73,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/services.AgentCreateRequest"
+                            "$ref": "#/definitions/handlers.AgentCreateRequest"
                         }
                     }
                 ],
@@ -134,7 +134,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/services.AgentInfo"
+                            "$ref": "#/definitions/handlers.AgentInfo"
                         }
                     },
                     "404": {
@@ -171,7 +171,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/services.AgentInfo"
+                                "$ref": "#/definitions/handlers.AgentInfo"
                             }
                         }
                     },
@@ -209,7 +209,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/services.AgentStats"
+                            "$ref": "#/definitions/handlers.AgentStats"
                         }
                     },
                     "500": {
@@ -1728,7 +1728,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/services.TransferResult"
+                            "$ref": "#/definitions/contract.TransferResult"
                         }
                     },
                     "400": {
@@ -1766,7 +1766,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/services.TransferRequest"
+                            "$ref": "#/definitions/contract.TransferRequest"
                         }
                     }
                 ],
@@ -1774,7 +1774,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/services.TransferResult"
+                            "$ref": "#/definitions/contract.TransferResult"
                         }
                     },
                     "400": {
@@ -2462,7 +2462,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/services.AgentPerformanceStats"
+                                "$ref": "#/definitions/contract.AgentPerformanceStats"
                             }
                         }
                     },
@@ -2500,7 +2500,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/services.CategoryStats"
+                                "$ref": "#/definitions/contract.CategoryStats"
                             }
                         }
                     },
@@ -2530,7 +2530,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/services.DashboardStats"
+                            "$ref": "#/definitions/contract.DashboardStats"
                         }
                     },
                     "500": {
@@ -2575,7 +2575,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/services.CategoryStats"
+                                "$ref": "#/definitions/contract.CategoryStats"
                             }
                         }
                     },
@@ -2627,7 +2627,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/services.CategoryStats"
+                                "$ref": "#/definitions/contract.CategoryStats"
                             }
                         }
                     },
@@ -2681,7 +2681,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/services.TimeRangeStats"
+                                "$ref": "#/definitions/contract.TimeRangeStats"
                             }
                         }
                     },
@@ -3355,6 +3355,38 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "contract.AgentPerformanceStats": {
+            "type": "object",
+            "properties": {
+                "agent_id": {
+                    "type": "integer"
+                },
+                "agent_name": {
+                    "type": "string"
+                },
+                "avg_resolution_time": {
+                    "type": "number"
+                },
+                "avg_response_time": {
+                    "type": "number"
+                },
+                "department": {
+                    "type": "string"
+                },
+                "online_time": {
+                    "type": "integer"
+                },
+                "rating": {
+                    "type": "number"
+                },
+                "resolved_tickets": {
+                    "type": "integer"
+                },
+                "total_tickets": {
+                    "type": "integer"
+                }
+            }
+        },
         "contract.BulkUpdateFailure": {
             "type": "object",
             "properties": {
@@ -3422,6 +3454,17 @@ const docTemplate = `{
                 }
             }
         },
+        "contract.CategoryStats": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string"
+                },
+                "count": {
+                    "type": "integer"
+                }
+            }
+        },
         "contract.CreateTicketRequest": {
             "type": "object",
             "required": [
@@ -3456,6 +3499,68 @@ const docTemplate = `{
                 },
                 "title": {
                     "type": "string"
+                }
+            }
+        },
+        "contract.DashboardStats": {
+            "type": "object",
+            "properties": {
+                "active_sessions": {
+                    "type": "integer"
+                },
+                "ai_usage_today": {
+                    "type": "integer"
+                },
+                "assigned_tickets": {
+                    "type": "integer"
+                },
+                "avg_resolution_time": {
+                    "type": "number"
+                },
+                "avg_response_time": {
+                    "type": "number"
+                },
+                "busy_agents": {
+                    "type": "integer"
+                },
+                "closed_tickets": {
+                    "type": "integer"
+                },
+                "customer_satisfaction": {
+                    "type": "number"
+                },
+                "online_agents": {
+                    "type": "integer"
+                },
+                "open_tickets": {
+                    "type": "integer"
+                },
+                "resolved_tickets": {
+                    "type": "integer"
+                },
+                "today_messages": {
+                    "type": "integer"
+                },
+                "today_sessions": {
+                    "type": "integer"
+                },
+                "today_tickets": {
+                    "type": "integer"
+                },
+                "total_agents": {
+                    "type": "integer"
+                },
+                "total_customers": {
+                    "type": "integer"
+                },
+                "total_sessions": {
+                    "type": "integer"
+                },
+                "total_tickets": {
+                    "type": "integer"
+                },
+                "weknora_usage_today": {
+                    "type": "integer"
                 }
             }
         },
@@ -3510,6 +3615,84 @@ const docTemplate = `{
                 }
             }
         },
+        "contract.TimeRangeStats": {
+            "type": "object",
+            "properties": {
+                "avg_response_time": {
+                    "type": "number"
+                },
+                "customer_satisfaction": {
+                    "type": "number"
+                },
+                "date": {
+                    "type": "string"
+                },
+                "messages": {
+                    "type": "integer"
+                },
+                "resolved_tickets": {
+                    "type": "integer"
+                },
+                "sessions": {
+                    "type": "integer"
+                },
+                "tickets": {
+                    "type": "integer"
+                }
+            }
+        },
+        "contract.TransferRequest": {
+            "type": "object",
+            "required": [
+                "session_id"
+            ],
+            "properties": {
+                "notes": {
+                    "type": "string"
+                },
+                "priority": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "session_id": {
+                    "type": "string"
+                },
+                "target_skills": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "contract.TransferResult": {
+            "type": "object",
+            "properties": {
+                "is_waiting": {
+                    "type": "boolean"
+                },
+                "new_agent_id": {
+                    "type": "integer"
+                },
+                "queued_at": {
+                    "type": "string"
+                },
+                "session_id": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                },
+                "summary": {
+                    "type": "string"
+                },
+                "transferred_at": {
+                    "type": "string"
+                }
+            }
+        },
         "contract.UpdateTicketRequest": {
             "type": "object",
             "properties": {
@@ -3540,6 +3723,114 @@ const docTemplate = `{
                 },
                 "title": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.AgentCreateRequest": {
+            "type": "object",
+            "required": [
+                "user_id"
+            ],
+            "properties": {
+                "department": {
+                    "type": "string",
+                    "example": "sales"
+                },
+                "max_concurrent": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "skills": {
+                    "type": "string",
+                    "example": "tech,support"
+                },
+                "user_id": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
+        "handlers.AgentInfo": {
+            "type": "object",
+            "properties": {
+                "avg_response_time": {
+                    "type": "integer",
+                    "example": 120
+                },
+                "connected_at": {
+                    "type": "string",
+                    "example": "2024-01-01T10:00:00Z"
+                },
+                "current_load": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "department": {
+                    "type": "string",
+                    "example": "sales"
+                },
+                "last_activity": {
+                    "type": "string",
+                    "example": "2024-01-01T12:00:00Z"
+                },
+                "max_concurrent": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "name": {
+                    "type": "string",
+                    "example": "John Doe"
+                },
+                "rating": {
+                    "type": "number",
+                    "example": 4.8
+                },
+                "skills": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "tech",
+                        "support"
+                    ]
+                },
+                "status": {
+                    "type": "string",
+                    "example": "online"
+                },
+                "user_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "username": {
+                    "type": "string",
+                    "example": "john_doe"
+                }
+            }
+        },
+        "handlers.AgentStats": {
+            "type": "object",
+            "properties": {
+                "avg_rating": {
+                    "type": "number",
+                    "example": 4.5
+                },
+                "avg_response_time": {
+                    "type": "integer",
+                    "example": 120
+                },
+                "busy": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "online": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 10
                 }
             }
         },
@@ -4297,133 +4588,6 @@ const docTemplate = `{
                 }
             }
         },
-        "services.AgentCreateRequest": {
-            "type": "object",
-            "required": [
-                "user_id"
-            ],
-            "properties": {
-                "department": {
-                    "type": "string"
-                },
-                "max_concurrent": {
-                    "type": "integer"
-                },
-                "skills": {
-                    "type": "string"
-                },
-                "user_id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "services.AgentInfo": {
-            "type": "object",
-            "properties": {
-                "avg_response_time": {
-                    "type": "integer"
-                },
-                "connected_at": {
-                    "type": "string"
-                },
-                "current_load": {
-                    "type": "integer"
-                },
-                "department": {
-                    "type": "string"
-                },
-                "last_activity": {
-                    "type": "string"
-                },
-                "max_concurrent": {
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "rating": {
-                    "type": "number"
-                },
-                "skills": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "status": {
-                    "type": "string"
-                },
-                "user_id": {
-                    "type": "integer"
-                },
-                "username": {
-                    "type": "string"
-                }
-            }
-        },
-        "services.AgentPerformanceStats": {
-            "type": "object",
-            "properties": {
-                "agent_id": {
-                    "type": "integer"
-                },
-                "agent_name": {
-                    "type": "string"
-                },
-                "avg_resolution_time": {
-                    "type": "number"
-                },
-                "avg_response_time": {
-                    "type": "number"
-                },
-                "department": {
-                    "type": "string"
-                },
-                "online_time": {
-                    "type": "integer"
-                },
-                "rating": {
-                    "type": "number"
-                },
-                "resolved_tickets": {
-                    "type": "integer"
-                },
-                "total_tickets": {
-                    "type": "integer"
-                }
-            }
-        },
-        "services.AgentStats": {
-            "type": "object",
-            "properties": {
-                "avg_rating": {
-                    "type": "number"
-                },
-                "avg_response_time": {
-                    "type": "integer"
-                },
-                "busy": {
-                    "type": "integer"
-                },
-                "online": {
-                    "type": "integer"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "services.CategoryStats": {
-            "type": "object",
-            "properties": {
-                "category": {
-                    "type": "string"
-                },
-                "count": {
-                    "type": "integer"
-                }
-            }
-        },
         "services.ChannelSummary": {
             "type": "object",
             "properties": {
@@ -4674,68 +4838,6 @@ const docTemplate = `{
                 }
             }
         },
-        "services.DashboardStats": {
-            "type": "object",
-            "properties": {
-                "active_sessions": {
-                    "type": "integer"
-                },
-                "ai_usage_today": {
-                    "type": "integer"
-                },
-                "assigned_tickets": {
-                    "type": "integer"
-                },
-                "avg_resolution_time": {
-                    "type": "number"
-                },
-                "avg_response_time": {
-                    "type": "number"
-                },
-                "busy_agents": {
-                    "type": "integer"
-                },
-                "closed_tickets": {
-                    "type": "integer"
-                },
-                "customer_satisfaction": {
-                    "type": "number"
-                },
-                "online_agents": {
-                    "type": "integer"
-                },
-                "open_tickets": {
-                    "type": "integer"
-                },
-                "resolved_tickets": {
-                    "type": "integer"
-                },
-                "today_messages": {
-                    "type": "integer"
-                },
-                "today_sessions": {
-                    "type": "integer"
-                },
-                "today_tickets": {
-                    "type": "integer"
-                },
-                "total_agents": {
-                    "type": "integer"
-                },
-                "total_customers": {
-                    "type": "integer"
-                },
-                "total_sessions": {
-                    "type": "integer"
-                },
-                "total_tickets": {
-                    "type": "integer"
-                },
-                "weknora_usage_today": {
-                    "type": "integer"
-                }
-            }
-        },
         "services.SLAComplianceTrend": {
             "type": "object",
             "properties": {
@@ -4980,84 +5082,6 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "date": {
-                    "type": "string"
-                }
-            }
-        },
-        "services.TimeRangeStats": {
-            "type": "object",
-            "properties": {
-                "avg_response_time": {
-                    "type": "number"
-                },
-                "customer_satisfaction": {
-                    "type": "number"
-                },
-                "date": {
-                    "type": "string"
-                },
-                "messages": {
-                    "type": "integer"
-                },
-                "resolved_tickets": {
-                    "type": "integer"
-                },
-                "sessions": {
-                    "type": "integer"
-                },
-                "tickets": {
-                    "type": "integer"
-                }
-            }
-        },
-        "services.TransferRequest": {
-            "type": "object",
-            "required": [
-                "session_id"
-            ],
-            "properties": {
-                "notes": {
-                    "type": "string"
-                },
-                "priority": {
-                    "type": "string"
-                },
-                "reason": {
-                    "type": "string"
-                },
-                "session_id": {
-                    "type": "string"
-                },
-                "target_skills": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "services.TransferResult": {
-            "type": "object",
-            "properties": {
-                "is_waiting": {
-                    "type": "boolean"
-                },
-                "new_agent_id": {
-                    "type": "integer"
-                },
-                "queued_at": {
-                    "type": "string"
-                },
-                "session_id": {
-                    "type": "string"
-                },
-                "success": {
-                    "type": "boolean"
-                },
-                "summary": {
-                    "type": "string"
-                },
-                "transferred_at": {
                     "type": "string"
                 }
             }

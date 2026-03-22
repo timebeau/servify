@@ -47,6 +47,10 @@ type AgentStats struct {
 	AvgRating       float64 `json:"avg_rating" example:"4.5"`
 }
 
+// Dummy reference to models.Agent to satisfy go vet for swag documentation
+// The @Success annotations reference models.Agent which requires this import
+var _ models.Agent
+
 // AgentHandler 客服管理处理器
 type AgentHandler struct {
 	agentService agentdelivery.HandlerService

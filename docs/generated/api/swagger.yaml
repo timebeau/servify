@@ -1,4 +1,25 @@
 definitions:
+  contract.AgentPerformanceStats:
+    properties:
+      agent_id:
+        type: integer
+      agent_name:
+        type: string
+      avg_resolution_time:
+        type: number
+      avg_response_time:
+        type: number
+      department:
+        type: string
+      online_time:
+        type: integer
+      rating:
+        type: number
+      resolved_tickets:
+        type: integer
+      total_tickets:
+        type: integer
+    type: object
   contract.BulkUpdateFailure:
     properties:
       error:
@@ -43,6 +64,13 @@ definitions:
     required:
     - ticket_ids
     type: object
+  contract.CategoryStats:
+    properties:
+      category:
+        type: string
+      count:
+        type: integer
+    type: object
   contract.CreateTicketRequest:
     properties:
       category:
@@ -67,6 +95,47 @@ definitions:
     required:
     - customer_id
     - title
+    type: object
+  contract.DashboardStats:
+    properties:
+      active_sessions:
+        type: integer
+      ai_usage_today:
+        type: integer
+      assigned_tickets:
+        type: integer
+      avg_resolution_time:
+        type: number
+      avg_response_time:
+        type: number
+      busy_agents:
+        type: integer
+      closed_tickets:
+        type: integer
+      customer_satisfaction:
+        type: number
+      online_agents:
+        type: integer
+      open_tickets:
+        type: integer
+      resolved_tickets:
+        type: integer
+      today_messages:
+        type: integer
+      today_sessions:
+        type: integer
+      today_tickets:
+        type: integer
+      total_agents:
+        type: integer
+      total_customers:
+        type: integer
+      total_sessions:
+        type: integer
+      total_tickets:
+        type: integer
+      weknora_usage_today:
+        type: integer
     type: object
   contract.PriorityCount:
     properties:
@@ -101,6 +170,57 @@ definitions:
       total:
         type: integer
     type: object
+  contract.TimeRangeStats:
+    properties:
+      avg_response_time:
+        type: number
+      customer_satisfaction:
+        type: number
+      date:
+        type: string
+      messages:
+        type: integer
+      resolved_tickets:
+        type: integer
+      sessions:
+        type: integer
+      tickets:
+        type: integer
+    type: object
+  contract.TransferRequest:
+    properties:
+      notes:
+        type: string
+      priority:
+        type: string
+      reason:
+        type: string
+      session_id:
+        type: string
+      target_skills:
+        items:
+          type: string
+        type: array
+    required:
+    - session_id
+    type: object
+  contract.TransferResult:
+    properties:
+      is_waiting:
+        type: boolean
+      new_agent_id:
+        type: integer
+      queued_at:
+        type: string
+      session_id:
+        type: string
+      success:
+        type: boolean
+      summary:
+        type: string
+      transferred_at:
+        type: string
+    type: object
   contract.UpdateTicketRequest:
     properties:
       agent_id:
@@ -122,6 +242,84 @@ definitions:
         type: string
       title:
         type: string
+    type: object
+  handlers.AgentCreateRequest:
+    properties:
+      department:
+        example: sales
+        type: string
+      max_concurrent:
+        example: 5
+        type: integer
+      skills:
+        example: tech,support
+        type: string
+      user_id:
+        example: 1
+        type: integer
+    required:
+    - user_id
+    type: object
+  handlers.AgentInfo:
+    properties:
+      avg_response_time:
+        example: 120
+        type: integer
+      connected_at:
+        example: "2024-01-01T10:00:00Z"
+        type: string
+      current_load:
+        example: 2
+        type: integer
+      department:
+        example: sales
+        type: string
+      last_activity:
+        example: "2024-01-01T12:00:00Z"
+        type: string
+      max_concurrent:
+        example: 5
+        type: integer
+      name:
+        example: John Doe
+        type: string
+      rating:
+        example: 4.8
+        type: number
+      skills:
+        example:
+        - tech
+        - support
+        items:
+          type: string
+        type: array
+      status:
+        example: online
+        type: string
+      user_id:
+        example: 1
+        type: integer
+      username:
+        example: john_doe
+        type: string
+    type: object
+  handlers.AgentStats:
+    properties:
+      avg_rating:
+        example: 4.5
+        type: number
+      avg_response_time:
+        example: 120
+        type: integer
+      busy:
+        example: 3
+        type: integer
+      online:
+        example: 5
+        type: integer
+      total:
+        example: 10
+        type: integer
     type: object
   handlers.ErrorResponse:
     properties:
@@ -632,89 +830,6 @@ definitions:
       username:
         type: string
     type: object
-  services.AgentCreateRequest:
-    properties:
-      department:
-        type: string
-      max_concurrent:
-        type: integer
-      skills:
-        type: string
-      user_id:
-        type: integer
-    required:
-    - user_id
-    type: object
-  services.AgentInfo:
-    properties:
-      avg_response_time:
-        type: integer
-      connected_at:
-        type: string
-      current_load:
-        type: integer
-      department:
-        type: string
-      last_activity:
-        type: string
-      max_concurrent:
-        type: integer
-      name:
-        type: string
-      rating:
-        type: number
-      skills:
-        items:
-          type: string
-        type: array
-      status:
-        type: string
-      user_id:
-        type: integer
-      username:
-        type: string
-    type: object
-  services.AgentPerformanceStats:
-    properties:
-      agent_id:
-        type: integer
-      agent_name:
-        type: string
-      avg_resolution_time:
-        type: number
-      avg_response_time:
-        type: number
-      department:
-        type: string
-      online_time:
-        type: integer
-      rating:
-        type: number
-      resolved_tickets:
-        type: integer
-      total_tickets:
-        type: integer
-    type: object
-  services.AgentStats:
-    properties:
-      avg_rating:
-        type: number
-      avg_response_time:
-        type: integer
-      busy:
-        type: integer
-      online:
-        type: integer
-      total:
-        type: integer
-    type: object
-  services.CategoryStats:
-    properties:
-      category:
-        type: string
-      count:
-        type: integer
-    type: object
   services.ChannelSummary:
     properties:
       active_sessions:
@@ -879,47 +994,6 @@ definitions:
         type: string
       tags:
         type: string
-    type: object
-  services.DashboardStats:
-    properties:
-      active_sessions:
-        type: integer
-      ai_usage_today:
-        type: integer
-      assigned_tickets:
-        type: integer
-      avg_resolution_time:
-        type: number
-      avg_response_time:
-        type: number
-      busy_agents:
-        type: integer
-      closed_tickets:
-        type: integer
-      customer_satisfaction:
-        type: number
-      online_agents:
-        type: integer
-      open_tickets:
-        type: integer
-      resolved_tickets:
-        type: integer
-      today_messages:
-        type: integer
-      today_sessions:
-        type: integer
-      today_tickets:
-        type: integer
-      total_agents:
-        type: integer
-      total_customers:
-        type: integer
-      total_sessions:
-        type: integer
-      total_tickets:
-        type: integer
-      weknora_usage_today:
-        type: integer
     type: object
   services.SLAComplianceTrend:
     properties:
@@ -1092,57 +1166,6 @@ definitions:
       date:
         type: string
     type: object
-  services.TimeRangeStats:
-    properties:
-      avg_response_time:
-        type: number
-      customer_satisfaction:
-        type: number
-      date:
-        type: string
-      messages:
-        type: integer
-      resolved_tickets:
-        type: integer
-      sessions:
-        type: integer
-      tickets:
-        type: integer
-    type: object
-  services.TransferRequest:
-    properties:
-      notes:
-        type: string
-      priority:
-        type: string
-      reason:
-        type: string
-      session_id:
-        type: string
-      target_skills:
-        items:
-          type: string
-        type: array
-    required:
-    - session_id
-    type: object
-  services.TransferResult:
-    properties:
-      is_waiting:
-        type: boolean
-      new_agent_id:
-        type: integer
-      queued_at:
-        type: string
-      session_id:
-        type: string
-      success:
-        type: boolean
-      summary:
-        type: string
-      transferred_at:
-        type: string
-    type: object
   services.WorkspaceOverview:
     properties:
       busy_agents:
@@ -1220,7 +1243,7 @@ paths:
         name: agent
         required: true
         schema:
-          $ref: '#/definitions/services.AgentCreateRequest'
+          $ref: '#/definitions/handlers.AgentCreateRequest'
       produces:
       - application/json
       responses:
@@ -1465,7 +1488,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/services.AgentInfo'
+            $ref: '#/definitions/handlers.AgentInfo'
         "404":
           description: Not Found
           schema:
@@ -1489,7 +1512,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/services.AgentInfo'
+              $ref: '#/definitions/handlers.AgentInfo'
             type: array
         "500":
           description: Internal Server Error
@@ -1514,7 +1537,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/services.AgentStats'
+            $ref: '#/definitions/handlers.AgentStats'
         "500":
           description: Internal Server Error
           schema:
@@ -2315,7 +2338,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/services.TransferResult'
+            $ref: '#/definitions/contract.TransferResult'
         "400":
           description: Bad Request
           schema:
@@ -2338,14 +2361,14 @@ paths:
         name: transfer
         required: true
         schema:
-          $ref: '#/definitions/services.TransferRequest'
+          $ref: '#/definitions/contract.TransferRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/services.TransferResult'
+            $ref: '#/definitions/contract.TransferResult'
         "400":
           description: Bad Request
           schema:
@@ -2805,7 +2828,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/services.AgentPerformanceStats'
+              $ref: '#/definitions/contract.AgentPerformanceStats'
             type: array
         "400":
           description: Bad Request
@@ -2830,7 +2853,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/services.CategoryStats'
+              $ref: '#/definitions/contract.CategoryStats'
             type: array
         "500":
           description: Internal Server Error
@@ -2850,7 +2873,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/services.DashboardStats'
+            $ref: '#/definitions/contract.DashboardStats'
         "500":
           description: Internal Server Error
           schema:
@@ -2879,7 +2902,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/services.CategoryStats'
+              $ref: '#/definitions/contract.CategoryStats'
             type: array
         "400":
           description: Bad Request
@@ -2913,7 +2936,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/services.CategoryStats'
+              $ref: '#/definitions/contract.CategoryStats'
             type: array
         "400":
           description: Bad Request
@@ -2949,7 +2972,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/services.TimeRangeStats'
+              $ref: '#/definitions/contract.TimeRangeStats'
             type: array
         "400":
           description: Bad Request
