@@ -39,10 +39,11 @@ type stubConversationRuntime struct {
 }
 
 type stubRoutingRuntime struct {
-	getTransferHistory func(ctx context.Context, sessionID string) ([]models.TransferRecord, error)
-	listWaitingRecords func(ctx context.Context, status string, limit int) ([]models.WaitingRecord, error)
-	getWaitingRecord   func(ctx context.Context, sessionID string) (*models.WaitingRecord, error)
-	cancelWaiting     func(ctx context.Context, tx *gorm.DB, sessionID string, reason string) (*models.WaitingRecord, error)
+	getTransferHistory   func(ctx context.Context, sessionID string) ([]models.TransferRecord, error)
+	listWaitingRecords   func(ctx context.Context, status string, limit int) ([]models.WaitingRecord, error)
+	getWaitingRecord     func(ctx context.Context, sessionID string) (*models.WaitingRecord, error)
+	cancelWaiting        func(ctx context.Context, tx *gorm.DB, sessionID string, reason string) (*models.WaitingRecord, error)
+	markWaitingTransferred func(ctx context.Context, tx *gorm.DB, sessionID string, agentID uint, assignedAt time.Time) (*models.WaitingRecord, error)
 }
 
 func (s stubConversationRuntime) LoadTransferSession(ctx context.Context, sessionID string) (*conversationdelivery.TransferSession, error) {
@@ -98,7 +99,10 @@ func (s stubRoutingRuntime) CancelWaiting(ctx context.Context, tx *gorm.DB, sess
 }
 
 func (s stubRoutingRuntime) MarkWaitingTransferred(ctx context.Context, tx *gorm.DB, sessionID string, agentID uint, assignedAt time.Time) (*models.WaitingRecord, error) {
-	return nil, nil
+	if s.markWaitingTransferred == nil {
+		return nil, nil
+	}
+	return s.markWaitingTransferred(ctx, tx, sessionID, agentID, assignedAt)
 }
 
 func TestSessionTransferService_LoadTransferSession_UsesConversationAdapterError(t *testing.T) {
@@ -235,5 +239,22 @@ func TestBuildTransferTicketUpdate_PreservesNonOpenStatus(t *testing.T) {
 	}
 	if _, ok := updates["status"]; ok {
 		t.Fatalf("did not expect status update, got %+v", updates)
+	}
+}
+
+func TestMarkWaitingTransferred_IgnoresRoutingNotFound(t *testing.T) {
+	svc := NewSessionTransferServiceWithAdapters(nil, nil, stubAIForTransferUnit{}, nil, nil, SessionTransferAdapters{
+		Routing: stubRoutingRuntime{
+			markWaitingTransferred: func(ctx context.Context, tx *gorm.DB, sessionID string, agentID uint, assignedAt time.Time) (*models.WaitingRecord, error) {
+				if sessionID != "s-transfer" || agentID != 11 {
+					t.Fatalf("unexpected transfer inputs: %s %d", sessionID, agentID)
+				}
+				return nil, gorm.ErrRecordNotFound
+			},
+		},
+	})
+
+	if err := svc.markWaitingTransferred(context.Background(), nil, "s-transfer", 11, time.Now()); err != nil {
+		t.Fatalf("expected not found to be ignored, got %v", err)
 	}
 }

@@ -524,6 +524,10 @@ func (s *SessionTransferService) markWaitingTransferred(ctx context.Context, tx 
 		}
 		return err
 	}
+	return s.updateTransferredWaitingRecord(tx, sessionID, targetAgentID, transferAt)
+}
+
+func (s *SessionTransferService) updateTransferredWaitingRecord(tx *gorm.DB, sessionID string, targetAgentID uint, transferAt time.Time) error {
 	return tx.Model(&models.WaitingRecord{}).
 		Where("session_id = ? AND status = ?", sessionID, "waiting").
 		Updates(map[string]interface{}{
