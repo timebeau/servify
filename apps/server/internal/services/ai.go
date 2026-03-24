@@ -200,6 +200,15 @@ func (s *AIService) getFallbackResponse(query string) string {
 	return "感谢您的咨询！我已经收到您的问题，正在为您查找相关信息。如果需要更详细的帮助，我可以为您转接人工客服。"
 }
 
+func (s *AIService) GetStatus(ctx context.Context) map[string]interface{} {
+	return map[string]interface{}{
+		"type":           "standard",
+		"openai_enabled": s.openAIAPIKey != "",
+		"knowledge_base": "legacy",
+		"document_count": len(s.knowledgeBase.documents),
+	}
+}
+
 // 知识库搜索功能
 func (kb *KnowledgeBase) Search(query string, limit int) []models.KnowledgeDoc {
 	var results []models.KnowledgeDoc

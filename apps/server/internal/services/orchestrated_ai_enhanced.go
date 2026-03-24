@@ -271,5 +271,3 @@ func confidenceFromSources(hits []knowledgeprovider.KnowledgeHit) float64 {
 	}
 	return score
 }
-
-var _ EnhancedAIServiceInterface = (*OrchestratedEnhancedAIService)(nil)

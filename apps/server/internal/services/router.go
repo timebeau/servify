@@ -13,10 +13,14 @@ import (
 
 type MessageRouter struct {
 	platforms map[string]PlatformAdapter
-	aiService AIServiceInterface
+	aiService routerAIService
 	wsHub     *WebSocketHub
 	db        *gorm.DB
 	mutex     sync.RWMutex
+}
+
+type routerAIService interface {
+	ProcessQuery(ctx context.Context, query string, sessionID string) (*AIResponse, error)
 }
 
 type MessageRouterRuntime interface {
@@ -78,7 +82,7 @@ type RouteRule struct {
 	Priority  int          `json:"priority"`
 }
 
-func NewMessageRouter(aiService AIServiceInterface, wsHub *WebSocketHub, db *gorm.DB) *MessageRouter {
+func NewMessageRouter(aiService routerAIService, wsHub *WebSocketHub, db *gorm.DB) *MessageRouter {
 	return &MessageRouter{
 		platforms: make(map[string]PlatformAdapter),
 		aiService: aiService,

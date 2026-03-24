@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"gorm.io/gorm"
 	"servify/apps/server/internal/config"
 	svrmetrics "servify/apps/server/internal/metrics"
 	aidelivery "servify/apps/server/internal/modules/ai/delivery"
@@ -234,12 +233,16 @@ type MetricsHandler struct {
 	webrtcService realtime.RTCGateway
 	aiService     aidelivery.HandlerService
 	startedAt     time.Time
-	db            *gorm.DB
+	dbStats       DBStatsProvider
+}
+
+type DBStatsProvider interface {
+	Stats() (sql.DBStats, bool)
 }
 
 // NewMetricsHandler 创建指标处理器
-func NewMetricsHandler(wsHub realtime.RealtimeGateway, webrtc realtime.RTCGateway, ai aidelivery.HandlerService, db *gorm.DB) *MetricsHandler {
-	return &MetricsHandler{wsHub: wsHub, webrtcService: webrtc, aiService: ai, startedAt: time.Now(), db: db}
+func NewMetricsHandler(wsHub realtime.RealtimeGateway, webrtc realtime.RTCGateway, ai aidelivery.HandlerService, dbStats DBStatsProvider) *MetricsHandler {
+	return &MetricsHandler{wsHub: wsHub, webrtcService: webrtc, aiService: ai, startedAt: time.Now(), dbStats: dbStats}
 }
 
 // GetMetrics 获取系统指标（Prometheus 格式）
@@ -316,13 +319,8 @@ func (h *MetricsHandler) GetMetrics(c *gin.Context) {
 	fmt.Fprintf(b, "servify_go_mem_alloc_bytes %d\n", ms.Alloc)
 
 	// Database/sql stats (if available)
-	if h.db != nil {
-		var sqlDB *sql.DB
-		if s, err := h.db.DB(); err == nil {
-			sqlDB = s
-		}
-		if sqlDB != nil {
-			ds := sqlDB.Stats()
+	if h.dbStats != nil {
+		if ds, ok := h.dbStats.Stats(); ok {
 			fmt.Fprintf(b, "\n# HELP servify_db_max_open_connections Maximum number of open connections to the database\n")
 			fmt.Fprintf(b, "# TYPE servify_db_max_open_connections gauge\n")
 			fmt.Fprintf(b, "servify_db_max_open_connections %d\n", ds.MaxOpenConnections)

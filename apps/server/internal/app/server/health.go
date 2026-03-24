@@ -16,7 +16,7 @@ func registerHealthRoutes(r routeRegistrar, deps Dependencies) {
 			deps.RealtimeGateway,
 			deps.RTCGateway,
 			deps.AIHandlerService,
-			deps.DB,
+			newGormDBStatsProvider(deps.DB),
 		).GetMetrics)
 	}
 }

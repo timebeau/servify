@@ -70,16 +70,16 @@
 
 - 可以替代旧增强 AI 主流程
 
-## A4.1 compatibility bridge
+## A4.1 runtime bridge
 
-- [x] 新增 legacy `AIServiceInterface` 兼容适配器
-- [x] 让旧接口可调用新 `QueryOrchestrator`
+- [x] 新增 runtime AI bridge，允许旧运行态逐步切到 `QueryOrchestrator`
+- [x] 让旧运行态入口可调用新 `QueryOrchestrator`
 - [x] 在标准模式入口 wiring 中逐步替换旧 AI service
 - [x] 在增强模式入口 wiring 中逐步替换旧 AI service
 
 验收：
 
-- 不改现有 handler 对外接口的情况下，可以复用新 AI 模块
+- 不改现有 handler / runtime 对外接口的情况下，可以复用新 AI 模块
 
 ## A5 prompt and retrieval
 

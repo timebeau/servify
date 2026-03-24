@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	voiceapp "servify/apps/server/internal/modules/voice/application"
 	voicedelivery "servify/apps/server/internal/modules/voice/delivery"
 	"servify/apps/server/internal/platform/voiceprotocol"
 
@@ -54,7 +53,7 @@ func (h *VoiceHandler) StartRecording(c *gin.Context) {
 	}
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
 	defer cancel()
-	recording, err := h.coordinator.StartRecording(ctx, voiceapp.StartRecordingCommand{
+	recording, err := h.coordinator.StartRecording(ctx, voicedelivery.StartRecordingCommand{
 		CallID:   req.CallID,
 		Provider: req.Provider,
 	})
@@ -77,7 +76,7 @@ func (h *VoiceHandler) StopRecording(c *gin.Context) {
 	}
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
 	defer cancel()
-	if err := h.coordinator.StopRecording(ctx, voiceapp.StopRecordingCommand{RecordingID: req.RecordingID}); err != nil {
+	if err := h.coordinator.StopRecording(ctx, voicedelivery.StopRecordingCommand{RecordingID: req.RecordingID}); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
@@ -116,7 +115,7 @@ func (h *VoiceHandler) AppendTranscript(c *gin.Context) {
 	}
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
 	defer cancel()
-	transcript, err := h.coordinator.AppendTranscript(ctx, voiceapp.AppendTranscriptCommand{
+	transcript, err := h.coordinator.AppendTranscript(ctx, voicedelivery.AppendTranscriptCommand{
 		CallID:    req.CallID,
 		Content:   req.Content,
 		Language:  req.Language,

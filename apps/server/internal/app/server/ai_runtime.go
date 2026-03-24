@@ -24,7 +24,7 @@ type AIAssemblyOptions struct {
 
 type AIAssembly struct {
 	Service        aidelivery.HandlerService
-	RuntimeService services.AIServiceInterface
+	RuntimeService aidelivery.RuntimeService
 	WeKnoraClient  weknora.WeKnoraInterface
 	WeKnoraHealthy bool
 }

@@ -8,9 +8,10 @@
   - 已具备较强的模块化基础
   - `handlers/ticket_handler.go` 通过 `ticketHandlerService` 接口工作
   - 已存在模块交付适配层 `modules/ticket/delivery/handler_adapter.go`
-  - 但旧 `services/TicketService` 仍保留，并且本身也在包装 `ticket` module 与 orchestration
+  - runtime 已直接改用 `modules/ticket/delivery.NewHandlerServiceWithDependencies(...)`
+  - 旧 `services/TicketService` 已删除
   - 当前规则：HTTP handler 应依赖 `modules/ticket/delivery.HandlerService`
-  - 结论：这是最适合优先完成“handler 直接面向 module adapter”的模块
+  - 结论：`ticket` 已完成主路径收口，并采用删除 legacy service 的策略收尾
 
 - `agent`
   - `services/AgentService` 已明显成为兼容层
@@ -31,7 +32,8 @@
   - 结论：迁移风险低，适合作为后续收口样板
 
 - `routing / session transfer`
-  - `services/SessionTransferService` 已注入 `modules/routing/delivery.SessionTransferAdapter`
+  - 主运行时已不再装配 `services/SessionTransferService`
+  - handler/runtime 已直接改用 `modules/routing/delivery.HandlerServiceAdapter`
   - session assignment 同步已改走 `modules/conversation/delivery` runtime adapter，不再直接更新 `Session`
   - transfer / waiting 的系统消息写入已改走 `modules/conversation/delivery` runtime adapter，不再直接写 `Message`
   - waiting queue 的读取、新增、取消、查询、转态同步，以及 transfer record 写入已收口到 routing module 状态机
@@ -40,27 +42,20 @@
   - 会话转接触发的 ticket assignment 同步已改走 `modules/ticket/delivery` runtime adapter，不再直接写 `Ticket` / `TicketStatus`
   - agent load 调整已改走 `modules/agent/delivery` runtime adapter，原先由 handler contract 反向依赖 `services` 引起的 import cycle 已被移除
   - websocket 通知依赖已收窄为 `sessionTransferNotifier`，不再把 `WebSocketHub` 作为 service 内部 concrete 字段保存
-  - 会话读取入口已切到 `modules/conversation/delivery.RuntimeService.LoadTransferSession(...)`，`SessionTransferService` 不再在主流程里直接预加载 `Session`
+  - 会话读取入口已切到 `modules/conversation/delivery.RuntimeService.LoadTransferSession(...)`
   - 默认装配下 `LoadTransferSession(...)` 的 adapter 错误会直接上抛，不再静默回退到 legacy DB 查询，避免掩盖 conversation runtime 故障
   - 加入等待队列时的会话 active/unassigned 同步也已切到 `modules/conversation/delivery.RuntimeService.SyncWaitingAssignment(...)`
-  - `app/server` 主运行时已改用 `NewSessionTransferServiceWithAdapters(...)` 一次性装配 routing/ticket/conversation/agent runtime adapters，减少可变 setter 装配面
-  - 旧的 setter 式 adapter 注入已从活跃代码路径移除，默认装配方式固定为显式构造
-  - waiting queue 的公开查询与后台处理读取现已统一复用同一条 service 内部查询路径，减少 adapter/fallback 与默认分页规则分叉
-  - transfer history 的公开查询也已收口到同一条 service 内部 routing-first 入口，避免顶层重复分支继续扩散
-  - 当前 waiting record 的读取与“仅 active waiting 才参与后续流程”的判定也已收口到统一 helper，固定 `ErrRecordNotFound` 语义
-  - waiting record 的取消更新逻辑也已抽成独立 helper，事务主流程继续向 orchestration 收敛
-  - ticket assignment 的 legacy fallback 分支也已拆出内部 helper，状态迁移与状态历史补写不再直接堆在主同步流程里
-  - waiting -> transferred 的 legacy 更新也已压到独立 helper，waiting record 状态补写不再散落在主流程分支里
-  - 转接主流程内剩余的 adapter/fallback 分支已收口到私有 helper，`executeTransfer` / `addToWaitingQueue` 现主要保留流程编排职责
-  - 但主流程仍强依赖 `gorm.DB`、`AgentService` 和旧会话模型
-  - 结论：属于“局部接入 module adapter，但主流程仍是 legacy service”的高风险混合区
+  - websocket 通知已收窄为 notifier 接口，不再把 `WebSocketHub` 作为内部 concrete 依赖保存
+  - 旧 `services/SessionTransferService` 已删除
+  - 结论：`routing / session transfer` 已完成主路径收口，并采用删除 legacy service 的策略收尾
 
 - `ai`
-  - 同时存在旧 `services/AIService`、`EnhancedAIService`、`OrchestratedAIService`
-  - `OrchestratedAIService` 已是 `modules/ai/application.QueryOrchestrator` 的适配层
+  - 旧 `services/AIService` 与增强 AI 实现仍存在，但已不再通过 `AIServiceInterface` 暴露给 handler/runtime 顶层
   - handler 已开始收口到 `modules/ai/delivery.HandlerService`
-  - `AIAssembly` 已去掉未消费的 `LegacyService *services.AIService` 暴露，仅保留 handler-facing contract、runtime-facing `AIServiceInterface` 与 WeKnora state
-  - 结论：迁移重点是继续压缩 legacy `AIServiceInterface` 的 handler 可见面，只保留 runtime 兼容用途
+  - `AIAssembly` 已去掉未消费的 `LegacyService *services.AIService` 暴露，仅保留 handler-facing contract、runtime-facing `RuntimeService` 与 WeKnora state
+  - 旧 `services/AIServiceInterface` / `services.OrchestratedAIService` 已删除
+  - `services/router.go` 与 `services/websocket.go` 只依赖局部最小 AI runtime 接口
+  - 结论：`ai` 已完成 handler/runtime 主路径收口，后续重点是继续收缩 runtime 局部接口
 
 - `legacy handler-only capabilities`
   - `satisfaction`、`csat public`、`macro`、`app integration`、`custom field`、`shift`、`suggestion`、`gamification` 等能力尚未模块化
@@ -107,6 +102,9 @@
 - `ticket`
 - `agent`
 - `analytics`
+- `customer`
+- `automation`
+- `knowledge`
 
 这些模块的共同特点：
 
@@ -116,26 +114,24 @@
 
 ### B. 已局部接入 module adapter，但主流程仍偏旧
 
-- `routing / session transfer`
 - `conversation` 相关 websocket/runtime 路径
 
 这些模块的共同特点：
 
 - module 已存在
-- 但核心运行时仍由旧 service 或旧 runtime struct 主导
+- 核心运行时仍由旧 runtime struct 主导
 - 需要先画清 runtime 职责边界，再做 handler/adapter 收口
 - `automation` 的 handler 已可先行收口，但 runtime 仍需要旧 service 持有 event bus subscriber
-- `conversation` 与 `routing` 仍是下一轮最重的运行态迁移区域
+- `conversation` 仍是下一轮最重的运行态迁移区域
 
 ### C. 多实现并存，需要先确定默认主路径
 
-- `ai`
+- `voice` 等非典型 `services -> modules` 能力
 
 特点：
 
-- legacy AI service 与 orchestrated AI module 并存
-- provider、fallback、enhanced 包装已经很多
-- 下一步更像“架构收敛”而不是简单替换调用点
+- 并不完全遵循本轮 `services -> modules` 迁移模板
+- 下一步更像边界收紧与 runtime assembly 整理，而不是简单替换调用点
 
 ## 推荐迁移顺序
 
@@ -145,31 +141,28 @@
 4. `customer`
 5. `automation`
 6. `knowledge`
-7. `routing / session transfer`
-8. `ai`
+7. `conversation / websocket runtime`
+8. 扩大 scorecard 覆盖范围
 
 ## 当前高风险点
 
 - 同一个业务能力同时存在 handler interface、legacy service、module service、delivery adapter 多层入口
 - 旧 service 中仍混有 runtime 状态与 side effects，导致无法简单替换
-- `ai` 路径下存在多个“看起来都像主实现”的对象，容易继续分叉
-- `routing` 与 `conversation` 仍强依赖旧 websocket / session runtime
+- `ai` 路径下仍有多种 provider / enhanced 实现，runtime contract 如果不继续收窄仍可能重新分叉
+- `conversation` 仍强依赖旧 websocket / session runtime
 - 若不继续守护，未模块化但较薄的 legacy handler service 仍可能重新把 concrete type 扩散回 `app/server` runtime/router
 
 ## 下一步建议
 
-- 先在 `ticket` 上定义唯一 HTTP 入口应该直连哪个 adapter
-- 明确 `services/*` 中哪些类型属于：
-  - 兼容 facade
-  - runtime state holder
-  - 仍未迁出的真实业务层
-- 为 `ticket`、`agent`、`analytics` 各拆一个最小任务包
+- 持续把 `conversation` 的运行态写路径收口到 module contract
+- 明确剩余 `services/*` 中哪些类型属于 runtime state holder / event bus glue / 历史兼容入口
+- 为仍处于 `legacy` 的能力拆最小任务包，并同步写入 scorecard
 
 ## 已确认的入口规则
 
 - `ticket`
   - HTTP handler 入口：`modules/ticket/delivery.HandlerService`
-  - 旧 `services/TicketService` 定位：兼容 facade + orchestration side effects 组装
+  - 旧 `services/TicketService` 状态：已删除
 - `agent`
   - HTTP handler 入口：`modules/agent/delivery.HandlerService`
   - 旧 `services/AgentService` 定位：兼容 facade + runtime state holder
@@ -188,19 +181,16 @@
   - 旧 `services/KnowledgeDocService` 定位：兼容 facade + module application / repository 装配
 - `routing / session transfer`
   - HTTP handler 入口：`modules/routing/delivery.HandlerService`
-  - 旧 `services/SessionTransferService` 定位：兼容 facade + runtime glue + legacy transfer orchestration
+  - 旧 `services/SessionTransferService` 状态：已删除
 - `conversation / websocket runtime`
   - websocket 持久化入口：`modules/conversation/delivery.WebSocketMessageWriter`
   - `services/WebSocketHub` 定位：runtime connection hub，不再自定义 conversation 私有持久化接口
 - `ai`
   - HTTP handler 入口：`modules/ai/delivery.HandlerService`
-  - `AIAssembly` 定位：显式区分 handler-facing AI contract 与 runtime-facing `AIServiceInterface`
+  - `AIAssembly` 定位：显式区分 handler-facing AI contract 与 runtime-facing `RuntimeService`
 
 ## 已确认的兼容职责边界
 
-- `services/TicketService`
-  - 允许保留：旧调用方兼容入口、event bus / automation / satisfaction 等 side effect 组装、module command/orchestrator 的装配
-  - 不应新增：新的 HTTP handler 直接依赖、新业务规则主入口、绕过 `modules/ticket/delivery.HandlerService` 的写路径
 - `services/AgentService`
   - 允许保留：旧调用方兼容入口、少量兼容方法
   - 不应新增：新的 HTTP handler 直接依赖、脱离 `modules/agent/application.Service` 的核心业务写路径
@@ -216,15 +206,12 @@
 - `services/KnowledgeDocService`
   - 允许保留：旧调用方兼容入口、DTO 映射、`modules/knowledge/application.Service` 与 repository 的兼容装配
   - 不应新增：新的 HTTP handler 直接依赖、绕过 `modules/knowledge/application.Service` 的文档 CRUD 主入口
-- `services/SessionTransferService`
-  - 允许保留：旧调用方兼容入口、AgentService/通知接口/AIService 协调、转接实时通知与 legacy transfer orchestration
-  - 不应新增：新的 HTTP handler 直接依赖、绕过 routing module 的 waiting/transfer record 读写规则
 - `services/WebSocketHub`
   - 允许保留：连接管理、广播、协议消息分发、对 AI/transfer 的 runtime glue
   - 不应新增：新的 conversation 私有持久化接口、绕过 `modules/conversation/delivery.WebSocketMessageWriter` 的消息落库路径
-- `services/AIServiceInterface` 及 legacy AI types
-  - 允许保留：WebSocketHub、MessageRouter、SessionTransferService 等 runtime 兼容调用面
-  - 不应新增：新的 HTTP handler 直接依赖、继续扩散为默认 AI 主入口
+- `services` 下 legacy AI types
+  - 允许保留：provider 实现、增强链路、局部 runtime 协调
+  - 不应新增：新的 HTTP handler 直接依赖、重新暴露全局 `AIServiceInterface` 一类宽接口
 
 ## 当前自动化守护
 

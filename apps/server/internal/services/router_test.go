@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// stubAI implements AIServiceInterface for tests
+// stubAI provides the router AI surface for tests.
 type stubAI struct{ reply string }
 
 func (s stubAI) ProcessQuery(ctx context.Context, query string, sessionID string) (*AIResponse, error) {
@@ -21,7 +21,6 @@ func (s stubAI) GetStatus(ctx context.Context) map[string]interface{} {
 }
 
 // ensure stub satisfies interface
-var _ AIServiceInterface = (*stubAI)(nil)
 
 func TestMessageRouter_HandleWebMessage_PushesAIResponse(t *testing.T) {
 	hub := NewWebSocketHub()

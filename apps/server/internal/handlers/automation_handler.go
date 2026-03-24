@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strconv"
 
-	automationapp "servify/apps/server/internal/modules/automation/application"
 	automationdelivery "servify/apps/server/internal/modules/automation/delivery"
 
 	"github.com/gin-gonic/gin"
@@ -32,7 +31,7 @@ func (h *AutomationHandler) ListTriggers(c *gin.Context) {
 
 // CreateTrigger 创建触发器
 func (h *AutomationHandler) CreateTrigger(c *gin.Context) {
-	var req automationapp.TriggerRequest
+	var req automationdelivery.TriggerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid request", Message: err.Error()})
 		return
@@ -70,7 +69,7 @@ func (h *AutomationHandler) DeleteTrigger(c *gin.Context) {
 
 // ListRuns 获取自动化执行记录
 func (h *AutomationHandler) ListRuns(c *gin.Context) {
-	var req automationapp.RunListQuery
+	var req automationdelivery.RunListQuery
 	if err := c.ShouldBindQuery(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid query parameters", Message: err.Error()})
 		return
@@ -93,7 +92,7 @@ func (h *AutomationHandler) ListRuns(c *gin.Context) {
 
 // RunBatch 批量执行某个自动化 event（支持 dry-run）
 func (h *AutomationHandler) RunBatch(c *gin.Context) {
-	var req automationapp.BatchRunRequest
+	var req automationdelivery.BatchRunRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid request", Message: err.Error()})
 		return

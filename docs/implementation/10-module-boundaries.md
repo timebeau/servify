@@ -24,8 +24,8 @@
   - 负责 runtime assembly
   - 可以持有 legacy concrete service，但对 HTTP 注入时应优先暴露 `modules/*/delivery` contract
 - `services/*`
-  - 允许保留兼容 facade、runtime glue、状态同步、side effect 组装
-  - 不应继续增长为新的默认业务中心
+  - 只在确有未迁出 runtime glue、状态同步、side effect 组装时临时保留
+  - 已收口且不再承担必要职责时应直接删除，而不是继续增长为默认业务中心
 - `modules/*/application`
   - 承担新的核心业务逻辑
 - `modules/*/delivery`
@@ -68,13 +68,15 @@
 
 - `handler` / `runtime` 规则记录在 `scripts/module-boundaries.rules`
 - `conversation` 的 websocket persistence 与 `AIAssembly` 的双入口规则也记录在同一规则文件
+- `scripts/check-module-boundaries.sh` 额外对非测试 handler 做 import 扫描，禁止直连 `modules/*/application`、`modules/*/infra`、`gorm`
 
 ## Legacy Service Freeze Policy
 
 - 已进入 `stabilized` 的能力：
-  - legacy `services/*` 只允许兼容 facade、runtime glue、状态同步、side effect 组装类修改
+  - legacy `services/*` 只允许必要的 runtime glue、状态同步、side effect 组装类修改
   - 新业务逻辑优先进入 `modules/*/application`
   - 新的 handler/router wiring 不得回退到 concrete service
+  - 若某个 legacy service 已无必要职责，应优先删除，不保留空壳 facade
 - 仍处于 `legacy` 的能力：
   - 允许临时修改，但每次新增业务逻辑都应同步标注目标 module 归属
 

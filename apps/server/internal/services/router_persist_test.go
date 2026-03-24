@@ -15,7 +15,7 @@ func (s stubAI2) ProcessQuery(ctx context.Context, query string, sessionID strin
 }
 func (s stubAI2) ShouldTransferToHuman(query string, _ []models.Message) bool { return false }
 
-// Implement the full AIServiceInterface
+// Implement the router AI surface used in tests.
 func (s stubAI2) GetSessionSummary(_ []models.Message) (string, error) { return "", nil }
 func (s stubAI2) InitializeKnowledgeBase()                             {}
 func (s stubAI2) GetStatus(ctx context.Context) map[string]interface{} {
@@ -23,7 +23,6 @@ func (s stubAI2) GetStatus(ctx context.Context) map[string]interface{} {
 }
 
 // compile-time assert
-var _ AIServiceInterface = (*stubAI2)(nil)
 
 func TestMessageRouter_RouteMessage_DBNil_FallbackAndContinue(t *testing.T) {
 	hub := NewWebSocketHub()

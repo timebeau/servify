@@ -28,6 +28,16 @@ forbid_pattern() {
   fi
 }
 
+forbid_glob_pattern() {
+  local glob="$1"
+  local pattern="$2"
+  local message="$3"
+  if find apps/server/internal/handlers -type f -name "$glob" ! -name '*_test.go' -print0 | xargs -0 rg -q "$pattern"; then
+    echo "$message"
+    has_error=1
+  fi
+}
+
 check_handler_contract() {
   local label="$1"
   local file="$2"
@@ -96,6 +106,19 @@ while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
       ;;
   esac
 done < "$RULES_FILE"
+
+forbid_glob_pattern \
+  '*.go' \
+  'servify/apps/server/internal/modules/.*/application' \
+  "Handlers must not import modules/*/application directly; route DTOs through delivery contracts."
+forbid_glob_pattern \
+  '*.go' \
+  'servify/apps/server/internal/modules/.*/infra' \
+  "Handlers must not import modules/*/infra directly."
+forbid_glob_pattern \
+  '*.go' \
+  'gorm\.io/gorm' \
+  "Handlers must not import gorm directly."
 
 if [[ "$has_error" -ne 0 ]]; then
   exit 1

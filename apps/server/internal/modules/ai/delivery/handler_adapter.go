@@ -4,8 +4,27 @@ import (
 	"context"
 	"fmt"
 
+	"servify/apps/server/internal/models"
 	"servify/apps/server/internal/services"
 )
+
+// RuntimeService is the AI contract used by websocket/router/runtime glue.
+type RuntimeService interface {
+	ProcessQuery(ctx context.Context, query string, sessionID string) (*services.AIResponse, error)
+	ShouldTransferToHuman(query string, sessionHistory []models.Message) bool
+	GetSessionSummary(messages []models.Message) (string, error)
+	GetStatus(ctx context.Context) map[string]interface{}
+}
+
+type EnhancedRuntimeService interface {
+	RuntimeService
+	ProcessQueryEnhanced(ctx context.Context, query string, sessionID string) (*services.EnhancedAIResponse, error)
+	UploadDocumentToWeKnora(ctx context.Context, title, content string, tags []string) error
+	GetMetrics() *services.AIMetrics
+	SetWeKnoraEnabled(enabled bool)
+	ResetCircuitBreaker()
+	SyncKnowledgeBase(ctx context.Context) error
+}
 
 // HandlerService is the only AI contract that HTTP handlers should depend on.
 type HandlerService interface {
@@ -20,10 +39,10 @@ type HandlerService interface {
 
 // HandlerServiceAdapter bridges legacy AI services to the handler-facing AI contract.
 type HandlerServiceAdapter struct {
-	service services.AIServiceInterface
+	service RuntimeService
 }
 
-func NewHandlerServiceAdapter(service services.AIServiceInterface) *HandlerServiceAdapter {
+func NewHandlerServiceAdapter(service RuntimeService) *HandlerServiceAdapter {
 	return &HandlerServiceAdapter{service: service}
 }
 
@@ -31,7 +50,7 @@ func (a *HandlerServiceAdapter) ProcessQuery(ctx context.Context, query string, 
 	if a == nil || a.service == nil {
 		return nil, fmt.Errorf("ai service not configured")
 	}
-	if enhanced, ok := a.service.(services.EnhancedAIServiceInterface); ok {
+	if enhanced, ok := a.service.(EnhancedRuntimeService); ok {
 		return enhanced.ProcessQueryEnhanced(ctx, query, sessionID)
 	}
 	return a.service.ProcessQuery(ctx, query, sessionID)
@@ -48,7 +67,7 @@ func (a *HandlerServiceAdapter) GetMetrics() (*services.AIMetrics, bool) {
 	if a == nil || a.service == nil {
 		return nil, false
 	}
-	enhanced, ok := a.service.(services.EnhancedAIServiceInterface)
+	enhanced, ok := a.service.(EnhancedRuntimeService)
 	if !ok {
 		return nil, false
 	}
@@ -59,7 +78,7 @@ func (a *HandlerServiceAdapter) UploadDocumentToWeKnora(ctx context.Context, tit
 	if a == nil || a.service == nil {
 		return fmt.Errorf("ai service not configured")
 	}
-	enhanced, ok := a.service.(services.EnhancedAIServiceInterface)
+	enhanced, ok := a.service.(EnhancedRuntimeService)
 	if !ok {
 		return errUnsupportedEnhancedFeature("document upload")
 	}
@@ -70,7 +89,7 @@ func (a *HandlerServiceAdapter) SyncKnowledgeBase(ctx context.Context) error {
 	if a == nil || a.service == nil {
 		return fmt.Errorf("ai service not configured")
 	}
-	enhanced, ok := a.service.(services.EnhancedAIServiceInterface)
+	enhanced, ok := a.service.(EnhancedRuntimeService)
 	if !ok {
 		return errUnsupportedEnhancedFeature("knowledge base sync")
 	}
@@ -81,7 +100,7 @@ func (a *HandlerServiceAdapter) SetWeKnoraEnabled(enabled bool) bool {
 	if a == nil || a.service == nil {
 		return false
 	}
-	enhanced, ok := a.service.(services.EnhancedAIServiceInterface)
+	enhanced, ok := a.service.(EnhancedRuntimeService)
 	if !ok {
 		return false
 	}
@@ -93,7 +112,7 @@ func (a *HandlerServiceAdapter) ResetCircuitBreaker() bool {
 	if a == nil || a.service == nil {
 		return false
 	}
-	enhanced, ok := a.service.(services.EnhancedAIServiceInterface)
+	enhanced, ok := a.service.(EnhancedRuntimeService)
 	if !ok {
 		return false
 	}

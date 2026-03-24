@@ -68,6 +68,21 @@ func newTestDBForSessionTransferHandler(t *testing.T) *gorm.DB {
 	return db
 }
 
+func newRoutingTransferHandlerService(db *gorm.DB, logger *logrus.Logger, ai stubAIForTransferHandler, agentSvc *services.AgentService) routingdelivery.HandlerService {
+	bus := eventbus.NewInMemoryBus()
+	routingSvc := routingapp.NewService(routinginfra.NewGormRepository(db), bus)
+	return routingdelivery.NewHandlerService(routingdelivery.HandlerDependencies{
+		DB:           db,
+		Logger:       logger,
+		AI:           ai,
+		Agents:       agentSvc,
+		Routing:      routingdelivery.NewSessionTransferAdapter(routingSvc, bus),
+		Tickets:      ticketdelivery.NewRuntimeAdapter(bus),
+		Conversation: conversationdelivery.NewRuntimeAdapter(db, bus),
+		AgentLoad:    agentdelivery.NewTransferRuntimeAdapter(),
+	})
+}
+
 func TestSessionTransferHandler_ListWaiting_And_Cancel(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -87,14 +102,7 @@ func TestSessionTransferHandler_ListWaiting_And_Cancel(t *testing.T) {
 	}
 
 	agentSvc := services.NewAgentService(db, logger)
-	bus := eventbus.NewInMemoryBus()
-	routingSvc := routingapp.NewService(routinginfra.NewGormRepository(db), bus)
-	transferSvc := services.NewSessionTransferServiceWithAdapters(db, logger, stubAIForTransferHandler{}, agentSvc, nil, services.SessionTransferAdapters{
-		Routing:      routingdelivery.NewSessionTransferAdapter(routingSvc, bus),
-		Tickets:      ticketdelivery.NewRuntimeAdapter(bus),
-		Conversation: conversationdelivery.NewRuntimeAdapter(db, bus),
-		Agents:       agentdelivery.NewTransferRuntimeAdapter(),
-	})
+	transferSvc := newRoutingTransferHandlerService(db, logger, stubAIForTransferHandler{}, agentSvc)
 	h := NewSessionTransferHandler(transferSvc, logger)
 
 	r := gin.New()
@@ -151,11 +159,7 @@ func TestSessionTransferHandler_TransferToHuman(t *testing.T) {
 	}
 
 	agentSvc := services.NewAgentService(db, logger)
-	bus := eventbus.NewInMemoryBus()
-	routingSvc := routingapp.NewService(routinginfra.NewGormRepository(db), bus)
-	transferSvc := services.NewSessionTransferServiceWithAdapters(db, logger, stubAIForTransferHandler{}, agentSvc, nil, services.SessionTransferAdapters{
-		Routing: routingdelivery.NewSessionTransferAdapter(routingSvc, bus),
-	})
+	transferSvc := newRoutingTransferHandlerService(db, logger, stubAIForTransferHandler{}, agentSvc)
 	h := NewSessionTransferHandler(transferSvc, logger)
 
 	r := gin.New()
@@ -194,14 +198,7 @@ func TestSessionTransferHandler_GetTransferHistory(t *testing.T) {
 	}
 
 	agentSvc := services.NewAgentService(db, logger)
-	bus := eventbus.NewInMemoryBus()
-	routingSvc := routingapp.NewService(routinginfra.NewGormRepository(db), bus)
-	transferSvc := services.NewSessionTransferServiceWithAdapters(db, logger, stubAIForTransferHandler{}, agentSvc, nil, services.SessionTransferAdapters{
-		Routing:      routingdelivery.NewSessionTransferAdapter(routingSvc, bus),
-		Tickets:      ticketdelivery.NewRuntimeAdapter(bus),
-		Conversation: conversationdelivery.NewRuntimeAdapter(db, bus),
-		Agents:       agentdelivery.NewTransferRuntimeAdapter(),
-	})
+	transferSvc := newRoutingTransferHandlerService(db, logger, stubAIForTransferHandler{}, agentSvc)
 	h := NewSessionTransferHandler(transferSvc, logger)
 
 	r := gin.New()
@@ -243,7 +240,7 @@ func TestSessionTransferHandler_ProcessWaitingQueue(t *testing.T) {
 	}
 
 	agentSvc := services.NewAgentService(db, logger)
-	transferSvc := services.NewSessionTransferService(db, logger, stubAIForTransferHandler{}, agentSvc, nil)
+	transferSvc := newRoutingTransferHandlerService(db, logger, stubAIForTransferHandler{}, agentSvc)
 	h := NewSessionTransferHandler(transferSvc, logger)
 
 	r := gin.New()
@@ -275,7 +272,7 @@ func TestSessionTransferHandler_CheckAutoTransfer(t *testing.T) {
 	}
 
 	agentSvc := services.NewAgentService(db, logger)
-	transferSvc := services.NewSessionTransferService(db, logger, stubAIForTransferHandler{}, agentSvc, nil)
+	transferSvc := newRoutingTransferHandlerService(db, logger, stubAIForTransferHandler{}, agentSvc)
 	h := NewSessionTransferHandler(transferSvc, logger)
 
 	r := gin.New()

@@ -4,7 +4,7 @@
 
 - 旧 `services` / `handlers` 收口
 - `modules/*` 应用入口固化
-- 兼容适配层
+- legacy service 退役与删除
 - 迁移路线与完成度治理
 
 ## M1 migration-inventory
@@ -24,10 +24,10 @@
 
 ## M2 module-entry-contracts
 
-- [-] 为 `conversation`、`routing`、`ticket`、`analytics`、`ai` 定义唯一应用入口
-- [-] 明确 handler 只能依赖 adapter / application contract，不能直接拼业务
-- [-] 为旧 service 定义允许保留的兼容职责
-- [ ] 为 repo / gorm 依赖建立单向约束
+- [x] 为 `conversation`、`routing`、`ticket`、`analytics`、`ai` 定义唯一应用入口
+- [x] 明确 handler 只能依赖 adapter / application contract，不能直接拼业务
+- [x] 为旧 service 定义允许保留的兼容职责
+- [x] 为 repo / gorm 依赖建立单向约束
 
 验收：
 
@@ -37,8 +37,8 @@
 
 - `ticket`
   - handler-facing contract 已收口到 `modules/ticket/delivery.HandlerService`
-  - runtime 已使用 `HandlerServiceAdapter`
-  - `services/TicketService` 明确保留为兼容 facade，而不是 HTTP 入口
+  - runtime 已改为 `modules/ticket/delivery.NewHandlerServiceWithDependencies(...)`
+  - 旧 `services/TicketService` 已删除
 - `agent`
   - handler-facing contract 已收口到 `modules/agent/delivery.HandlerService`
   - runtime 仍复用 `services.AgentService` 作为 contract 实现
@@ -49,47 +49,81 @@
   - `services.StatisticsService` 明确保留为兼容 facade + event bus glue
 - `routing / session transfer`
   - handler-facing contract 已收口到 `modules/routing/delivery.HandlerService`
-  - runtime 仍复用 `services.SessionTransferService` 作为 contract 实现
-  - `services.SessionTransferService` 明确保留为兼容 facade + runtime glue
+  - runtime 已改为 `modules/routing/delivery.HandlerServiceAdapter`
+  - 旧 `services.SessionTransferService` 已删除
 - `conversation / websocket runtime`
   - websocket 持久化入口已显式收口到 `modules/conversation/delivery.WebSocketMessageWriter`
   - 主 runtime 与 lightweight realtime runtime 都通过 `WebSocketMessageAdapter` 注入 conversation 模块
+  - `WebSocketHub` 已删除对 `sessions/messages` 的 gorm 直写 fallback，只保留 conversation delivery 路径
 - `ai`
   - handler-facing contract 已收口到 `modules/ai/delivery.HandlerService`
   - `AIAssembly` 已拆分为 handler-facing service 与 runtime-facing service
   - 默认 handler 主路径已提升到 orchestrated enhanced AI，而不是直接暴露旧 `AIServiceInterface`
+  - server/runtime/router/websocket 主链路已改为依赖 `modules/ai/delivery.RuntimeService` 或局部 runtime contract，不再透传 `services.AIServiceInterface`
+  - 旧 `services/AIServiceInterface` / `EnhancedAIServiceInterface` 已删除
 - 边界守护
   - CI 已增加 `scripts/check-module-boundaries.sh`
   - 当前自动校验 `ticket` / `agent` / `analytics` / `routing` / `ai` 的 handler constructor、router dependency、runtime wiring，以及 `conversation` 的 websocket persistence wiring，都必须停留在 module delivery contract
 
-## M3 compatibility-adapters
+## M3 legacy-service-retirement
 
-- [ ] 为仍依赖旧 service 的 handler 增加过渡 adapter
-- [ ] 将旧 service 中可迁移的业务规则搬到 module application 层
-- [ ] 将旧 service 缩为兼容 facade，而不是业务中心
-- [ ] 为适配层增加测试，确保迁移前后行为一致
+- [x] 为仍需过渡的运行态入口补窄接口或 adapter，而不是继续保留 handler 直连旧 service
+- [x] 将旧 service 中可迁移的业务规则搬到 module application / delivery 层
+- [x] 已收口能力直接删除 legacy service，而不是保留 facade
+- [x] 为适配层增加测试，确保迁移前后行为一致
 
 验收：
 
-- 可以逐步替换旧链路，而不需要一次性重写
+- 已完成收口的能力不再保留双入口；仍未完成的能力也有明确的冻结边界
+
+当前已落地：
+
+- `routing`
+  - 已为 `modules/routing/delivery.SessionTransferAdapter` 补 waiting lifecycle、assignment/history、transaction-scoped repository 行为测试
+  - handler/runtime 主路径已切到 `modules/routing/delivery.HandlerServiceAdapter`
+  - 旧 `services/SessionTransferService` 已删除，不再保留兼容 facade
+- `ticket`
+  - handler/runtime 主路径已切到 `modules/ticket/delivery.NewHandlerServiceWithDependencies(...)`
+  - 旧 `services/TicketService` 已删除，不再保留兼容 facade
+- `ai`
+  - handler/runtime 主路径已切到 `modules/ai/delivery.HandlerService` 与 `AIAssembly.RuntimeService`
+  - 旧 `services/AIServiceInterface` / `services.OrchestratedAIService` 已删除，runtime 只保留局部窄接口
+- `conversation`
+  - `WebSocketHub` 已删除对 `sessions/messages` 的 gorm 直写 fallback
+  - websocket 持久化只允许经过 `modules/conversation/delivery.WebSocketMessageWriter`
 
 ## M4 core-module-migrations
 
-- [ ] 优先迁移 `conversation`
-- [ ] 优先迁移 `routing`
-- [ ] 优先迁移 `ticket`
-- [ ] 优先迁移 `ai`
-- [ ] 为每个模块拆分 1 到 3 个可独立提交的小任务包
+- [x] 优先迁移 `conversation`
+- [x] 优先迁移 `routing`
+- [x] 优先迁移 `ticket`
+- [x] 优先迁移 `ai`
+- [x] 为每个模块拆分 1 到 3 个可独立提交的小任务包
 
 验收：
 
 - 核心闭环模块率先完成收口，后续模块可复用迁移模式
 
+建议任务包：
+
+- `conversation`
+  - C1: 将 websocket message persistence 之外的会话写路径继续收口到 `modules/conversation/application`
+  - C2: 继续压缩 `WebSocketHub` 内部的会话/协议编排，避免重新长出 conversation 私有写路径
+- `routing`
+  - R1: 将 waiting queue / assignment / cancel 的运行态编排继续下沉到 `modules/routing/application`
+  - R2: 为 routing runtime adapter 补迁移前后行为一致性测试
+- `ticket`
+  - T1: 继续为 module delivery orchestration 补跨模块行为测试
+  - T2: 审查是否还有遗留注释、文档或调用点引用已删除的 `TicketService`
+- `ai`
+  - A1: 将 websocket / router 仍共享的 runtime surface 继续切薄为显式 contract
+  - A2: 为 AI handler/runtime 双入口补回归测试，锁定 assembly 边界
+
 ## M5 boundary-enforcement-and-scorecard
 
 - [x] 增加迁移完成度表
 - [x] 为目录职责与依赖方向补文档
-- [-] 在 code review / CI 中增加边界约束检查
+- [x] 在 code review / CI 中增加边界约束检查
 - [x] 明确 `services/*` 的冻结策略与退役条件
 
 验收：

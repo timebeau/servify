@@ -19,13 +19,12 @@ import (
 
 	"servify/apps/server/internal/models"
 	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
-	"servify/apps/server/internal/services"
 )
 
 func newTestDBForTickets(t *testing.T) *gorm.DB {
 	t.Helper()
 
-	// Use shared in-memory DB; TicketService spawns goroutines (auto-assign) that may
+	// Use shared in-memory DB; ticket orchestration may spawn goroutines that
 	// use a different connection.
 	dsn := "file:ticket_handler_" + strings.NewReplacer("/", "_", " ", "_").Replace(t.Name()) + "?mode=memory&cache=shared"
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
@@ -39,7 +38,7 @@ func newTestDBForTickets(t *testing.T) *gorm.DB {
 	}
 	sqlDB.SetMaxOpenConns(1)
 
-	// TicketService.GetTicketByID preloads these associations; keep schema in sync.
+	// Ticket read paths preload these associations; keep schema in sync.
 	if err := db.AutoMigrate(
 		&models.User{},
 		&models.Agent{},
@@ -81,8 +80,10 @@ func TestTicketHandler_Create_Get_List_Assign(t *testing.T) {
 		t.Fatalf("seed agent 2: %v", err)
 	}
 
-	ticketSvc := services.NewTicketService(db, logger, nil)
-	h := NewTicketHandler(ticketdelivery.NewHandlerServiceAdapter(db, ticketSvc.ModuleCommandService(), ticketSvc.Orchestrator()), logger)
+	h := NewTicketHandler(ticketdelivery.NewHandlerServiceWithDependencies(ticketdelivery.HandlerAssemblyDependencies{
+		DB:     db,
+		Logger: logger,
+	}), logger)
 
 	r := gin.New()
 	r.POST("/api/tickets", h.CreateTicket)
@@ -245,8 +246,10 @@ func TestTicketHandler_CustomFields_Create_Filter_Export(t *testing.T) {
 		t.Fatalf("seed custom field: %v", err)
 	}
 
-	svc := services.NewTicketService(db, logger, nil)
-	h := NewTicketHandler(ticketdelivery.NewHandlerServiceAdapter(db, svc.ModuleCommandService(), svc.Orchestrator()), logger)
+	h := NewTicketHandler(ticketdelivery.NewHandlerServiceWithDependencies(ticketdelivery.HandlerAssemblyDependencies{
+		DB:     db,
+		Logger: logger,
+	}), logger)
 
 	r := gin.New()
 	r.POST("/api/tickets", h.CreateTicket)

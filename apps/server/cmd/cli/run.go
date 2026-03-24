@@ -57,7 +57,16 @@ func run(cmd *cobra.Command, args []string) {
 	app.DB = db
 
 	openAIProvider := openai.NewProvider(cfg.AI.OpenAI.APIKey, cfg.AI.OpenAI.BaseURL)
-	aiService := services.NewOrchestratedAIService(openAIProvider, nil)
+	baseAI := services.NewAIService(cfg.AI.OpenAI.APIKey, cfg.AI.OpenAI.BaseURL)
+	baseAI.InitializeKnowledgeBase()
+	aiService := services.NewOrchestratedEnhancedAIService(
+		baseAI,
+		openAIProvider,
+		nil,
+		nil,
+		"",
+		app.Logger,
+	)
 	runtime := appserver.BuildRealtimeRuntime(cfg, app.Logger, db, aiService, aidelivery.NewHandlerServiceAdapter(aiService))
 	if err := runtime.Start(); err != nil {
 		logrus.Fatalf("Failed to start message router: %v", err)

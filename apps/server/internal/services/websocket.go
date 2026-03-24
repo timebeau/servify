@@ -12,10 +12,20 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
-	"gorm.io/gorm"
 	"servify/apps/server/internal/models"
 	conversationdelivery "servify/apps/server/internal/modules/conversation/delivery"
+	routingcontract "servify/apps/server/internal/modules/routing/contract"
 )
+
+type sessionTransferRuntime interface {
+	TransferToHuman(ctx context.Context, req *routingcontract.TransferRequest) (*routingcontract.TransferResult, error)
+}
+
+type websocketAIService interface {
+	ProcessQuery(ctx context.Context, query string, sessionID string) (*AIResponse, error)
+	ShouldTransferToHuman(query string, sessionHistory []models.Message) bool
+	GetSessionSummary(messages []models.Message) (string, error)
+}
 
 type WebSocketMessage struct {
 	Type      string      `json:"type"`
@@ -39,11 +49,9 @@ type WebSocketHub struct {
 	unregister chan *WebSocketClient
 	mutex      sync.RWMutex
 	// 可选：用于直接在WS层调用AI服务（未设置时则仅广播）
-	aiService AIServiceInterface
+	aiService websocketAIService
 	// 可选：用于触发“转人工”流程（未设置则仅返回提示）
-	transferService SessionTransferRuntime
-	// 可选：用于将文本消息落库（如未设置则仅记录日志）
-	db *gorm.DB
+	transferService sessionTransferRuntime
 	// 优先使用 conversation 模块适配器持久化消息
 	conversationWriter conversationdelivery.WebSocketMessageWriter
 }
@@ -64,24 +72,17 @@ func NewWebSocketHub() *WebSocketHub {
 }
 
 // SetAIService 为WebSocketHub注入AI服务（可选）
-func (h *WebSocketHub) SetAIService(ai AIServiceInterface) {
+func (h *WebSocketHub) SetAIService(ai websocketAIService) {
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 	h.aiService = ai
 }
 
 // SetSessionTransferService 为 WebSocketHub 注入会话转接服务（可选）
-func (h *WebSocketHub) SetSessionTransferService(svc SessionTransferRuntime) {
+func (h *WebSocketHub) SetSessionTransferService(svc sessionTransferRuntime) {
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 	h.transferService = svc
-}
-
-// SetDB 为 WebSocketHub 注入可选的数据库实例，用于持久化消息
-func (h *WebSocketHub) SetDB(db *gorm.DB) {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
-	h.db = db
 }
 
 // SetConversationMessageWriter injects the modular conversation persistence adapter.
@@ -312,53 +313,13 @@ func (c *WebSocketClient) persistTextMessage(message WebSocketMessage) error {
 	// 若未配置数据库，则直接返回
 	hub := c.Hub
 	hub.mutex.RLock()
-	db := hub.db
 	writer := hub.conversationWriter
 	hub.mutex.RUnlock()
 
-	// 优先走 conversation 模块适配器；未配置时退回旧 DB 直写路径
-	if writer != nil {
-		var content string
-		switch v := message.Data.(type) {
-		case map[string]interface{}:
-			if s, ok := v["content"].(string); ok {
-				content = s
-			}
-		case string:
-			content = v
-		}
-		if strings.TrimSpace(content) == "" {
-			return nil
-		}
-		return writer.PersistTextMessage(context.Background(), c.SessionID, content)
-	}
-
-	if db == nil {
+	if writer == nil {
 		return nil
 	}
 
-	// 确保会话存在（以 SessionID 作为主键），若不存在则创建
-	var sess models.Session
-	if err := db.First(&sess, "id = ?", c.SessionID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			now := time.Now()
-			sess = models.Session{
-				ID:        c.SessionID,
-				Status:    "active",
-				Platform:  "web",
-				StartedAt: now,
-				CreatedAt: now,
-				UpdatedAt: now,
-			}
-			if err := db.Create(&sess).Error; err != nil {
-				return fmt.Errorf("create session: %w", err)
-			}
-		} else {
-			return err
-		}
-	}
-
-	// 提取文本内容
 	var content string
 	switch v := message.Data.(type) {
 	case map[string]interface{}:
@@ -370,20 +331,10 @@ func (c *WebSocketClient) persistTextMessage(message WebSocketMessage) error {
 	default:
 		// 其他格式不处理
 	}
-
-	// 插入消息记录
-	m := &models.Message{
-		SessionID: c.SessionID,
-		UserID:    0,
-		Content:   content,
-		Type:      "text",
-		Sender:    "user",
-		CreatedAt: time.Now(),
+	if strings.TrimSpace(content) == "" {
+		return nil
 	}
-	if err := db.Create(m).Error; err != nil {
-		return fmt.Errorf("persist message: %w", err)
-	}
-	return nil
+	return writer.PersistTextMessage(context.Background(), c.SessionID, content)
 }
 
 // processMessageWithAI 使用 AI 处理消息
@@ -393,7 +344,6 @@ func (c *WebSocketClient) processMessageWithAI(message WebSocketMessage) {
 	h.mutex.RLock()
 	ai := h.aiService
 	transferSvc := h.transferService
-	db := h.db
 	writer := h.conversationWriter
 	h.mutex.RUnlock()
 	if ai == nil {
@@ -429,32 +379,18 @@ func (c *WebSocketClient) processMessageWithAI(message WebSocketMessage) {
 			return
 		}
 	}
-	if writer == nil && db != nil {
-		var sess models.Session
-		if err := db.Select("id", "agent_id", "status").First(&sess, "id = ?", c.SessionID).Error; err == nil {
-			if sess.AgentID != nil && sess.Status != "ended" {
-				return
-			}
-		}
-	}
-
 	// 触发“转人工”流程（优先于 AI 正常回答）
 	if transferSvc != nil {
 		var history []models.Message
 		if writer != nil {
 			history, _ = writer.ListRecentMessages(context.Background(), c.SessionID, 6)
-		} else if db != nil {
-			_ = db.Where("session_id = ?", c.SessionID).
-				Order("created_at DESC").
-				Limit(6).
-				Find(&history).Error
 		}
 		if ai.ShouldTransferToHuman(content, history) {
 			go func(sessionID string) {
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer cancel()
 
-				result, err := transferSvc.TransferToHuman(ctx, &TransferRequest{
+				result, err := transferSvc.TransferToHuman(ctx, &routingcontract.TransferRequest{
 					SessionID: sessionID,
 					Reason:    "user_request",
 				})

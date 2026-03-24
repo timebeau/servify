@@ -27,7 +27,7 @@ type Dependencies struct {
 	Config                   *config.Config
 	Logger                   *logrus.Logger
 	DB                       *gorm.DB
-	AIService                services.AIServiceInterface
+	AIService                aidelivery.RuntimeService
 	AIHandlerService         aidelivery.HandlerService
 	RealtimeGateway          realtimeplatform.RealtimeGateway
 	RTCGateway               realtimeplatform.RTCGateway

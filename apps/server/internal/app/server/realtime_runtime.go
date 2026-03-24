@@ -20,7 +20,7 @@ type RealtimeRuntime struct {
 	Config           *config.Config
 	Logger           *logrus.Logger
 	DB               *gorm.DB
-	AIService        services.AIServiceInterface
+	AIService        aidelivery.RuntimeService
 	AIHandlerService aidelivery.HandlerService
 	wsRuntime        websocketRunner
 	RealtimeGateway  realtimeplatform.RealtimeGateway
@@ -28,10 +28,9 @@ type RealtimeRuntime struct {
 	MessageRouter    services.MessageRouterRuntime
 }
 
-func BuildRealtimeRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, ai services.AIServiceInterface, handlerAI aidelivery.HandlerService) *RealtimeRuntime {
+func BuildRealtimeRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, ai aidelivery.RuntimeService, handlerAI aidelivery.HandlerService) *RealtimeRuntime {
 	wsHub := services.NewWebSocketHub()
 	if db != nil {
-		wsHub.SetDB(db)
 		conversationRepo := conversationinfra.NewGormRepository(db)
 		conversationService := conversationapp.NewService(conversationRepo, nil)
 		wsHub.SetConversationMessageWriter(conversationdelivery.NewWebSocketMessageAdapter(conversationService))

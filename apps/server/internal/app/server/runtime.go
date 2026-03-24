@@ -41,7 +41,7 @@ type Runtime struct {
 	DB     *gorm.DB
 	Bus    eventbus.Bus
 
-	AIService                services.AIServiceInterface
+	AIService                aidelivery.RuntimeService
 	AIHandlerService         aidelivery.HandlerService
 	wsRuntime                websocketRunner
 	RealtimeGateway          realtimeplatform.RealtimeGateway
@@ -95,7 +95,6 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	wsHub := services.NewWebSocketHub()
 	rt.wsRuntime = wsHub
 	rt.RealtimeGateway = realtimeplatform.NewWebSocketAdapter(wsHub)
-	wsHub.SetDB(db)
 
 	conversationRepo := conversationinfra.NewGormRepository(db)
 	conversationService := conversationapp.NewService(conversationRepo, bus)
@@ -144,23 +143,17 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	rt.AgentHandlerService = agentAssembly.Service
 	go agentAssembly.Maintenance.Start()
 
-	ticketService := services.NewTicketService(db, logger, slaService)
-	ticketService.SetEventBus(bus)
-	ticketService.SetAutomationService(automationService)
-
-	transferService := services.NewSessionTransferServiceWithAdapters(
-		db,
-		logger,
-		rt.AIService,
-		agentAssembly.Service,
-		wsHub,
-		services.SessionTransferAdapters{
-			Routing:      routingdelivery.NewSessionTransferAdapter(routingService, bus),
-			Tickets:      ticketdelivery.NewRuntimeAdapter(bus),
-			Conversation: conversationdelivery.NewRuntimeAdapter(db, bus),
-			Agents:       agentdelivery.NewTransferRuntimeAdapter(),
-		},
-	)
+	transferService := routingdelivery.NewHandlerService(routingdelivery.HandlerDependencies{
+		DB:           db,
+		Logger:       logger,
+		AI:           rt.AIService,
+		Agents:       agentAssembly.Service,
+		Notifier:     newRoutingTransferNotifier(rt.RealtimeGateway),
+		Routing:      routingdelivery.NewSessionTransferAdapter(routingService, bus),
+		Tickets:      ticketdelivery.NewRuntimeAdapter(bus),
+		Conversation: conversationdelivery.NewRuntimeAdapter(db, bus),
+		AgentLoad:    agentdelivery.NewTransferRuntimeAdapter(),
+	})
 	rt.TransferHandlerService = transferService
 
 	statisticsService := services.NewStatisticsService(db, logger)
@@ -170,7 +163,6 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 
 	satisfactionService := services.NewSatisfactionService(db, logger)
 	rt.SatisfactionService = satisfactionService
-	ticketService.SetSatisfactionService(satisfactionService)
 
 	rt.ShiftService = services.NewShiftService(db, logger)
 	rt.WorkspaceService = services.NewWorkspaceService(db, agentAssembly.Service)
@@ -180,7 +172,13 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	rt.KnowledgeDocHandler = knowledgedelivery.NewHandlerServiceWithProvider(db, aiAssembly.KnowledgeProvider(cfg))
 	rt.SuggestionService = services.NewSuggestionService(db)
 	rt.GamificationService = services.NewGamificationService(db)
-	rt.TicketHandlerService = ticketdelivery.NewHandlerServiceAdapter(db, ticketService.ModuleCommandService(), ticketService.Orchestrator())
+	rt.TicketHandlerService = ticketdelivery.NewHandlerServiceWithDependencies(ticketdelivery.HandlerAssemblyDependencies{
+		DB:           db,
+		Logger:       logger,
+		Bus:          bus,
+		SLA:          slaService,
+		Satisfaction: satisfactionService,
+	})
 	rt.TicketReaderService = ticketdelivery.NewReaderServiceAdapter(db)
 
 	wsHub.SetSessionTransferService(transferService)

@@ -416,18 +416,6 @@ func TestWebSocketHub_SetSessionTransferService(t *testing.T) {
 	// we'll skip this test for now and rely on integration tests
 }
 
-func TestWebSocketHub_SetDB(t *testing.T) {
-	hub := NewWebSocketHub()
-
-	// Create a mock DB
-	// We can't easily create a real GORM DB without migrations, so we'll just test it doesn't panic
-	// In a real scenario, you'd pass an actual *gorm.DB
-
-	// SetDB requires a real database connection
-	// For now, just verify the method exists and can be called
-	_ = hub
-}
-
 func TestWebSocketHub_SetConversationMessageWriter(t *testing.T) {
 	hub := NewWebSocketHub()
 	writer := &stubConversationWriter{}
