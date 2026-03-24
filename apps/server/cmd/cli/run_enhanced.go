@@ -5,6 +5,7 @@ package cli
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"sync"
@@ -22,6 +23,28 @@ import (
 	"github.com/spf13/cobra"
 	"gorm.io/gorm"
 )
+
+type gormDBStatsProvider struct {
+	db *gorm.DB
+}
+
+func newGormDBStatsProvider(db *gorm.DB) *gormDBStatsProvider {
+	if db == nil {
+		return nil
+	}
+	return &gormDBStatsProvider{db: db}
+}
+
+func (p *gormDBStatsProvider) Stats() (sql.DBStats, bool) {
+	if p == nil || p.db == nil {
+		return sql.DBStats{}, false
+	}
+	sqlDB, err := p.db.DB()
+	if err != nil || sqlDB == nil {
+		return sql.DBStats{}, false
+	}
+	return sqlDB.Stats(), true
+}
 
 var runCmd = &cobra.Command{
 	Use:   "run",
@@ -167,7 +190,7 @@ func setupEnhancedRouter(
 
 	// 监控端点
 	if cfg.Monitoring.Enabled {
-		router.GET(cfg.Monitoring.MetricsPath, handlers.NewMetricsHandler(runtime.RealtimeGateway, runtime.RTCGateway, runtime.AIHandlerService, db).GetMetrics)
+		router.GET(cfg.Monitoring.MetricsPath, handlers.NewMetricsHandler(runtime.RealtimeGateway, runtime.RTCGateway, runtime.AIHandlerService, newGormDBStatsProvider(db)).GetMetrics)
 	}
 
 	// API 路由组
