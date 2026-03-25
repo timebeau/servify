@@ -51,7 +51,7 @@ func (s *CustomFieldService) List(ctx context.Context, resource string, activeOn
 	if resource == "" {
 		resource = "ticket"
 	}
-	q := s.db.WithContext(ctx).Model(&models.CustomField{}).Where("resource = ?", resource).Order("id ASC")
+	q := applyScopeFilter(s.db.WithContext(ctx).Model(&models.CustomField{}), ctx).Where("resource = ?", resource).Order("id ASC")
 	if activeOnly {
 		q = q.Where("active = ?", true)
 	}
@@ -64,7 +64,7 @@ func (s *CustomFieldService) List(ctx context.Context, resource string, activeOn
 
 func (s *CustomFieldService) Get(ctx context.Context, id uint) (*models.CustomField, error) {
 	var field models.CustomField
-	if err := s.db.WithContext(ctx).First(&field, id).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).First(&field, id).Error; err != nil {
 		return nil, err
 	}
 	return &field, nil
@@ -110,7 +110,10 @@ func (s *CustomFieldService) Create(ctx context.Context, req *CustomFieldCreateR
 	}
 
 	now := time.Now()
+	tenantID, workspaceID := tenantAndWorkspace(ctx)
 	field := &models.CustomField{
+		TenantID:       tenantID,
+		WorkspaceID:    workspaceID,
 		Resource:       resource,
 		Key:            key,
 		Name:           strings.TrimSpace(req.Name),
@@ -138,7 +141,7 @@ func (s *CustomFieldService) Update(ctx context.Context, id uint, req *CustomFie
 		return nil, errors.New("request required")
 	}
 	var field models.CustomField
-	if err := s.db.WithContext(ctx).First(&field, id).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).First(&field, id).Error; err != nil {
 		return nil, err
 	}
 	if req.Name != nil {
@@ -187,7 +190,7 @@ func (s *CustomFieldService) Update(ctx context.Context, id uint, req *CustomFie
 }
 
 func (s *CustomFieldService) Delete(ctx context.Context, id uint) error {
-	result := s.db.WithContext(ctx).Delete(&models.CustomField{}, id)
+	result := applyScopeFilter(s.db.WithContext(ctx), ctx).Delete(&models.CustomField{}, id)
 	if result.Error != nil {
 		return result.Error
 	}

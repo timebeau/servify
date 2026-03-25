@@ -75,6 +75,33 @@ func TestSLAService_CheckViolation_FirstResponse(t *testing.T) {
 	}
 }
 
+func TestSLAService_ListConfigsScopedByWorkspace(t *testing.T) {
+	db := newSLATestDB(t)
+	svc := NewSLAService(db, logrus.New())
+
+	ctxA := scopedContext("tenant-a", "workspace-a")
+	ctxB := scopedContext("tenant-a", "workspace-b")
+
+	if _, err := svc.CreateSLAConfig(ctxA, &SLAConfigCreateRequest{
+		Name: "A", Priority: "high", FirstResponseTime: 5, ResolutionTime: 60, EscalationTime: 30,
+	}); err != nil {
+		t.Fatalf("create A failed: %v", err)
+	}
+	if _, err := svc.CreateSLAConfig(ctxB, &SLAConfigCreateRequest{
+		Name: "B", Priority: "normal", FirstResponseTime: 10, ResolutionTime: 120, EscalationTime: 30,
+	}); err != nil {
+		t.Fatalf("create B failed: %v", err)
+	}
+
+	items, total, err := svc.ListSLAConfigs(ctxA, &SLAConfigListRequest{Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("list failed: %v", err)
+	}
+	if total != 1 || len(items) != 1 || items[0].WorkspaceID != "workspace-a" {
+		t.Fatalf("unexpected items: total=%d items=%+v", total, items)
+	}
+}
+
 func TestSLAService_ResolveViolationsByTicket(t *testing.T) {
 	db := newSLATestDB(t)
 	svc := NewSLAService(db, logrus.New())

@@ -9,3 +9,7 @@ import (
 func RequireRolesAny(required ...string) gin.HandlerFunc {
 	return platformauth.RequireRolesAny(required...)
 }
+
+func RequirePrincipalKinds(required ...string) gin.HandlerFunc {
+	return platformauth.RequirePrincipalKinds(required...)
+}

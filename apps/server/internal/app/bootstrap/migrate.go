@@ -38,6 +38,7 @@ func MigrationModels() []interface{} {
 		&models.AutomationTrigger{},
 		&models.AutomationRun{},
 		&models.Macro{},
+		&models.AuditLog{},
 	}
 }
 

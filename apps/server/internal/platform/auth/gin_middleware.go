@@ -53,6 +53,8 @@ func AuthMiddleware(cfg MiddlewareConfig) gin.HandlerFunc {
 		}
 
 		claims := extractClaims(payload, resolver)
+		reqCtx := ContextWithScope(c.Request.Context(), claims.TenantID, claims.WorkspaceID)
+		c.Request = c.Request.WithContext(reqCtx)
 		if claims.HasUserID {
 			c.Set("user_id", claims.UserID)
 		}
@@ -64,6 +66,13 @@ func AuthMiddleware(cfg MiddlewareConfig) gin.HandlerFunc {
 		}
 		if len(claims.Permissions) > 0 {
 			c.Set("permissions", claims.Permissions)
+		}
+		c.Set("principal_kind", claims.PrincipalKind)
+		if claims.TenantID != "" {
+			c.Set("tenant_id", claims.TenantID)
+		}
+		if claims.WorkspaceID != "" {
+			c.Set("workspace_id", claims.WorkspaceID)
 		}
 
 		c.Next()
@@ -138,6 +147,24 @@ func RequireRolesAny(required ...string) gin.HandlerFunc {
 	}
 }
 
+// RequirePrincipalKinds requires the caller to match one of the normalized principal kinds.
+func RequirePrincipalKinds(required ...string) gin.HandlerFunc {
+	reqSet := make(map[string]struct{}, len(required))
+	for _, r := range required {
+		if kind := normalizePrincipalKind(r); kind != "" {
+			reqSet[kind] = struct{}{}
+		}
+	}
+	return func(c *gin.Context) {
+		kind := getPrincipalKind(c)
+		if _, ok := reqSet[kind]; ok {
+			c.Next()
+			return
+		}
+		abortJSON(c, http.StatusForbidden, "Forbidden", "insufficient principal type")
+	}
+}
+
 func getGrantedPermissions(c *gin.Context) []string {
 	if v, ok := c.Get("permissions"); ok {
 		if perms, ok := v.([]string); ok {
@@ -167,6 +194,15 @@ func getGrantedRoles(c *gin.Context) []string {
 		}
 	}
 	return nil
+}
+
+func getPrincipalKind(c *gin.Context) string {
+	if v, ok := c.Get("principal_kind"); ok {
+		if kind := normalizePrincipalKind(v); kind != "" {
+			return kind
+		}
+	}
+	return PrincipalUnknown
 }
 
 func abortJSON(c *gin.Context, status int, errCode, msg string) {

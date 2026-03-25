@@ -50,3 +50,26 @@ func TestAppIntegrationService_CreateAndList(t *testing.T) {
 		t.Fatalf("unexpected list result: total=%d len=%d", total, len(list))
 	}
 }
+
+func TestAppIntegrationService_ListScopedByWorkspace(t *testing.T) {
+	db := newIntegrationTestDB(t)
+	svc := NewAppIntegrationService(db, logrus.New())
+
+	ctxA := scopedContext("tenant-a", "workspace-a")
+	ctxB := scopedContext("tenant-a", "workspace-b")
+
+	if _, err := svc.Create(ctxA, &AppIntegrationCreateRequest{Name: "Stripe A", Slug: "stripe-a", IFrameURL: "https://a.example.com"}); err != nil {
+		t.Fatalf("create A failed: %v", err)
+	}
+	if _, err := svc.Create(ctxB, &AppIntegrationCreateRequest{Name: "Stripe B", Slug: "stripe-b", IFrameURL: "https://b.example.com"}); err != nil {
+		t.Fatalf("create B failed: %v", err)
+	}
+
+	list, total, err := svc.List(ctxA, &AppIntegrationListRequest{Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("list A failed: %v", err)
+	}
+	if total != 1 || len(list) != 1 || list[0].Slug != "stripe-a" {
+		t.Fatalf("unexpected list result: total=%d list=%+v", total, list)
+	}
+}

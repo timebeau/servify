@@ -7,12 +7,15 @@ import (
 
 // Claims is the normalized auth context derived from a validated JWT payload.
 type Claims struct {
-	Values      map[string]interface{}
-	UserID      uint
-	HasUserID   bool
-	UserIDRaw   interface{}
-	Roles       []string
-	Permissions []string
+	Values        map[string]interface{}
+	UserID        uint
+	HasUserID     bool
+	UserIDRaw     interface{}
+	Roles         []string
+	Permissions   []string
+	PrincipalKind string
+	TenantID      string
+	WorkspaceID   string
 }
 
 func extractClaims(payload map[string]interface{}, resolver Resolver) Claims {
@@ -20,6 +23,9 @@ func extractClaims(payload map[string]interface{}, resolver Resolver) Claims {
 		Values: payload,
 		Roles:  normalizeStringList(payload["roles"]),
 	}
+	claims.PrincipalKind = derivePrincipalKind(payload, claims.Roles)
+	claims.TenantID = normalizeOptionalString(firstValue(payload["tenant_id"], payload["tenant"], payload["tid"]))
+	claims.WorkspaceID = normalizeOptionalString(firstValue(payload["workspace_id"], payload["workspace"], payload["wid"]))
 
 	if uid, ok := firstNonNil(payload["user_id"], payload["sub"]); ok {
 		switch t := uid.(type) {
@@ -118,4 +124,9 @@ func dedupeStrings(in []string) []string {
 		out = append(out, s)
 	}
 	return out
+}
+
+func normalizeOptionalString(v interface{}) string {
+	s, _ := v.(string)
+	return strings.TrimSpace(s)
 }

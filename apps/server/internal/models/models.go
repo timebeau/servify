@@ -95,6 +95,8 @@ type Ticket struct {
 // CustomField 自定义字段配置（用于动态表单 / 查询 / 导出）
 type CustomField struct {
 	ID             uint           `gorm:"primaryKey" json:"id"`
+	TenantID       string         `gorm:"index" json:"tenant_id"`
+	WorkspaceID    string         `gorm:"index" json:"workspace_id"`
 	Resource       string         `gorm:"default:'ticket';index" json:"resource"` // ticket
 	Key            string         `gorm:"unique;not null" json:"key"`             // stable identifier (slug)
 	Name           string         `gorm:"not null" json:"name"`
@@ -226,13 +228,15 @@ type WaitingRecord struct {
 
 // 知识库文档
 type KnowledgeDoc struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	Title     string    `json:"title"`
-	Content   string    `gorm:"type:text" json:"content"`
-	Category  string    `json:"category"`
-	Tags      string    `json:"tags"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	TenantID    string    `gorm:"index" json:"tenant_id"`
+	WorkspaceID string    `gorm:"index" json:"workspace_id"`
+	Title       string    `json:"title"`
+	Content     string    `gorm:"type:text" json:"content"`
+	Category    string    `json:"category"`
+	Tags        string    `json:"tags"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // 知识库索引任务
@@ -259,6 +263,8 @@ type WebRTCConnection struct {
 // SLA 配置
 type SLAConfig struct {
 	ID                uint      `gorm:"primaryKey" json:"id"`
+	TenantID          string    `gorm:"index" json:"tenant_id"`
+	WorkspaceID       string    `gorm:"index" json:"workspace_id"`
 	Name              string    `gorm:"unique;not null" json:"name"`
 	Priority          string    `gorm:"not null" json:"priority"`            // low, normal, high, urgent
 	CustomerTier      string    `gorm:"default:''" json:"customer_tier"`     // 针对特定客户级别（为空表示全部）
@@ -326,6 +332,8 @@ type SatisfactionSurvey struct {
 // AppIntegration 市场应用集成定义
 type AppIntegration struct {
 	ID             uint      `gorm:"primaryKey" json:"id"`
+	TenantID       string    `gorm:"index" json:"tenant_id"`
+	WorkspaceID    string    `gorm:"index" json:"workspace_id"`
 	Name           string    `gorm:"unique;not null" json:"name"`
 	Slug           string    `gorm:"unique;not null" json:"slug"`
 	Vendor         string    `json:"vendor"`
@@ -372,4 +380,27 @@ type DailyStats struct {
 	SLAViolations        int       `gorm:"default:0" json:"sla_violations"` // SLA违约次数
 	CreatedAt            time.Time `json:"created_at"`
 	UpdatedAt            time.Time `json:"updated_at"`
+}
+
+// AuditLog records management-surface write operations for traceability.
+type AuditLog struct {
+	ID            uint      `gorm:"primaryKey" json:"id"`
+	ActorUserID   *uint     `gorm:"index" json:"actor_user_id"`
+	PrincipalKind string    `gorm:"index;not null" json:"principal_kind"`
+	Action        string    `gorm:"index;not null" json:"action"`
+	ResourceType  string    `gorm:"index;not null" json:"resource_type"`
+	ResourceID    string    `gorm:"index" json:"resource_id"`
+	Route         string    `gorm:"not null" json:"route"`
+	Method        string    `gorm:"not null" json:"method"`
+	StatusCode    int       `json:"status_code"`
+	Success       bool      `gorm:"index" json:"success"`
+	RequestID     string    `gorm:"index" json:"request_id"`
+	ClientIP      string    `json:"client_ip"`
+	UserAgent     string    `gorm:"type:text" json:"user_agent"`
+	TenantID      string    `gorm:"index" json:"tenant_id"`
+	WorkspaceID   string    `gorm:"index" json:"workspace_id"`
+	RequestJSON   string    `gorm:"type:text" json:"request_json"`
+	BeforeJSON    string    `gorm:"type:text" json:"before_json"`
+	AfterJSON     string    `gorm:"type:text" json:"after_json"`
+	CreatedAt     time.Time `json:"created_at"`
 }

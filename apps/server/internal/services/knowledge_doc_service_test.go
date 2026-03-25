@@ -265,6 +265,29 @@ func TestKnowledgeDocService_List(t *testing.T) {
 	}
 }
 
+func TestKnowledgeDocService_ListScopedByWorkspace(t *testing.T) {
+	db := newKnowledgeDocTestDB(t)
+	svc := NewKnowledgeDocService(db)
+
+	ctxA := scopedContext("tenant-a", "workspace-a")
+	ctxB := scopedContext("tenant-a", "workspace-b")
+
+	if _, err := svc.Create(ctxA, &KnowledgeDocCreateRequest{Title: "Doc A", Content: "alpha"}); err != nil {
+		t.Fatalf("create A failed: %v", err)
+	}
+	if _, err := svc.Create(ctxB, &KnowledgeDocCreateRequest{Title: "Doc B", Content: "beta"}); err != nil {
+		t.Fatalf("create B failed: %v", err)
+	}
+
+	docs, total, err := svc.List(ctxA, &KnowledgeDocListRequest{Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("list A failed: %v", err)
+	}
+	if total != 1 || len(docs) != 1 || docs[0].Title != "Doc A" {
+		t.Fatalf("unexpected scoped docs: total=%d docs=%+v", total, docs)
+	}
+}
+
 func TestKnowledgeDocService_Update(t *testing.T) {
 	db := newKnowledgeDocTestDB(t)
 	svc := NewKnowledgeDocService(db)

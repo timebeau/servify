@@ -61,6 +61,29 @@ func TestCustomFieldService_List(t *testing.T) {
 	}
 }
 
+func TestCustomFieldService_ListScopedByWorkspace(t *testing.T) {
+	db := newCustomFieldTestDB(t)
+	svc := NewCustomFieldService(db)
+
+	ctxA := scopedContext("tenant-a", "workspace-a")
+	ctxB := scopedContext("tenant-a", "workspace-b")
+
+	if _, err := svc.Create(ctxA, &CustomFieldCreateRequest{Key: "priority_a", Name: "A", Type: "select"}); err != nil {
+		t.Fatalf("create A failed: %v", err)
+	}
+	if _, err := svc.Create(ctxB, &CustomFieldCreateRequest{Key: "priority_b", Name: "B", Type: "select"}); err != nil {
+		t.Fatalf("create B failed: %v", err)
+	}
+
+	fieldsA, err := svc.List(ctxA, "ticket", false)
+	if err != nil {
+		t.Fatalf("list A failed: %v", err)
+	}
+	if len(fieldsA) != 1 || fieldsA[0].WorkspaceID != "workspace-a" {
+		t.Fatalf("unexpected fields for A: %+v", fieldsA)
+	}
+}
+
 func TestCustomFieldService_Get(t *testing.T) {
 	db := newCustomFieldTestDB(t)
 	svc := NewCustomFieldService(db)

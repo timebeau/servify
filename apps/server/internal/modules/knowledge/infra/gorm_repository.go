@@ -9,6 +9,7 @@ import (
 	"servify/apps/server/internal/models"
 	knowledgeapp "servify/apps/server/internal/modules/knowledge/application"
 	"servify/apps/server/internal/modules/knowledge/domain"
+	platformauth "servify/apps/server/internal/platform/auth"
 
 	"gorm.io/gorm"
 )
@@ -22,13 +23,17 @@ func NewGormDocumentRepository(db *gorm.DB) *GormDocumentRepository {
 }
 
 func (r *GormDocumentRepository) Create(ctx context.Context, doc *domain.Document) error {
+	tenantID := platformauth.TenantIDFromContext(ctx)
+	workspaceID := platformauth.WorkspaceIDFromContext(ctx)
 	model := &models.KnowledgeDoc{
-		Title:     doc.Title,
-		Content:   doc.Content,
-		Category:  doc.Category,
-		Tags:      strings.Join(doc.Tags, ","),
-		CreatedAt: doc.CreatedAt,
-		UpdatedAt: doc.UpdatedAt,
+		TenantID:    tenantID,
+		WorkspaceID: workspaceID,
+		Title:       doc.Title,
+		Content:     doc.Content,
+		Category:    doc.Category,
+		Tags:        strings.Join(doc.Tags, ","),
+		CreatedAt:   doc.CreatedAt,
+		UpdatedAt:   doc.UpdatedAt,
 	}
 	if err := r.db.WithContext(ctx).Create(model).Error; err != nil {
 		return err
@@ -42,7 +47,7 @@ func (r *GormDocumentRepository) Update(ctx context.Context, doc *domain.Documen
 	if err != nil {
 		return err
 	}
-	result := r.db.WithContext(ctx).Model(&models.KnowledgeDoc{}).Where("id = ?", id).Updates(map[string]interface{}{
+	result := applyKnowledgeScope(r.db.WithContext(ctx).Model(&models.KnowledgeDoc{}), ctx).Where("id = ?", id).Updates(map[string]interface{}{
 		"title":      doc.Title,
 		"content":    doc.Content,
 		"category":   doc.Category,
@@ -63,7 +68,7 @@ func (r *GormDocumentRepository) Delete(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	result := r.db.WithContext(ctx).Delete(&models.KnowledgeDoc{}, docID)
+	result := applyKnowledgeScope(r.db.WithContext(ctx), ctx).Delete(&models.KnowledgeDoc{}, docID)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -79,14 +84,14 @@ func (r *GormDocumentRepository) Get(ctx context.Context, id string) (*domain.Do
 		return nil, err
 	}
 	var model models.KnowledgeDoc
-	if err := r.db.WithContext(ctx).First(&model, docID).Error; err != nil {
+	if err := applyKnowledgeScope(r.db.WithContext(ctx), ctx).First(&model, docID).Error; err != nil {
 		return nil, err
 	}
 	return documentFromModel(model), nil
 }
 
 func (r *GormDocumentRepository) List(ctx context.Context, filter knowledgeapp.ListDocumentsFilter) ([]domain.Document, int64, error) {
-	q := r.db.WithContext(ctx).Model(&models.KnowledgeDoc{})
+	q := applyKnowledgeScope(r.db.WithContext(ctx).Model(&models.KnowledgeDoc{}), ctx)
 	if c := strings.TrimSpace(filter.Category); c != "" {
 		q = q.Where("category = ?", c)
 	}
@@ -241,6 +246,18 @@ func parseDocumentID(raw string) (uint, error) {
 		return 0, fmt.Errorf("invalid document id")
 	}
 	return uint(id), nil
+}
+
+func applyKnowledgeScope(tx *gorm.DB, ctx context.Context) *gorm.DB {
+	tenantID := platformauth.TenantIDFromContext(ctx)
+	workspaceID := platformauth.WorkspaceIDFromContext(ctx)
+	if tenantID != "" {
+		tx = tx.Where("tenant_id = ?", tenantID)
+	}
+	if workspaceID != "" {
+		tx = tx.Where("workspace_id = ?", workspaceID)
+	}
+	return tx
 }
 
 func splitTags(raw string) []string {

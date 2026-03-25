@@ -91,7 +91,7 @@ func (s *AppIntegrationService) List(ctx context.Context, req *AppIntegrationLis
 		req.PageSize = 20
 	}
 
-	query := s.db.WithContext(ctx).Model(&models.AppIntegration{})
+	query := applyScopeFilter(s.db.WithContext(ctx).Model(&models.AppIntegration{}), ctx)
 	if req.Category != "" {
 		query = query.Where("category = ?", req.Category)
 	}
@@ -139,14 +139,17 @@ func (s *AppIntegrationService) Create(ctx context.Context, req *AppIntegrationC
 	}
 
 	var exists int64
-	if err := s.db.WithContext(ctx).Model(&models.AppIntegration{}).Where("slug = ?", slug).Count(&exists).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx).Model(&models.AppIntegration{}), ctx).Where("slug = ?", slug).Count(&exists).Error; err != nil {
 		return nil, fmt.Errorf("failed to check slug: %w", err)
 	}
 	if exists > 0 {
 		return nil, fmt.Errorf("integration slug already exists")
 	}
 
+	tenantID, workspaceID := tenantAndWorkspace(ctx)
 	model := &models.AppIntegration{
+		TenantID:       tenantID,
+		WorkspaceID:    workspaceID,
 		Name:           req.Name,
 		Slug:           slug,
 		Vendor:         req.Vendor,
@@ -176,7 +179,7 @@ func (s *AppIntegrationService) Update(ctx context.Context, id uint, req *AppInt
 	}
 
 	var model models.AppIntegration
-	if err := s.db.WithContext(ctx).First(&model, id).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).First(&model, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, fmt.Errorf("integration not found")
 		}
@@ -221,7 +224,7 @@ func (s *AppIntegrationService) Update(ctx context.Context, id uint, req *AppInt
 
 // Delete 删除集成
 func (s *AppIntegrationService) Delete(ctx context.Context, id uint) error {
-	result := s.db.WithContext(ctx).Delete(&models.AppIntegration{}, id)
+	result := applyScopeFilter(s.db.WithContext(ctx), ctx).Delete(&models.AppIntegration{}, id)
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete integration: %w", result.Error)
 	}

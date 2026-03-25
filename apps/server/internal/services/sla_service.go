@@ -148,7 +148,7 @@ func (s *SLAService) CreateSLAConfig(ctx context.Context, req *SLAConfigCreateRe
 
 	// 检查相同优先级 + 客户级别是否已有配置
 	var existingConfig models.SLAConfig
-	if err := s.db.Where("priority = ? AND customer_tier = ?", req.Priority, tier).First(&existingConfig).Error; err == nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).Where("priority = ? AND customer_tier = ?", req.Priority, tier).First(&existingConfig).Error; err == nil {
 		return nil, fmt.Errorf("SLA config for priority '%s' and tier '%s' already exists", req.Priority, tier)
 	} else if err != gorm.ErrRecordNotFound {
 		return nil, fmt.Errorf("failed to check existing config: %w", err)
@@ -161,7 +161,10 @@ func (s *SLAService) CreateSLAConfig(ctx context.Context, req *SLAConfigCreateRe
 	}
 
 	// 创建SLA配置
+	tenantID, workspaceID := tenantAndWorkspace(ctx)
 	config := &models.SLAConfig{
+		TenantID:          tenantID,
+		WorkspaceID:       workspaceID,
 		Name:              req.Name,
 		Priority:          req.Priority,
 		CustomerTier:      tier,
@@ -196,7 +199,7 @@ func (s *SLAService) GetSLAConfig(ctx context.Context, id uint) (*models.SLAConf
 	span.SetAttributes(attribute.Int64("sla.config.id", int64(id)))
 
 	var config models.SLAConfig
-	if err := s.db.WithContext(ctx).First(&config, id).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).First(&config, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, fmt.Errorf("SLA config not found")
 		}
@@ -212,7 +215,7 @@ func (s *SLAService) ListSLAConfigs(ctx context.Context, req *SLAConfigListReque
 	ctx, span := s.tracer.Start(ctx, "sla.list_configs")
 	defer span.End()
 
-	query := s.db.WithContext(ctx).Model(&models.SLAConfig{})
+	query := applyScopeFilter(s.db.WithContext(ctx).Model(&models.SLAConfig{}), ctx)
 
 	// 应用筛选
 	if len(req.Priority) > 0 {
@@ -267,7 +270,7 @@ func (s *SLAService) UpdateSLAConfig(ctx context.Context, id uint, req *SLAConfi
 	span.SetAttributes(attribute.Int64("sla.config.id", int64(id)))
 
 	var config models.SLAConfig
-	if err := s.db.WithContext(ctx).First(&config, id).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).First(&config, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, fmt.Errorf("SLA config not found")
 		}
@@ -289,7 +292,7 @@ func (s *SLAService) UpdateSLAConfig(ctx context.Context, id uint, req *SLAConfi
 		// 检查是否有其他配置使用这个优先级
 		if *req.Priority != config.Priority {
 			var existingConfig models.SLAConfig
-			if err := s.db.Where("priority = ? AND id != ?", *req.Priority, id).First(&existingConfig).Error; err == nil {
+			if err := applyScopeFilter(s.db.WithContext(ctx), ctx).Where("priority = ? AND id != ?", *req.Priority, id).First(&existingConfig).Error; err == nil {
 				return nil, fmt.Errorf("SLA config for priority '%s' already exists", *req.Priority)
 			} else if err != gorm.ErrRecordNotFound {
 				return nil, fmt.Errorf("failed to check existing config: %w", err)
