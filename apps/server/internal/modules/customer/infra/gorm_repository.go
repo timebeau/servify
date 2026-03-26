@@ -10,6 +10,7 @@ import (
 
 	"servify/apps/server/internal/models"
 	customerapp "servify/apps/server/internal/modules/customer/application"
+	platformauth "servify/apps/server/internal/platform/auth"
 )
 
 type GormRepository struct {
@@ -42,6 +43,7 @@ func (r *GormRepository) CreateCustomer(ctx context.Context, cmd customerapp.Cre
 		Notes:    cmd.Notes,
 		Priority: cmd.Priority,
 	}
+	applyCustomerScopeFields(ctx, customer)
 	if err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(user).Error; err != nil {
 			return fmt.Errorf("failed to create user: %w", err)
@@ -59,11 +61,28 @@ func (r *GormRepository) CreateCustomer(ctx context.Context, cmd customerapp.Cre
 
 func (r *GormRepository) GetCustomerByID(ctx context.Context, customerID uint) (*models.User, error) {
 	var user models.User
-	if err := r.db.WithContext(ctx).Preload("Sessions", func(db *gorm.DB) *gorm.DB {
-		return db.Order("created_at DESC").Limit(10)
+	query := r.db.WithContext(ctx).Model(&models.User{}).
+		Joins("JOIN customers ON customers.user_id = users.id")
+	query = applyCustomerScope(query, ctx)
+	if err := query.Preload("Sessions", func(db *gorm.DB) *gorm.DB {
+		db = db.Order("created_at DESC").Limit(10)
+		if tenantID := platformauth.TenantIDFromContext(ctx); tenantID != "" {
+			db = db.Where("tenant_id = ?", tenantID)
+		}
+		if workspaceID := platformauth.WorkspaceIDFromContext(ctx); workspaceID != "" {
+			db = db.Where("workspace_id = ?", workspaceID)
+		}
+		return db
 	}).Preload("Tickets", func(db *gorm.DB) *gorm.DB {
-		return db.Order("created_at DESC").Limit(10)
-	}).First(&user, customerID).Error; err != nil {
+		db = db.Order("created_at DESC").Limit(10)
+		if tenantID := platformauth.TenantIDFromContext(ctx); tenantID != "" {
+			db = db.Where("tenant_id = ?", tenantID)
+		}
+		if workspaceID := platformauth.WorkspaceIDFromContext(ctx); workspaceID != "" {
+			db = db.Where("workspace_id = ?", workspaceID)
+		}
+		return db
+	}).First(&user, "users.id = ?", customerID).Error; err != nil {
 		return nil, fmt.Errorf("customer not found: %w", err)
 	}
 	return &user, nil
@@ -106,7 +125,7 @@ func (r *GormRepository) UpdateCustomer(ctx context.Context, customerID uint, cm
 			}
 		}
 		if len(customerUpdates) > 0 {
-			if err := tx.Model(&models.Customer{}).Where("user_id = ?", customerID).Updates(customerUpdates).Error; err != nil {
+			if err := applyCustomerScope(tx.Model(&models.Customer{}), ctx).Where("user_id = ?", customerID).Updates(customerUpdates).Error; err != nil {
 				return fmt.Errorf("failed to update customer: %w", err)
 			}
 		}
@@ -122,6 +141,7 @@ func (r *GormRepository) ListCustomers(ctx context.Context, query customerapp.Li
 		Select("users.*, customers.company, customers.industry, customers.source, customers.tags, customers.notes, customers.priority").
 		Joins("LEFT JOIN customers ON users.id = customers.user_id").
 		Where("users.role = ?", "customer")
+	db = applyCustomerScope(db, ctx)
 
 	if len(query.Industry) > 0 {
 		db = db.Where("customers.industry IN ?", query.Industry)
@@ -161,15 +181,28 @@ func (r *GormRepository) ListCustomers(ctx context.Context, query customerapp.Li
 
 func (r *GormRepository) GetCustomerActivity(ctx context.Context, customerID uint, limit int) (*customerapp.CustomerActivityDTO, error) {
 	activity := &customerapp.CustomerActivityDTO{CustomerID: customerID}
-	r.db.WithContext(ctx).Where("user_id = ?", customerID).Order("created_at DESC").Limit(limit).Find(&activity.RecentSessions)
-	r.db.WithContext(ctx).Where("customer_id = ?", customerID).Order("created_at DESC").Limit(limit).Find(&activity.RecentTickets)
-	r.db.WithContext(ctx).Joins("JOIN sessions ON messages.session_id = sessions.id").Where("sessions.user_id = ?", customerID).Order("messages.created_at DESC").Limit(limit).Find(&activity.RecentMessages)
+	sessionQuery := r.db.WithContext(ctx).Where("user_id = ?", customerID).Order("created_at DESC").Limit(limit)
+	ticketQuery := r.db.WithContext(ctx).Where("customer_id = ?", customerID).Order("created_at DESC").Limit(limit)
+	messageQuery := r.db.WithContext(ctx).Joins("JOIN sessions ON messages.session_id = sessions.id").Where("sessions.user_id = ?", customerID).Order("messages.created_at DESC").Limit(limit)
+	if tenantID := platformauth.TenantIDFromContext(ctx); tenantID != "" {
+		sessionQuery = sessionQuery.Where("tenant_id = ?", tenantID)
+		ticketQuery = ticketQuery.Where("tenant_id = ?", tenantID)
+		messageQuery = messageQuery.Where("messages.tenant_id = ? AND sessions.tenant_id = ?", tenantID, tenantID)
+	}
+	if workspaceID := platformauth.WorkspaceIDFromContext(ctx); workspaceID != "" {
+		sessionQuery = sessionQuery.Where("workspace_id = ?", workspaceID)
+		ticketQuery = ticketQuery.Where("workspace_id = ?", workspaceID)
+		messageQuery = messageQuery.Where("messages.workspace_id = ? AND sessions.workspace_id = ?", workspaceID, workspaceID)
+	}
+	sessionQuery.Find(&activity.RecentSessions)
+	ticketQuery.Find(&activity.RecentTickets)
+	messageQuery.Find(&activity.RecentMessages)
 	return activity, nil
 }
 
 func (r *GormRepository) AddNote(ctx context.Context, customerID uint, note customerapp.CustomerNoteDTO) error {
 	var customer models.Customer
-	if err := r.db.WithContext(ctx).Where("user_id = ?", customerID).First(&customer).Error; err != nil {
+	if err := applyCustomerScope(r.db.WithContext(ctx), ctx).Where("user_id = ?", customerID).First(&customer).Error; err != nil {
 		return fmt.Errorf("customer not found: %w", err)
 	}
 	line := fmt.Sprintf("[%s] 用户%d: %s", note.CreatedAt.Format("2006-01-02 15:04:05"), note.AuthorID, note.Content)
@@ -177,14 +210,14 @@ func (r *GormRepository) AddNote(ctx context.Context, customerID uint, note cust
 	if customer.Notes != "" {
 		next = customer.Notes + "\n" + line
 	}
-	if err := r.db.WithContext(ctx).Model(&models.Customer{}).Where("user_id = ?", customerID).Update("notes", next).Error; err != nil {
+	if err := applyCustomerScope(r.db.WithContext(ctx).Model(&models.Customer{}), ctx).Where("user_id = ?", customerID).Update("notes", next).Error; err != nil {
 		return fmt.Errorf("failed to add note: %w", err)
 	}
 	return nil
 }
 
 func (r *GormRepository) UpdateTags(ctx context.Context, customerID uint, tags []string) error {
-	if err := r.db.WithContext(ctx).Model(&models.Customer{}).Where("user_id = ?", customerID).Update("tags", strings.Join(tags, ",")).Error; err != nil {
+	if err := applyCustomerScope(r.db.WithContext(ctx).Model(&models.Customer{}), ctx).Where("user_id = ?", customerID).Update("tags", strings.Join(tags, ",")).Error; err != nil {
 		return fmt.Errorf("failed to update tags: %w", err)
 	}
 	return nil
@@ -192,13 +225,41 @@ func (r *GormRepository) UpdateTags(ctx context.Context, customerID uint, tags [
 
 func (r *GormRepository) GetStats(ctx context.Context) (*customerapp.CustomerStatsDTO, error) {
 	stats := &customerapp.CustomerStatsDTO{}
-	r.db.WithContext(ctx).Model(&models.User{}).Where("role = ?", "customer").Count(&stats.Total)
+	r.db.WithContext(ctx).Model(&models.User{}).Joins("JOIN customers ON customers.user_id = users.id").Where("role = ?", "customer").Scopes(func(db *gorm.DB) *gorm.DB {
+		return applyCustomerScope(db, ctx)
+	}).Count(&stats.Total)
 	thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
-	r.db.WithContext(ctx).Model(&models.User{}).Where("role = ? AND last_login > ?", "customer", thirtyDaysAgo).Count(&stats.Active)
+	r.db.WithContext(ctx).Model(&models.User{}).Joins("JOIN customers ON customers.user_id = users.id").Where("role = ? AND last_login > ?", "customer", thirtyDaysAgo).Scopes(func(db *gorm.DB) *gorm.DB {
+		return applyCustomerScope(db, ctx)
+	}).Count(&stats.Active)
 	sevenDaysAgo := time.Now().AddDate(0, 0, -7)
-	r.db.WithContext(ctx).Model(&models.User{}).Where("role = ? AND created_at > ?", "customer", sevenDaysAgo).Count(&stats.NewThisWeek)
-	r.db.WithContext(ctx).Model(&models.Customer{}).Select("source, COUNT(*) as count").Group("source").Scan(&stats.BySource)
-	r.db.WithContext(ctx).Model(&models.Customer{}).Select("industry, COUNT(*) as count").Group("industry").Having("industry != ''").Scan(&stats.ByIndustry)
-	r.db.WithContext(ctx).Model(&models.Customer{}).Select("priority, COUNT(*) as count").Group("priority").Scan(&stats.ByPriority)
+	r.db.WithContext(ctx).Model(&models.User{}).Joins("JOIN customers ON customers.user_id = users.id").Where("role = ? AND created_at > ?", "customer", sevenDaysAgo).Scopes(func(db *gorm.DB) *gorm.DB {
+		return applyCustomerScope(db, ctx)
+	}).Count(&stats.NewThisWeek)
+	applyCustomerScope(r.db.WithContext(ctx).Model(&models.Customer{}), ctx).Select("source, COUNT(*) as count").Group("source").Scan(&stats.BySource)
+	applyCustomerScope(r.db.WithContext(ctx).Model(&models.Customer{}), ctx).Select("industry, COUNT(*) as count").Group("industry").Having("industry != ''").Scan(&stats.ByIndustry)
+	applyCustomerScope(r.db.WithContext(ctx).Model(&models.Customer{}), ctx).Select("priority, COUNT(*) as count").Group("priority").Scan(&stats.ByPriority)
 	return stats, nil
+}
+
+func applyCustomerScope(db *gorm.DB, ctx context.Context) *gorm.DB {
+	if tenantID := platformauth.TenantIDFromContext(ctx); tenantID != "" {
+		db = db.Where("customers.tenant_id = ?", tenantID)
+	}
+	if workspaceID := platformauth.WorkspaceIDFromContext(ctx); workspaceID != "" {
+		db = db.Where("customers.workspace_id = ?", workspaceID)
+	}
+	return db
+}
+
+func applyCustomerScopeFields(ctx context.Context, customer *models.Customer) {
+	if customer == nil {
+		return
+	}
+	if tenantID := platformauth.TenantIDFromContext(ctx); tenantID != "" {
+		customer.TenantID = tenantID
+	}
+	if workspaceID := platformauth.WorkspaceIDFromContext(ctx); workspaceID != "" {
+		customer.WorkspaceID = workspaceID
+	}
 }

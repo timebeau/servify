@@ -2,19 +2,24 @@ package handlers
 
 import (
 	"net/http"
-	"strings"
 
 	"servify/apps/server/internal/config"
+	"servify/apps/server/internal/platform/configscope"
 
 	"github.com/gin-gonic/gin"
 )
 
 type PortalConfigHandler struct {
-	cfg *config.Config
+	cfg      *config.Config
+	resolver *configscope.Resolver
 }
 
 func NewPortalConfigHandler(cfg *config.Config) *PortalConfigHandler {
-	return &PortalConfigHandler{cfg: cfg}
+	return NewPortalConfigHandlerWithResolver(cfg, configscope.NewResolver(cfg))
+}
+
+func NewPortalConfigHandlerWithResolver(cfg *config.Config, resolver *configscope.Resolver) *PortalConfigHandler {
+	return &PortalConfigHandler{cfg: cfg, resolver: resolver}
 }
 
 type PortalConfigResponse struct {
@@ -29,23 +34,10 @@ type PortalConfigResponse struct {
 
 func (h *PortalConfigHandler) Get(c *gin.Context) {
 	var p config.PortalConfig
-	if h.cfg != nil {
-		p = h.cfg.Portal
-	}
-	if strings.TrimSpace(p.BrandName) == "" {
-		p.BrandName = "Servify"
-	}
-	if strings.TrimSpace(p.PrimaryColor) == "" {
-		p.PrimaryColor = "#4299e1"
-	}
-	if strings.TrimSpace(p.SecondaryColor) == "" {
-		p.SecondaryColor = "#764ba2"
-	}
-	if strings.TrimSpace(p.DefaultLocale) == "" {
-		p.DefaultLocale = "zh-CN"
-	}
-	if len(p.Locales) == 0 {
-		p.Locales = []string{"zh-CN", "en-US"}
+	if h.resolver != nil {
+		p = h.resolver.ResolvePortal(c.Request.Context(), nil)
+	} else if h.cfg != nil {
+		p = configscope.NewResolver(h.cfg).ResolvePortal(c.Request.Context(), nil)
 	}
 	c.JSON(http.StatusOK, PortalConfigResponse{
 		BrandName:      p.BrandName,

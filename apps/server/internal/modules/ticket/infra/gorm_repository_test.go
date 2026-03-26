@@ -48,11 +48,14 @@ func TestGormRepositoryListTicketCustomFields(t *testing.T) {
 
 	seed := []models.CustomField{
 		{ID: 1, Resource: "ticket", Key: "severity", Name: "Severity", Type: "select", Active: true},
-		{ID: 2, Resource: "ticket", Key: "region", Name: "Region", Type: "string", Active: false},
+		{ID: 2, Resource: "ticket", Key: "region", Name: "Region", Type: "string", Active: true},
 		{ID: 3, Resource: "customer", Key: "segment", Name: "Segment", Type: "string", Active: true},
 	}
 	if err := db.Create(&seed).Error; err != nil {
 		t.Fatalf("seed custom fields: %v", err)
+	}
+	if err := db.Model(&models.CustomField{}).Where("id = ?", 2).Update("active", false).Error; err != nil {
+		t.Fatalf("deactivate seeded custom field: %v", err)
 	}
 
 	all, err := repo.ListTicketCustomFields(context.Background(), false)

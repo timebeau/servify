@@ -27,17 +27,19 @@ type User struct {
 
 // 客户信息扩展
 type Customer struct {
-	ID        uint           `gorm:"primaryKey" json:"id"`
-	UserID    uint           `gorm:"index" json:"user_id"`
-	Company   string         `json:"company"`
-	Industry  string         `json:"industry"`
-	Source    string         `json:"source"` // web, referral, marketing
-	Tags      string         `json:"tags"`   // 标签，逗号分隔
-	Notes     string         `gorm:"type:text" json:"notes"`
-	Priority  string         `gorm:"default:'normal'" json:"priority"` // low, normal, high, urgent
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	ID          uint           `gorm:"primaryKey" json:"id"`
+	TenantID    string         `gorm:"index:idx_customers_scope" json:"tenant_id"`
+	WorkspaceID string         `gorm:"index:idx_customers_scope" json:"workspace_id"`
+	UserID      uint           `gorm:"index" json:"user_id"`
+	Company     string         `json:"company"`
+	Industry    string         `json:"industry"`
+	Source      string         `json:"source"` // web, referral, marketing
+	Tags        string         `json:"tags"`   // 标签，逗号分隔
+	Notes       string         `gorm:"type:text" json:"notes"`
+	Priority    string         `gorm:"default:'normal'" json:"priority"` // low, normal, high, urgent
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 
 	User User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
@@ -45,6 +47,8 @@ type Customer struct {
 // 客服代理
 type Agent struct {
 	ID              uint           `gorm:"primaryKey" json:"id"`
+	TenantID        string         `gorm:"index:idx_agents_scope" json:"tenant_id"`
+	WorkspaceID     string         `gorm:"index:idx_agents_scope" json:"workspace_id"`
 	UserID          uint           `gorm:"index" json:"user_id"`
 	Department      string         `json:"department"`
 	Skills          string         `json:"skills"`                             // 技能标签，逗号分隔
@@ -65,6 +69,8 @@ type Agent struct {
 // 工单模型
 type Ticket struct {
 	ID          uint           `gorm:"primaryKey" json:"id"`
+	TenantID    string         `gorm:"index:idx_tickets_scope" json:"tenant_id"`
+	WorkspaceID string         `gorm:"index:idx_tickets_scope" json:"workspace_id"`
 	Title       string         `gorm:"not null" json:"title"`
 	Description string         `gorm:"type:text" json:"description"`
 	CustomerID  uint           `gorm:"index" json:"customer_id"`
@@ -167,16 +173,18 @@ type TicketStatus struct {
 
 // 会话模型（更新）
 type Session struct {
-	ID        string     `gorm:"primaryKey" json:"id"`
-	UserID    uint       `gorm:"index" json:"user_id"`
-	AgentID   *uint      `gorm:"index" json:"agent_id"`
-	TicketID  *uint      `gorm:"index" json:"ticket_id"`
-	Status    string     `gorm:"default:'active'" json:"status"` // active, ended, transferred
-	Platform  string     `json:"platform"`                       // web, telegram, wechat, etc.
-	StartedAt time.Time  `json:"started_at"`
-	EndedAt   *time.Time `json:"ended_at"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
+	ID          string     `gorm:"primaryKey" json:"id"`
+	TenantID    string     `gorm:"index:idx_sessions_scope" json:"tenant_id"`
+	WorkspaceID string     `gorm:"index:idx_sessions_scope" json:"workspace_id"`
+	UserID      uint       `gorm:"index" json:"user_id"`
+	AgentID     *uint      `gorm:"index" json:"agent_id"`
+	TicketID    *uint      `gorm:"index" json:"ticket_id"`
+	Status      string     `gorm:"default:'active'" json:"status"` // active, ended, transferred
+	Platform    string     `json:"platform"`                       // web, telegram, wechat, etc.
+	StartedAt   time.Time  `json:"started_at"`
+	EndedAt     *time.Time `json:"ended_at"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 
 	User     User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
 	Agent    *User     `gorm:"foreignKey:AgentID" json:"agent,omitempty"`
@@ -186,13 +194,15 @@ type Session struct {
 
 // 消息模型（更新）
 type Message struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	SessionID string    `gorm:"index" json:"session_id"`
-	UserID    uint      `gorm:"index" json:"user_id"`
-	Content   string    `gorm:"type:text" json:"content"`
-	Type      string    `json:"type"`   // text, image, file, system
-	Sender    string    `json:"sender"` // user, ai, agent
-	CreatedAt time.Time `json:"created_at"`
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	TenantID    string    `gorm:"index:idx_messages_scope" json:"tenant_id"`
+	WorkspaceID string    `gorm:"index:idx_messages_scope" json:"workspace_id"`
+	SessionID   string    `gorm:"index" json:"session_id"`
+	UserID      uint      `gorm:"index" json:"user_id"`
+	Content     string    `gorm:"type:text" json:"content"`
+	Type        string    `json:"type"`   // text, image, file, system
+	Sender      string    `json:"sender"` // user, ai, agent
+	CreatedAt   time.Time `json:"created_at"`
 
 	Session Session `gorm:"foreignKey:SessionID" json:"session,omitempty"`
 	User    User    `gorm:"foreignKey:UserID" json:"user,omitempty"`
@@ -201,6 +211,8 @@ type Message struct {
 // 会话转接记录
 type TransferRecord struct {
 	ID             uint      `gorm:"primaryKey" json:"id"`
+	TenantID       string    `gorm:"index:idx_transfer_records_scope" json:"tenant_id"`
+	WorkspaceID    string    `gorm:"index:idx_transfer_records_scope" json:"workspace_id"`
 	SessionID      string    `gorm:"index" json:"session_id"`
 	FromAgentID    *uint     `gorm:"index" json:"from_agent_id,omitempty"`
 	ToAgentID      *uint     `gorm:"index" json:"to_agent_id,omitempty"`
@@ -214,6 +226,8 @@ type TransferRecord struct {
 // 会话等待队列记录
 type WaitingRecord struct {
 	ID           uint       `gorm:"primaryKey" json:"id"`
+	TenantID     string     `gorm:"index:idx_waiting_records_scope" json:"tenant_id"`
+	WorkspaceID  string     `gorm:"index:idx_waiting_records_scope" json:"workspace_id"`
 	SessionID    string     `gorm:"index" json:"session_id"`
 	Reason       string     `json:"reason"`
 	TargetSkills string     `json:"target_skills"`

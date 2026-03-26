@@ -289,3 +289,25 @@ func TestWorkspaceOverview_Structure(t *testing.T) {
 		t.Errorf("expected 1 channel, got %d", len(overview.Channels))
 	}
 }
+
+func TestWorkspaceService_GetOverview_AppliesScope(t *testing.T) {
+	db := newWorkspaceServiceTestDB(t)
+	svc := NewWorkspaceService(db, nil)
+	now := time.Now()
+
+	db.Create(&models.Agent{UserID: 1, TenantID: "tenant-a", WorkspaceID: "workspace-a", Status: "online", AvgResponseTime: 10})
+	db.Create(&models.Agent{UserID: 2, TenantID: "tenant-b", WorkspaceID: "workspace-b", Status: "busy", AvgResponseTime: 20, CurrentLoad: 5, MaxConcurrent: 5})
+	db.Create(&models.Session{ID: "sess-a", TenantID: "tenant-a", WorkspaceID: "workspace-a", Platform: "web", Status: "active", StartedAt: now})
+	db.Create(&models.Session{ID: "sess-b", TenantID: "tenant-b", WorkspaceID: "workspace-b", Platform: "api", Status: "active", StartedAt: now})
+
+	overview, err := svc.GetOverview(scopedContext("tenant-a", "workspace-a"), 10)
+	if err != nil {
+		t.Fatalf("GetOverview() error = %v", err)
+	}
+	if overview.TotalActiveSessions != 1 || overview.OnlineAgents != 1 || overview.BusyAgents != 0 {
+		t.Fatalf("unexpected scoped overview: %+v", overview)
+	}
+	if len(overview.Channels) != 1 || overview.Channels[0].Platform != "web" {
+		t.Fatalf("unexpected scoped channels: %+v", overview.Channels)
+	}
+}

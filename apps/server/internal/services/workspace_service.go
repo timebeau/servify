@@ -69,13 +69,13 @@ func (s *WorkspaceService) GetOverview(ctx context.Context, limit int) (*Workspa
 
 	overview := &WorkspaceOverview{}
 
-	if err := s.db.Model(&models.Session{}).
+	if err := applyScopeFilter(s.db.WithContext(ctx).Model(&models.Session{}), ctx).
 		Where("status = ?", "active").
 		Count(&overview.TotalActiveSessions).Error; err != nil {
 		return nil, fmt.Errorf("count active sessions: %w", err)
 	}
 
-	if err := s.db.Model(&models.Session{}).
+	if err := applyScopeFilter(s.db.WithContext(ctx).Model(&models.Session{}), ctx).
 		Where("status = ? AND agent_id IS NULL", "active").
 		Count(&overview.WaitingQueue).Error; err != nil {
 		return nil, fmt.Errorf("count waiting sessions: %w", err)
@@ -86,7 +86,7 @@ func (s *WorkspaceService) GetOverview(ctx context.Context, limit int) (*Workspa
 		Active   int64
 		Waiting  int64
 	}
-	if err := s.db.Model(&models.Session{}).
+	if err := applyScopeFilter(s.db.WithContext(ctx).Model(&models.Session{}), ctx).
 		Select("COALESCE(platform, 'unknown') AS platform, SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active, SUM(CASE WHEN status = 'active' AND agent_id IS NULL THEN 1 ELSE 0 END) AS waiting").
 		Group("platform").
 		Scan(&channelRows).Error; err != nil {
@@ -98,28 +98,35 @@ func (s *WorkspaceService) GetOverview(ctx context.Context, limit int) (*Workspa
 			Platform:        row.Platform,
 			ActiveSessions:  row.Active,
 			WaitingSessions: row.Waiting,
-			AvgResponseTime: s.getAvgResponseTime(),
+			AvgResponseTime: s.getAvgResponseTime(ctx),
 		})
 	}
 
-	if s.agentService != nil {
-		online := s.agentService.GetOnlineAgents(ctx)
-		overview.OnlineAgents = int64(len(online))
-		busy := 0
-		for _, a := range online {
-			if a.Status == "busy" || a.CurrentLoad >= a.MaxConcurrent {
-				busy++
-			}
-		}
-		overview.BusyAgents = int64(busy)
+	if err := applyScopeFilter(s.db.WithContext(ctx).Model(&models.Agent{}), ctx).
+		Where("status = ?", "online").
+		Count(&overview.OnlineAgents).Error; err != nil {
+		return nil, fmt.Errorf("count online agents: %w", err)
+	}
+	if err := applyScopeFilter(s.db.WithContext(ctx).Model(&models.Agent{}), ctx).
+		Where("status = ? OR current_load >= max_concurrent", "busy").
+		Count(&overview.BusyAgents).Error; err != nil {
+		return nil, fmt.Errorf("count busy agents: %w", err)
 	}
 
 	var sessions []WorkspaceSession
-	if err := s.db.Table("sessions").
+	query := s.db.WithContext(ctx).Table("sessions")
+	tenantID, workspaceID := tenantAndWorkspace(ctx)
+	if tenantID != "" {
+		query = query.Where("sessions.tenant_id = ?", tenantID)
+	}
+	if workspaceID != "" {
+		query = query.Where("sessions.workspace_id = ?", workspaceID)
+	}
+	if err := query.
 		Select(`sessions.id, COALESCE(sessions.platform, 'unknown') AS platform, sessions.status, sessions.agent_id, sessions.started_at,
 				customers.user_id AS customer_id, cu.name AS customer_name, au.name AS agent_name`).
 		Joins("LEFT JOIN tickets t ON t.id = sessions.ticket_id").
-		Joins("LEFT JOIN customers ON customers.id = t.customer_id").
+		Joins("LEFT JOIN customers ON customers.user_id = t.customer_id").
 		Joins("LEFT JOIN users cu ON cu.id = customers.user_id").
 		Joins("LEFT JOIN users au ON au.id = sessions.agent_id").
 		Order("sessions.created_at DESC").
@@ -132,8 +139,8 @@ func (s *WorkspaceService) GetOverview(ctx context.Context, limit int) (*Workspa
 	return overview, nil
 }
 
-func (s *WorkspaceService) getAvgResponseTime() float64 {
+func (s *WorkspaceService) getAvgResponseTime(ctx context.Context) float64 {
 	var avg float64
-	_ = s.db.Model(&models.Agent{}).Select("AVG(avg_response_time)").Row().Scan(&avg)
+	_ = applyScopeFilter(s.db.WithContext(ctx).Model(&models.Agent{}), ctx).Select("AVG(avg_response_time)").Row().Scan(&avg)
 	return avg
 }

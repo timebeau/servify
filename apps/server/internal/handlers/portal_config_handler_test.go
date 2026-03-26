@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -8,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"servify/apps/server/internal/config"
+	"servify/apps/server/internal/platform/configscope"
 )
 
 func TestPortalConfigHandler_Get_WithDefaults(t *testing.T) {
@@ -129,6 +131,59 @@ func TestNewPortalConfigHandler(t *testing.T) {
 
 	assert.NotNil(t, handler)
 	assert.Equal(t, cfg, handler.cfg)
+}
+
+func TestPortalConfigHandler_Get_WithResolverOverrides(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cfg := &config.Config{
+		Portal: config.PortalConfig{
+			BrandName:      "System Brand",
+			PrimaryColor:   "#111111",
+			SecondaryColor: "#222222",
+			DefaultLocale:  "zh-CN",
+		},
+	}
+	resolver := configscope.NewResolver(
+		cfg,
+		configscope.WithTenantPortalProvider(stubPortalProvider{
+			ok: true,
+			value: config.PortalConfig{
+				BrandName:    "Tenant Brand",
+				PrimaryColor: "#333333",
+			},
+		}),
+		configscope.WithWorkspacePortalProvider(stubPortalProvider{
+			ok: true,
+			value: config.PortalConfig{
+				BrandName:     "Workspace Brand",
+				DefaultLocale: "en-US",
+			},
+		}),
+	)
+	handler := NewPortalConfigHandlerWithResolver(cfg, resolver)
+
+	router := gin.New()
+	router.GET("/portal/config", handler.Get)
+
+	req := httptest.NewRequest("GET", "/portal/config", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "Workspace Brand")
+	assert.Contains(t, w.Body.String(), "#333333")
+	assert.Contains(t, w.Body.String(), "en-US")
+}
+
+type stubPortalProvider struct {
+	value config.PortalConfig
+	ok    bool
+	err   error
+}
+
+func (s stubPortalProvider) LoadPortalConfig(ctx context.Context) (config.PortalConfig, bool, error) {
+	return s.value, s.ok, s.err
 }
 
 func TestPortalConfigResponse_Structure(t *testing.T) {

@@ -11,3 +11,8 @@ import (
 func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 	return platformauth.AuthMiddleware(platformauth.MiddlewareConfigFromApp(cfg))
 }
+
+// EnforceRequestScope keeps the compatibility layer aligned with platform/auth scope rules.
+func EnforceRequestScope() gin.HandlerFunc {
+	return platformauth.EnforceRequestScope()
+}

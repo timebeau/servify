@@ -69,6 +69,7 @@ func BuildRouter(deps Dependencies) *gin.Engine {
 func registerManagementRoutes(r *gin.Engine, deps Dependencies) {
 	api := r.Group("/api")
 	api.Use(middleware.AuthMiddleware(deps.Config))
+	api.Use(middleware.EnforceRequestScope())
 	api.Use(middleware.RequirePrincipalKinds("agent", "admin", "service"))
 	api.Use(middleware.AuditMiddleware(deps.DB))
 
@@ -163,6 +164,7 @@ func registerRealtimeRoutes(r *gin.Engine, deps Dependencies) {
 
 	managementV1 := r.Group("/api/v1")
 	managementV1.Use(middleware.AuthMiddleware(deps.Config))
+	managementV1.Use(middleware.EnforceRequestScope())
 	managementV1.Use(middleware.RequirePrincipalKinds("agent", "admin", "service"))
 	managementV1.GET("/ws/stats", wsHandler.GetStats)
 	managementV1.GET("/webrtc/stats", webrtcHandler.GetStats)
@@ -183,6 +185,7 @@ func registerRealtimeRoutes(r *gin.Engine, deps Dependencies) {
 	ingest := handlers.NewMetricsIngestHandler(handlers.NewMetricsAggregator())
 	serviceV1 := r.Group("/api/v1")
 	serviceV1.Use(middleware.AuthMiddleware(deps.Config))
+	serviceV1.Use(middleware.EnforceRequestScope())
 	serviceV1.Use(middleware.RequirePrincipalKinds("service"))
 	serviceV1.POST("/metrics/ingest", ingest.Ingest)
 }

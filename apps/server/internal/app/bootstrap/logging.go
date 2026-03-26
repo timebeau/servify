@@ -14,5 +14,7 @@ func InitLogging(cfg *config.Config) (*logrus.Logger, error) {
 	if err := config.InitLogger(cfg); err != nil {
 		return nil, err
 	}
-	return logrus.StandardLogger(), nil
+	logger := logrus.StandardLogger()
+	LogSecurityWarnings(logger, cfg)
+	return logger, nil
 }

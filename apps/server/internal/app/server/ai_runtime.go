@@ -7,6 +7,7 @@ import (
 
 	"servify/apps/server/internal/config"
 	aidelivery "servify/apps/server/internal/modules/ai/delivery"
+	"servify/apps/server/internal/platform/configscope"
 	"servify/apps/server/internal/platform/knowledgeprovider"
 	weknorakp "servify/apps/server/internal/platform/knowledgeprovider/weknora"
 	"servify/apps/server/internal/platform/llm/openai"
@@ -23,28 +24,33 @@ type AIAssemblyOptions struct {
 }
 
 type AIAssembly struct {
-	Service        aidelivery.HandlerService
-	RuntimeService aidelivery.RuntimeService
-	WeKnoraClient  weknora.WeKnoraInterface
-	WeKnoraHealthy bool
+	Service         aidelivery.HandlerService
+	RuntimeService  aidelivery.RuntimeService
+	WeKnoraClient   weknora.WeKnoraInterface
+	WeKnoraHealthy  bool
+	KnowledgeBaseID string
 }
 
 func (a *AIAssembly) KnowledgeProvider(cfg *config.Config) knowledgeprovider.KnowledgeProvider {
-	if a == nil || cfg == nil || !a.WeKnoraHealthy || a.WeKnoraClient == nil {
+	if a == nil || !a.WeKnoraHealthy || a.WeKnoraClient == nil {
 		return nil
 	}
-	return weknorakp.NewProvider(a.WeKnoraClient, cfg.WeKnora.KnowledgeBaseID)
+	return weknorakp.NewProvider(a.WeKnoraClient, a.KnowledgeBaseID)
 }
 
 func BuildAIAssembly(cfg *config.Config, logger *logrus.Logger, opts AIAssemblyOptions) (*AIAssembly, error) {
 	if logger == nil {
 		logger = logrus.StandardLogger()
 	}
-	baseAI := services.NewAIService(cfg.AI.OpenAI.APIKey, cfg.AI.OpenAI.BaseURL)
+	resolver := configscope.NewResolver(cfg)
+	openAIConfig := resolver.ResolveOpenAI(nil)
+	weKnoraConfig := resolver.ResolveWeKnora(nil)
+
+	baseAI := services.NewAIService(openAIConfig.APIKey, openAIConfig.BaseURL)
 	baseAI.InitializeKnowledgeBase()
 	defaultService := services.NewOrchestratedEnhancedAIService(
 		baseAI,
-		openai.NewProvider(cfg.AI.OpenAI.APIKey, cfg.AI.OpenAI.BaseURL),
+		openai.NewProvider(openAIConfig.APIKey, openAIConfig.BaseURL),
 		nil,
 		nil,
 		"",
@@ -52,19 +58,20 @@ func BuildAIAssembly(cfg *config.Config, logger *logrus.Logger, opts AIAssemblyO
 	)
 
 	assembly := &AIAssembly{
-		Service:        aidelivery.NewHandlerServiceAdapter(defaultService),
-		RuntimeService: defaultService,
+		Service:         aidelivery.NewHandlerServiceAdapter(defaultService),
+		RuntimeService:  defaultService,
+		KnowledgeBaseID: weKnoraConfig.KnowledgeBaseID,
 	}
-	if !cfg.WeKnora.Enabled {
+	if !weKnoraConfig.Enabled {
 		return assembly, nil
 	}
 
 	client := weknora.NewClient(&weknora.Config{
-		BaseURL:    cfg.WeKnora.BaseURL,
-		APIKey:     cfg.WeKnora.APIKey,
-		TenantID:   cfg.WeKnora.TenantID,
-		Timeout:    cfg.WeKnora.Timeout,
-		MaxRetries: cfg.WeKnora.MaxRetries,
+		BaseURL:    weKnoraConfig.BaseURL,
+		APIKey:     weKnoraConfig.APIKey,
+		TenantID:   weKnoraConfig.TenantID,
+		Timeout:    weKnoraConfig.Timeout,
+		MaxRetries: weKnoraConfig.MaxRetries,
 	}, logger)
 	assembly.WeKnoraClient = client
 
@@ -88,10 +95,10 @@ func BuildAIAssembly(cfg *config.Config, logger *logrus.Logger, opts AIAssemblyO
 
 	enhanced := services.NewOrchestratedEnhancedAIService(
 		baseAI,
-		openai.NewProvider(cfg.AI.OpenAI.APIKey, cfg.AI.OpenAI.BaseURL),
-		weknorakp.NewProvider(client, cfg.WeKnora.KnowledgeBaseID),
+		openai.NewProvider(openAIConfig.APIKey, openAIConfig.BaseURL),
+		weknorakp.NewProvider(client, weKnoraConfig.KnowledgeBaseID),
 		client,
-		cfg.WeKnora.KnowledgeBaseID,
+		weKnoraConfig.KnowledgeBaseID,
 		logger,
 	)
 	if opts.SyncKnowledgeBase {

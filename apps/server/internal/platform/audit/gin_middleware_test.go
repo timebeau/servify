@@ -100,3 +100,42 @@ func TestMiddlewareSkipsFailedWriteAndReads(t *testing.T) {
 		t.Fatalf("expected no audit entries, got %d", len(recorder.entries))
 	}
 }
+
+func TestMiddlewareRedactsSensitiveFields(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := &stubRecorder{}
+
+	r := gin.New()
+	r.Use(Middleware(recorder))
+	r.POST("/api/apps/config", func(c *gin.Context) {
+		SetBefore(c, gin.H{"api_key": "before-secret"})
+		SetAfter(c, gin.H{"nested": gin.H{"access_token": "after-secret"}})
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/apps/config", strings.NewReader(`{"password":"p@ss","profile":{"api_key":"k-1"},"list":[{"refresh_token":"r-1"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d body=%s", w.Code, w.Body.String())
+	}
+	if len(recorder.entries) != 1 {
+		t.Fatalf("expected 1 audit entry got %d", len(recorder.entries))
+	}
+
+	entry := recorder.entries[0]
+	if strings.Contains(entry.RequestJSON, "p@ss") || strings.Contains(entry.RequestJSON, "k-1") || strings.Contains(entry.RequestJSON, "r-1") {
+		t.Fatalf("request_json should redact secrets, got %q", entry.RequestJSON)
+	}
+	if strings.Contains(entry.BeforeJSON, "before-secret") {
+		t.Fatalf("before_json should redact secrets, got %q", entry.BeforeJSON)
+	}
+	if strings.Contains(entry.AfterJSON, "after-secret") {
+		t.Fatalf("after_json should redact secrets, got %q", entry.AfterJSON)
+	}
+	if !strings.Contains(entry.RequestJSON, "[REDACTED]") || !strings.Contains(entry.BeforeJSON, "[REDACTED]") || !strings.Contains(entry.AfterJSON, "[REDACTED]") {
+		t.Fatalf("expected redaction markers, got request=%q before=%q after=%q", entry.RequestJSON, entry.BeforeJSON, entry.AfterJSON)
+	}
+}

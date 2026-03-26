@@ -8,6 +8,7 @@ import (
 	"servify/apps/server/internal/models"
 	conversationdomain "servify/apps/server/internal/modules/conversation/domain"
 	conversationinfra "servify/apps/server/internal/modules/conversation/infra"
+	platformauth "servify/apps/server/internal/platform/auth"
 	"servify/apps/server/internal/platform/eventbus"
 
 	"gorm.io/gorm"
@@ -28,7 +29,14 @@ func (a *RuntimeAdapter) LoadTransferSession(ctx context.Context, sessionID stri
 		return nil, gorm.ErrInvalidDB
 	}
 	var model models.Session
-	if err := a.db.WithContext(ctx).
+	query := a.db.WithContext(ctx)
+	if tenantID := platformauth.TenantIDFromContext(ctx); tenantID != "" {
+		query = query.Where("tenant_id = ?", tenantID)
+	}
+	if workspaceID := platformauth.WorkspaceIDFromContext(ctx); workspaceID != "" {
+		query = query.Where("workspace_id = ?", workspaceID)
+	}
+	if err := query.
 		Preload("User").
 		First(&model, "id = ?", sessionID).Error; err != nil {
 		return nil, err

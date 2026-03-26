@@ -267,6 +267,35 @@ func TestStatisticsService_GetTicketCategoryStats_WithCategories(t *testing.T) {
 	}
 }
 
+func TestStatisticsService_GetDashboardStats_AppliesScope(t *testing.T) {
+	db := newStatisticsServiceTestDB(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.ErrorLevel)
+	svc := NewStatisticsService(db, logger)
+	now := time.Now()
+
+	db.Create(&models.User{ID: 1, Username: "customer_a", Email: "customer_a@test.com", Role: "customer"})
+	db.Create(&models.User{ID: 2, Username: "customer_b", Email: "customer_b@test.com", Role: "customer"})
+	db.Create(&models.Customer{UserID: 1, TenantID: "tenant-a", WorkspaceID: "workspace-a", Source: "web"})
+	db.Create(&models.Customer{UserID: 2, TenantID: "tenant-b", WorkspaceID: "workspace-b", Source: "referral"})
+	db.Create(&models.Agent{UserID: 11, TenantID: "tenant-a", WorkspaceID: "workspace-a", Status: "online"})
+	db.Create(&models.Agent{UserID: 12, TenantID: "tenant-b", WorkspaceID: "workspace-b", Status: "busy"})
+	db.Create(&models.Ticket{Title: "A", TenantID: "tenant-a", WorkspaceID: "workspace-a", Status: "open", CreatedAt: now, UpdatedAt: now})
+	db.Create(&models.Ticket{Title: "B", TenantID: "tenant-b", WorkspaceID: "workspace-b", Status: "closed", CreatedAt: now, UpdatedAt: now})
+	db.Create(&models.Session{ID: "sess-a", TenantID: "tenant-a", WorkspaceID: "workspace-a", Status: "active", StartedAt: now})
+	db.Create(&models.Session{ID: "sess-b", TenantID: "tenant-b", WorkspaceID: "workspace-b", Status: "active", StartedAt: now})
+	db.Create(&models.Message{SessionID: "sess-a", TenantID: "tenant-a", WorkspaceID: "workspace-a", Content: "hello", Type: "text", Sender: "user", CreatedAt: now})
+	db.Create(&models.Message{SessionID: "sess-b", TenantID: "tenant-b", WorkspaceID: "workspace-b", Content: "hello", Type: "text", Sender: "user", CreatedAt: now})
+
+	stats, err := svc.GetDashboardStats(scopedContext("tenant-a", "workspace-a"))
+	if err != nil {
+		t.Fatalf("GetDashboardStats() error = %v", err)
+	}
+	if stats.TotalCustomers != 1 || stats.TotalAgents != 1 || stats.TotalTickets != 1 || stats.TotalSessions != 1 || stats.TodayMessages != 1 {
+		t.Fatalf("unexpected scoped dashboard stats: %+v", stats)
+	}
+}
+
 func TestStatisticsService_GetTicketPriorityStats_Empty(t *testing.T) {
 	db := newStatisticsServiceTestDB(t)
 	logger := logrus.New()

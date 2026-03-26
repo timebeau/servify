@@ -7,6 +7,7 @@ import (
 
 	"servify/apps/server/internal/config"
 	aidelivery "servify/apps/server/internal/modules/ai/delivery"
+	"servify/apps/server/internal/platform/configscope"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -87,7 +88,8 @@ func (h *EnhancedHealthHandler) Health(c *gin.Context) {
 	}
 
 	// 检查 WeKnora（如果启用）
-	if h.config.Monitoring.HealthChecks.WeKnora && h.config.WeKnora.Enabled {
+	weKnoraConfig := configscope.NewResolver(h.config).ResolveWeKnora(nil)
+	if h.config.Monitoring.HealthChecks.WeKnora && weKnoraConfig.Enabled {
 		h.checkWeKnora(ctx, &response, &allHealthy)
 	}
 
@@ -260,6 +262,7 @@ func (h *EnhancedHealthHandler) checkRedis(ctx context.Context, response *Health
 // checkWeKnora 检查 WeKnora 状态
 func (h *EnhancedHealthHandler) checkWeKnora(ctx context.Context, response *HealthResponse, allHealthy *bool) {
 	start := time.Now()
+	weKnoraConfig := configscope.NewResolver(h.config).ResolveWeKnora(nil)
 
 	// 如果是增强 AI 服务，获取 WeKnora 状态
 	if _, ok := h.aiService.GetMetrics(); ok {
@@ -279,8 +282,8 @@ func (h *EnhancedHealthHandler) checkWeKnora(ctx context.Context, response *Heal
 				Status:  "healthy",
 				Latency: time.Since(start).String(),
 				Details: map[string]interface{}{
-					"base_url": h.config.WeKnora.BaseURL,
-					"kb_id":    h.config.WeKnora.KnowledgeBaseID,
+					"base_url": weKnoraConfig.BaseURL,
+					"kb_id":    weKnoraConfig.KnowledgeBaseID,
 				},
 			}
 		}

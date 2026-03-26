@@ -86,7 +86,7 @@ func captureRequestBody(c *gin.Context) string {
 		return ""
 	}
 	c.Request.Body = io.NopCloser(bytes.NewReader(body))
-	return strings.TrimSpace(string(body))
+	return redactJSONText(strings.TrimSpace(string(body)))
 }
 
 func actorUserID(c *gin.Context) *uint {
@@ -128,7 +128,75 @@ func contextJSON(c *gin.Context, key string) string {
 	if err != nil {
 		return ""
 	}
+	return redactJSONText(string(data))
+}
+
+func redactJSONText(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+
+	var payload interface{}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		return raw
+	}
+
+	redacted, changed := redactValue(payload)
+	if !changed {
+		return raw
+	}
+
+	data, err := json.Marshal(redacted)
+	if err != nil {
+		return raw
+	}
 	return string(data)
+}
+
+func redactValue(value interface{}) (interface{}, bool) {
+	switch typed := value.(type) {
+	case map[string]interface{}:
+		changed := false
+		for key, item := range typed {
+			if shouldRedactKey(key) {
+				typed[key] = "[REDACTED]"
+				changed = true
+				continue
+			}
+			next, nestedChanged := redactValue(item)
+			if nestedChanged {
+				typed[key] = next
+				changed = true
+			}
+		}
+		return typed, changed
+	case []interface{}:
+		changed := false
+		for i, item := range typed {
+			next, nestedChanged := redactValue(item)
+			if nestedChanged {
+				typed[i] = next
+				changed = true
+			}
+		}
+		return typed, changed
+	default:
+		return value, false
+	}
+}
+
+func shouldRedactKey(key string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(key))
+	normalized = strings.ReplaceAll(normalized, "-", "")
+	normalized = strings.ReplaceAll(normalized, "_", "")
+
+	switch normalized {
+	case "password", "passwd", "secret", "clientsecret", "apikey", "token", "accesstoken", "refreshtoken", "authorization":
+		return true
+	default:
+		return strings.HasSuffix(normalized, "secret") || strings.HasSuffix(normalized, "token") || strings.HasSuffix(normalized, "apikey")
+	}
 }
 
 func inferResourceType(route string) string {

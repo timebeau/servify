@@ -11,6 +11,7 @@ import (
 	"servify/apps/server/internal/models"
 	agentapp "servify/apps/server/internal/modules/agent/application"
 	agentdomain "servify/apps/server/internal/modules/agent/domain"
+	platformauth "servify/apps/server/internal/platform/auth"
 )
 
 type GormRepository struct {
@@ -27,7 +28,7 @@ func (r *GormRepository) CreateAgent(ctx context.Context, userID uint, departmen
 		return nil, fmt.Errorf("user not found: %w", err)
 	}
 	var existing models.Agent
-	if err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&existing).Error; err == nil {
+	if err := applyAgentScope(r.db.WithContext(ctx), ctx).Where("user_id = ?", userID).First(&existing).Error; err == nil {
 		return nil, fmt.Errorf("user is already an agent")
 	}
 	agent := &models.Agent{
@@ -38,6 +39,7 @@ func (r *GormRepository) CreateAgent(ctx context.Context, userID uint, departmen
 		MaxConcurrent: maxChatConcurrency,
 		Rating:        5,
 	}
+	applyAgentScopeFields(ctx, agent)
 	if err := r.db.WithContext(ctx).Create(agent).Error; err != nil {
 		return nil, fmt.Errorf("failed to create agent: %w", err)
 	}
@@ -47,8 +49,15 @@ func (r *GormRepository) CreateAgent(ctx context.Context, userID uint, departmen
 
 func (r *GormRepository) GetAgentByUserID(ctx context.Context, userID uint) (*agentdomain.AgentProfile, *models.Agent, error) {
 	var agent models.Agent
-	if err := r.db.WithContext(ctx).Preload("User").Preload("Tickets", func(db *gorm.DB) *gorm.DB {
-		return db.Where("status NOT IN ?", []string{"closed"}).Order("created_at DESC")
+	if err := applyAgentScope(r.db.WithContext(ctx), ctx).Preload("User").Preload("Tickets", func(db *gorm.DB) *gorm.DB {
+		db = db.Where("status NOT IN ?", []string{"closed"}).Order("created_at DESC")
+		if tenantID := platformauth.TenantIDFromContext(ctx); tenantID != "" {
+			db = db.Where("tenant_id = ?", tenantID)
+		}
+		if workspaceID := platformauth.WorkspaceIDFromContext(ctx); workspaceID != "" {
+			db = db.Where("workspace_id = ?", workspaceID)
+		}
+		return db
 	}).Where("user_id = ?", userID).First(&agent).Error; err != nil {
 		return nil, nil, fmt.Errorf("agent not found: %w", err)
 	}
@@ -61,21 +70,21 @@ func (r *GormRepository) ListAgents(ctx context.Context, limit int) ([]models.Ag
 		limit = 200
 	}
 	var agents []models.Agent
-	if err := r.db.WithContext(ctx).Preload("User").Order("updated_at DESC").Limit(limit).Find(&agents).Error; err != nil {
+	if err := applyAgentScope(r.db.WithContext(ctx), ctx).Preload("User").Order("updated_at DESC").Limit(limit).Find(&agents).Error; err != nil {
 		return nil, fmt.Errorf("failed to list agents: %w", err)
 	}
 	return agents, nil
 }
 
 func (r *GormRepository) UpdatePresenceStatus(ctx context.Context, userID uint, status agentdomain.PresenceStatus) error {
-	if err := r.db.WithContext(ctx).Model(&models.Agent{}).Where("user_id = ?", userID).Update("status", string(status)).Error; err != nil {
+	if err := applyAgentScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Where("user_id = ?", userID).Update("status", string(status)).Error; err != nil {
 		return fmt.Errorf("failed to update agent status: %w", err)
 	}
 	return nil
 }
 
 func (r *GormRepository) UpdateChatLoad(ctx context.Context, userID uint, currentLoad int) error {
-	return r.db.WithContext(ctx).Model(&models.Agent{}).Where("user_id = ?", userID).Update("current_load", currentLoad).Error
+	return applyAgentScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Where("user_id = ?", userID).Update("current_load", currentLoad).Error
 }
 
 func (r *GormRepository) GetSessionByID(ctx context.Context, sessionID string) (*models.Session, error) {
@@ -109,18 +118,40 @@ func (r *GormRepository) ReleaseSession(ctx context.Context, sessionID string, a
 
 func (r *GormRepository) GetStats(ctx context.Context, agentUserID *uint) (*agentapp.AgentStatsDTO, error) {
 	stats := &agentapp.AgentStatsDTO{}
-	query := r.db.WithContext(ctx).Model(&models.Agent{})
+	query := applyAgentScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx)
 	if agentUserID != nil {
 		query = query.Where("user_id = ?", *agentUserID)
 	}
 	query.Count(&stats.Total)
 	var avgResponseTime float64
-	r.db.WithContext(ctx).Model(&models.Agent{}).Select("AVG(avg_response_time)").Row().Scan(&avgResponseTime)
+	applyAgentScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Select("AVG(avg_response_time)").Row().Scan(&avgResponseTime)
 	stats.AvgResponseTime = int64(avgResponseTime)
 	var avgRating float64
-	r.db.WithContext(ctx).Model(&models.Agent{}).Select("AVG(rating)").Row().Scan(&avgRating)
+	applyAgentScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Select("AVG(rating)").Row().Scan(&avgRating)
 	stats.AvgRating = avgRating
 	return stats, nil
+}
+
+func applyAgentScope(db *gorm.DB, ctx context.Context) *gorm.DB {
+	if tenantID := platformauth.TenantIDFromContext(ctx); tenantID != "" {
+		db = db.Where("tenant_id = ?", tenantID)
+	}
+	if workspaceID := platformauth.WorkspaceIDFromContext(ctx); workspaceID != "" {
+		db = db.Where("workspace_id = ?", workspaceID)
+	}
+	return db
+}
+
+func applyAgentScopeFields(ctx context.Context, agent *models.Agent) {
+	if agent == nil {
+		return
+	}
+	if tenantID := platformauth.TenantIDFromContext(ctx); tenantID != "" {
+		agent.TenantID = tenantID
+	}
+	if workspaceID := platformauth.WorkspaceIDFromContext(ctx); workspaceID != "" {
+		agent.WorkspaceID = workspaceID
+	}
 }
 
 func mapProfile(user models.User, agent models.Agent) *agentdomain.AgentProfile {

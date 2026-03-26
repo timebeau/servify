@@ -10,6 +10,7 @@ import (
 
 	"servify/apps/server/internal/models"
 	"servify/apps/server/internal/modules/conversation/domain"
+	platformauth "servify/apps/server/internal/platform/auth"
 )
 
 type GormRepository struct {
@@ -26,6 +27,7 @@ func (r *GormRepository) CreateConversation(ctx context.Context, conversation *d
 	}
 
 	model := mapConversationModel(*conversation)
+	applyConversationScopeFields(ctx, &model)
 	if err := r.db.WithContext(ctx).Create(&model).Error; err != nil {
 		return err
 	}
@@ -35,7 +37,7 @@ func (r *GormRepository) CreateConversation(ctx context.Context, conversation *d
 
 func (r *GormRepository) GetConversation(ctx context.Context, conversationID string) (*domain.Conversation, error) {
 	var model models.Session
-	err := r.db.WithContext(ctx).
+	err := applyConversationScope(r.db.WithContext(ctx), ctx).
 		Preload("User").
 		Preload("Agent").
 		First(&model, "id = ?", conversationID).Error
@@ -74,7 +76,7 @@ func (r *GormRepository) UpdateConversation(ctx context.Context, conversation *d
 		updates["agent_id"] = nil
 	}
 
-	return r.db.WithContext(ctx).Model(&models.Session{}).Where("id = ?", conversation.ID).Updates(updates).Error
+	return applyConversationScope(r.db.WithContext(ctx).Model(&models.Session{}), ctx).Where("id = ?", conversation.ID).Updates(updates).Error
 }
 
 func (r *GormRepository) AppendMessage(ctx context.Context, message *domain.ConversationMessage) error {
@@ -83,6 +85,7 @@ func (r *GormRepository) AppendMessage(ctx context.Context, message *domain.Conv
 	}
 
 	model := mapMessageModel(*message)
+	applyMessageScopeFields(ctx, &model)
 	if err := r.db.WithContext(ctx).Create(&model).Error; err != nil {
 		return err
 	}
@@ -95,7 +98,7 @@ func (r *GormRepository) ListRecentMessages(ctx context.Context, conversationID 
 		limit = 10
 	}
 	var items []models.Message
-	if err := r.db.WithContext(ctx).
+	if err := applyConversationScope(r.db.WithContext(ctx), ctx).
 		Where("session_id = ?", conversationID).
 		Order("created_at DESC").
 		Limit(limit).
@@ -183,6 +186,42 @@ func mapConversationModel(conversation domain.Conversation) models.Session {
 		model.UpdatedAt = *conversation.LastMessageAt
 	}
 	return model
+}
+
+func applyConversationScope(db *gorm.DB, ctx context.Context) *gorm.DB {
+	tenantID := platformauth.TenantIDFromContext(ctx)
+	workspaceID := platformauth.WorkspaceIDFromContext(ctx)
+	if tenantID != "" {
+		db = db.Where("tenant_id = ?", tenantID)
+	}
+	if workspaceID != "" {
+		db = db.Where("workspace_id = ?", workspaceID)
+	}
+	return db
+}
+
+func applyConversationScopeFields(ctx context.Context, model *models.Session) {
+	if model == nil {
+		return
+	}
+	if tenantID := platformauth.TenantIDFromContext(ctx); tenantID != "" {
+		model.TenantID = tenantID
+	}
+	if workspaceID := platformauth.WorkspaceIDFromContext(ctx); workspaceID != "" {
+		model.WorkspaceID = workspaceID
+	}
+}
+
+func applyMessageScopeFields(ctx context.Context, model *models.Message) {
+	if model == nil {
+		return
+	}
+	if tenantID := platformauth.TenantIDFromContext(ctx); tenantID != "" {
+		model.TenantID = tenantID
+	}
+	if workspaceID := platformauth.WorkspaceIDFromContext(ctx); workspaceID != "" {
+		model.WorkspaceID = workspaceID
+	}
 }
 
 func mapMessage(model models.Message) domain.ConversationMessage {

@@ -11,6 +11,7 @@ import (
 
 	"servify/apps/server/internal/models"
 	"servify/apps/server/internal/modules/routing/domain"
+	platformauth "servify/apps/server/internal/platform/auth"
 )
 
 type GormRepository struct {
@@ -26,6 +27,7 @@ func (r *GormRepository) CreateAssignment(ctx context.Context, assignment *domai
 		return fmt.Errorf("assignment required")
 	}
 	model := mapTransferRecordModel(*assignment)
+	applyRoutingTransferScopeFields(ctx, &model)
 	if err := r.db.WithContext(ctx).Create(&model).Error; err != nil {
 		return err
 	}
@@ -35,7 +37,7 @@ func (r *GormRepository) CreateAssignment(ctx context.Context, assignment *domai
 
 func (r *GormRepository) ListAssignments(ctx context.Context, sessionID string) ([]domain.TransferRecord, error) {
 	var items []models.TransferRecord
-	if err := r.db.WithContext(ctx).
+	if err := applyRoutingScope(r.db.WithContext(ctx), ctx).
 		Where("session_id = ?", sessionID).
 		Order("transferred_at DESC").
 		Find(&items).Error; err != nil {
@@ -53,6 +55,7 @@ func (r *GormRepository) CreateQueueEntry(ctx context.Context, entry *domain.Que
 		return fmt.Errorf("queue entry required")
 	}
 	model := mapWaitingRecordModel(*entry)
+	applyRoutingWaitingScopeFields(ctx, &model)
 	if err := r.db.WithContext(ctx).Create(&model).Error; err != nil {
 		return err
 	}
@@ -62,7 +65,7 @@ func (r *GormRepository) CreateQueueEntry(ctx context.Context, entry *domain.Que
 
 func (r *GormRepository) GetQueueEntry(ctx context.Context, sessionID string) (*domain.QueueEntry, error) {
 	var model models.WaitingRecord
-	if err := r.db.WithContext(ctx).
+	if err := applyRoutingScope(r.db.WithContext(ctx), ctx).
 		Order("queued_at DESC").
 		First(&model, "session_id = ?", sessionID).Error; err != nil {
 		return nil, err
@@ -76,7 +79,7 @@ func (r *GormRepository) ListQueueEntries(ctx context.Context, status string, li
 		limit = 50
 	}
 	var items []models.WaitingRecord
-	if err := r.db.WithContext(ctx).
+	if err := applyRoutingScope(r.db.WithContext(ctx), ctx).
 		Where("status = ?", status).
 		Order("priority DESC, queued_at ASC").
 		Limit(limit).
@@ -104,15 +107,14 @@ func (r *GormRepository) UpdateQueueEntry(ctx context.Context, entry *domain.Que
 		"assigned_at":   entry.AssignedAt,
 		"assigned_to":   entry.AssignedTo,
 	}
-	return r.db.WithContext(ctx).
+	return applyRoutingScope(r.db.WithContext(ctx).Model(&models.WaitingRecord{}), ctx).
 		Model(&models.WaitingRecord{}).
 		Where("session_id = ?", entry.SessionID).
 		Updates(updates).Error
 }
 
 func (r *GormRepository) MarkQueueEntryTransferred(ctx context.Context, sessionID string, agentID uint, assignedAt time.Time) (*domain.QueueEntry, error) {
-	result := r.db.WithContext(ctx).
-		Model(&models.WaitingRecord{}).
+	result := applyRoutingScope(r.db.WithContext(ctx).Model(&models.WaitingRecord{}), ctx).
 		Where("session_id = ? AND status = ?", sessionID, "waiting").
 		Updates(map[string]interface{}{
 			"status":      string(domain.QueueStatusTransferred),
@@ -190,6 +192,42 @@ func mapQueueStatus(status string) domain.QueueStatus {
 		return domain.QueueStatusCancelled
 	default:
 		return domain.QueueStatusWaiting
+	}
+}
+
+func applyRoutingScope(db *gorm.DB, ctx context.Context) *gorm.DB {
+	tenantID := platformauth.TenantIDFromContext(ctx)
+	workspaceID := platformauth.WorkspaceIDFromContext(ctx)
+	if tenantID != "" {
+		db = db.Where("tenant_id = ?", tenantID)
+	}
+	if workspaceID != "" {
+		db = db.Where("workspace_id = ?", workspaceID)
+	}
+	return db
+}
+
+func applyRoutingTransferScopeFields(ctx context.Context, model *models.TransferRecord) {
+	if model == nil {
+		return
+	}
+	if tenantID := platformauth.TenantIDFromContext(ctx); tenantID != "" {
+		model.TenantID = tenantID
+	}
+	if workspaceID := platformauth.WorkspaceIDFromContext(ctx); workspaceID != "" {
+		model.WorkspaceID = workspaceID
+	}
+}
+
+func applyRoutingWaitingScopeFields(ctx context.Context, model *models.WaitingRecord) {
+	if model == nil {
+		return
+	}
+	if tenantID := platformauth.TenantIDFromContext(ctx); tenantID != "" {
+		model.TenantID = tenantID
+	}
+	if workspaceID := platformauth.WorkspaceIDFromContext(ctx); workspaceID != "" {
+		model.WorkspaceID = workspaceID
 	}
 }
 

@@ -29,6 +29,10 @@ footer: Servify documentation site
 ## 专题文档
 
 - [WeKnora 集成](/WEKNORA_INTEGRATION)
+- [配置作用域规则](/configuration-scopes)
+- [运行安全基线](/security-baseline-operations)
+- [Token 生命周期与密钥轮换](/token-lifecycle-and-key-rotation)
+- [开放接口安全清单](/public-surface-security-checklist)
 - [CI / GitHub Hosted Runner](/CI_SELF_HOSTED)
 - [版本发布策略](/release-versioning)
 - [测试金字塔](/testing-pyramid)

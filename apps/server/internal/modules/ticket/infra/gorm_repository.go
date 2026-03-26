@@ -11,6 +11,7 @@ import (
 	"servify/apps/server/internal/models"
 	"servify/apps/server/internal/modules/ticket/application"
 	"servify/apps/server/internal/modules/ticket/domain"
+	platformauth "servify/apps/server/internal/platform/auth"
 )
 
 type GormRepository struct {
@@ -31,7 +32,7 @@ func (r *GormRepository) GetTicketByID(ctx context.Context, ticketID uint) (*dom
 
 func (r *GormRepository) LoadTicketModelByID(ctx context.Context, ticketID uint) (*models.Ticket, error) {
 	var ticket models.Ticket
-	err := r.db.WithContext(ctx).
+	err := applyTicketScope(r.db.WithContext(ctx), ctx).
 		Preload("Customer").
 		Preload("Agent").
 		Preload("Session").
@@ -65,7 +66,7 @@ func (r *GormRepository) ListTickets(ctx context.Context, query application.List
 }
 
 func (r *GormRepository) ListTicketModels(ctx context.Context, query application.ListTicketsQuery) ([]models.Ticket, int64, error) {
-	db := r.db.WithContext(ctx).Model(&models.Ticket{})
+	db := applyTicketScope(r.db.WithContext(ctx).Model(&models.Ticket{}), ctx)
 	db = applyListTicketFilters(db, query)
 
 	var total int64
@@ -102,7 +103,7 @@ func (r *GormRepository) ListTicketModels(ctx context.Context, query application
 func (r *GormRepository) GetTicketStats(ctx context.Context, agentID *uint) (*application.TicketStatsDTO, error) {
 	stats := &application.TicketStatsDTO{}
 
-	query := r.db.WithContext(ctx).Model(&models.Ticket{})
+	query := applyTicketScope(r.db.WithContext(ctx).Model(&models.Ticket{}), ctx)
 	if agentID != nil {
 		query = query.Where("agent_id = ?", *agentID)
 	}
@@ -110,11 +111,11 @@ func (r *GormRepository) GetTicketStats(ctx context.Context, agentID *uint) (*ap
 		return nil, err
 	}
 
-	statusQuery := r.db.WithContext(ctx).Model(&models.Ticket{})
-	priorityQuery := r.db.WithContext(ctx).Model(&models.Ticket{})
-	todayQuery := r.db.WithContext(ctx).Model(&models.Ticket{})
-	pendingQuery := r.db.WithContext(ctx).Model(&models.Ticket{})
-	resolvedQuery := r.db.WithContext(ctx).Model(&models.Ticket{})
+	statusQuery := applyTicketScope(r.db.WithContext(ctx).Model(&models.Ticket{}), ctx)
+	priorityQuery := applyTicketScope(r.db.WithContext(ctx).Model(&models.Ticket{}), ctx)
+	todayQuery := applyTicketScope(r.db.WithContext(ctx).Model(&models.Ticket{}), ctx)
+	pendingQuery := applyTicketScope(r.db.WithContext(ctx).Model(&models.Ticket{}), ctx)
+	resolvedQuery := applyTicketScope(r.db.WithContext(ctx).Model(&models.Ticket{}), ctx)
 	if agentID != nil {
 		statusQuery = statusQuery.Where("agent_id = ?", *agentID)
 		priorityQuery = priorityQuery.Where("agent_id = ?", *agentID)
@@ -146,6 +147,12 @@ func (r *GormRepository) GetTicketStats(ctx context.Context, agentID *uint) (*ap
 
 func (r *GormRepository) ListTicketCustomFields(ctx context.Context, activeOnly bool) ([]models.CustomField, error) {
 	q := r.db.WithContext(ctx).Model(&models.CustomField{}).Where("resource = ?", "ticket").Order("id ASC")
+	if tenantID := platformauth.TenantIDFromContext(ctx); tenantID != "" {
+		q = q.Where("tenant_id = ?", tenantID)
+	}
+	if workspaceID := platformauth.WorkspaceIDFromContext(ctx); workspaceID != "" {
+		q = q.Where("workspace_id = ?", workspaceID)
+	}
 	if activeOnly {
 		q = q.Where("active = ?", true)
 	}
@@ -159,6 +166,7 @@ func (r *GormRepository) ListTicketCustomFields(ctx context.Context, activeOnly 
 
 func (r *GormRepository) CreateTicket(ctx context.Context, ticket *domain.Ticket) error {
 	model := mapTicketModel(*ticket)
+	applyTicketScopeFields(ctx, &model)
 	if err := r.db.WithContext(ctx).Create(&model).Error; err != nil {
 		return err
 	}
@@ -173,6 +181,7 @@ func (r *GormRepository) CreateTicketModelWithCustomFieldsAndStatus(
 	initialStatus *models.TicketStatus,
 ) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		applyTicketScopeFields(ctx, ticket)
 		if err := tx.Create(ticket).Error; err != nil {
 			return err
 		}
@@ -270,7 +279,7 @@ func (r *GormRepository) UpdateTicketModelWithStatusAndCustomFields(
 ) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if len(updates) > 0 {
-			if err := tx.Model(&models.Ticket{}).Where("id = ?", ticketID).Updates(updates).Error; err != nil {
+			if err := applyTicketScope(tx.Model(&models.Ticket{}), ctx).Where("id = ?", ticketID).Updates(updates).Error; err != nil {
 				return err
 			}
 		}
@@ -344,7 +353,7 @@ func (r *GormRepository) CloseTicket(ctx context.Context, ticket *domain.Ticket,
 			"closed_at":  ticket.ClosedAt,
 			"updated_at": ticket.UpdatedAt,
 		}
-		if err := tx.Model(&models.Ticket{}).Where("id = ?", ticket.ID).Updates(updates).Error; err != nil {
+		if err := applyTicketScope(tx.Model(&models.Ticket{}), ctx).Where("id = ?", ticket.ID).Updates(updates).Error; err != nil {
 			return err
 		}
 
@@ -370,7 +379,7 @@ func (r *GormRepository) CloseTicket(ctx context.Context, ticket *domain.Ticket,
 }
 
 func (r *GormRepository) UpdateTicketModel(ctx context.Context, ticketID uint, updates map[string]interface{}) error {
-	return r.db.WithContext(ctx).Model(&models.Ticket{}).Where("id = ?", ticketID).Updates(updates).Error
+	return applyTicketScope(r.db.WithContext(ctx).Model(&models.Ticket{}), ctx).Where("id = ?", ticketID).Updates(updates).Error
 }
 
 func (r *GormRepository) SyncTicketCustomFieldValues(
@@ -444,7 +453,7 @@ func (r *GormRepository) AssignTicketModel(
 		if toStatus != fromStatus {
 			updates["status"] = toStatus
 		}
-		if err := tx.Model(&models.Ticket{}).Where("id = ?", ticketID).Updates(updates).Error; err != nil {
+		if err := applyTicketScope(tx.Model(&models.Ticket{}), ctx).Where("id = ?", ticketID).Updates(updates).Error; err != nil {
 			return err
 		}
 		if err := tx.Model(&models.Agent{}).Where("user_id = ?", agentID).UpdateColumn("current_load", gorm.Expr("current_load + 1")).Error; err != nil {
@@ -485,7 +494,7 @@ func (r *GormRepository) UnassignTicketModel(
 		if toStatus != fromStatus {
 			updates["status"] = toStatus
 		}
-		if err := tx.Model(&models.Ticket{}).Where("id = ?", ticketID).Updates(updates).Error; err != nil {
+		if err := applyTicketScope(tx.Model(&models.Ticket{}), ctx).Where("id = ?", ticketID).Updates(updates).Error; err != nil {
 			return err
 		}
 
@@ -533,7 +542,7 @@ func (r *GormRepository) RecordStatusChange(ctx context.Context, ticketID uint, 
 
 func (r *GormRepository) GetTicket(ctx context.Context, ticketID uint) (*domain.Ticket, error) {
 	var ticket models.Ticket
-	if err := r.db.WithContext(ctx).First(&ticket, ticketID).Error; err != nil {
+	if err := applyTicketScope(r.db.WithContext(ctx), ctx).First(&ticket, ticketID).Error; err != nil {
 		return nil, err
 	}
 	result := mapTicket(ticket)
@@ -570,6 +579,28 @@ func (r *GormRepository) FindAutoAssignableAgent(ctx context.Context) (*models.A
 		return nil, err
 	}
 	return &agent, nil
+}
+
+func applyTicketScope(db *gorm.DB, ctx context.Context) *gorm.DB {
+	if tenantID := platformauth.TenantIDFromContext(ctx); tenantID != "" {
+		db = db.Where("tenant_id = ?", tenantID)
+	}
+	if workspaceID := platformauth.WorkspaceIDFromContext(ctx); workspaceID != "" {
+		db = db.Where("workspace_id = ?", workspaceID)
+	}
+	return db
+}
+
+func applyTicketScopeFields(ctx context.Context, model *models.Ticket) {
+	if model == nil {
+		return
+	}
+	if tenantID := platformauth.TenantIDFromContext(ctx); tenantID != "" {
+		model.TenantID = tenantID
+	}
+	if workspaceID := platformauth.WorkspaceIDFromContext(ctx); workspaceID != "" {
+		model.WorkspaceID = workspaceID
+	}
 }
 
 func applyListTicketFilters(db *gorm.DB, query application.ListTicketsQuery) *gorm.DB {

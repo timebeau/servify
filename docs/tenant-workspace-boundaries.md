@@ -19,37 +19,48 @@
 ### 直接或隐式属于 workspace / tenant 的对象
 
 - `Ticket`
-  - 当前通过 `Customer`、`Agent`、`Session` 等关系隐式归属
-  - 尚无显式 `tenant_id` / `workspace_id`
+  - 当前已补显式 `tenant_id` / `workspace_id`
+  - `ticket` 仓储主查询、统计与创建路径已默认按上下文过滤
 
 - `Session`
-  - 当前与 `User` / `Agent` / `Ticket` 关联
-  - 归属仍为隐式
+  - 当前已补显式 `tenant_id` / `workspace_id`
+  - `conversation` 仓储与 runtime adapter 已默认按上下文过滤
 
 - `Message`
-  - 当前通过 `Session` 继承归属
+  - 当前已补显式 `tenant_id` / `workspace_id`
+  - `conversation` 仓储、customer activity、analytics 统计已按上下文过滤
 
 - `TransferRecord`
-  - 当前通过 `SessionID` 继承归属
+  - 当前已补显式 `tenant_id` / `workspace_id`
+  - `routing` 仓储已默认按上下文过滤
 
 - `WaitingRecord`
-  - 当前通过 `SessionID` 继承归属
+  - 当前已补显式 `tenant_id` / `workspace_id`
+  - `routing` 仓储已默认按上下文过滤
+
+- `Customer`
+  - 当前已补显式 `tenant_id` / `workspace_id`
+  - `customer` 仓储通过扩展表 join 收口用户读取、列表、统计与活动查询
+
+- `Agent`
+  - 当前已补显式 `tenant_id` / `workspace_id`
+  - `agent` 仓储与 transfer runtime load 同步路径已按上下文过滤
 
 - `KnowledgeDoc`
   - 当前 provider 层支持 `tenant_id`
-  - 应视为 tenant-scoped 资源
+  - 已视为 tenant/workspace scoped 资源，并默认按上下文过滤
 
 - `CustomField`
-  - 当前更接近 workspace-scoped 配置
-  - 但尚未显式建模作用域
+  - 已补显式 scope 字段
+  - service/repository 默认按上下文过滤
 
 - `SLAConfig`
-  - 当前更接近 workspace-scoped 或 tenant-scoped 配置
-  - 尚未显式建模
+  - 已补显式 scope 字段
+  - service 默认按上下文过滤
 
 - `AppIntegration`
-  - 当前更接近 workspace-scoped 配置
-  - 尚未显式建模
+  - 已补显式 scope 字段
+  - service 默认按上下文过滤
 
 ## 当前运行时上下文
 
@@ -70,17 +81,33 @@ JWT claims 已支持透传：
 ## 当前隔离语义
 
 - 管理面与服务面请求已经可以带 `tenant_id` / `workspace_id` 上下文
+- 管理面与服务面受保护路由现已统一拦截显式 scope 选择器：
+  - `agent` / `end_user` 不允许在请求中额外声明超出 token 的 `tenant_id` / `workspace_id`
+  - `admin` / `service` 仅可在 token 未显式 scope 时通过请求窄化作用域
+  - header / query 中若出现互相冲突的 scope 值，直接拒绝请求
 - 审计日志会记录这两个字段
 - 以下对象已开始显式 scope 化并默认按上下文过滤：
   - `KnowledgeDoc`
   - `CustomField`
   - `SLAConfig`
   - `AppIntegration`
-- 其余业务表读写尚未统一按 `tenant_id` / `workspace_id` 过滤
+- 以下会话链路对象现已补显式 scope 字段，并在 `conversation/routing` 仓储默认按上下文过滤：
+  - `Session`
+  - `Message`
+  - `TransferRecord`
+  - `WaitingRecord`
+- `Ticket` 现已补显式 scope 字段，并在 `ticket` 仓储的主查询、统计与创建路径按上下文过滤
+- `Customer` 现已补显式 scope 字段；`customer` 仓储通过 `customers` 扩展表 join 收口用户读取、列表、统计与活动查询
+- `Agent` 现已补显式 scope 字段，并在 `agent` 仓储的创建、读取、列表与统计路径按上下文过滤
+- `WorkspaceService`、`analytics` 模块聚合仓储、agent transfer load 同步路径已开始按上下文过滤已 scope 化主数据
+- 尚未统一 scope 化的主要剩余面：
+  - `ShiftSchedule` 等尚未补显式 scope 字段的运营类模型
+  - 仍保留在旧 `services/*` 中、未完全迁移到 modules 的零散聚合查询
+  - `DailyStats` 这类跨租户全局聚合表，当前仍按系统级统计处理，而非 tenant/workspace 维度拆分
 
 ## 下一步建议
 
-1. 为真正 tenant-scoped 的核心表补显式 `tenant_id`
-2. 为 workspace-scoped 配置表补 `workspace_id`
-3. 先从配置类与知识库类对象开始，因为它们的边界最清晰
-4. 在 repository / service 层引入统一 scope 过滤，而不是把过滤散落在 handler
+1. 将 `T4 configuration-scopes` 作为下一阶段重点，明确系统级与租户级配置边界
+2. 为 `ShiftSchedule` 等剩余运营模型评估是否需要显式 `tenant_id` / `workspace_id`
+3. 继续压缩旧 `services/*` 中残留的聚合查询，避免新增绕过 modules scope 的读写路径
+4. 若后续需要租户级报表，补 `DailyStats` 等全局汇总表的 tenant/workspace 维度设计
