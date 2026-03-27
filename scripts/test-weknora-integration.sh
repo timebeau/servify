@@ -14,6 +14,41 @@ echo "🧪 WeKnora 集成测试开始..."
 SERVIFY_URL=${SERVIFY_URL:-"http://localhost:8080"}
 WEKNORA_URL=${WEKNORA_URL:-"http://localhost:9000"}
 WEKNORA_ENABLED=${WEKNORA_ENABLED:-true}
+JWT_SECRET=${JWT_SECRET:-"default-secret-key"}
+
+create_service_token() {
+  python3 - "$JWT_SECRET" <<'PY'
+import base64
+import hashlib
+import hmac
+import json
+import sys
+import time
+
+secret = sys.argv[1].encode()
+
+def b64url(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+now = int(time.time())
+header = {"alg": "HS256", "typ": "JWT"}
+payload = {
+    "sub": "integration-service",
+    "token_type": "service",
+    "principal_kind": "service",
+    "roles": ["service"],
+    "iat": now,
+    "exp": now + 3600,
+}
+
+signing_input = f"{b64url(json.dumps(header, separators=(',', ':')).encode())}.{b64url(json.dumps(payload, separators=(',', ':')).encode())}"
+signature = hmac.new(secret, signing_input.encode(), hashlib.sha256).digest()
+print(f"{signing_input}.{b64url(signature)}")
+PY
+}
+
+AUTH_TOKEN=$(create_service_token)
+AUTH_HEADER="Authorization: Bearer ${AUTH_TOKEN}"
 
 # 小工具：带重试的等待
 wait_for() {
@@ -69,6 +104,7 @@ echo "🤖 测试 AI 服务..."
 # 测试简单查询
 echo "  ✓ 测试基础 AI 查询..."
 AI_RESPONSE=$(curl -fsS -X POST "$SERVIFY_URL/api/v1/ai/query" \
+    -H "$AUTH_HEADER" \
     -H "Content-Type: application/json" \
     -d '{
         "query": "你好，我想了解远程协助功能",
@@ -90,7 +126,10 @@ fi
 
 # 4. 测试 AI 状态
 echo "  ✓ 测试 AI 服务状态..."
-AI_STATUS=$(curl -fsS "$SERVIFY_URL/api/v1/ai/status")
+AI_STATUS=$(curl -fsS \
+    -H "$AUTH_HEADER" \
+    "$SERVIFY_URL/api/v1/ai/status")
+SERVICE_TYPE="unknown"
 
 if echo "$AI_STATUS" | grep -q '"success":true'; then
     echo "    ✅ AI 状态查询通过"
@@ -120,7 +159,9 @@ if [ "$SERVICE_TYPE" = "enhanced" ]; then
 
     # 测试指标查询
     echo "  ✓ 测试服务指标..."
-    METRICS_RESPONSE=$(curl -fsS "$SERVIFY_URL/api/v1/ai/metrics")
+    METRICS_RESPONSE=$(curl -fsS \
+        -H "$AUTH_HEADER" \
+        "$SERVIFY_URL/api/v1/ai/metrics")
 
     if echo "$METRICS_RESPONSE" | grep -q '"success":true'; then
         echo "    ✅ 指标查询通过"
@@ -144,6 +185,7 @@ if [ "$SERVICE_TYPE" = "enhanced" ]; then
     # 测试文档上传
     echo "  ✓ 测试文档上传..."
     UPLOAD_RESPONSE=$(curl -fsS -X POST "$SERVIFY_URL/api/v1/ai/knowledge/upload" \
+        -H "$AUTH_HEADER" \
         -H "Content-Type: application/json" \
         -d '{
             "title": "测试文档",
@@ -165,7 +207,9 @@ fi
 echo "🔌 测试 WebSocket 连接..."
 
 # 检查 WebSocket 端点是否响应
-WS_STATS=$(curl -fsS "$SERVIFY_URL/api/v1/ws/stats")
+WS_STATS=$(curl -fsS \
+    -H "$AUTH_HEADER" \
+    "$SERVIFY_URL/api/v1/ws/stats")
 
 if echo "$WS_STATS" | grep -q '"success":true'; then
     echo "    ✅ WebSocket 服务正常"
@@ -179,7 +223,9 @@ fi
 # 7. 测试 WebRTC 功能
 echo "📡 测试 WebRTC 服务..."
 
-WEBRTC_STATS=$(curl -fsS "$SERVIFY_URL/api/v1/webrtc/connections")
+WEBRTC_STATS=$(curl -fsS \
+    -H "$AUTH_HEADER" \
+    "$SERVIFY_URL/api/v1/webrtc/connections")
 
 if echo "$WEBRTC_STATS" | grep -q '"success":true'; then
     echo "    ✅ WebRTC 服务正常"
@@ -199,6 +245,7 @@ START_TIME=$(date +%s)
 
 for i in $(seq 1 $CONCURRENT_REQUESTS); do
     curl -s -X POST "$SERVIFY_URL/api/v1/ai/query" \
+        -H "$AUTH_HEADER" \
         -H "Content-Type: application/json" \
         -d "{
             \"query\": \"测试查询 $i\",
