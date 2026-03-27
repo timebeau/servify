@@ -338,15 +338,18 @@ base64url() {
   openssl base64 -A | tr '+/' '-_' | tr -d '='
 }
 
-# Generate HS256 JWT with default secret (must match server config/jwt.secret)
+# Generate HS256 JWT with custom claims (must match server config/jwt.secret)
 issue_jwt() {
   local secret="${1:-default-secret-key}"
-  local uid="${2:-1}"
-  local roles="${3:-[\"admin\"]}"
+  local token_type="${2:-service}"
+  local principal_kind="${3:-service}"
+  local roles="${4:-[\"service\"]}"
+  local permissions="${5:-[]}"
   local now=$(date +%s)
   local exp=$((now + 3600))
   local header='{"alg":"HS256","typ":"JWT"}'
-  local payload=$(printf '{"user_id":%s,"roles":%s,"iat":%s,"exp":%s}' "$uid" "$roles" "$now" "$exp")
+  local payload=$(printf '{"sub":"integration-auth","token_type":"%s","principal_kind":"%s","roles":%s,"permissions":%s,"iat":%s,"exp":%s}' \
+    "$token_type" "$principal_kind" "$roles" "$permissions" "$now" "$exp")
   local b64_header=$(printf '%s' "$header" | base64url)
   local b64_payload=$(printf '%s' "$payload" | base64url)
   local signing_input="${b64_header}.${b64_payload}"
@@ -354,7 +357,7 @@ issue_jwt() {
   printf '%s.%s' "$signing_input" "$sig"
 }
 
-AUTH_TOKEN=$(issue_jwt "default-secret-key" "1" "[\"admin\"]")
+AUTH_TEST_TOKEN=$(issue_jwt "default-secret-key" "service" "service" "[\"service\"]" "[\"customers.read\"]")
 
 echo "  ✓ 无 token 访问应被拒绝..."
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$SERVIFY_URL/api/customers/stats" || true)
@@ -368,13 +371,13 @@ else
 fi
 
 echo "  ✓ 携带有效 token 访问应成功..."
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $AUTH_TOKEN" "$SERVIFY_URL/api/customers/stats" || true)
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $AUTH_TEST_TOKEN" "$SERVIFY_URL/api/customers/stats" || true)
 if [ "$HTTP_CODE" = "200" ]; then
   echo "    ✅ 授权访问成功 (200)"
 else
   echo "    ❌ 授权访问失败，HTTP $HTTP_CODE"
   echo "    🔎 返回详情："
-  curl -s -i -H "Authorization: Bearer $AUTH_TOKEN" "$SERVIFY_URL/api/customers/stats" || true
+  curl -s -i -H "Authorization: Bearer $AUTH_TEST_TOKEN" "$SERVIFY_URL/api/customers/stats" || true
   exit 1
 fi
 
@@ -384,7 +387,7 @@ echo ""
 echo "🛡️ 管理员专属接口测试（/api/statistics/...）..."
 
 # 仅 agent 角色访问 admin-only 接口应 403
-AGENT_TOKEN=$(issue_jwt "default-secret-key" "2" "[\"agent\"]")
+AGENT_TOKEN=$(issue_jwt "default-secret-key" "service" "agent" "[\"agent\"]" "[]")
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $AGENT_TOKEN" "$SERVIFY_URL/api/statistics/dashboard" || true)
 if [ "$HTTP_CODE" = "403" ]; then
   echo "    ✅ agent 访问 admin-only 接口被拒绝 (403)"
@@ -396,7 +399,7 @@ else
 fi
 
 # admin 访问应 200
-ADMIN_TOKEN=$(issue_jwt "default-secret-key" "1" "[\"admin\"]")
+ADMIN_TOKEN=$(issue_jwt "default-secret-key" "service" "service" "[\"service\"]" "[\"statistics.read\"]")
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $ADMIN_TOKEN" "$SERVIFY_URL/api/statistics/dashboard" || true)
 if [ "$HTTP_CODE" = "200" ]; then
   echo "    ✅ admin 访问 admin-only 接口成功 (200)"
@@ -416,6 +419,7 @@ R429=0
 TOTAL=50
 for i in $(seq 1 "$TOTAL"); do
   CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$SERVIFY_URL/api/v1/ai/query" \
+    -H "$AUTH_HEADER" \
     -H "Content-Type: application/json" \
     -d "{\"query\":\"rl_test_$i\",\"session_id\":\"rl_test_session\"}" || true)
   if [ "$CODE" = "200" ]; then R200=$((R200+1)); fi
@@ -438,6 +442,7 @@ if [ "$RATE_LIMIT_ENABLED" = "true" ]; then
   R429=0
   for i in $(seq 1 "$TOTAL"); do
     CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$SERVIFY_URL/api/v1/ai/query" \
+      -H "$AUTH_HEADER" \
       -H "Content-Type: application/json" \
       -H "X-API-Key: internal-test-key" \
       -d "{\"query\":\"wl_test_$i\",\"session_id\":\"rl_test_session\"}" || true)

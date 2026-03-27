@@ -27,10 +27,12 @@ Servify 是一个面向客服、工单、AI 协同和实时会话的服务平台
 ## 📊 当前状态
 
 - ✅ 已完成核心模块化拆分：`ticket`、`conversation`、`routing`
+- ✅ 已完成管理面模块迁移：`agent`、`customer` 已具备独立 application / delivery / infra 边界
 - ✅ 已完成 AI/知识库基础抽象：`LLMProvider`、`KnowledgeProvider`、`ai` module、`knowledge` module
 - ✅ 已完成事件总线基础设施：`internal/platform/eventbus`
+- ✅ 已完成管理面安全基线首轮收口：tenant/workspace scope、RBAC、audit、token state revoke、security surface
 - ✅ 已明确未来扩展边界：Web SDK、未来 API/App SDK、渠道适配器、SIP/voice
-- 🔄 当前仍在继续拆分：`agent`、`customer`、`automation`、`analytics`、`voice`
+- 🔄 当前仍在继续拆分：`automation`、`analytics`、`voice`
 
 ---
 
@@ -122,11 +124,19 @@ flowchart LR
 
 | 模块 | 当前目标 |
 | --- | --- |
-| `agent` | 客服档案、在线状态、chat/voice 并发负载 |
-| `customer` | 客户档案、标签、备注、活动轨迹 |
 | `automation` | 基于事件总线的自动化执行 |
 | `analytics` | 统计读模型与增量聚合 |
 | `voice` | 呼叫会话、媒体会话、录音、转接，作为 SIP 落点 |
+
+### 🔐 安全与管理面现状
+
+| 能力 | 状态 | 说明 |
+| --- | --- | --- |
+| tenant / workspace scope | 已接入管理面 | 管理类路由统一经过 `AuthMiddleware`、`EnforceRequestScope`、`RequirePrincipalKinds`、`RequireResourcePermission` |
+| 审计日志 | 已接入管理面 | 关键管理操作统一经过 `AuditMiddleware`，敏感字段做脱敏 |
+| 用户 token 状态失效 | 已完成首轮能力 | 支持 `token_valid_after` + `token_version`，并在 router auth middleware 中强制校验 |
+| 通用 user security surface | 已完成首轮能力 | 提供 `/api/security/users/:id` 与 `/api/security/users/:id/revoke-tokens` |
+| 更细粒度 session / refresh token 管理 | 待补充 | 仍缺 refresh token、revoke list、批量失效、审批回滚等能力 |
 
 ---
 
@@ -318,16 +328,18 @@ Jaeger 默认地址：`http://localhost:16686`
 - `docs/implementation/08-ai-provider-expansion.md`：已清零
 - `docs/implementation/09-runtime-and-repo-hygiene.md`：进行中
 - `docs/implementation/10-service-to-module-migration.md`：待开始
-- `docs/implementation/11-tenant-auth-and-audit.md`：待开始
+- `docs/implementation/11-tenant-auth-and-audit.md`：进行中
 - `docs/implementation/12-operator-observability.md`：待开始
 
 当前代码状态说明：
 
 - 服务端已从“大 service 直连 handler”收敛到模块化单体结构
+- `agent`、`customer` 管理面已收口到模块化链路，不再只依赖旧 service 直连 handler
 - AI 已统一到 `QueryOrchestrator + LLMProvider + KnowledgeProvider`
 - WeKnora 已降级为 `KnowledgeProvider` 适配器，不再是内核依赖
 - Web SDK 已按 `core + transport + binding` 方向收口
 - API/App SDK 当前只预留 contract 和目录，不做伪实现
+- 管理面安全基线已接入首轮能力：scope、RBAC、audit、token policy、统一 user security 入口
 - SIP/渠道接入已建立平台层骨架，后续在 `voice` 模块上继续补业务语义
 
 ---
