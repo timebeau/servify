@@ -38,9 +38,9 @@
     <section class="hero">
       <div class="container hero-wrap">
         <div class="hero-copy">
-          <div class="hero-badge">v0.1 模块化架构</div>
+          <div class="hero-badge">模块化单体 + 管理面安全基线</div>
           <h1>开源智能<br><span>客服与工单系统</span></h1>
-          <p class="subtitle">模块化单体架构，支持 AI 智能问答、多渠道接入、实时会话与语音能力。企业级可观测性，灵活演进，易于扩展。</p>
+          <p class="subtitle">Servify 已完成 ticket、conversation、routing、agent、customer 的核心拆分，并接入 tenant/workspace scope、RBAC、audit 与 token state revoke，适合继续向 automation、analytics 与 voice 演进。</p>
           <div class="cta">
             <a class="btn primary" href="https://toconvo.github.io/servify/" target="_blank" rel="noopener">查看文档</a>
             <a class="btn secondary" href="https://github.com/Toconvo/servify" target="_blank" rel="noopener">GitHub &rarr;</a>
@@ -63,20 +63,20 @@
     <section class="stats">
       <div class="container stats-wrap">
         <div class="stat-item">
-          <div class="stat-value">8+</div>
-          <div class="stat-label">业务模块</div>
+          <div class="stat-value">5</div>
+          <div class="stat-label">已收口核心模块</div>
         </div>
         <div class="stat-item">
-          <div class="stat-value">AI</div>
-          <div class="stat-label">智能问答</div>
+          <div class="stat-value">RBAC</div>
+          <div class="stat-label">管理面权限控制</div>
         </div>
         <div class="stat-item">
-          <div class="stat-value">WS</div>
-          <div class="stat-label">实时通信</div>
+          <div class="stat-value">Audit</div>
+          <div class="stat-label">关键操作审计</div>
         </div>
         <div class="stat-item">
-          <div class="stat-value">100%</div>
-          <div class="stat-label">开源免费</div>
+          <div class="stat-value">Token</div>
+          <div class="stat-label">用户状态失效策略</div>
         </div>
       </div>
     </section>
@@ -152,6 +152,11 @@
             <div class="card-icon"><i data-lucide="activity"></i></div>
             <h3>可观测性</h3>
             <p>OpenTelemetry 追踪，Prometheus 指标，结构化日志，完整的运营诊断能力。</p>
+          </div>
+          <div class="card">
+            <div class="card-icon"><i data-lucide="shield-check"></i></div>
+            <h3>管理面安全基线</h3>
+            <p>管理类接口统一叠加 scope、RBAC、审计与 token state policy，并提供通用 user security 管理入口。</p>
           </div>
         </div>
       </div>
