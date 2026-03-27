@@ -395,6 +395,12 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Diagnose Cloudflare Pages context
+        if: steps.gate.outputs.skip == 'false' && steps.detect.outputs.changed == 'true'
+        run: |
+          echo "CF_PAGES_PROJECT=$CF_PAGES_PROJECT"
+          npx wrangler pages project list
+
       - name: Deploy to Cloudflare Pages
         if: steps.gate.outputs.skip == 'false' && steps.detect.outputs.changed == 'true'
         run: npx wrangler pages deploy apps/website --project-name "$CF_PAGES_PROJECT"
