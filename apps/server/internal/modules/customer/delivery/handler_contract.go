@@ -17,4 +17,5 @@ type HandlerService interface {
 	AddCustomerNote(ctx context.Context, customerID uint, note string, userID uint) error
 	UpdateCustomerTags(ctx context.Context, customerID uint, tags []string) error
 	GetCustomerStats(ctx context.Context) (*services.CustomerStats, error)
+	RevokeCustomerTokens(ctx context.Context, customerID uint) (int, error)
 }

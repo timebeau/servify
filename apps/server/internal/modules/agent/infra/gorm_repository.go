@@ -12,6 +12,7 @@ import (
 	agentapp "servify/apps/server/internal/modules/agent/application"
 	agentdomain "servify/apps/server/internal/modules/agent/domain"
 	platformauth "servify/apps/server/internal/platform/auth"
+	"servify/apps/server/internal/platform/usersecurity"
 )
 
 type GormRepository struct {
@@ -130,6 +131,10 @@ func (r *GormRepository) GetStats(ctx context.Context, agentUserID *uint) (*agen
 	applyAgentScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Select("AVG(rating)").Row().Scan(&avgRating)
 	stats.AvgRating = avgRating
 	return stats, nil
+}
+
+func (r *GormRepository) RevokeUserTokens(ctx context.Context, userID uint, revokeAt time.Time) (int, error) {
+	return usersecurity.RevokeUserTokens(ctx, r.db, userID, revokeAt)
 }
 
 func applyAgentScope(db *gorm.DB, ctx context.Context) *gorm.DB {

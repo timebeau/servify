@@ -75,6 +75,7 @@ func TestAgentHandler_Create_Online_Status_Offline(t *testing.T) {
 	r.PUT("/api/agents/:id/status", h.UpdateAgentStatus)
 	r.GET("/api/agents/online", h.GetOnlineAgents)
 	r.POST("/api/agents/:id/offline", h.AgentGoOffline)
+	r.POST("/api/agents/:id/revoke-tokens", h.RevokeAgentTokens)
 
 	// Create agent for user 10
 	createBody := map[string]any{"user_id": 10, "department": "support", "skills": "billing,tech", "max_concurrent": 3}
@@ -128,5 +129,13 @@ func TestAgentHandler_Create_Online_Status_Offline(t *testing.T) {
 	r.ServeHTTP(w5, req5)
 	if w5.Code != http.StatusOK {
 		t.Fatalf("offline status=%d body=%s", w5.Code, w5.Body.String())
+	}
+
+	// Revoke tokens
+	w6 := httptest.NewRecorder()
+	req6, _ := http.NewRequest(http.MethodPost, "/api/agents/10/revoke-tokens", nil)
+	r.ServeHTTP(w6, req6)
+	if w6.Code != http.StatusOK {
+		t.Fatalf("revoke tokens status=%d body=%s", w6.Code, w6.Body.String())
 	}
 }

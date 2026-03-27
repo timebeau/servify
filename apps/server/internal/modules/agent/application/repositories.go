@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"time"
 
 	"servify/apps/server/internal/models"
 	agentdomain "servify/apps/server/internal/modules/agent/domain"
@@ -17,6 +18,7 @@ type Repository interface {
 	AssignSession(ctx context.Context, sessionID string, agentUserID uint) error
 	ReleaseSession(ctx context.Context, sessionID string, agentUserID uint) error
 	GetStats(ctx context.Context, agentUserID *uint) (*AgentStatsDTO, error)
+	RevokeUserTokens(ctx context.Context, userID uint, revokeAt time.Time) (int, error)
 }
 
 type RuntimeRegistry interface {

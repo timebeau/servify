@@ -374,6 +374,8 @@ definitions:
       status:
         description: online, offline, busy
         type: string
+      tenant_id:
+        type: string
       tickets:
         items:
           $ref: '#/definitions/models.Ticket'
@@ -387,6 +389,8 @@ definitions:
         $ref: '#/definitions/models.User'
       user_id:
         type: integer
+      workspace_id:
+        type: string
     type: object
   models.CustomField:
     properties:
@@ -412,6 +416,8 @@ definitions:
       show_when_json:
         description: JSON condition expression
         type: string
+      tenant_id:
+        type: string
       type:
         description: string, number, boolean, date, select, multiselect
         type: string
@@ -419,6 +425,8 @@ definitions:
         type: string
       validation_json:
         description: JSON object (min/max/regex/etc)
+        type: string
+      workspace_id:
         type: string
     type: object
   models.Customer:
@@ -442,12 +450,16 @@ definitions:
       tags:
         description: 标签，逗号分隔
         type: string
+      tenant_id:
+        type: string
       updated_at:
         type: string
       user:
         $ref: '#/definitions/models.User'
       user_id:
         type: integer
+      workspace_id:
+        type: string
     type: object
   models.CustomerSatisfaction:
     properties:
@@ -491,6 +503,8 @@ definitions:
         $ref: '#/definitions/models.Session'
       session_id:
         type: string
+      tenant_id:
+        type: string
       type:
         description: text, image, file, system
         type: string
@@ -498,6 +512,8 @@ definitions:
         $ref: '#/definitions/models.User'
       user_id:
         type: integer
+      workspace_id:
+        type: string
     type: object
   models.SLAConfig:
     properties:
@@ -529,11 +545,15 @@ definitions:
       tags:
         description: 逗号分隔标签，用于细分条件
         type: string
+      tenant_id:
+        type: string
       updated_at:
         type: string
       warning_threshold:
         description: 触发告警的阈值（百分比）
         type: integer
+      workspace_id:
+        type: string
     type: object
   models.SLAViolation:
     properties:
@@ -617,6 +637,8 @@ definitions:
       status:
         description: active, ended, transferred
         type: string
+      tenant_id:
+        type: string
       ticket:
         $ref: '#/definitions/models.Ticket'
       ticket_id:
@@ -627,6 +649,8 @@ definitions:
         $ref: '#/definitions/models.User'
       user_id:
         type: integer
+      workspace_id:
+        type: string
     type: object
   models.Ticket:
     properties:
@@ -687,9 +711,13 @@ definitions:
       tags:
         description: 标签，逗号分隔
         type: string
+      tenant_id:
+        type: string
       title:
         type: string
       updated_at:
+        type: string
+      workspace_id:
         type: string
     type: object
   models.TicketComment:
@@ -789,9 +817,13 @@ definitions:
         type: string
       session_summary:
         type: string
+      tenant_id:
+        type: string
       to_agent_id:
         type: integer
       transferred_at:
+        type: string
+      workspace_id:
         type: string
     type: object
   models.User:
@@ -825,6 +857,10 @@ definitions:
         items:
           $ref: '#/definitions/models.Ticket'
         type: array
+      token_valid_after:
+        type: string
+      token_version:
+        type: integer
       updated_at:
         type: string
       username:
@@ -934,6 +970,10 @@ definitions:
         items:
           $ref: '#/definitions/models.Ticket'
         type: array
+      token_valid_after:
+        type: string
+      token_version:
+        type: integer
       updated_at:
         type: string
       username:
@@ -1427,6 +1467,36 @@ paths:
       summary: 释放客服的会话
       tags:
       - 客服管理
+  /api/agents/{id}/revoke-tokens:
+    post:
+      consumes:
+      - application/json
+      description: 提升 token_version 并刷新 token_valid_after，使该客服旧 token 失效
+      parameters:
+      - description: 客服用户ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: 强制失效客服 token
+      tags:
+      - 客服管理
   /api/agents/{id}/status:
     put:
       consumes:
@@ -1797,6 +1867,36 @@ paths:
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
       summary: 添加客户备注
+      tags:
+      - 客户管理
+  /api/customers/{id}/revoke-tokens:
+    post:
+      consumes:
+      - application/json
+      description: 提升 token_version 并刷新 token_valid_after，使该客户旧 token 失效
+      parameters:
+      - description: 客户ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: 强制失效客户 token
       tags:
       - 客户管理
   /api/customers/{id}/tags:
@@ -2203,6 +2303,72 @@ paths:
       summary: 重新发送 CSAT 调查
       tags:
       - 满意度评价
+  /api/security/users/{id}:
+    get:
+      description: 返回用户当前状态、token_version、token_valid_after 和最近登录时间
+      parameters:
+      - description: 用户ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: 获取用户安全状态
+      tags:
+      - 安全管理
+  /api/security/users/{id}/revoke-tokens:
+    post:
+      consumes:
+      - application/json
+      description: 提升 token_version 并刷新 token_valid_after，使该用户旧 token 失效
+      parameters:
+      - description: 用户ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: 强制失效用户 token
+      tags:
+      - 安全管理
   /api/session-transfer/cancel:
     post:
       consumes:

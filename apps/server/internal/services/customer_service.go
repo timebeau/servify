@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"strings"
+	"time"
 
 	"servify/apps/server/internal/models"
 	customerapp "servify/apps/server/internal/modules/customer/application"
@@ -154,6 +155,15 @@ func (s *CustomerService) GetCustomerStats(ctx context.Context) (*CustomerStats,
 		return nil, err
 	}
 	return customerStatsFromDTO(stats), nil
+}
+
+func (s *CustomerService) RevokeCustomerTokens(ctx context.Context, customerID uint) (int, error) {
+	version, err := s.module.RevokeCustomerTokens(ctx, customerID, time.Now().UTC())
+	if err != nil {
+		return 0, err
+	}
+	s.logger.Infof("Revoked tokens for customer %d, new token version %d", customerID, version)
+	return version, nil
 }
 
 // CustomerInfo 客户信息（用于列表显示）。

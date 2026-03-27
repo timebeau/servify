@@ -28,6 +28,10 @@ security:
         requests_per_minute: 120
         burst: 30
       - enabled: true
+        prefix: "/api/v1/ws"
+        requests_per_minute: 40
+        burst: 20
+      - enabled: true
         prefix: "/api/v1/ai/query"
         requests_per_minute: 45
         burst: 15
@@ -59,4 +63,3 @@ log:
 
 monitoring:
   enabled: true
-

@@ -26,6 +26,13 @@ func SecurityWarnings(cfg *config.Config) []string {
 	}
 	if !cfg.Security.RateLimiting.Enabled {
 		warnings = append(warnings, "security.rate_limiting is disabled")
+	} else {
+		if !hasRateLimitPrefix(cfg.Security.RateLimiting.Paths, "/public/") {
+			warnings = append(warnings, "security.rate_limiting.paths has no dedicated limit for /public/")
+		}
+		if !hasRateLimitPrefix(cfg.Security.RateLimiting.Paths, "/api/v1/ws") {
+			warnings = append(warnings, "security.rate_limiting.paths has no dedicated limit for /api/v1/ws")
+		}
 	}
 	if strings.TrimSpace(cfg.AI.OpenAI.APIKey) == "" {
 		warnings = append(warnings, "ai.openai.api_key is empty")
@@ -35,6 +42,22 @@ func SecurityWarnings(cfg *config.Config) []string {
 	}
 
 	return warnings
+}
+
+func hasRateLimitPrefix(paths []config.PathRateLimitConfig, prefix string) bool {
+	prefix = strings.TrimSpace(prefix)
+	if prefix == "" {
+		return false
+	}
+	for _, path := range paths {
+		if !path.Enabled {
+			continue
+		}
+		if strings.TrimSpace(path.Prefix) == prefix {
+			return true
+		}
+	}
+	return false
 }
 
 func LogSecurityWarnings(logger *logrus.Logger, cfg *config.Config) {

@@ -3,6 +3,7 @@ package delivery
 import (
 	"context"
 	"strings"
+	"time"
 
 	"servify/apps/server/internal/models"
 	customerapp "servify/apps/server/internal/modules/customer/application"
@@ -107,6 +108,10 @@ func (a *HandlerServiceAdapter) GetCustomerStats(ctx context.Context) (*services
 		return nil, err
 	}
 	return customerStatsFromDTO(stats), nil
+}
+
+func (a *HandlerServiceAdapter) RevokeCustomerTokens(ctx context.Context, customerID uint) (int, error) {
+	return a.service.RevokeCustomerTokens(ctx, customerID, time.Now().UTC())
 }
 
 func customerInfoFromDTO(dto customerapp.CustomerInfoDTO) services.CustomerInfo {

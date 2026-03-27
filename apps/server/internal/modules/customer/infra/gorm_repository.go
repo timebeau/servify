@@ -11,6 +11,7 @@ import (
 	"servify/apps/server/internal/models"
 	customerapp "servify/apps/server/internal/modules/customer/application"
 	platformauth "servify/apps/server/internal/platform/auth"
+	"servify/apps/server/internal/platform/usersecurity"
 )
 
 type GormRepository struct {
@@ -240,6 +241,23 @@ func (r *GormRepository) GetStats(ctx context.Context) (*customerapp.CustomerSta
 	applyCustomerScope(r.db.WithContext(ctx).Model(&models.Customer{}), ctx).Select("industry, COUNT(*) as count").Group("industry").Having("industry != ''").Scan(&stats.ByIndustry)
 	applyCustomerScope(r.db.WithContext(ctx).Model(&models.Customer{}), ctx).Select("priority, COUNT(*) as count").Group("priority").Scan(&stats.ByPriority)
 	return stats, nil
+}
+
+func (r *GormRepository) RevokeCustomerTokens(ctx context.Context, customerID uint, revokeAt time.Time) (int, error) {
+	if revokeAt.IsZero() {
+		revokeAt = time.Now().UTC()
+	}
+
+	var customer models.Customer
+	if err := applyCustomerScope(r.db.WithContext(ctx), ctx).Where("user_id = ?", customerID).First(&customer).Error; err != nil {
+		return 0, fmt.Errorf("customer not found: %w", err)
+	}
+
+	version, err := usersecurity.RevokeUserTokens(ctx, r.db, customerID, revokeAt)
+	if err != nil {
+		return 0, fmt.Errorf("failed to revoke customer tokens: %w", err)
+	}
+	return version, nil
 }
 
 func applyCustomerScope(db *gorm.DB, ctx context.Context) *gorm.DB {

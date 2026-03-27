@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"testing"
+	"time"
 
 	"servify/apps/server/internal/models"
 )
@@ -41,6 +42,9 @@ func (s *stubRepo) UpdateTags(ctx context.Context, customerID uint, tags []strin
 }
 func (s *stubRepo) GetStats(ctx context.Context) (*CustomerStatsDTO, error) {
 	return &CustomerStatsDTO{Total: 1}, nil
+}
+func (s *stubRepo) RevokeCustomerTokens(ctx context.Context, customerID uint, revokeAt time.Time) (int, error) {
+	return 1, nil
 }
 
 func TestCreateCustomerNormalizesDefaults(t *testing.T) {

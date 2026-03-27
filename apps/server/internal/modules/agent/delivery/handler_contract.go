@@ -14,6 +14,7 @@ type HandlerService interface {
 	AgentGoOnline(ctx context.Context, userID uint) error
 	AgentGoOffline(ctx context.Context, userID uint) error
 	UpdateAgentStatus(ctx context.Context, userID uint, status string) error
+	RevokeAgentTokens(ctx context.Context, userID uint) (int, error)
 	AssignSessionToAgent(ctx context.Context, sessionID string, agentID uint) error
 	ReleaseSessionFromAgent(ctx context.Context, sessionID string, agentID uint) error
 	FindAvailableAgent(ctx context.Context, skills []string, priority string) (*AgentInfo, error)

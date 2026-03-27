@@ -60,6 +60,10 @@ func (r *maintenanceRepo) GetStats(ctx context.Context, agentUserID *uint) (*age
 	return &agentapp.AgentStatsDTO{}, nil
 }
 
+func (r *maintenanceRepo) RevokeUserTokens(ctx context.Context, userID uint, revokeAt time.Time) (int, error) {
+	return 0, nil
+}
+
 type maintenanceRegistry struct {
 	items map[uint]agentapp.AgentRuntimeDTO
 }

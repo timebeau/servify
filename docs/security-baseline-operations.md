@@ -87,6 +87,7 @@
 
 - `InitLogging` 现在会在启动时输出基础安全告警
 - 当前已覆盖默认或空 `jwt.secret`、开放式 `CORS=*`、关闭限流、空 OpenAI API key、启用 WeKnora 但未配置 API key 等场景
+- 若启用了限流但没有为 `/public/` 与 `/api/v1/ws` 配置独立路径级限流，也会输出 warning，避免匿名入口只落在全局限流下
 - 当前为 warning-only，不阻断本地开发或测试启动
 
 ## 建议的最小生产配置

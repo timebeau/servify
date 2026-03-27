@@ -14,7 +14,9 @@ import (
 	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
 	voicedelivery "servify/apps/server/internal/modules/voice/delivery"
 	auditplatform "servify/apps/server/internal/platform/audit"
+	platformauth "servify/apps/server/internal/platform/auth"
 	realtimeplatform "servify/apps/server/internal/platform/realtime"
+	"servify/apps/server/internal/platform/usersecurity"
 	"servify/apps/server/internal/platform/voiceprotocol"
 	"servify/apps/server/internal/services"
 
@@ -68,7 +70,7 @@ func BuildRouter(deps Dependencies) *gin.Engine {
 
 func registerManagementRoutes(r *gin.Engine, deps Dependencies) {
 	api := r.Group("/api")
-	api.Use(middleware.AuthMiddleware(deps.Config))
+	api.Use(middleware.AuthMiddleware(deps.Config, platformauth.NewUserStateTokenPolicy(deps.DB)))
 	api.Use(middleware.EnforceRequestScope())
 	api.Use(middleware.RequirePrincipalKinds("agent", "admin", "service"))
 	api.Use(middleware.AuditMiddleware(deps.DB))
@@ -144,6 +146,10 @@ func registerManagementRoutes(r *gin.Engine, deps Dependencies) {
 	auditAPI := api.Group("/")
 	auditAPI.Use(middleware.RequireResourcePermission("audit"))
 	handlers.RegisterAuditRoutes(auditAPI, handlers.NewAuditHandler(auditplatform.NewGormQueryService(deps.DB)))
+
+	securityAPI := api.Group("/")
+	securityAPI.Use(middleware.RequireResourcePermission("security"))
+	handlers.RegisterUserSecurityRoutes(securityAPI, handlers.NewUserSecurityHandler(usersecurity.NewService(deps.DB, deps.Logger), deps.Logger))
 }
 
 func registerPublicRoutes(r *gin.Engine, deps Dependencies) {
@@ -163,7 +169,7 @@ func registerRealtimeRoutes(r *gin.Engine, deps Dependencies) {
 	aiHandler := handlers.NewAIHandler(deps.AIHandlerService)
 
 	managementV1 := r.Group("/api/v1")
-	managementV1.Use(middleware.AuthMiddleware(deps.Config))
+	managementV1.Use(middleware.AuthMiddleware(deps.Config, platformauth.NewUserStateTokenPolicy(deps.DB)))
 	managementV1.Use(middleware.EnforceRequestScope())
 	managementV1.Use(middleware.RequirePrincipalKinds("agent", "admin", "service"))
 	managementV1.GET("/ws/stats", wsHandler.GetStats)
@@ -184,7 +190,7 @@ func registerRealtimeRoutes(r *gin.Engine, deps Dependencies) {
 
 	ingest := handlers.NewMetricsIngestHandler(handlers.NewMetricsAggregator())
 	serviceV1 := r.Group("/api/v1")
-	serviceV1.Use(middleware.AuthMiddleware(deps.Config))
+	serviceV1.Use(middleware.AuthMiddleware(deps.Config, platformauth.NewUserStateTokenPolicy(deps.DB)))
 	serviceV1.Use(middleware.EnforceRequestScope())
 	serviceV1.Use(middleware.RequirePrincipalKinds("service"))
 	serviceV1.POST("/metrics/ingest", ingest.Ingest)

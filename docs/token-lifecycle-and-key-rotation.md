@@ -100,5 +100,10 @@
 
 - JWT 配置：`apps/server/internal/config/config.go`
 - 认证与 principal kind：`apps/server/internal/platform/auth`
+- token 失效策略钩子：`apps/server/internal/platform/auth/token_policy.go`
+- 基于用户状态的 token 失效策略：`apps/server/internal/platform/auth/user_state_policy.go`
+- 管理面主动失效入口：`POST /api/agents/:id/revoke-tokens`、`POST /api/customers/:id/revoke-tokens`
+- 通用失效实现：`apps/server/internal/platform/usersecurity/revoke.go`
+- 通用 admin/security 入口：`GET /api/security/users/:id`、`POST /api/security/users/:id/revoke-tokens`
 - 管理面 / service 面路由表面：`apps/server/internal/app/server/router.go`
 - 审计脱敏：`apps/server/internal/platform/audit/gin_middleware.go`

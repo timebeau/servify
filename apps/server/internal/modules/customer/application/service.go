@@ -80,6 +80,16 @@ func (s *Service) GetStats(ctx context.Context) (*CustomerStatsDTO, error) {
 	return s.repo.GetStats(ctx)
 }
 
+func (s *Service) RevokeCustomerTokens(ctx context.Context, customerID uint, revokeAt time.Time) (int, error) {
+	if customerID == 0 {
+		return 0, fmt.Errorf("customer_id required")
+	}
+	if revokeAt.IsZero() {
+		revokeAt = time.Now().UTC()
+	}
+	return s.repo.RevokeCustomerTokens(ctx, customerID, revokeAt)
+}
+
 func normalizeTags(tags []string) []string {
 	out := make([]string, 0, len(tags))
 	for _, tag := range tags {

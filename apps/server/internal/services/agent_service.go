@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"strings"
+	"time"
 
 	"servify/apps/server/internal/models"
 	agentapp "servify/apps/server/internal/modules/agent/application"
@@ -106,6 +107,15 @@ func (s *AgentService) UpdateAgentStatus(ctx context.Context, userID uint, statu
 	s.syncLegacyRuntime(ctx)
 	s.logger.Infof("Agent %d status updated to %s", userID, status)
 	return nil
+}
+
+func (s *AgentService) RevokeAgentTokens(ctx context.Context, userID uint) (int, error) {
+	version, err := s.module.RevokeUserTokens(ctx, userID, time.Now().UTC())
+	if err != nil {
+		return 0, err
+	}
+	s.logger.Infof("Revoked tokens for agent %d, new token version %d", userID, version)
+	return version, nil
 }
 
 func (s *AgentService) AssignSessionToAgent(ctx context.Context, sessionID string, agentID uint) error {

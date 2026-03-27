@@ -469,6 +469,51 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/agents/{id}/revoke-tokens": {
+            "post": {
+                "description": "提升 token_version 并刷新 token_valid_after，使该客服旧 token 失效",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客服管理"
+                ],
+                "summary": "强制失效客服 token",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "客服用户ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/agents/{id}/status": {
             "put": {
                 "description": "更新客服的在线状态",
@@ -916,6 +961,51 @@ const docTemplate = `{
                                 "type": "string"
                             }
                         }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/customers/{id}/revoke-tokens": {
+            "post": {
+                "description": "提升 token_version 并刷新 token_valid_after，使该客户旧 token 失效",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "客户管理"
+                ],
+                "summary": "强制失效客户 token",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "客户ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1502,6 +1592,105 @@ const docTemplate = `{
                 "responses": {
                     "204": {
                         "description": "删除成功"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/security/users/{id}": {
+            "get": {
+                "description": "返回用户当前状态、token_version、token_valid_after 和最近登录时间",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "安全管理"
+                ],
+                "summary": "获取用户安全状态",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "用户ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/security/users/{id}/revoke-tokens": {
+            "post": {
+                "description": "提升 token_version 并刷新 token_valid_after，使该用户旧 token 失效",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "安全管理"
+                ],
+                "summary": "强制失效用户 token",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "用户ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
                     },
                     "400": {
                         "description": "Bad Request",
@@ -3911,6 +4100,9 @@ const docTemplate = `{
                     "description": "online, offline, busy",
                     "type": "string"
                 },
+                "tenant_id": {
+                    "type": "string"
+                },
                 "tickets": {
                     "type": "array",
                     "items": {
@@ -3929,6 +4121,9 @@ const docTemplate = `{
                 },
                 "user_id": {
                     "type": "integer"
+                },
+                "workspace_id": {
+                    "type": "string"
                 }
             }
         },
@@ -3966,6 +4161,9 @@ const docTemplate = `{
                     "description": "JSON condition expression",
                     "type": "string"
                 },
+                "tenant_id": {
+                    "type": "string"
+                },
                 "type": {
                     "description": "string, number, boolean, date, select, multiselect",
                     "type": "string"
@@ -3975,6 +4173,9 @@ const docTemplate = `{
                 },
                 "validation_json": {
                     "description": "JSON object (min/max/regex/etc)",
+                    "type": "string"
+                },
+                "workspace_id": {
                     "type": "string"
                 }
             }
@@ -4009,6 +4210,9 @@ const docTemplate = `{
                     "description": "标签，逗号分隔",
                     "type": "string"
                 },
+                "tenant_id": {
+                    "type": "string"
+                },
                 "updated_at": {
                     "type": "string"
                 },
@@ -4017,6 +4221,9 @@ const docTemplate = `{
                 },
                 "user_id": {
                     "type": "integer"
+                },
+                "workspace_id": {
+                    "type": "string"
                 }
             }
         },
@@ -4082,6 +4289,9 @@ const docTemplate = `{
                 "session_id": {
                     "type": "string"
                 },
+                "tenant_id": {
+                    "type": "string"
+                },
                 "type": {
                     "description": "text, image, file, system",
                     "type": "string"
@@ -4091,6 +4301,9 @@ const docTemplate = `{
                 },
                 "user_id": {
                     "type": "integer"
+                },
+                "workspace_id": {
+                    "type": "string"
                 }
             }
         },
@@ -4136,12 +4349,18 @@ const docTemplate = `{
                     "description": "逗号分隔标签，用于细分条件",
                     "type": "string"
                 },
+                "tenant_id": {
+                    "type": "string"
+                },
                 "updated_at": {
                     "type": "string"
                 },
                 "warning_threshold": {
                     "description": "触发告警的阈值（百分比）",
                     "type": "integer"
+                },
+                "workspace_id": {
+                    "type": "string"
                 }
             }
         },
@@ -4267,6 +4486,9 @@ const docTemplate = `{
                     "description": "active, ended, transferred",
                     "type": "string"
                 },
+                "tenant_id": {
+                    "type": "string"
+                },
                 "ticket": {
                     "$ref": "#/definitions/models.Ticket"
                 },
@@ -4281,6 +4503,9 @@ const docTemplate = `{
                 },
                 "user_id": {
                     "type": "integer"
+                },
+                "workspace_id": {
+                    "type": "string"
                 }
             }
         },
@@ -4372,10 +4597,16 @@ const docTemplate = `{
                     "description": "标签，逗号分隔",
                     "type": "string"
                 },
+                "tenant_id": {
+                    "type": "string"
+                },
                 "title": {
                     "type": "string"
                 },
                 "updated_at": {
+                    "type": "string"
+                },
+                "workspace_id": {
                     "type": "string"
                 }
             }
@@ -4527,10 +4758,16 @@ const docTemplate = `{
                 "session_summary": {
                     "type": "string"
                 },
+                "tenant_id": {
+                    "type": "string"
+                },
                 "to_agent_id": {
                     "type": "integer"
                 },
                 "transferred_at": {
+                    "type": "string"
+                },
+                "workspace_id": {
                     "type": "string"
                 }
             }
@@ -4579,6 +4816,12 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/models.Ticket"
                     }
+                },
+                "token_valid_after": {
+                    "type": "string"
+                },
+                "token_version": {
+                    "type": "integer"
                 },
                 "updated_at": {
                     "type": "string"
@@ -4743,6 +4986,12 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/models.Ticket"
                     }
+                },
+                "token_valid_after": {
+                    "type": "string"
+                },
+                "token_version": {
+                    "type": "integer"
                 },
                 "updated_at": {
                     "type": "string"

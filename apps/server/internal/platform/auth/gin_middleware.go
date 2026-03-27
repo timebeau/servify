@@ -14,6 +14,7 @@ type MiddlewareConfig struct {
 	Secret string
 	RBAC   config.RBACConfig
 	Now    func() time.Time
+	Policy TokenPolicy
 }
 
 func MiddlewareConfigFromApp(cfg *config.Config) MiddlewareConfig {
@@ -53,6 +54,16 @@ func AuthMiddleware(cfg MiddlewareConfig) gin.HandlerFunc {
 		}
 
 		claims := extractClaims(payload, resolver)
+		now := time.Now()
+		if cfg.Now != nil {
+			now = cfg.Now()
+		}
+		if cfg.Policy != nil {
+			if err := cfg.Policy(payload, claims, now); err != nil {
+				abortJSON(c, http.StatusUnauthorized, "Unauthorized", err.Error())
+				return
+			}
+		}
 		reqCtx := ContextWithScope(c.Request.Context(), claims.TenantID, claims.WorkspaceID)
 		c.Request = c.Request.WithContext(reqCtx)
 		if claims.HasUserID {

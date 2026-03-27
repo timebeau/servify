@@ -173,3 +173,73 @@ func TestBuildRouter_PublicRoutesRemainAnonymous(t *testing.T) {
 		t.Fatalf("expected 200 got %d body=%s", w.Code, w.Body.String())
 	}
 }
+
+func TestBuildRouter_UserSecurityRouteRequiresSecurityPermission(t *testing.T) {
+	router := BuildRouter(Dependencies{
+		Config: testRouterConfig(),
+	})
+
+	t.Run("agent token without security permission rejected on revoke", func(t *testing.T) {
+		token := createTestHS256JWT(t, map[string]interface{}{
+			"user_id":        7,
+			"principal_kind": "agent",
+			"roles":          []string{"agent"},
+		}, "test-secret")
+
+		req := httptest.NewRequest(http.MethodPost, "/api/security/users/1/revoke-tokens", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		if w.Code != http.StatusForbidden {
+			t.Fatalf("expected 403 got %d body=%s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("agent token without security permission rejected on read", func(t *testing.T) {
+		token := createTestHS256JWT(t, map[string]interface{}{
+			"user_id":        7,
+			"principal_kind": "agent",
+			"roles":          []string{"agent"},
+		}, "test-secret")
+
+		req := httptest.NewRequest(http.MethodGet, "/api/security/users/1", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		if w.Code != http.StatusForbidden {
+			t.Fatalf("expected 403 got %d body=%s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("admin token passes authz layer on revoke", func(t *testing.T) {
+		token := createTestHS256JWT(t, map[string]interface{}{
+			"user_id":        1,
+			"principal_kind": "admin",
+			"roles":          []string{"admin"},
+		}, "test-secret")
+
+		req := httptest.NewRequest(http.MethodPost, "/api/security/users/1/revoke-tokens", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		if w.Code != http.StatusNotFound && w.Code != http.StatusOK {
+			t.Fatalf("expected authz to pass and reach handler, got %d body=%s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("admin token passes authz layer on read", func(t *testing.T) {
+		token := createTestHS256JWT(t, map[string]interface{}{
+			"user_id":        1,
+			"principal_kind": "admin",
+			"roles":          []string{"admin"},
+		}, "test-secret")
+
+		req := httptest.NewRequest(http.MethodGet, "/api/security/users/1", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		if w.Code != http.StatusNotFound && w.Code != http.StatusOK {
+			t.Fatalf("expected authz to pass and reach handler, got %d body=%s", w.Code, w.Body.String())
+		}
+	})
+}

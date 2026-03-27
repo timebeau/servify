@@ -49,6 +49,10 @@ func (r *legacyAdapterRepo) GetStats(ctx context.Context, agentUserID *uint) (*a
 	return &agentapp.AgentStatsDTO{}, nil
 }
 
+func (r *legacyAdapterRepo) RevokeUserTokens(ctx context.Context, userID uint, revokeAt time.Time) (int, error) {
+	return 0, nil
+}
+
 type legacyAdapterRegistry struct {
 	items map[uint]agentapp.AgentRuntimeDTO
 }

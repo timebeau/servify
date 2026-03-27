@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"time"
 
 	"servify/apps/server/internal/models"
 	agentdomain "servify/apps/server/internal/modules/agent/domain"
@@ -154,6 +155,16 @@ func (s *Service) GetStats(ctx context.Context, agentUserID *uint) (*AgentStatsD
 		}
 	}
 	return stats, nil
+}
+
+func (s *Service) RevokeUserTokens(ctx context.Context, userID uint, revokeAt time.Time) (int, error) {
+	if userID == 0 {
+		return 0, fmt.Errorf("user_id required")
+	}
+	if revokeAt.IsZero() {
+		revokeAt = time.Now().UTC()
+	}
+	return s.repo.RevokeUserTokens(ctx, userID, revokeAt)
 }
 
 func (s *Service) ApplySessionTransfer(ctx context.Context, sessionID string, fromAgentID *uint, toAgentID uint) error {

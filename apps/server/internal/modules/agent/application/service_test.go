@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"testing"
+	"time"
 
 	"servify/apps/server/internal/models"
 	agentdomain "servify/apps/server/internal/modules/agent/domain"
@@ -17,6 +18,8 @@ type stubRepo struct {
 	statusUpdates   []string
 	lastChatLoad    int
 	sessionAssigned string
+	tokenVersion    int
+	tokenRevokedAt  time.Time
 }
 
 func (s *stubRepo) CreateAgent(ctx context.Context, userID uint, department string, skills []string, maxChatConcurrency int) (*agentdomain.AgentProfile, error) {
@@ -76,6 +79,12 @@ func (s *stubRepo) GetStats(ctx context.Context, agentUserID *uint) (*AgentStats
 	return s.stats, nil
 }
 
+func (s *stubRepo) RevokeUserTokens(ctx context.Context, userID uint, revokeAt time.Time) (int, error) {
+	s.tokenRevokedAt = revokeAt
+	s.tokenVersion++
+	return s.tokenVersion, nil
+}
+
 func TestServiceGoOnlineAndAssignSession(t *testing.T) {
 	repo := &stubRepo{
 		profile: &agentdomain.AgentProfile{
@@ -107,6 +116,22 @@ func TestServiceGoOnlineAndAssignSession(t *testing.T) {
 	}
 	if repo.lastChatLoad != 1 {
 		t.Fatalf("UpdateChatLoad() = %d, want 1", repo.lastChatLoad)
+	}
+}
+
+func TestServiceRevokeUserTokens(t *testing.T) {
+	repo := &stubRepo{tokenVersion: 1}
+	svc := NewService(repo, newStubRegistry())
+
+	version, err := svc.RevokeUserTokens(context.Background(), 7, time.Time{})
+	if err != nil {
+		t.Fatalf("RevokeUserTokens() error = %v", err)
+	}
+	if version != 2 {
+		t.Fatalf("RevokeUserTokens() version = %d, want 2", version)
+	}
+	if repo.tokenRevokedAt.IsZero() {
+		t.Fatal("expected token revoke time to be set")
 	}
 }
 

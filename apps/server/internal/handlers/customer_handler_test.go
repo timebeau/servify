@@ -61,6 +61,7 @@ func TestCustomerHandler_Create_Get_Update_List(t *testing.T) {
 	r.GET("/api/customers", h.ListCustomers)
 	r.GET("/api/customers/:id", h.GetCustomer)
 	r.PUT("/api/customers/:id", h.UpdateCustomer)
+	r.POST("/api/customers/:id/revoke-tokens", h.RevokeCustomerTokens)
 
 	// Create
 	createBody := map[string]any{
@@ -111,6 +112,14 @@ func TestCustomerHandler_Create_Get_Update_List(t *testing.T) {
 	r.ServeHTTP(w4, req4)
 	if w4.Code != http.StatusOK {
 		t.Fatalf("list status=%d body=%s", w4.Code, w4.Body.String())
+	}
+
+	// Revoke tokens
+	w5 := httptest.NewRecorder()
+	req5, _ := http.NewRequest(http.MethodPost, "/api/customers/"+toStr(created.ID)+"/revoke-tokens", nil)
+	r.ServeHTTP(w5, req5)
+	if w5.Code != http.StatusOK {
+		t.Fatalf("revoke tokens status=%d body=%s", w5.Code, w5.Body.String())
 	}
 }
 

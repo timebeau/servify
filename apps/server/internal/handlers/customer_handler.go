@@ -140,6 +140,45 @@ func (h *CustomerHandler) UpdateCustomer(c *gin.Context) {
 	c.JSON(http.StatusOK, customer)
 }
 
+// RevokeCustomerTokens 强制失效客户已有 token
+// @Summary 强制失效客户 token
+// @Description 提升 token_version 并刷新 token_valid_after，使该客户旧 token 失效
+// @Tags 客户管理
+// @Accept json
+// @Produce json
+// @Param id path int true "客户ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/customers/{id}/revoke-tokens [post]
+func (h *CustomerHandler) RevokeCustomerTokens(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "Invalid customer ID",
+			Message: "ID must be a valid number",
+		})
+		return
+	}
+
+	version, err := h.customerService.RevokeCustomerTokens(c.Request.Context(), uint(id))
+	if err != nil {
+		h.logger.Errorf("Failed to revoke customer %d tokens: %v", id, err)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "Failed to revoke customer tokens",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":       "Customer tokens revoked successfully",
+		"customer_id":   id,
+		"token_version": version,
+	})
+}
+
 // ListCustomers 获取客户列表
 // @Summary 获取客户列表
 // @Description 获取客户列表，支持分页和过滤
@@ -372,6 +411,7 @@ func RegisterCustomerRoutes(r *gin.RouterGroup, handler *CustomerHandler) {
 		customers.GET("/stats", handler.GetCustomerStats)
 		customers.GET("/:id", handler.GetCustomer)
 		customers.PUT("/:id", handler.UpdateCustomer)
+		customers.POST("/:id/revoke-tokens", handler.RevokeCustomerTokens)
 		customers.GET("/:id/activity", handler.GetCustomerActivity)
 		customers.POST("/:id/notes", handler.AddCustomerNote)
 		customers.PUT("/:id/tags", handler.UpdateCustomerTags)

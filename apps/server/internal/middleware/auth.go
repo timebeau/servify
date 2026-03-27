@@ -8,8 +8,10 @@ import (
 )
 
 // AuthMiddleware keeps the legacy middleware entrypoint but delegates to platform/auth.
-func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
-	return platformauth.AuthMiddleware(platformauth.MiddlewareConfigFromApp(cfg))
+func AuthMiddleware(cfg *config.Config, policies ...platformauth.TokenPolicy) gin.HandlerFunc {
+	mwCfg := platformauth.MiddlewareConfigFromApp(cfg)
+	mwCfg.Policy = platformauth.ComposeTokenPolicies(policies...)
+	return platformauth.AuthMiddleware(mwCfg)
 }
 
 // EnforceRequestScope keeps the compatibility layer aligned with platform/auth scope rules.

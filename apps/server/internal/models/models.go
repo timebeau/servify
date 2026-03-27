@@ -7,18 +7,20 @@ import (
 
 // 用户模型
 type User struct {
-	ID        uint           `gorm:"primaryKey" json:"id"`
-	Username  string         `gorm:"unique;not null" json:"username"`
-	Email     string         `gorm:"unique;not null" json:"email"`
-	Name      string         `json:"name"`
-	Phone     string         `json:"phone"`
-	Avatar    string         `json:"avatar"`
-	Role      string         `gorm:"default:'customer'" json:"role"` // customer, agent, admin
-	Status    string         `gorm:"default:'active'" json:"status"` // active, inactive, banned
-	LastLogin *time.Time     `json:"last_login"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	ID              uint           `gorm:"primaryKey" json:"id"`
+	Username        string         `gorm:"unique;not null" json:"username"`
+	Email           string         `gorm:"unique;not null" json:"email"`
+	Name            string         `json:"name"`
+	Phone           string         `json:"phone"`
+	Avatar          string         `json:"avatar"`
+	Role            string         `gorm:"default:'customer'" json:"role"` // customer, agent, admin
+	Status          string         `gorm:"default:'active'" json:"status"` // active, inactive, banned
+	LastLogin       *time.Time     `json:"last_login"`
+	TokenValidAfter *time.Time     `json:"token_valid_after,omitempty"`
+	TokenVersion    int            `gorm:"default:0" json:"token_version"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
 
 	// 关联关系
 	Sessions []Session `gorm:"foreignKey:UserID" json:"sessions,omitempty"`

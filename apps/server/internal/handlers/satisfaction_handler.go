@@ -320,7 +320,10 @@ func (h *SatisfactionHandler) ResendSurvey(c *gin.Context) {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/tickets/{ticket_id}/satisfaction [get]
 func (h *SatisfactionHandler) GetSatisfactionByTicket(c *gin.Context) {
-	ticketIDStr := c.Param("id")
+	ticketIDStr := c.Param("ticket_id")
+	if ticketIDStr == "" {
+		ticketIDStr = c.Param("id")
+	}
 	ticketID, err := strconv.ParseUint(ticketIDStr, 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{

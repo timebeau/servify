@@ -116,4 +116,11 @@
 - 已新增 `config.production.secure.example.yml`，提供启用限流、收紧 CORS、使用环境变量注入 secrets 的生产示例模板
 - 已新增 `docs/public-surface-security-checklist.md`，收口匿名 / 对外开放接口的最小评审项与逐类入口检查清单
 - 已新增 bootstrap 启动安全告警，对默认 `jwt.secret`、开放式 CORS、关闭限流、空 provider key 等高风险配置输出 warning
-- 当前仍缺更细粒度的 token 吊销 / refresh token 策略实现，以及把开放接口 checklist 转成代码层强制校验的机制
+- 启动安全告警现已进一步覆盖匿名入口限流基线，若 `/public/` 或 `/api/v1/ws` 未配置独立路径级 rate limit，会在启动时明确告警
+- `internal/platform/auth` 现已新增可组合 token policy 钩子，支持按 `iat` 做 issued-before 失效、按 `token_version` 做最小会话版本淘汰，为后续账号级吊销策略预留接入点
+- `internal/platform/auth` 现已新增基于 `users` 表状态的 token policy，并接入 router auth middleware：非 active 用户会被拒绝，设置 `token_valid_after` / `token_version` 后可使旧 token 失效
+- agent 管理面现已新增 `POST /api/agents/:id/revoke-tokens`，可主动提升用户 `token_version` 并刷新 `token_valid_after`，将旧 token 作废
+- customer 管理面现已新增 `POST /api/customers/:id/revoke-tokens`，可对受作用域约束的客户账号主动触发旧 token 失效
+- token 主动失效底层逻辑现已收敛到 `internal/platform/usersecurity`，agent/customer 两条管理面路径复用同一套 `token_valid_after + token_version` 更新实现
+- 管理面现已新增统一 `security` surface：`GET /api/security/users/:id` 可查询用户安全状态，`POST /api/security/users/:id/revoke-tokens` 可执行通用 user revoke，分别由 `security.read` / `security.write` 权限保护
+- 当前仍缺 refresh token / revoke list 等更细粒度失效实现，以及批量失效、审批回滚等更完整的 user security 操作能力

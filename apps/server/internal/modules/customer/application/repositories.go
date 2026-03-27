@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"time"
 
 	"servify/apps/server/internal/models"
 )
@@ -15,4 +16,5 @@ type Repository interface {
 	AddNote(ctx context.Context, customerID uint, note CustomerNoteDTO) error
 	UpdateTags(ctx context.Context, customerID uint, tags []string) error
 	GetStats(ctx context.Context) (*CustomerStatsDTO, error)
+	RevokeCustomerTokens(ctx context.Context, customerID uint, revokeAt time.Time) (int, error)
 }
