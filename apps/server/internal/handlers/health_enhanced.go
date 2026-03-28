@@ -68,7 +68,7 @@ func (h *EnhancedHealthHandler) Health(c *gin.Context) {
 		System: SystemInfo{
 			Uptime:    time.Since(startTime),
 			Version:   "1.1.0",
-			GoVersion: "1.21+",
+			GoVersion: "1.25+",
 		},
 	}
 

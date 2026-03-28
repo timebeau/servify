@@ -63,7 +63,7 @@
 
 | 组件 | 版本 | 说明 |
 |------|------|------|
-| Go | 1.21+ | 服务端编译 |
+| Go | 1.25+ | 服务端编译 |
 | Node.js | 20+ | SDK 构建、网站 |
 | Docker | 24+ | 容器化部署 |
 | Docker Compose | v2+ | 编排 |
@@ -225,7 +225,7 @@ docker build -t servify:v0.1.0 -t servify:latest .
 ```
 
 镜像特点：
-- 基于 `golang:1.21-alpine` 编译，`alpine` 运行
+- 基于 `golang:1.25-alpine` 编译，`alpine` 运行
 - 静态编译（`CGO_ENABLED=0`），无外部依赖
 - 镜像大小约 20-30 MB
 
