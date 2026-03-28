@@ -293,6 +293,53 @@ jobs:
           chmod +x scripts/run-smoke-tests.sh
           ./scripts/run-smoke-tests.sh
 
+  admin-checks:
+    name: Admin Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('apps/admin/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install admin dependencies
+        run: pnpm --dir apps/admin install --frozen-lockfile
+
+      - name: Build admin frontend
+        run: pnpm --dir apps/admin run build
+
+      - name: Upload admin build artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-dist
+          path: apps/admin/dist
+          if-no-files-found: warn
+
   integration:
     name: Integration
     runs-on: ubuntu-latest
@@ -302,6 +349,7 @@ jobs:
       - docs-checks
       - script-checks
       - smoke-checks
+      - admin-checks
     timeout-minutes: 25
     defaults:
       run:

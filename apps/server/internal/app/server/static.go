@@ -18,18 +18,36 @@ var defaultStaticRoots = []string{
 	"/app/apps/admin",
 }
 
+// demoStaticDirs contains paths that serve the demo site and SDK assets.
+var demoStaticDirs = []string{
+	"./apps/demo",
+	"./apps/demo-sdk",
+}
+
 func registerStatic(r staticRegistrar) {
 	root := detectStaticRoot(defaultStaticRoots)
-	// Use NoRoute to serve static files as a fallback
+
+	// Serve demo-sdk assets directly (no auth)
 	r.NoRoute(func(c *gin.Context) {
+		path := c.Request.URL.Path
+
 		// Don't handle API routes
-		if strings.HasPrefix(c.Request.URL.Path, "/api") || strings.HasPrefix(c.Request.URL.Path, "/public") {
+		if strings.HasPrefix(path, "/api") || strings.HasPrefix(path, "/public") {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 			return
 		}
 
-		// Try to serve the requested file
-		reqPath := c.Request.URL.Path
+		// Serve demo-sdk assets from ./apps/demo-sdk/
+		if rest, ok := strings.CutPrefix(path, "/demo-sdk/"); ok {
+			filePath := filepath.Join(".", "apps", "demo-sdk", filepath.Clean(rest))
+			if _, err := os.Stat(filePath); err == nil {
+				c.File(filePath)
+				return
+			}
+		}
+
+		// Try to serve the requested file from admin dist
+		reqPath := path
 		if reqPath == "/" {
 			reqPath = "/index.html"
 		}

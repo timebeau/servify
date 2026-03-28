@@ -1,58 +1,337 @@
-(function(root){
-  function $(sel, ctx){ return (ctx||document).querySelector(sel); }
-  function el(tag, cls, text){ const e=document.createElement(tag); if(cls) e.className=cls; if(text) e.textContent=text; return e; }
+/**
+ * Servify Widget — 可嵌入的客服聊天组件
+ *
+ * 使用方式:
+ *   <link rel="stylesheet" href="/demo-sdk/widget.css">
+ *   <script src="/demo-sdk/servify-sdk.umd.js"></script>
+ *   <script src="/demo-sdk/widget.js"></script>
+ *   <script>
+ *     ServifyWidget.create({
+ *       baseUrl: 'http://localhost:8080',
+ *       sessionId: 'optional-custom-session-id',
+ *       primaryColor: '#667eea'  // optional
+ *     });
+ *   </script>
+ *
+ * 或自动初始化:
+ *   <script src="/demo-sdk/servify-sdk.umd.js" data-servify-sdk></script>
+ *   <script src="/demo-sdk/widget.js" data-servify-widget data-base-url="http://localhost:8080"></script>
+ */
+(function (root) {
+  'use strict';
 
-  function createWidget(opts){
+  function $(sel, ctx) { return (ctx || document).querySelector(sel); }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text) e.textContent = text;
+    return e;
+  }
+
+  // ── WebSocket-only lightweight client ──────────────────────────
+  // 不依赖 SDK REST API（那些需要认证），直接通过 WebSocket 收发消息
+  function WSClient(opts) {
+    this.url = opts.wsUrl;
+    this.sessionId = opts.sessionId || ('ws_' + Date.now());
+    this.ws = null;
+    this.listeners = {};
+    this.reconnectAttempts = 0;
+    this.maxReconnect = 5;
+    this.isManualClose = false;
+  }
+
+  WSClient.prototype.on = function (event, fn) {
+    if (!this.listeners[event]) this.listeners[event] = [];
+    this.listeners[event].push(fn);
+  };
+
+  WSClient.prototype.emit = function (event) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    var fns = this.listeners[event] || [];
+    for (var i = 0; i < fns.length; i++) {
+      try { fns[i].apply(null, args); } catch (e) { console.error('[ServifyWidget]', e); }
+    }
+  };
+
+  WSClient.prototype.connect = function () {
+    var self = this;
+    self.isManualClose = false;
+
+    var url = self.url + '?session_id=' + encodeURIComponent(self.sessionId);
+    self.emit('status', 'connecting');
+
+    try {
+      self.ws = new WebSocket(url);
+    } catch (e) {
+      self.emit('status', 'error');
+      self.emit('error', e);
+      return;
+    }
+
+    self.ws.onopen = function () {
+      self.reconnectAttempts = 0;
+      self.emit('status', 'connected');
+    };
+
+    self.ws.onmessage = function (evt) {
+      try {
+        var msg = JSON.parse(evt.data);
+        self.emit('message', msg);
+      } catch (e) {
+        // ignore non-JSON
+      }
+    };
+
+    self.ws.onclose = function () {
+      self.emit('status', 'disconnected');
+      if (!self.isManualClose && self.reconnectAttempts < self.maxReconnect) {
+        self.reconnectAttempts++;
+        var delay = Math.min(1000 * Math.pow(2, self.reconnectAttempts - 1), 10000);
+        setTimeout(function () { self.connect(); }, delay);
+      }
+    };
+
+    self.ws.onerror = function () {
+      self.emit('status', 'error');
+    };
+  };
+
+  WSClient.prototype.send = function (text) {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      this.emit('error', new Error('未连接'));
+      return;
+    }
+    var msg = {
+      type: 'text-message',
+      data: { content: text },
+      session_id: this.sessionId,
+      timestamp: new Date().toISOString()
+    };
+    this.ws.send(JSON.stringify(msg));
+  };
+
+  WSClient.prototype.disconnect = function () {
+    this.isManualClose = true;
+    if (this.ws) { this.ws.close(); this.ws = null; }
+  };
+
+  WSClient.prototype.isConnected = function () {
+    return this.ws && this.ws.readyState === WebSocket.OPEN;
+  };
+
+  // ── Widget UI ──────────────────────────────────────────────────
+
+  function createWidget(opts) {
     opts = opts || {};
-    const baseUrl = opts.baseUrl || (location.origin);
-    const sessionId = opts.sessionId || ('w_'+Date.now());
+    var baseUrl = opts.baseUrl || (location.protocol + '//' + location.host);
+    var sessionId = opts.sessionId || '';
+    var primaryColor = opts.primaryColor || '#667eea';
+    var wsUrl = baseUrl.replace(/^http/, 'ws') + '/api/v1/ws';
 
-    // ensure SDK available (UMD)
-    var Servify = root.Servify;
-    if (!Servify) { console.error('Servify SDK not found. Include /sdk/servify-sdk.umd.js first.'); return; }
-    const client = Servify.createClient({ baseUrl, sessionId });
+    // Create DOM
+    var wrap = el('div', 'servify-widget');
+    wrap.setAttribute('data-servify', '');
 
-    const wrap = el('div', 'servify-widget');
-    const btn = el('button', 'btn'); btn.innerHTML = '💬';
-    const panel = el('div', 'panel');
-    const header = el('header', '', 'Servify 在线客服');
-    const status = el('div', 'status', '连接中...');
-    const msgs = el('div', 'messages');
-    const inputWrap = el('div', 'input');
-    const input = el('input'); input.placeholder = '输入消息...';
-    const sendBtn = el('button', '', '发送');
+    // Toggle button
+    var btn = el('button', 'sw-trigger');
+    btn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+    btn.setAttribute('title', '在线客服');
+    btn.style.background = primaryColor;
 
-    inputWrap.appendChild(input); inputWrap.appendChild(sendBtn);
-    panel.appendChild(header); panel.appendChild(status); panel.appendChild(msgs); panel.appendChild(inputWrap);
-    wrap.appendChild(btn); wrap.appendChild(panel);
+    // Close icon
+    var closeSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+
+    // Panel
+    var panel = el('div', 'sw-panel');
+    var header = el('div', 'sw-header');
+    header.style.background = 'linear-gradient(135deg, ' + primaryColor + ', ' + adjustColor(primaryColor, -30) + ')';
+    var headerTitle = el('div', 'sw-header-title', '在线客服');
+    var headerStatus = el('div', 'sw-header-status', '未连接');
+    headerStatus.style.opacity = '0.75';
+    headerStatus.style.fontSize = '12px';
+    var closeBtn = el('button', 'sw-close');
+    closeBtn.innerHTML = closeSvg;
+    header.appendChild(headerTitle);
+    header.appendChild(headerStatus);
+    header.appendChild(closeBtn);
+
+    var msgs = el('div', 'sw-messages');
+    var inputArea = el('div', 'sw-input-area');
+    var input = el('input', 'sw-input');
+    input.type = 'text';
+    input.placeholder = '输入消息...';
+    var sendBtn = el('button', 'sw-send-btn', '发送');
+    sendBtn.style.background = primaryColor;
+
+    inputArea.appendChild(input);
+    inputArea.appendChild(sendBtn);
+    panel.appendChild(header);
+    panel.appendChild(msgs);
+    panel.appendChild(inputArea);
+    wrap.appendChild(btn);
+    wrap.appendChild(panel);
+
+    // Inject styles
+    if (!document.getElementById('servify-widget-styles')) {
+      var style = document.createElement('style');
+      style.id = 'servify-widget-styles';
+      style.textContent = getStyles(primaryColor);
+      document.head.appendChild(style);
+    }
+
     document.body.appendChild(wrap);
 
-    function addMsg(role, content){
-      const m = el('div', 'msg '+role);
-      const b = el('div', 'bubble', content);
+    // ── Client ────────────────────────────────────────────────
+
+    var client = new WSClient({ wsUrl: wsUrl, sessionId: sessionId });
+    var panelOpen = false;
+    var connected = false;
+
+    function togglePanel() {
+      panelOpen = !panelOpen;
+      if (panelOpen) {
+        panel.classList.add('open');
+        btn.innerHTML = closeSvg;
+        btn.style.borderRadius = '50%';
+        input.focus();
+        if (!connected) client.connect();
+      } else {
+        panel.classList.remove('open');
+        btn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+      }
+    }
+
+    btn.addEventListener('click', togglePanel);
+    closeBtn.addEventListener('click', function () {
+      if (panelOpen) togglePanel();
+    });
+
+    function addMsg(role, content) {
+      var m = el('div', 'sw-msg sw-msg-' + role);
+      var b = el('div', 'sw-bubble', content);
       m.appendChild(b);
       msgs.appendChild(m);
       msgs.scrollTop = msgs.scrollHeight;
     }
 
-    btn.addEventListener('click', () => panel.classList.toggle('open'));
-    sendBtn.addEventListener('click', () => { if (!input.value.trim()) return; client.sendMessage(input.value.trim()); addMsg('user', input.value.trim()); input.value=''; });
-    input.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); sendBtn.click(); }});
+    function sendMsg() {
+      var text = input.value.trim();
+      if (!text) return;
+      addMsg('user', text);
+      input.value = '';
+      client.send(text);
+    }
 
-    client.on('status', (s) => status.textContent = '状态: '+s);
-    client.on('ai', (m) => addMsg('ai', m.content || ''));
-    client.on('message', (m) => { if (m && m.type==='text-message') addMsg('user', m.data?.content||''); });
-    client.connect();
+    sendBtn.addEventListener('click', sendMsg);
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); sendMsg(); }
+    });
 
-    return { mount: wrap, client };
+    // Welcome message
+    addMsg('bot', '您好！欢迎来到 Servify Demo。请问有什么可以帮您的？');
+
+    // Client events
+    client.on('status', function (s) {
+      connected = s === 'connected';
+      var label = { connecting: '连接中...', connected: '已连接', disconnected: '连接断开', error: '连接失败' };
+      headerStatus.textContent = label[s] || s;
+      if (s === 'connected') {
+        input.placeholder = '输入消息...';
+      } else {
+        input.placeholder = s === 'connecting' ? '正在连接...' : '未连接';
+      }
+    });
+
+    client.on('message', function (msg) {
+      if (!msg) return;
+
+      // AI response
+      if (msg.type === 'ai-response' && msg.data) {
+        var data = msg.data;
+        if (typeof data === 'object' && data.content) {
+          addMsg('bot', data.content);
+        } else if (typeof data === 'string') {
+          addMsg('bot', data);
+        }
+        return;
+      }
+
+      // Echo of own text message (broadcast from hub)
+      if (msg.type === 'text-message' && msg.data) {
+        // This is broadcast back to us — skip to avoid duplicate
+        return;
+      }
+
+      // Any other message type
+      if (msg.data) {
+        var content = typeof msg.data === 'object'
+          ? (msg.data.content || JSON.stringify(msg.data))
+          : String(msg.data);
+        if (content) addMsg('bot', content);
+      }
+    });
+
+    client.on('error', function (e) {
+      console.warn('[ServifyWidget] Error:', e);
+    });
+
+    return { mount: wrap, client: client };
   }
+
+  // ── Inline CSS ─────────────────────────────────────────────────
+
+  function getStyles(color) {
+    return '\
+.servify-widget { position:fixed; right:24px; bottom:24px; z-index:99999; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; font-size:14px; }\
+.servify-widget * { box-sizing:border-box; }\
+.servify-widget .sw-trigger { width:56px; height:56px; border-radius:50%; border:none; color:#fff; cursor:pointer; box-shadow:0 4px 16px rgba(0,0,0,.25); display:flex; align-items:center; justify-content:center; transition:transform .2s,box-shadow .2s; }\
+.servify-widget .sw-trigger:hover { transform:scale(1.1); box-shadow:0 6px 24px rgba(0,0,0,.3); }\
+.servify-widget .sw-panel { position:absolute; right:0; bottom:68px; width:380px; height:520px; background:#fff; border-radius:16px; box-shadow:0 8px 40px rgba(0,0,0,.15); display:none; flex-direction:column; overflow:hidden; }\
+.servify-widget .sw-panel.open { display:flex; }\
+.servify-widget .sw-header { padding:16px; color:#fff; display:flex; align-items:center; justify-content:space-between; }\
+.servify-widget .sw-header-title { font-size:16px; font-weight:600; flex:1; }\
+.servify-widget .sw-header-status { margin:0 12px; }\
+.servify-widget .sw-close { background:none; border:none; color:#fff; cursor:pointer; opacity:.8; padding:4px; display:flex; align-items:center; }\
+.servify-widget .sw-close:hover { opacity:1; }\
+.servify-widget .sw-messages { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px; background:#fafafa; }\
+.servify-widget .sw-msg { max-width:80%; }\
+.servify-widget .sw-bubble { padding:10px 14px; border-radius:12px; line-height:1.5; word-break:break-word; }\
+.servify-widget .sw-msg-user { align-self:flex-end; }\
+.servify-widget .sw-msg-user .sw-bubble { background:' + color + '; color:#fff; border-bottom-right-radius:4px; }\
+.servify-widget .sw-msg-bot { align-self:flex-start; }\
+.servify-widget .sw-msg-bot .sw-bubble { background:#f0f0f0; color:#333; border-bottom-left-radius:4px; }\
+.servify-widget .sw-input-area { padding:12px; border-top:1px solid #eee; display:flex; gap:8px; background:#fff; }\
+.servify-widget .sw-input { flex:1; padding:10px 14px; border:1px solid #ddd; border-radius:20px; font-size:14px; outline:none; transition:border-color .2s; }\
+.servify-widget .sw-input:focus { border-color:' + color + '; }\
+.servify-widget .sw-send-btn { padding:10px 16px; border-radius:20px; border:none; color:#fff; cursor:pointer; font-size:14px; font-weight:500; transition:opacity .2s; }\
+.servify-widget .sw-send-btn:hover { opacity:.9; }\
+@media (max-width:480px) {\
+  .servify-widget .sw-panel { width:calc(100vw - 32px); right:-8px; height:60vh; bottom:72px; }\
+}';
+  }
+
+  function adjustColor(hex, amount) {
+    var num = parseInt(hex.replace('#', ''), 16);
+    var r = Math.min(255, Math.max(0, (num >> 16) + amount));
+    var g = Math.min(255, Math.max(0, ((num >> 8) & 0x00FF) + amount));
+    var b = Math.min(255, Math.max(0, (num & 0x0000FF) + amount));
+    return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  }
+
+  // ── Exports ─────────────────────────────────────────────────────
 
   root.ServifyWidget = { create: createWidget };
 
-  // auto init by <script data-servify-widget> if present
-  if (document.currentScript && document.currentScript.hasAttribute('data-servify-widget')){
-    var baseUrl = document.currentScript.getAttribute('data-base-url') || location.origin;
-    var sessionId = document.currentScript.getAttribute('data-session-id') || '';
-    createWidget({ baseUrl: baseUrl, sessionId: sessionId });
+  // Auto init
+  if (document.currentScript && document.currentScript.hasAttribute('data-servify-widget')) {
+    var baseUrl = document.currentScript.getAttribute('data-base-url') || (location.protocol + '//' + location.host);
+    var sid = document.currentScript.getAttribute('data-session-id') || '';
+    var color = document.currentScript.getAttribute('data-primary-color') || '#667eea';
+    // Defer to allow DOM ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () { createWidget({ baseUrl: baseUrl, sessionId: sid, primaryColor: color }); });
+    } else {
+      createWidget({ baseUrl: baseUrl, sessionId: sid, primaryColor: color });
+    }
   }
-})(this);
+})(typeof window !== 'undefined' ? window : this);
