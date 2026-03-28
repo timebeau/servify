@@ -1,0 +1,108 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Conversations Created",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(conversations_created_total[5m])) by (channel)",
+          "legendFormat": "{{channel}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops/s" }
+      }
+    },
+    {
+      "title": "Tickets: Created vs Resolved",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(tickets_created_total[5m]))",
+          "legendFormat": "created"
+        },
+        {
+          "expr": "sum(rate(tickets_resolved_total[5m]))",
+          "legendFormat": "resolved"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops/s" }
+      }
+    },
+    {
+      "title": "Routing Decisions",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(routing_decisions_total[5m])) by (strategy, outcome)",
+          "legendFormat": "{{strategy}}/{{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops/s" }
+      }
+    },
+    {
+      "title": "AI Request Volume",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(ai_requests_total[5m])) by (provider, outcome)",
+          "legendFormat": "{{provider}}/{{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops/s" }
+      }
+    },
+    {
+      "title": "AI Request Latency",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(ai_request_duration_seconds_bucket[5m])) by (le, provider))",
+          "legendFormat": "{{provider}} p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(ai_request_duration_seconds_bucket[5m])) by (le, provider))",
+          "legendFormat": "{{provider}} p95"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s" }
+      }
+    },
+    {
+      "title": "LLM Token Consumption",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum(rate(ai_llm_tokens_total[1h])) by (provider, token_type)",
+          "legendFormat": "{{provider}}/{{token_type}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "tokens/h" }
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["servify", "business"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "Servify - Business Metrics",
+  "uid": "servify-business"
+}

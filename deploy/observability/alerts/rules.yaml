@@ -1,0 +1,113 @@
+groups:
+  - name: servify.infrastructure
+    rules:
+      - alert: HighHTTP5xxRate
+        expr: |
+          sum(rate(http_requests_total{status_code=~"5.."}[5m]))
+          / sum(rate(http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "HTTP 5xx error rate exceeds 5%"
+          description: "Current 5xx rate is {{ $value | humanizePercentage }}."
+
+      - alert: HighP99Latency
+        expr: |
+          histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P99 HTTP latency exceeds 5 seconds"
+          description: "Current P99 latency is {{ $value }}s."
+
+      - alert: HighRateLimitDrops
+        expr: sum(rate(ratelimit_dropped_total[5m])) > 10
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: "High rate of rate-limited requests"
+          description: "Rate limit drops at {{ $value }}/s for prefix {{ $labels.prefix }}."
+
+      - alert: HighGoroutineCount
+        expr: go_goroutines > 10000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Goroutine count exceeds 10000"
+          description: "Current goroutine count is {{ $value }}."
+
+  - name: servify.errors
+    rules:
+      - alert: HighSystemErrorRate
+        expr: sum(rate(errors_total{severity="system"}[5m])) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High system error rate in module {{ $labels.error_module }}"
+          description: "System errors in {{ $labels.error_module }} at {{ $value }}/s."
+
+      - alert: HighDependencyErrorRate
+        expr: sum(rate(errors_total{severity="dependency"}[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High dependency error rate in {{ $labels.error_module }}"
+          description: "Dependency errors in {{ $labels.error_module }} at {{ $value }}/s."
+
+  - name: servify.eventbus
+    rules:
+      - alert: EventBusHandlerFailures
+        expr: sum(rate(eventbus_failed_total[5m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Event bus handler failures for {{ $labels.event_type }}"
+          description: "Event handler failures at {{ $value }}/s."
+
+      - alert: EventBusDeadLetters
+        expr: sum(rate(eventbus_dead_letter_total[5m])) > 0
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "Events being dead-lettered for {{ $labels.event_type }}"
+
+  - name: servify.workers
+    rules:
+      - alert: WorkerJobFailures
+        expr: sum(rate(worker_jobs_total{outcome="failure"}[5m])) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Worker {{ $labels.worker_name }} is failing"
+          description: "Worker failure rate at {{ $value }}/s."
+
+  - name: servify.ai
+    rules:
+      - alert: AIProviderDegraded
+        expr: |
+          sum(rate(ai_requests_total{outcome="failure"}[5m]))
+          / sum(rate(ai_requests_total[5m])) > 0.2
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AI provider failure rate exceeds 20% for {{ $labels.provider }}"
+          description: "AI provider {{ $labels.provider }} failure rate is {{ $value | humanizePercentage }}."
+
+      - alert: AIHighLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(ai_request_duration_seconds_bucket[5m])) by (le, provider)) > 10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AI provider {{ $labels.provider }} P95 latency exceeds 10s"

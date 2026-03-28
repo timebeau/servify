@@ -14,6 +14,7 @@ import (
 	conversationinfra "servify/apps/server/internal/modules/conversation/infra"
 	customerdelivery "servify/apps/server/internal/modules/customer/delivery"
 	knowledgedelivery "servify/apps/server/internal/modules/knowledge/delivery"
+	svcmetrics "servify/apps/server/internal/observability/metrics"
 	routingapp "servify/apps/server/internal/modules/routing/application"
 	routingdelivery "servify/apps/server/internal/modules/routing/delivery"
 	routinginfra "servify/apps/server/internal/modules/routing/infra"
@@ -66,6 +67,7 @@ type Runtime struct {
 	KnowledgeDocHandler      knowledgedelivery.HandlerService
 	SuggestionService        handlers.SuggestionService
 	GamificationService      handlers.GamificationService
+	HTTPMetrics              *svcmetrics.HTTPMetrics
 
 	// Private fields for worker access only
 	statisticsService *services.StatisticsService
@@ -83,6 +85,13 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 		Logger: logger,
 		DB:     db,
 		Bus:    bus,
+	}
+
+	// Initialize observability metrics if monitoring is enabled.
+	if cfg.Monitoring.Enabled {
+		svcmetrics.DefaultRegistry.RegisterGoCollector()
+		svcmetrics.DefaultRegistry.RegisterProcessCollector()
+		rt.HTTPMetrics = svcmetrics.NewHTTPMetrics(svcmetrics.DefaultRegistry)
 	}
 
 	aiAssembly, err := BuildAIAssembly(cfg, logger, AIAssemblyOptions{})
@@ -238,5 +247,6 @@ func (rt *Runtime) RouterDependencies() Dependencies {
 		KnowledgeDocHandler:      rt.KnowledgeDocHandler,
 		SuggestionService:        rt.SuggestionService,
 		GamificationService:      rt.GamificationService,
+		HTTPMetrics:              rt.HTTPMetrics,
 	}
 }

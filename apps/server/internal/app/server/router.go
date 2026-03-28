@@ -10,6 +10,7 @@ import (
 	automationdelivery "servify/apps/server/internal/modules/automation/delivery"
 	customerdelivery "servify/apps/server/internal/modules/customer/delivery"
 	knowledgedelivery "servify/apps/server/internal/modules/knowledge/delivery"
+	svcmetrics "servify/apps/server/internal/observability/metrics"
 	routingdelivery "servify/apps/server/internal/modules/routing/delivery"
 	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
 	voicedelivery "servify/apps/server/internal/modules/voice/delivery"
@@ -54,12 +55,13 @@ type Dependencies struct {
 	KnowledgeDocHandler      knowledgedelivery.HandlerService
 	SuggestionService        handlers.SuggestionService
 	GamificationService      handlers.GamificationService
+	HTTPMetrics              *svcmetrics.HTTPMetrics
 }
 
 // BuildRouter assembles the HTTP routes and middleware around already-wired services.
 func BuildRouter(deps Dependencies) *gin.Engine {
 	r := gin.New()
-	registerBaseMiddleware(r, deps.Config)
+	registerBaseMiddleware(r, deps.Config, deps.HTTPMetrics)
 	registerHealthRoutes(r, deps)
 	registerManagementRoutes(r, deps)
 	registerPublicRoutes(r, deps)

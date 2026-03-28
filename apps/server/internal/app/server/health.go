@@ -2,6 +2,7 @@ package server
 
 import (
 	"servify/apps/server/internal/handlers"
+	svcmetrics "servify/apps/server/internal/observability/metrics"
 
 	"github.com/gin-gonic/gin"
 )
@@ -12,12 +13,16 @@ func registerHealthRoutes(r routeRegistrar, deps Dependencies) {
 	r.GET("/ready", healthHandler.Ready)
 
 	if deps.Config != nil && deps.Config.Monitoring.Enabled {
-		r.GET(deps.Config.Monitoring.MetricsPath, handlers.NewMetricsHandler(
-			deps.RealtimeGateway,
-			deps.RTCGateway,
-			deps.AIHandlerService,
-			newGormDBStatsProvider(deps.DB),
-		).GetMetrics)
+		if deps.HTTPMetrics != nil {
+			r.GET(deps.Config.Monitoring.MetricsPath, svcmetrics.PrometheusHandler(svcmetrics.DefaultRegistry))
+		} else {
+			r.GET(deps.Config.Monitoring.MetricsPath, handlers.NewMetricsHandler(
+				deps.RealtimeGateway,
+				deps.RTCGateway,
+				deps.AIHandlerService,
+				newGormDBStatsProvider(deps.DB),
+			).GetMetrics)
+		}
 	}
 }
 

@@ -6,17 +6,20 @@ import (
 
 	"servify/apps/server/internal/config"
 	"servify/apps/server/internal/middleware"
+	svcmetrics "servify/apps/server/internal/observability/metrics"
+	"servify/apps/server/internal/observability/telemetry"
 
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
-func registerBaseMiddleware(r *gin.Engine, cfg *config.Config) {
+func registerBaseMiddleware(r *gin.Engine, cfg *config.Config, httpMetrics *svcmetrics.HTTPMetrics) {
 	if cfg != nil && cfg.Log.Level == "debug" {
 		gin.SetMode(gin.DebugMode)
 	} else {
 		gin.SetMode(gin.ReleaseMode)
 	}
+	r.Use(telemetry.RequestIDMiddleware())
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 	r.Use(corsMiddlewareWithConfig(cfg))
@@ -24,12 +27,15 @@ func registerBaseMiddleware(r *gin.Engine, cfg *config.Config) {
 	if cfg != nil && cfg.Monitoring.Tracing.Enabled {
 		r.Use(otelgin.Middleware(cfg.Monitoring.Tracing.ServiceName))
 	}
+	if httpMetrics != nil {
+		r.Use(httpMetrics.Middleware())
+	}
 }
 
 func corsMiddlewareWithConfig(cfg *config.Config) gin.HandlerFunc {
 	allowedOrigins := "*"
 	allowedMethods := "GET, POST, PUT, DELETE, OPTIONS"
-	allowedHeaders := "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization"
+	allowedHeaders := "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, X-Request-ID"
 	if cfg != nil && cfg.Security.CORS.Enabled {
 		if len(cfg.Security.CORS.AllowedOrigins) > 0 {
 			allowedOrigins = strings.Join(cfg.Security.CORS.AllowedOrigins, ", ")
