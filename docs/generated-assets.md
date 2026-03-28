@@ -6,9 +6,9 @@
 
 `generated-assets.manifest` 当前包含：
 
-- `apps/admin/sdk/servify-sdk.esm.js`
-- `apps/admin/sdk/servify-sdk.umd.js`
-- `apps/admin/sdk/index.d.ts`
+- `apps/demo-sdk/servify-sdk.esm.js`
+- `apps/demo-sdk/servify-sdk.umd.js`
+- `apps/demo-sdk/index.d.ts`
 - `docs/generated/api/docs.go`
 - `docs/generated/api/swagger.json`
 - `docs/generated/api/swagger.yaml`
@@ -51,9 +51,9 @@ sh scripts/sync-sdk-to-admin.sh
 
 输出：
 
-- `apps/admin/sdk/servify-sdk.esm.js`
-- `apps/admin/sdk/servify-sdk.umd.js`
-- `apps/admin/sdk/index.d.ts`
+- `apps/demo-sdk/servify-sdk.esm.js`
+- `apps/demo-sdk/servify-sdk.umd.js`
+- `apps/demo-sdk/index.d.ts`
 
 ### API Docs
 
@@ -111,7 +111,7 @@ sh scripts/verify-generated-assets.sh
 - 本地可在重建后执行：
 
 ```bash
-git diff --exit-code -- apps/admin/sdk docs/generated/api
+git diff --exit-code -- apps/demo-sdk docs/generated/api
 ```
 
 ## 新增生成物时的规则

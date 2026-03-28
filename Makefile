@@ -215,7 +215,7 @@ logs:
 
 # Sync SDK bundles into admin web
 demo-sync-sdk:
-	@echo "Syncing SDK bundles into apps/admin/sdk ..."
+	@echo "Syncing SDK bundles into apps/demo-sdk ..."
 	chmod +x ./scripts/sync-sdk-to-admin.sh
 	./scripts/sync-sdk-to-admin.sh
 

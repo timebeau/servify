@@ -165,7 +165,7 @@ jobs:
           ./scripts/check-generated-drift.sh \
             "SDK generated assets" \
             "sh scripts/regenerate-generated-assets.sh" \
-            apps/admin/sdk
+            apps/demo-sdk
 
   docs-checks:
     name: Docs Checks
