@@ -63,11 +63,26 @@ func BuildRouter(deps Dependencies) *gin.Engine {
 	r := gin.New()
 	registerBaseMiddleware(r, deps.Config, deps.HTTPMetrics)
 	registerHealthRoutes(r, deps)
+	registerAuthRoutes(r, deps)
 	registerManagementRoutes(r, deps)
 	registerPublicRoutes(r, deps)
 	registerRealtimeRoutes(r, deps)
 	registerStatic(r)
 	return r
+}
+
+func registerAuthRoutes(r *gin.Engine, deps Dependencies) {
+	auth := r.Group("/api/v1/auth")
+	authHandler := handlers.NewAuthHandler(deps.DB, deps.Config)
+
+	auth.POST("/register", authHandler.Register)
+	auth.POST("/login", authHandler.Login)
+
+	// Authenticated auth routes
+	authMe := auth.Group("")
+	authMe.Use(middleware.AuthMiddleware(deps.Config, platformauth.NewUserStateTokenPolicy(deps.DB)))
+	authMe.GET("/me", authHandler.GetCurrentUser)
+	authMe.POST("/refresh", authHandler.RefreshToken)
 }
 
 func registerManagementRoutes(r *gin.Engine, deps Dependencies) {
