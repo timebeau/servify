@@ -33,8 +33,8 @@ func TestBusMiddleware_Success(t *testing.T) {
 	wrapped := WrapHandler("test.event", handler, busMetrics, nil, nil)
 
 	evt := &testEvent{base: eventbus.BaseEvent{
-		EventID:     "evt-1",
-		EventName:   "test.event",
+		EventID:         "evt-1",
+		EventName:       "test.event",
 		EventOccurredAt: time.Now(),
 	}}
 
@@ -74,8 +74,8 @@ func TestBusMiddleware_Failure(t *testing.T) {
 	wrapped := WrapHandler("test.event", handler, busMetrics, dlr, nil)
 
 	evt := &testEvent{base: eventbus.BaseEvent{
-		EventID:     "evt-2",
-		EventName:   "test.event",
+		EventID:         "evt-2",
+		EventName:       "test.event",
 		EventOccurredAt: time.Now(),
 	}}
 

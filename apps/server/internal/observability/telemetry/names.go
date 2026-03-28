@@ -27,9 +27,9 @@ const (
 	MetricEventBusDeadLetter = "eventbus_dead_letter_total"
 
 	// Worker metrics
-	MetricWorkerJobsTotal    = "worker_jobs_total"
-	MetricWorkerJobDuration  = "worker_job_duration_seconds"
-	MetricWorkerActiveJobs   = "worker_active_jobs"
+	MetricWorkerJobsTotal   = "worker_jobs_total"
+	MetricWorkerJobDuration = "worker_job_duration_seconds"
+	MetricWorkerActiveJobs  = "worker_active_jobs"
 
 	// Error metrics
 	MetricErrorsTotal = "errors_total"
