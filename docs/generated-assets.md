@@ -40,7 +40,7 @@ make demo-sync-sdk
 或：
 
 ```bash
-sh scripts/sync-sdk-to-demo.sh
+sh scripts/sync-sdk-to-admin.sh
 ```
 
 来源：

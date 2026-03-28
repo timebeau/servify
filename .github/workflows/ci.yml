@@ -149,10 +149,10 @@ jobs:
       - name: Test SDK
         run: npm -C sdk run test
 
-      - name: Sync SDK to demo
+      - name: Sync SDK to admin
         run: |
-          chmod +x scripts/sync-sdk-to-demo.sh
-          ./scripts/sync-sdk-to-demo.sh
+          chmod +x scripts/sync-sdk-to-admin.sh
+          ./scripts/sync-sdk-to-admin.sh
 
       - name: Verify generated assets manifest
         run: |
