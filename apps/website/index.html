@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Servify - 开源智能客服与工单系统</title>
-  <meta name="description" content="Servify：模块化客服与工单系统，支持 AI 问答、多渠道接入与实时会话。" />
+  <meta name="description" content="Servify：模块化客服与工单系统，已完成核心模块拆分并接入管理面安全基线，支持 AI、多渠道接入与实时会话。" />
   <meta property="og:title" content="Servify - 开源智能客服与工单系统" />
   <meta property="og:description" content="集成 AI 智能问答、多渠道接入与实时会话，打造极致客户体验。" />
   <meta property="og:type" content="website" />
@@ -40,7 +40,7 @@
         <div class="hero-copy">
           <div class="hero-badge">模块化单体 + 管理面安全基线</div>
           <h1>开源智能<br><span>客服与工单系统</span></h1>
-          <p class="subtitle">Servify 已完成 ticket、conversation、routing、agent、customer 的核心拆分，并接入 tenant/workspace scope、RBAC、audit 与 token state revoke，适合继续向 automation、analytics 与 voice 演进。</p>
+          <p class="subtitle">Servify 已完成 ticket、conversation、routing、agent、customer 的模块收口，并落地 ai / knowledge 基础抽象与 tenant/workspace scope、RBAC、audit、token state revoke，当前继续推进 automation、analytics 与 voice。</p>
           <div class="cta">
             <a class="btn primary" href="https://toconvo.github.io/servify/" target="_blank" rel="noopener">查看文档</a>
             <a class="btn secondary" href="https://github.com/Toconvo/servify" target="_blank" rel="noopener">GitHub &rarr;</a>
@@ -63,8 +63,8 @@
     <section class="stats">
       <div class="container stats-wrap">
         <div class="stat-item">
-          <div class="stat-value">5</div>
-          <div class="stat-label">已收口核心模块</div>
+          <div class="stat-value">7</div>
+          <div class="stat-label">已收口业务模块</div>
         </div>
         <div class="stat-item">
           <div class="stat-value">RBAC</div>
@@ -247,6 +247,7 @@ flowchart TB
         KNOW["knowledge<br/>知识库"]
         VOICE["voice<br/>语音能力"]
         AUTO["automation<br/>自动化"]
+        ANALYTICS["analytics<br/>统计分析"]
     end
 
     subgraph PL["Platform Layer"]
@@ -281,6 +282,7 @@ flowchart TB
     CONV --> BUS
     ROUTE --> BUS
     BUS --> AUTO
+    BUS --> ANALYTICS
 
     classDef sdkStyle fill:#4f46e5,stroke:#4338ca,color:#fff
     classDef dlStyle fill:#6366f1,stroke:#4f46e5,color:#fff
@@ -290,7 +292,7 @@ flowchart TB
 
     class WEB,API,CH sdkStyle
     class GIN dlStyle
-    class TICKET,CONV,ROUTE,AGENT,CUST,AI,KNOW,VOICE,AUTO bmStyle
+    class TICKET,CONV,ROUTE,AGENT,CUST,AI,KNOW,VOICE,AUTO,ANALYTICS bmStyle
     class BUS,AUTH,CFG,TRC plStyle
     class LLM,KP,SIP pvStyle
           </div>
@@ -311,7 +313,7 @@ flowchart TB
         <div class="phase-block">
           <div class="phase-header">
             <div class="phase-indicator done"></div>
-            <h3>第一阶段 - 核心业务模块</h3>
+            <h3>第一阶段 - 当前轮模块收口</h3>
             <span class="phase-status done">已完成</span>
           </div>
           <div class="modules-expanded">
@@ -365,6 +367,26 @@ flowchart TB
               </div>
               <p>文档管理、索引任务、Knowledge Provider 抽象</p>
             </div>
+            <div class="module-card done">
+              <div class="module-header">
+                <i data-lucide="users"></i>
+                <div>
+                  <h4>agent</h4>
+                  <span class="module-badge completed">v0.1</span>
+                </div>
+              </div>
+              <p>客服档案、认证接入、统一 user security 与令牌失效控制</p>
+            </div>
+            <div class="module-card done">
+              <div class="module-header">
+                <i data-lucide="user-circle"></i>
+                <div>
+                  <h4>customer</h4>
+                  <span class="module-badge completed">v0.1</span>
+                </div>
+              </div>
+              <p>客户档案、标签备注、管理面边界迁移与受保护查询入口</p>
+            </div>
           </div>
         </div>
 
@@ -378,33 +400,33 @@ flowchart TB
           <div class="modules-expanded">
             <div class="module-card wip">
               <div class="module-header">
-                <i data-lucide="users"></i>
-                <div>
-                  <h4>agent</h4>
-                  <span class="module-badge progress">开发中</span>
-                </div>
-              </div>
-              <p>客服档案、在线状态、并发负载管理</p>
-            </div>
-            <div class="module-card">
-              <div class="module-header">
-                <i data-lucide="user-circle"></i>
-                <div>
-                  <h4>customer</h4>
-                  <span class="module-badge pending">待开始</span>
-                </div>
-              </div>
-              <p>客户档案、标签、备注、活动轨迹</p>
-            </div>
-            <div class="module-card">
-              <div class="module-header">
                 <i data-lucide="workflow"></i>
                 <div>
                   <h4>automation</h4>
-                  <span class="module-badge pending">待开始</span>
+                  <span class="module-badge progress">进行中</span>
                 </div>
               </div>
-              <p>基于事件总线的自动化执行引擎</p>
+              <p>基于事件总线的自动化执行引擎与规则编排能力</p>
+            </div>
+            <div class="module-card wip">
+              <div class="module-header">
+                <i data-lucide="bar-chart-3"></i>
+                <div>
+                  <h4>analytics</h4>
+                  <span class="module-badge progress">进行中</span>
+                </div>
+              </div>
+              <p>统计读模型、增量聚合、运营指标与数据看板</p>
+            </div>
+            <div class="module-card wip">
+              <div class="module-header">
+                <i data-lucide="phone"></i>
+                <div>
+                  <h4>voice</h4>
+                  <span class="module-badge progress">进行中</span>
+                </div>
+              </div>
+              <p>呼叫会话、媒体事件、录音转写与 SIP / WebRTC 适配</p>
             </div>
           </div>
         </div>
@@ -412,30 +434,20 @@ flowchart TB
         <!-- Phase 3: Planned -->
         <div class="phase-block">
           <div class="phase-header">
-            <div class="phase-indicator pending"></div>
-            <h3>第三阶段 - 增强能力</h3>
-            <span class="phase-status pending">规划中</span>
+            <div class="phase-indicator done"></div>
+            <h3>第三阶段 - 管理面安全基线</h3>
+            <span class="phase-status done">已完成</span>
           </div>
           <div class="modules-expanded">
-            <div class="module-card">
+            <div class="module-card done">
               <div class="module-header">
-                <i data-lucide="bar-chart-3"></i>
+                <i data-lucide="shield-check"></i>
                 <div>
-                  <h4>analytics</h4>
-                  <span class="module-badge pending">待开始</span>
+                  <h4>security baseline</h4>
+                  <span class="module-badge completed">v0.1</span>
                 </div>
               </div>
-              <p>统计读模型、增量聚合、数据看板</p>
-            </div>
-            <div class="module-card">
-              <div class="module-header">
-                <i data-lucide="phone"></i>
-                <div>
-                  <h4>voice</h4>
-                  <span class="module-badge pending">待开始</span>
-                </div>
-              </div>
-              <p>呼叫会话、媒体会话、录音转写、SIP 适配</p>
+              <p>tenant/workspace scope、RBAC、audit、token state policy 与统一 user security surface</p>
             </div>
           </div>
         </div>
