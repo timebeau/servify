@@ -38,9 +38,9 @@
     <section class="hero">
       <div class="container hero-wrap">
         <div class="hero-copy">
-          <div class="hero-badge">模块化单体 + 管理面安全基线</div>
+          <div class="hero-badge">12 个实施 backlog 全部完成</div>
           <h1>开源智能<br><span>客服与工单系统</span></h1>
-          <p class="subtitle">Servify 已完成 ticket、conversation、routing、agent、customer 的模块收口，并落地 ai / knowledge 基础抽象与 tenant/workspace scope、RBAC、audit、token state revoke，当前继续推进 automation、analytics 与 voice。</p>
+          <p class="subtitle">Servify 已完成全部核心模块化拆分与管理面安全基线，落地 AI/知识库基础抽象、tenant/workspace scope、RBAC、审计与令牌状态管理，并建立完整的可观测性体系（Prometheus 指标、错误分类、事件总线观测与 Grafana 面板）。</p>
           <div class="cta">
             <a class="btn primary" href="https://toconvo.github.io/servify/" target="_blank" rel="noopener">查看文档</a>
             <a class="btn secondary" href="https://github.com/Toconvo/servify" target="_blank" rel="noopener">GitHub &rarr;</a>
@@ -63,7 +63,7 @@
     <section class="stats">
       <div class="container stats-wrap">
         <div class="stat-item">
-          <div class="stat-value">7</div>
+          <div class="stat-value">10</div>
           <div class="stat-label">已收口业务模块</div>
         </div>
         <div class="stat-item">
@@ -71,12 +71,12 @@
           <div class="stat-label">管理面权限控制</div>
         </div>
         <div class="stat-item">
-          <div class="stat-value">Audit</div>
-          <div class="stat-label">关键操作审计</div>
+          <div class="stat-value">Prometheus</div>
+          <div class="stat-label">指标采集与告警</div>
         </div>
         <div class="stat-item">
-          <div class="stat-value">Token</div>
-          <div class="stat-label">用户状态失效策略</div>
+          <div class="stat-value">Grafana</div>
+          <div class="stat-label">运营面板与排障</div>
         </div>
       </div>
     </section>
@@ -431,7 +431,7 @@ flowchart TB
           </div>
         </div>
 
-        <!-- Phase 3: Planned -->
+        <!-- Phase 3: Completed -->
         <div class="phase-block">
           <div class="phase-header">
             <div class="phase-indicator done"></div>
@@ -448,6 +448,67 @@ flowchart TB
                 </div>
               </div>
               <p>tenant/workspace scope、RBAC、audit、token state policy 与统一 user security surface</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase 4: Observability -->
+        <div class="phase-block">
+          <div class="phase-header">
+            <div class="phase-indicator done"></div>
+            <h3>第四阶段 - 可观测性体系</h3>
+            <span class="phase-status done">已完成</span>
+          </div>
+          <div class="modules-expanded">
+            <div class="module-card done">
+              <div class="module-header">
+                <i data-lucide="activity"></i>
+                <div>
+                  <h4>telemetry</h4>
+                  <span class="module-badge completed">v0.1</span>
+                </div>
+              </div>
+              <p>统一指标/追踪/日志命名规范、上下文传播、RequestID 中间件</p>
+            </div>
+            <div class="module-card done">
+              <div class="module-header">
+                <i data-lucide="bar-chart-2"></i>
+                <div>
+                  <h4>metrics</h4>
+                  <span class="module-badge completed">v0.1</span>
+                </div>
+              </div>
+              <p>Prometheus Registry、HTTP 指标中间件、业务指标（会话/工单/路由/AI）</p>
+            </div>
+            <div class="module-card done">
+              <div class="module-header">
+                <i data-lucide="alert-triangle"></i>
+                <div>
+                  <h4>error taxonomy</h4>
+                  <span class="module-badge completed">v0.1</span>
+                </div>
+              </div>
+              <p>4 级严重度 × 8 类别错误分类、自动映射、错误计数与用户安全消息</p>
+            </div>
+            <div class="module-card done">
+              <div class="module-header">
+                <i data-lucide="repeat"></i>
+                <div>
+                  <h4>async observability</h4>
+                  <span class="module-badge completed">v0.1</span>
+                </div>
+              </div>
+              <p>事件总线装饰器、Worker 追踪、死信记录、Replay 接口预留</p>
+            </div>
+            <div class="module-card done">
+              <div class="module-header">
+                <i data-lucide="monitor"></i>
+                <div>
+                  <h4>dashboards & alerts</h4>
+                  <span class="module-badge completed">v0.1</span>
+                </div>
+              </div>
+              <p>Grafana Dashboard JSON、Prometheus 告警规则、运维排障手册</p>
             </div>
           </div>
         </div>
