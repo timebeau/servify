@@ -1,0 +1,44 @@
+import { request } from '@umijs/max';
+
+const API = '/api/agents';
+
+export async function listAgents(params: {
+  page?: number;
+  page_size?: number;
+  status?: string;
+  search?: string;
+}) {
+  return request<API.PaginatedResponse<API.Agent>>(API, { params });
+}
+
+export async function getAgent(id: number) {
+  return request<API.Agent>(`${API}/${id}`);
+}
+
+export async function updateAgentStatus(id: number, status: string) {
+  return request(`${API}/${id}/status`, { method: 'PUT', data: { status } });
+}
+
+export async function agentOnline(id: number) {
+  return request(`${API}/${id}/online`, { method: 'POST' });
+}
+
+export async function agentOffline(id: number) {
+  return request(`${API}/${id}/offline`, { method: 'POST' });
+}
+
+export async function assignSessionToAgent(id: number, sessionId: string) {
+  return request(`${API}/${id}/assign-session`, { method: 'POST', data: { session_id: sessionId } });
+}
+
+export async function releaseAgentSession(id: number, sessionId: string) {
+  return request(`${API}/${id}/release-session`, { method: 'POST', data: { session_id: sessionId } });
+}
+
+export async function getOnlineAgents() {
+  return request(`${API}/online`);
+}
+
+export async function getAgentStats() {
+  return request(`${API}/stats`);
+}

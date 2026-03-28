@@ -10,8 +10,11 @@ import (
 )
 
 var defaultStaticRoots = []string{
+	"./apps/admin/dist",
 	"./apps/admin",
+	"../admin/dist",
 	"../admin",
+	"/app/apps/admin/dist",
 	"/app/apps/admin",
 }
 
@@ -49,7 +52,7 @@ func detectStaticRoot(candidates []string) string {
 			return p
 		}
 	}
-	return "./apps/admin"
+	return "./apps/admin/dist"
 }
 
 type staticRegistrar interface {

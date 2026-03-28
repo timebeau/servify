@@ -219,6 +219,19 @@ demo-sync-sdk:
 	chmod +x ./scripts/sync-sdk-to-admin.sh
 	./scripts/sync-sdk-to-admin.sh
 
+# Admin panel commands
+admin-install:
+	@echo "Installing admin dependencies..."
+	cd apps/admin && pnpm install
+
+admin-dev:
+	@echo "Starting admin dev server..."
+	cd apps/admin && pnpm dev
+
+admin-build:
+	@echo "Building admin panel..."
+	cd apps/admin && pnpm install --frozen-lockfile && pnpm build
+
 # Website (Cloudflare Worker) commands
 website-dev:
 	@echo "Starting Cloudflare Worker dev for website..."

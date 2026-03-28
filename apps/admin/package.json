@@ -1,0 +1,27 @@
+{
+  "name": "@servify/admin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Servify Admin Panel",
+  "scripts": {
+    "dev": "max dev",
+    "build": "max build",
+    "preview": "max preview",
+    "lint": "max lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "packageManager": "pnpm@10.22.0",
+  "dependencies": {
+    "@ant-design/charts": "^2.6.7",
+    "@ant-design/icons": "^6.1.1",
+    "@ant-design/pro-components": "^2.8.10",
+    "@ant-design/pro-layout": "^7.22.7",
+    "@umijs/max": "^4.6.36",
+    "antd": "^5.29.3"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.28",
+    "@types/react-dom": "^18.3.7",
+    "typescript": "^5.9.3"
+  }
+}
