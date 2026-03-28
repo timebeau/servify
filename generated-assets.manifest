@@ -1,7 +1,7 @@
 # Generated assets that must remain committed after regeneration.
-apps/demo-web/sdk/servify-sdk.esm.js
-apps/demo-web/sdk/servify-sdk.umd.js
-apps/demo-web/sdk/index.d.ts
+apps/admin/sdk/servify-sdk.esm.js
+apps/admin/sdk/servify-sdk.umd.js
+apps/admin/sdk/index.d.ts
 docs/generated/api/docs.go
 docs/generated/api/swagger.json
 docs/generated/api/swagger.yaml

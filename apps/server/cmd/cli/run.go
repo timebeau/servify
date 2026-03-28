@@ -146,11 +146,11 @@ func setupRouter(cfg *config.Config, runtime *appserver.RealtimeRuntime) *gin.En
 
 	// 静态文件服务（尝试多路径）
 	staticRoots := []string{
-		"./apps/demo-web",
-		"../demo-web",
-		"/app/apps/demo-web",
+		"./apps/admin",
+		"../admin",
+		"/app/apps/admin",
 	}
-	sr := "./apps/demo-web"
+	sr := "./apps/admin"
 	for _, p := range staticRoots {
 		if fi, err := os.Stat(p); err == nil && fi.IsDir() {
 			sr = p

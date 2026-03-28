@@ -8,7 +8,7 @@ import (
 
 func TestDetectStaticRoot(t *testing.T) {
 	tmp := t.TempDir()
-	existing := filepath.Join(tmp, "demo-web")
+	existing := filepath.Join(tmp, "admin")
 	if err := os.MkdirAll(existing, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}

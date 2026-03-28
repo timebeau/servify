@@ -42,7 +42,7 @@ Servify 是一个面向客服、工单、AI 协同和实时会话的服务平台
 .
 |-- apps/
 |   |-- server/              # Go 服务端
-|   |-- demo-web/            # Web demo
+|   |-- admin/               # Admin 管理面板
 |   `-- website/             # 官网静态站点
 |-- docs/
 |   `-- implementation/      # 分主题实施 backlog

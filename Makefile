@@ -213,11 +213,11 @@ logs:
 	@echo "Showing application logs..."
 	docker-compose -f infra/compose/docker-compose.yml logs -f servify
 
-# Sync SDK bundles into demo web
+# Sync SDK bundles into admin web
 demo-sync-sdk:
-	@echo "Syncing SDK bundles into apps/demo-web/sdk ..."
-	chmod +x ./scripts/sync-sdk-to-demo.sh
-	./scripts/sync-sdk-to-demo.sh
+	@echo "Syncing SDK bundles into apps/admin/sdk ..."
+	chmod +x ./scripts/sync-sdk-to-admin.sh
+	./scripts/sync-sdk-to-admin.sh
 
 # Website (Cloudflare Worker) commands
 website-dev:

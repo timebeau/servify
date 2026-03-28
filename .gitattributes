@@ -41,6 +41,6 @@ server binary
 # GitHub Linguist tuning
 # Count SDK source, but ignore built artifacts
 sdk/packages/*/dist/** linguist-generated=true
-apps/demo-web/sdk/**    linguist-generated=true linguist-vendored=true
+apps/admin/sdk/**    linguist-generated=true linguist-vendored=true
 vendor/**               linguist-vendored=true
 
