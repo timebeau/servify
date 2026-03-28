@@ -399,8 +399,12 @@ jobs:
         if: steps.gate.outputs.skip == 'false' && steps.detect.outputs.changed == 'true'
         run: |
           echo "CF_PAGES_PROJECT=$CF_PAGES_PROJECT"
-          npx wrangler pages project list
+          echo "CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID:0:8}... (redacted)"
+          echo "--- Listing Pages projects ---"
+          npx wrangler pages project list 2>&1 || true
+          echo "--- Checking target project ---"
+          npx wrangler pages project get "$CF_PAGES_PROJECT" 2>&1 || true
 
       - name: Deploy to Cloudflare Pages
         if: steps.gate.outputs.skip == 'false' && steps.detect.outputs.changed == 'true'
-        run: npx wrangler pages deploy apps/website --project-name "$CF_PAGES_PROJECT"
+        run: npx wrangler pages deploy apps/website --project-name "$CF_PAGES_PROJECT" --commit-dirty=true
