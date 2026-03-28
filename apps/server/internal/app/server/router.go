@@ -83,6 +83,11 @@ func registerAuthRoutes(r *gin.Engine, deps Dependencies) {
 	authMe.Use(middleware.AuthMiddleware(deps.Config, platformauth.NewUserStateTokenPolicy(deps.DB)))
 	authMe.GET("/me", authHandler.GetCurrentUser)
 	authMe.POST("/refresh", authHandler.RefreshToken)
+
+	// File upload (authenticated)
+	uploadHandler := handlers.NewFileUploadHandler("./uploads", 32<<20) // 32MB max
+	r.POST("/api/v1/upload", middleware.AuthMiddleware(deps.Config, platformauth.NewUserStateTokenPolicy(deps.DB)), uploadHandler.Upload)
+	r.Static("/uploads", "./uploads")
 }
 
 func registerManagementRoutes(r *gin.Engine, deps Dependencies) {
