@@ -1,31 +1,32 @@
 package handlers
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/json"
+	"context"
+	"errors"
 	"net/http"
 	"strings"
-	"time"
 
-	"servify/apps/server/internal/config"
 	"servify/apps/server/internal/models"
+	"servify/apps/server/internal/services"
 
 	"github.com/gin-gonic/gin"
-	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm"
 )
 
 // AuthHandler handles authentication endpoints.
 type AuthHandler struct {
-	DB     *gorm.DB
-	Config *config.Config
+	service authService
+}
+
+type authService interface {
+	Register(ctx context.Context, req services.RegisterInput) (*services.AuthResult, error)
+	Login(ctx context.Context, req services.LoginInput) (*services.AuthResult, error)
+	GetCurrentUser(ctx context.Context, userID uint) (*models.User, error)
+	RefreshToken(ctx context.Context, userID uint) (*services.AuthResult, error)
 }
 
 // NewAuthHandler creates a new AuthHandler.
-func NewAuthHandler(db *gorm.DB, cfg *config.Config) *AuthHandler {
-	return &AuthHandler{DB: db, Config: cfg}
+func NewAuthHandler(service authService) *AuthHandler {
+	return &AuthHandler{service: service}
 }
 
 // Register godoc
@@ -52,64 +53,30 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	// Check uniqueness
-	var count int64
-	h.DB.Model(&models.User{}).Where("username = ? OR email = ?", req.Username, req.Email).Count(&count)
-	if count > 0 {
-		c.JSON(http.StatusConflict, gin.H{"error": "用户名或邮箱已存在"})
-		return
-	}
-
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "内部错误"})
-		return
-	}
-
-	role := req.Role
-	if role == "" {
-		role = "customer"
-	}
-	// Only allow admin role if explicitly requested and no users exist yet
-	if role == "admin" {
-		var total int64
-		h.DB.Model(&models.User{}).Count(&total)
-		if total > 0 {
-			role = "customer" // Downgrade to customer for security
-		}
-	}
-
-	user := models.User{
+	result, err := h.service.Register(c.Request.Context(), services.RegisterInput{
 		Username: req.Username,
 		Email:    req.Email,
-		Password: string(hash),
+		Password: req.Password,
 		Name:     req.Name,
 		Phone:    req.Phone,
-		Role:     role,
-		Status:   "active",
-	}
-	if err := h.DB.Create(&user).Error; err != nil {
-		if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "unique") {
-			c.JSON(http.StatusConflict, gin.H{"error": "用户名或邮箱已存在"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建用户失败"})
-		return
-	}
-
-	token, err := h.generateToken(user.ID, user.Role)
+		Role:     req.Role,
+	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成 Token 失败"})
+		switch {
+		case errors.Is(err, services.ErrInvalidAuthInput):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "用户名、邮箱和密码不能为空"})
+		case errors.Is(err, services.ErrAuthUserAlreadyExists):
+			c.JSON(http.StatusConflict, gin.H{"error": "用户名或邮箱已存在"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "创建用户失败"})
+		}
 		return
 	}
-
-	now := time.Now()
-	h.DB.Model(&user).Update("last_login", now)
 
 	c.JSON(http.StatusCreated, tokenResponse{
-		Token:     token,
-		ExpiresIn: int(h.Config.JWT.ExpiresIn.Seconds()),
-		User:      userResponse{ID: user.ID, Username: user.Username, Email: user.Email, Name: user.Name, Role: user.Role, Status: user.Status},
+		Token:     result.Token,
+		ExpiresIn: result.ExpiresIn,
+		User:      mapUserResponse(result.User),
 	})
 }
 
@@ -129,35 +96,26 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	var user models.User
-	if err := h.DB.Where("username = ? OR email = ?", req.Username, req.Username).First(&user).Error; err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "用户名或密码错误"})
-		return
-	}
-
-	if user.Status != "active" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "账号已被禁用"})
-		return
-	}
-
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "用户名或密码错误"})
-		return
-	}
-
-	token, err := h.generateToken(user.ID, user.Role)
+	result, err := h.service.Login(c.Request.Context(), services.LoginInput{
+		Username: req.Username,
+		Password: req.Password,
+	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成 Token 失败"})
+		switch {
+		case errors.Is(err, services.ErrAuthInvalidCredentials):
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "用户名或密码错误"})
+		case errors.Is(err, services.ErrAuthUserDisabled):
+			c.JSON(http.StatusForbidden, gin.H{"error": "账号已被禁用"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "登录失败"})
+		}
 		return
 	}
-
-	now := time.Now()
-	h.DB.Model(&user).Update("last_login", now)
 
 	c.JSON(http.StatusOK, tokenResponse{
-		Token:     token,
-		ExpiresIn: int(h.Config.JWT.ExpiresIn.Seconds()),
-		User:      userResponse{ID: user.ID, Username: user.Username, Email: user.Email, Name: user.Name, Role: user.Role, Status: user.Status},
+		Token:     result.Token,
+		ExpiresIn: result.ExpiresIn,
+		User:      mapUserResponse(result.User),
 	})
 }
 
@@ -170,42 +128,20 @@ func (h *AuthHandler) Login(c *gin.Context) {
 // @Failure 401 {object} map[string]string
 // @Router /api/v1/auth/me [get]
 func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
-	userIDRaw, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "未认证"})
-		return
-	}
-
-	var userID uint
-	switch v := userIDRaw.(type) {
-	case float64:
-		userID = uint(v)
-	case uint:
-		userID = v
-	case int:
-		userID = uint(v)
-	default:
+	userID, ok := authUserID(c)
+	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "无效的 Token"})
 		return
 	}
 
-	var user models.User
-	if err := h.DB.First(&user, userID).Error; err != nil {
+	user, err := h.service.GetCurrentUser(c.Request.Context(), userID)
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"data": userResponse{
-			ID:     user.ID,
-			Username: user.Username,
-			Email:    user.Email,
-			Name:     user.Name,
-			Phone:    user.Phone,
-			Avatar:   user.Avatar,
-			Role:     user.Role,
-			Status:   user.Status,
-		},
+		"data": mapUserResponse(user),
 	})
 }
 
@@ -217,87 +153,55 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 // @Success 200 {object} tokenResponse
 // @Router /api/v1/auth/refresh [post]
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
-	userIDRaw, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "未认证"})
-		return
-	}
-
-	var userID uint
-	switch v := userIDRaw.(type) {
-	case float64:
-		userID = uint(v)
-	case uint:
-		userID = v
-	case int:
-		userID = uint(v)
-	default:
+	userID, ok := authUserID(c)
+	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "无效的 Token"})
 		return
 	}
 
-	var user models.User
-	if err := h.DB.First(&user, userID).Error; err != nil {
+	result, err := h.service.RefreshToken(c.Request.Context(), userID)
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
 		return
 	}
 
-	token, err := h.generateToken(user.ID, user.Role)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成 Token 失败"})
-		return
-	}
-
 	c.JSON(http.StatusOK, tokenResponse{
-		Token:     token,
-		ExpiresIn: int(h.Config.JWT.ExpiresIn.Seconds()),
-		User:      userResponse{ID: user.ID, Username: user.Username, Email: user.Email, Name: user.Name, Role: user.Role, Status: user.Status},
+		Token:     result.Token,
+		ExpiresIn: result.ExpiresIn,
+		User:      mapUserResponse(result.User),
 	})
 }
 
-func (h *AuthHandler) generateToken(userID uint, role string) (string, error) {
-	now := time.Now()
-	payload := map[string]interface{}{
-		"iat":    now.Unix(),
-		"sub":    userID,
-		"user_id": userID,
-		"roles":  []string{role},
-		"exp":    now.Add(h.Config.JWT.ExpiresIn).Unix(),
+func authUserID(c *gin.Context) (uint, bool) {
+	userIDRaw, exists := c.Get("user_id")
+	if !exists {
+		return 0, false
 	}
-	return createHS256JWT(payload, h.Config.JWT.Secret)
-}
 
-// createHS256JWT builds a compact JWT using HS256 with the given payload.
-func createHS256JWT(payload map[string]interface{}, secret string) (string, error) {
-	header := map[string]string{"alg": "HS256", "typ": "JWT"}
-	headerJSON, _ := json.Marshal(header)
-	payloadJSON, _ := json.Marshal(payload)
-	enc := func(b []byte) string { return base64.RawURLEncoding.EncodeToString(b) }
-
-	h := enc(headerJSON)
-	p := enc(payloadJSON)
-	signing := h + "." + p
-
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(signing))
-	sig := mac.Sum(nil)
-	s := enc(sig)
-	return signing + "." + s, nil
+	switch v := userIDRaw.(type) {
+	case float64:
+		return uint(v), true
+	case uint:
+		return v, true
+	case int:
+		return uint(v), true
+	default:
+		return 0, false
+	}
 }
 
 // Request/Response types
-
 type registerRequest struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
 	Name     string `json:"name"`
 	Phone    string `json:"phone"`
-	Role     string `json:"role"` // optional, defaults to "customer"
+	Role     string `json:"role"`
 }
 
 type loginRequest struct {
-	Username string `json:"username"` // username or email
+	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
@@ -316,4 +220,20 @@ type userResponse struct {
 	Avatar   string `json:"avatar"`
 	Role     string `json:"role"`
 	Status   string `json:"status"`
+}
+
+func mapUserResponse(user *models.User) userResponse {
+	if user == nil {
+		return userResponse{}
+	}
+	return userResponse{
+		ID:       user.ID,
+		Username: user.Username,
+		Email:    user.Email,
+		Name:     user.Name,
+		Phone:    user.Phone,
+		Avatar:   user.Avatar,
+		Role:     user.Role,
+		Status:   user.Status,
+	}
 }

@@ -1,0 +1,158 @@
+package handlers
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	conversationapp "servify/apps/server/internal/modules/conversation/application"
+	conversationdelivery "servify/apps/server/internal/modules/conversation/delivery"
+	conversationdomain "servify/apps/server/internal/modules/conversation/domain"
+	conversationinfra "servify/apps/server/internal/modules/conversation/infra"
+	realtimeplatform "servify/apps/server/internal/platform/realtime"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"servify/apps/server/internal/models"
+)
+
+type stubRealtimeGateway struct {
+	messages []realtimeplatform.Message
+}
+
+func (s *stubRealtimeGateway) HandleWebSocket(*gin.Context) {}
+func (s *stubRealtimeGateway) SendToSession(sessionID string, message realtimeplatform.Message) {
+	s.messages = append(s.messages, message)
+}
+func (s *stubRealtimeGateway) ClientCount() int { return 0 }
+
+func newConversationWorkspaceTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	dsn := "file:conversation_workspace_" + t.Name() + "?mode=memory&cache=shared"
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.AutoMigrate(&models.User{}, &models.Session{}, &models.Message{}); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
+	return db
+}
+
+func seedConversation(t *testing.T, db *gorm.DB) *conversationapp.Service {
+	t.Helper()
+	repo := conversationinfra.NewGormRepository(db)
+	service := conversationapp.NewService(repo, nil)
+	customerID := uint(1)
+	if err := db.Create(&models.User{ID: customerID, Username: "customer", Email: "customer@example.com", Password: "x"}).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	if _, err := service.CreateConversation(context.Background(), conversationapp.CreateConversationCommand{
+		ConversationID: "sess-1",
+		CustomerID:     &customerID,
+		Channel: conversationdomain.ChannelBinding{
+			Channel:   "web",
+			SessionID: "sess-1",
+		},
+		Participants: []conversationdomain.Participant{
+			{ID: "customer:1", UserID: &customerID, Role: conversationdomain.ParticipantRoleCustomer},
+		},
+	}); err != nil {
+		t.Fatalf("create conversation: %v", err)
+	}
+	if _, err := service.IngestTextMessage(context.Background(), conversationapp.IngestTextMessageCommand{
+		ConversationID: "sess-1",
+		Sender:         conversationdomain.ParticipantRoleCustomer,
+		Content:        "hello",
+	}); err != nil {
+		t.Fatalf("seed message: %v", err)
+	}
+	if _, err := service.IngestTextMessage(context.Background(), conversationapp.IngestTextMessageCommand{
+		ConversationID: "sess-1",
+		Sender:         conversationdomain.ParticipantRoleAgent,
+		Content:        "hi there",
+	}); err != nil {
+		t.Fatalf("seed agent message: %v", err)
+	}
+	return service
+}
+
+func TestConversationWorkspaceHandler_ListMessages(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db := newConversationWorkspaceTestDB(t)
+	service := seedConversation(t, db)
+	handler := NewConversationWorkspaceHandler(conversationdelivery.NewHandlerService(service), nil)
+
+	router := gin.New()
+	group := router.Group("/api")
+	RegisterConversationWorkspaceRoutes(group, handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/omni/sessions/sess-1/messages", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Data []conversationapp.ConversationMessageDTO `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(resp.Data) != 2 {
+		t.Fatalf("expected 2 messages, got %d", len(resp.Data))
+	}
+	if resp.Data[0].Content != "hello" || resp.Data[1].Content != "hi there" {
+		t.Fatalf("expected chronological messages, got %+v", resp.Data)
+	}
+}
+
+func TestConversationWorkspaceHandler_SendMessage(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db := newConversationWorkspaceTestDB(t)
+	service := seedConversation(t, db)
+	realtime := &stubRealtimeGateway{}
+	handler := NewConversationWorkspaceHandler(conversationdelivery.NewHandlerService(service), realtime)
+
+	router := gin.New()
+	group := router.Group("/api")
+	RegisterConversationWorkspaceRoutes(group, handler)
+
+	body, _ := json.Marshal(map[string]string{"content": "admin reply"})
+	req := httptest.NewRequest(http.MethodPost, "/api/omni/sessions/sess-1/messages", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	items, err := service.ListRecentMessages(context.Background(), "sess-1", 10)
+	if err != nil {
+		t.Fatalf("list messages: %v", err)
+	}
+	if len(items) != 3 {
+		t.Fatalf("expected 3 messages, got %d", len(items))
+	}
+	if items[0].CreatedAt.After(items[1].CreatedAt) && items[0].CreatedAt.After(items[2].CreatedAt) {
+		// repository order is desc; verify latest content exists.
+	}
+	found := false
+	for _, item := range items {
+		if item.Content == "admin reply" && item.Sender == "agent" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected agent message persisted, got %+v", items)
+	}
+	if len(realtime.messages) != 1 || realtime.messages[0].Type != "agent-message" {
+		t.Fatalf("expected realtime agent-message broadcast, got %+v", realtime.messages)
+	}
+}

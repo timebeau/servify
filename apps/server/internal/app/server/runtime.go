@@ -48,6 +48,7 @@ type Runtime struct {
 	RealtimeGateway          realtimeplatform.RealtimeGateway
 	RTCGateway               realtimeplatform.RTCGateway
 	MessageRouter            services.MessageRouterRuntime
+	ConversationHandler      conversationdelivery.HandlerService
 	VoiceCoordinator         *voicedelivery.Coordinator
 	VoiceProtocolRegistry    *voiceprotocol.Registry
 	CustomerHandlerService   customerdelivery.HandlerService
@@ -107,6 +108,7 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 
 	conversationRepo := conversationinfra.NewGormRepository(db)
 	conversationService := conversationapp.NewService(conversationRepo, bus)
+	rt.ConversationHandler = conversationdelivery.NewHandlerService(conversationService)
 	wsHub.SetConversationMessageWriter(conversationdelivery.NewWebSocketMessageAdapter(conversationService))
 
 	routingRepo := routinginfra.NewGormRepository(db)
@@ -228,6 +230,7 @@ func (rt *Runtime) RouterDependencies() Dependencies {
 		RealtimeGateway:          rt.RealtimeGateway,
 		RTCGateway:               rt.RTCGateway,
 		MessageRouter:            rt.MessageRouter,
+		ConversationHandler:      rt.ConversationHandler,
 		VoiceCoordinator:         rt.VoiceCoordinator,
 		VoiceProtocolRegistry:    rt.VoiceProtocolRegistry,
 		CustomerHandlerService:   rt.CustomerHandlerService,

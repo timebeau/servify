@@ -8,6 +8,7 @@ import (
 	aidelivery "servify/apps/server/internal/modules/ai/delivery"
 	analyticsdelivery "servify/apps/server/internal/modules/analytics/delivery"
 	automationdelivery "servify/apps/server/internal/modules/automation/delivery"
+	conversationdelivery "servify/apps/server/internal/modules/conversation/delivery"
 	customerdelivery "servify/apps/server/internal/modules/customer/delivery"
 	knowledgedelivery "servify/apps/server/internal/modules/knowledge/delivery"
 	routingdelivery "servify/apps/server/internal/modules/routing/delivery"
@@ -39,6 +40,7 @@ type Dependencies struct {
 	VoiceCoordinator         *voicedelivery.Coordinator
 	VoiceProtocolRegistry    *voiceprotocol.Registry
 	CustomerHandlerService   customerdelivery.HandlerService
+	ConversationHandler      conversationdelivery.HandlerService
 	AgentHandlerService      agentdelivery.HandlerService
 	TicketHandlerService     ticketdelivery.HandlerService
 	TicketReaderService      *ticketdelivery.ReaderServiceAdapter
@@ -73,7 +75,7 @@ func BuildRouter(deps Dependencies) *gin.Engine {
 
 func registerAuthRoutes(r *gin.Engine, deps Dependencies) {
 	auth := r.Group("/api/v1/auth")
-	authHandler := handlers.NewAuthHandler(deps.DB, deps.Config)
+	authHandler := handlers.NewAuthHandler(services.NewAuthService(deps.DB, deps.Config))
 
 	auth.POST("/register", authHandler.Register)
 	auth.POST("/login", authHandler.Login)
@@ -120,6 +122,7 @@ func registerManagementRoutes(r *gin.Engine, deps Dependencies) {
 	workspaceAPI := api.Group("/")
 	workspaceAPI.Use(middleware.RequireResourcePermission("workspace"))
 	handlers.RegisterWorkspaceRoutes(workspaceAPI, handlers.NewWorkspaceHandler(deps.WorkspaceService))
+	handlers.RegisterConversationWorkspaceRoutes(workspaceAPI, handlers.NewConversationWorkspaceHandler(deps.ConversationHandler, deps.RealtimeGateway))
 
 	macrosAPI := api.Group("/")
 	macrosAPI.Use(middleware.RequireResourcePermission("macros"))

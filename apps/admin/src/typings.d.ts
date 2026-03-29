@@ -103,6 +103,16 @@ declare namespace API {
     updated_at: string;
   }
 
+  interface ConversationMessage {
+    id: string;
+    conversation_id: string;
+    sender: string;
+    kind: string;
+    content: string;
+    metadata?: Record<string, string>;
+    created_at: string;
+  }
+
   // ---- 知识库文档 ----
   interface KnowledgeDoc {
     id: number;
