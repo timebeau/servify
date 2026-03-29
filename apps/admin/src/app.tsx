@@ -1,4 +1,3 @@
-import { history, RequestConfig } from '@umijs/max';
 import { getToken, clearToken, parseJwtPayload, setUserInfo } from './utils/auth';
 
 const loginPath = '/login';
@@ -29,30 +28,18 @@ export const layout = () => ({
   menu: { locale: false },
   logout: () => {
     clearToken();
-    history.push(loginPath);
+    window.location.replace(loginPath);
   },
 });
 
 /** 请求配置：JWT 拦截器 */
-export const request: RequestConfig = {
+export const request = {
   timeout: 30000,
-  requestInterceptors: [
-    (config: any) => {
-      const token = getToken();
-      if (token) {
-        config.headers = {
-          ...config.headers,
-          Authorization: `Bearer ${token}`,
-        };
-      }
-      return config;
-    },
-  ],
   responseInterceptors: [
     (response: any) => {
       if (response.status === 401) {
         clearToken();
-        history.push(loginPath);
+        window.location.replace(loginPath);
       }
       return response;
     },

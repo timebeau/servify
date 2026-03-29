@@ -6,12 +6,25 @@ import { getDashboardStats } from '@/services/statistics';
 const DashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<API.DashboardStats>({
-    total_conversations: 0,
+    total_sessions: 0,
     total_tickets: 0,
     total_customers: 0,
-    avg_satisfaction: 0,
+    total_agents: 0,
+    today_tickets: 0,
+    today_sessions: 0,
+    today_messages: 0,
     open_tickets: 0,
+    assigned_tickets: 0,
+    resolved_tickets: 0,
+    closed_tickets: 0,
     online_agents: 0,
+    busy_agents: 0,
+    active_sessions: 0,
+    avg_response_time: 0,
+    avg_resolution_time: 0,
+    customer_satisfaction: 0,
+    ai_usage_today: 0,
+    weknora_usage_today: 0,
   });
 
   useEffect(() => {
@@ -46,11 +59,11 @@ const DashboardPage: React.FC = () => {
           <StatisticCard
             statistic={{
               title: '总会话数',
-              value: stats.total_conversations,
+              value: stats.total_sessions,
               description: (
                 <StatisticCard.Statistic
-                  title="较昨日"
-                  value="暂无数据"
+                  title="今日新增"
+                  value={stats.today_sessions}
                 />
               ),
             }}
@@ -63,8 +76,8 @@ const DashboardPage: React.FC = () => {
               value: stats.total_tickets,
               description: (
                 <StatisticCard.Statistic
-                  title="较昨日"
-                  value="暂无数据"
+                  title="今日新增"
+                  value={stats.today_tickets}
                 />
               ),
             }}
@@ -77,8 +90,8 @@ const DashboardPage: React.FC = () => {
               value: stats.total_customers,
               description: (
                 <StatisticCard.Statistic
-                  title="较昨日"
-                  value="暂无数据"
+                  title="在线客服"
+                  value={stats.online_agents}
                 />
               ),
             }}
@@ -88,13 +101,13 @@ const DashboardPage: React.FC = () => {
           <StatisticCard
             statistic={{
               title: '满意度',
-              value: stats.avg_satisfaction
-                ? `${(stats.avg_satisfaction * 20).toFixed(1)}%`
+              value: stats.customer_satisfaction
+                ? `${(stats.customer_satisfaction * 20).toFixed(1)}%`
                 : '0%',
               description: (
                 <StatisticCard.Statistic
-                  title="较昨日"
-                  value="暂无数据"
+                  title="活跃会话"
+                  value={stats.active_sessions}
                 />
               ),
             }}
@@ -107,9 +120,26 @@ const DashboardPage: React.FC = () => {
         style={{ marginTop: 16 }}
         collapsible
       >
-        <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>
-          图表区域占位 - 待接入数据
-        </div>
+        <Row gutter={[16, 16]}>
+          <Col xs={24} sm={8}>
+            <StatisticCard
+              statistic={{ title: '今日消息量', value: stats.today_messages }}
+            />
+          </Col>
+          <Col xs={24} sm={8}>
+            <StatisticCard
+              statistic={{ title: '已解决工单', value: stats.resolved_tickets }}
+            />
+          </Col>
+          <Col xs={24} sm={8}>
+            <StatisticCard
+              statistic={{
+                title: '平均响应时长',
+                value: `${stats.avg_response_time.toFixed(1)}s`,
+              }}
+            />
+          </Col>
+        </Row>
       </ProCard>
     </div>
   );

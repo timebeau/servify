@@ -1,4 +1,4 @@
-import { request } from '@umijs/max';
+import { request } from '@/lib/request';
 
 /** 仪表板统计 */
 export async function getDashboardStats() {

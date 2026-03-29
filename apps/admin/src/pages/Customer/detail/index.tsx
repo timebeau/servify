@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { ProDescriptions } from '@ant-design/pro-components';
 import { ProCard } from '@ant-design/pro-components';
-import { Tag, Button, Space, Spin, List, message } from 'antd';
-import { useParams, history } from '@umijs/max';
+import { Tag, Button, Space, Spin, List } from 'antd';
+import { goBack, useDetailParams } from '@/lib/navigation';
 import { CUSTOMER_SOURCE_MAP } from '@/utils/constants';
 import { getCustomer, getCustomerActivity } from '@/services/customer';
 
 const CustomerDetailPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useDetailParams();
   const [loading, setLoading] = useState(true);
   const [customer, setCustomer] = useState<API.Customer | null>(null);
   const [activities, setActivities] = useState<any[]>([]);
@@ -56,14 +56,14 @@ const CustomerDetailPage: React.FC = () => {
       <div style={{ textAlign: 'center', padding: 80, color: '#999' }}>
         客户不存在或加载失败
         <br />
-        <Button style={{ marginTop: 16 }} onClick={() => history.back()}>
+        <Button style={{ marginTop: 16 }} onClick={goBack}>
           返回
         </Button>
       </div>
     );
   }
 
-  const sourceText = CUSTOMER_SOURCE_MAP[customer.source];
+  const sourceText = customer.source ? CUSTOMER_SOURCE_MAP[customer.source] : undefined;
 
   return (
     <div>
@@ -71,7 +71,7 @@ const CustomerDetailPage: React.FC = () => {
         title="客户详情"
         extra={
           <Space>
-            <Button onClick={() => history.back()}>返回</Button>
+            <Button onClick={goBack}>返回</Button>
             <Button>编辑</Button>
             <Button type="primary">新建工单</Button>
           </Space>

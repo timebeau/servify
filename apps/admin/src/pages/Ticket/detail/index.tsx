@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { ProDescriptions } from '@ant-design/pro-components';
 import { ProCard } from '@ant-design/pro-components';
 import { Tag, Steps, Button, Space, Divider, Input, List, Spin, message } from 'antd';
-import { useParams, history } from '@umijs/max';
+import { goBack, useDetailParams } from '@/lib/navigation';
 import { TICKET_STATUS_MAP, TICKET_PRIORITY_MAP } from '@/utils/constants';
 import { getTicket, getComments, addComment } from '@/services/ticket';
 
 const TicketDetailPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useDetailParams();
   const [loading, setLoading] = useState(true);
   const [ticket, setTicket] = useState<API.Ticket | null>(null);
   const [comments, setComments] = useState<any[]>([]);
@@ -57,7 +57,7 @@ const TicketDetailPage: React.FC = () => {
       <div style={{ textAlign: 'center', padding: 80, color: '#999' }}>
         工单不存在或加载失败
         <br />
-        <Button style={{ marginTop: 16 }} onClick={() => history.back()}>
+        <Button style={{ marginTop: 16 }} onClick={goBack}>
           返回
         </Button>
       </div>
@@ -104,7 +104,7 @@ const TicketDetailPage: React.FC = () => {
         title="工单详情"
         extra={
           <Space>
-            <Button onClick={() => history.back()}>返回</Button>
+            <Button onClick={goBack}>返回</Button>
             <Button type="primary">回复</Button>
           </Space>
         }

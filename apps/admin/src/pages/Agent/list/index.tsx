@@ -3,7 +3,7 @@ import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
 import { Tag, Button, Space, Progress } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
-import { history } from '@umijs/max';
+import { navigateTo } from '@/lib/navigation';
 import { AGENT_STATUS_MAP } from '@/utils/constants';
 import { listAgents } from '@/services/agent';
 
@@ -64,7 +64,7 @@ const AgentListPage: React.FC = () => {
       width: 120,
       render: (_, record) => (
         <Space>
-          <a onClick={() => history.push(`/agent/detail/${record.id}`)}>查看</a>
+          <a onClick={() => navigateTo(`/agent/detail/${record.id}`)}>查看</a>
           <a>编辑</a>
         </Space>
       ),

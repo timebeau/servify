@@ -1,4 +1,4 @@
-import { request } from '@umijs/max';
+import { request } from '@/lib/request';
 
 export async function getWaitingQueue() {
   return request('/api/session-transfer/waiting');

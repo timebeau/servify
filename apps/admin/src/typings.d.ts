@@ -193,12 +193,50 @@ declare namespace API {
 
   // ---- 统计 ----
   interface DashboardStats {
-    total_conversations: number;
+    total_sessions: number;
     total_tickets: number;
     total_customers: number;
-    avg_satisfaction: number;
+    total_agents: number;
+    today_tickets: number;
+    today_sessions: number;
+    today_messages: number;
     open_tickets: number;
+    assigned_tickets: number;
+    resolved_tickets: number;
+    closed_tickets: number;
     online_agents: number;
+    busy_agents: number;
+    active_sessions: number;
+    avg_response_time: number;
+    avg_resolution_time: number;
+    customer_satisfaction: number;
+    ai_usage_today: number;
+    weknora_usage_today: number;
+  }
+
+  interface WorkspaceSession {
+    id: string;
+    platform: string;
+    status: string;
+    agent_id?: number;
+    agent_name?: string;
+    customer_id?: number;
+    customer_name?: string;
+    started_at: string;
+  }
+
+  interface WorkspaceOverview {
+    total_active_sessions: number;
+    waiting_queue: number;
+    online_agents: number;
+    busy_agents: number;
+    channels: Array<{
+      platform: string;
+      active_sessions: number;
+      waiting_sessions: number;
+      avg_response_time: number;
+    }>;
+    recent_sessions: WorkspaceSession[];
   }
 
   // ---- AI ----

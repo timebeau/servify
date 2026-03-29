@@ -3,7 +3,7 @@ import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns, ActionType } from '@ant-design/pro-components';
 import { Tag, Button, Space } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
-import { history } from '@umijs/max';
+import { navigateTo } from '@/lib/navigation';
 import { CUSTOMER_SOURCE_MAP } from '@/utils/constants';
 import { listCustomers } from '@/services/customer';
 
@@ -39,7 +39,7 @@ const CustomerListPage: React.FC = () => {
         Object.entries(CUSTOMER_SOURCE_MAP).map(([k, v]) => [k, { text: v }]),
       ),
       render: (_, record) => {
-        const text = CUSTOMER_SOURCE_MAP[record.source];
+        const text = record.source ? CUSTOMER_SOURCE_MAP[record.source] : undefined;
         return text ? <Tag>{text}</Tag> : record.source;
       },
     },
@@ -63,7 +63,7 @@ const CustomerListPage: React.FC = () => {
       width: 120,
       render: (_, record) => (
         <Space>
-          <a onClick={() => history.push(`/customer/detail/${record.id}`)}>查看</a>
+          <a onClick={() => navigateTo(`/customer/detail/${record.id}`)}>查看</a>
           <a>编辑</a>
         </Space>
       ),

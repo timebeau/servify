@@ -3,7 +3,7 @@ import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
 import { Tag, Button, Space, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
-import { history } from '@umijs/max';
+import { navigateTo } from '@/lib/navigation';
 import { listDocs, deleteDoc } from '@/services/knowledge';
 
 const KnowledgeListPage: React.FC = () => {
@@ -43,7 +43,7 @@ const KnowledgeListPage: React.FC = () => {
       width: 160,
       render: (_, record) => (
         <Space>
-          <a onClick={() => history.push(`/knowledge/detail/${record.id}`)}>查看</a>
+          <a onClick={() => navigateTo(`/knowledge/detail/${record.id}`)}>查看</a>
           <a>编辑</a>
           <a
             onClick={async () => {

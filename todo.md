@@ -46,6 +46,35 @@
 - `09` 到 `12` 全部 backlog 已清零
 - 所有已规划 backlog 均已完成
 
+产品收口新增待办：
+
+- [ ] `apps/admin` 工程基线修复
+  - 目标：先恢复 `typecheck` / `build` 可用，移除对错误 `@umijs/max` 导出的依赖
+  - 范围：
+    - 统一请求封装与鉴权注入
+    - 收口页面导航与路由参数读取
+    - 清理当前 `strict` 模式下的明显类型错误
+
+- [ ] 管理端核心契约对齐
+  - 目标：修复前后端 DTO 字段错位，避免页面空白或伪数据
+  - 范围：
+    - Dashboard 统计字段与后端 analytics contract 对齐
+    - Conversation 页面与 workspace overview contract 对齐
+    - 为 admin typings 增加工作台/统计真实结构
+
+- [ ] 核心运营链路闭环第一阶段
+  - 目标：先让“登录 -> 看板 -> 会话工作台 -> 工单处理”成为可演示、可继续迭代的主链路
+  - 范围：
+    - 去除 Dashboard/Conversation 的关键占位依赖
+    - 补齐会话列表展示与空态
+    - 为核心页补基础错误态和加载态
+
+- [ ] 产品化差距后续收口
+  - 范围：
+    - 逐步替换 mock / in-memory 运行时能力
+    - 让 analytics 指标脱离硬编码
+    - 继续把 legacy services 收口进 modules 边界
+
 下一阶段建议专题：
 
 - [09-runtime-and-repo-hygiene](docs/implementation/09-runtime-and-repo-hygiene.md)

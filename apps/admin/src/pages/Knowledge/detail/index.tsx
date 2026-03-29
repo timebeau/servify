@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { ProDescriptions } from '@ant-design/pro-components';
 import { ProCard } from '@ant-design/pro-components';
 import { Button, Space, Spin } from 'antd';
-import { useParams, history } from '@umijs/max';
+import { goBack, useDetailParams } from '@/lib/navigation';
 import { getDoc } from '@/services/knowledge';
 
 const KnowledgeDetailPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useDetailParams();
   const [loading, setLoading] = useState(true);
   const [doc, setDoc] = useState<API.KnowledgeDoc | null>(null);
 
@@ -41,7 +41,7 @@ const KnowledgeDetailPage: React.FC = () => {
       <div style={{ textAlign: 'center', padding: 80, color: '#999' }}>
         文档不存在或加载失败
         <br />
-        <Button style={{ marginTop: 16 }} onClick={() => history.back()}>
+        <Button style={{ marginTop: 16 }} onClick={goBack}>
           返回
         </Button>
       </div>
@@ -54,7 +54,7 @@ const KnowledgeDetailPage: React.FC = () => {
         title="文档详情"
         extra={
           <Space>
-            <Button onClick={() => history.back()}>返回</Button>
+            <Button onClick={goBack}>返回</Button>
             <Button>编辑</Button>
             <Button type="primary">发布</Button>
           </Space>

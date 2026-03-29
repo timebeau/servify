@@ -8,15 +8,14 @@ interface ConversationRecord {
   id: string;
   customer_name?: string;
   agent_name?: string;
-  channel?: string;
+  platform?: string;
   status: string;
-  created_at: string;
-  updated_at: string;
+  started_at: string;
 }
 
 const ConversationPage: React.FC = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [overview, setOverview] = useState<any>(null);
+  const [overview, setOverview] = useState<API.WorkspaceOverview | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -54,7 +53,7 @@ const ConversationPage: React.FC = () => {
     },
     {
       title: '渠道',
-      dataIndex: 'channel',
+      dataIndex: 'platform',
       width: 100,
     },
     {
@@ -65,11 +64,13 @@ const ConversationPage: React.FC = () => {
     },
     {
       title: '开始时间',
-      dataIndex: 'created_at',
+      dataIndex: 'started_at',
       valueType: 'dateTime',
       width: 180,
     },
   ];
+
+  const sessions = overview?.recent_sessions || [];
 
   return (
     <div style={{ display: 'flex', gap: 16, height: 'calc(100vh - 120px)' }}>
@@ -91,7 +92,6 @@ const ConversationPage: React.FC = () => {
           })}
           request={async () => {
             try {
-              const sessions = overview?.sessions || [];
               return { data: sessions, total: sessions.length, success: true };
             } catch (error) {
               console.error('获取会话列表失败:', error);
@@ -107,7 +107,9 @@ const ConversationPage: React.FC = () => {
         >
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <div style={{ flex: 1, textAlign: 'center', padding: 40, color: '#999' }}>
-              聊天消息区域占位 - 待接入数据
+              {selectedId
+                ? `已选择会话 ${selectedId}。下一步需要接入消息详情与会话操作。`
+                : '请先从左侧选择一个会话。'}
             </div>
             <Input.TextArea
               rows={3}

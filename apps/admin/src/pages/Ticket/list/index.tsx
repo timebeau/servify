@@ -3,7 +3,7 @@ import { ProTable, ModalForm, ProFormText, ProFormTextArea, ProFormSelect } from
 import type { ProColumns, ActionType } from '@ant-design/pro-components';
 import { Tag, Button, Space, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
-import { history } from '@umijs/max';
+import { navigateTo } from '@/lib/navigation';
 import { TICKET_STATUS_MAP, TICKET_PRIORITY_MAP } from '@/utils/constants';
 import { listTickets, createTicket } from '@/services/ticket';
 
@@ -72,7 +72,7 @@ const TicketListPage: React.FC = () => {
       width: 120,
       render: (_, record) => (
         <Space>
-          <a onClick={() => history.push(`/ticket/detail/${record.id}`)}>查看</a>
+          <a onClick={() => navigateTo(`/ticket/detail/${record.id}`)}>查看</a>
           <a>编辑</a>
         </Space>
       ),
@@ -120,7 +120,7 @@ const TicketListPage: React.FC = () => {
               name="priority"
               label="优先级"
               valueEnum={Object.fromEntries(
-                Object.entries(TICKET_PRIORITY_MAP).map(([k, v]) => [k, { label: v.text }]),
+                Object.entries(TICKET_PRIORITY_MAP).map(([k, v]) => [k, { text: v.text }]),
               )}
             />
           </ModalForm>,

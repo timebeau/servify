@@ -1,13 +1,11 @@
 import React from 'react';
-import { history, useModel } from '@umijs/max';
 import { LoginForm, ProFormText } from '@ant-design/pro-components';
 import { LockOutlined, UserOutlined } from '@ant-design/icons';
 import { message } from 'antd';
+import { navigateTo } from '@/lib/navigation';
 import { setToken, parseJwtPayload, setUserInfo } from '@/utils/auth';
 
 const LoginPage: React.FC = () => {
-  const { refresh } = useModel('@@initialState');
-
   const handleSubmit = async (values: { username: string; password: string }) => {
     try {
       const resp = await fetch('/api/v1/auth/login', {
@@ -34,8 +32,7 @@ const LoginPage: React.FC = () => {
       if (user) setUserInfo(user);
 
       message.success('登录成功');
-      refresh();
-      history.push('/dashboard');
+      navigateTo('/dashboard');
     } catch {
       message.error('网络错误，请检查后端服务是否启动');
     }
