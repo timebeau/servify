@@ -20,23 +20,23 @@ type InMemoryBus struct {
 	logger   *logrus.Logger
 
 	// observability counters
-	publishedCount atomic.Int64
-	failedCount    atomic.Int64
+	publishedCount  atomic.Int64
+	failedCount     atomic.Int64
 	deadLetterCount atomic.Int64
 
 	// deadLetterMu protects the dead letter slice.
-	deadLetterMu sync.Mutex
-	deadLetters  []DeadLetterEntry
+	deadLetterMu   sync.Mutex
+	deadLetters    []DeadLetterEntry
 	maxDeadLetters int
 }
 
 // DeadLetterEntry records a handler failure for diagnostics.
 type DeadLetterEntry struct {
-	EventID   string
-	EventName string
+	EventID    string
+	EventName  string
 	HandlerIdx int
-	Error     string
-	FailedAt  time.Time
+	Error      string
+	FailedAt   time.Time
 }
 
 // BusHealth returns a snapshot of bus metrics.

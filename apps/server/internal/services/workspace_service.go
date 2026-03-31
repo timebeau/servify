@@ -53,12 +53,12 @@ type AgentBasicInfo struct {
 
 // WorkspaceOverview 全渠道视图
 type WorkspaceOverview struct {
-	TotalActiveSessions int64              `json:"total_active_sessions"`
-	WaitingQueue        int64              `json:"waiting_queue"`
-	OnlineAgents        int64              `json:"online_agents"`
-	BusyAgents          int64              `json:"busy_agents"`
-	Channels            []ChannelSummary   `json:"channels"`
-	RecentSessions      []WorkspaceSession `json:"recent_sessions"`
+	TotalActiveSessions int64               `json:"total_active_sessions"`
+	WaitingQueue        int64               `json:"waiting_queue"`
+	OnlineAgents        int64               `json:"online_agents"`
+	BusyAgents          int64               `json:"busy_agents"`
+	Channels            []ChannelSummary    `json:"channels"`
+	RecentSessions      []WorkspaceSession  `json:"recent_sessions"`
 	AgentStats          *AgentStatsOverview `json:"agent_stats,omitempty"`
 }
 

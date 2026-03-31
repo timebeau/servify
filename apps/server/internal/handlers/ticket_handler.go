@@ -9,28 +9,26 @@ import (
 	"strings"
 	"time"
 
-	"servify/apps/server/internal/models"
 	ticketcontract "servify/apps/server/internal/modules/ticket/contract"
 	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"gorm.io/gorm"
 )
 
 // TicketHandler 工单处理器
 type TicketHandler struct {
 	ticketService ticketdelivery.HandlerService
 	logger        *logrus.Logger
-	db            *gorm.DB
+
 }
 
 // NewTicketHandler 创建工单处理器
-func NewTicketHandler(ticketService ticketdelivery.HandlerService, logger *logrus.Logger, db *gorm.DB) *TicketHandler {
+func NewTicketHandler(ticketService ticketdelivery.HandlerService, logger *logrus.Logger) *TicketHandler {
 	return &TicketHandler{
 		ticketService: ticketService,
 		logger:        logger,
-		db:            db,
+
 	}
 }
 
@@ -579,15 +577,11 @@ func (h *TicketHandler) GetRelatedConversations(c *gin.Context) {
 		return
 	}
 
-	var sessions []models.Session
-	result := h.db.Preload("User").Preload("Agent").
-		Where("ticket_id = ?", ticketID).
-		Order("started_at DESC").
-		Find(&sessions)
-	if result.Error != nil {
+	sessions, err := h.ticketService.GetRelatedConversations(c.Request.Context(), uint(ticketID))
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "Failed to load related conversations",
-			Message: result.Error.Error(),
+			Message: err.Error(),
 		})
 		return
 	}

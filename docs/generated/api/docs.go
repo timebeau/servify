@@ -5058,6 +5058,28 @@ const docTemplate = `{
                 }
             }
         },
+        "services.AgentBasicInfo": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.AgentStatsOverview": {
+            "type": "object",
+            "properties": {
+                "available_agents": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.AgentBasicInfo"
+                    }
+                }
+            }
+        },
         "services.ChannelSummary": {
             "type": "object",
             "properties": {
@@ -5565,6 +5587,9 @@ const docTemplate = `{
         "services.WorkspaceOverview": {
             "type": "object",
             "properties": {
+                "agent_stats": {
+                    "$ref": "#/definitions/services.AgentStatsOverview"
+                },
                 "busy_agents": {
                     "type": "integer"
                 },

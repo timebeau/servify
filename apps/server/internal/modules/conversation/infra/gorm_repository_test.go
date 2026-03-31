@@ -104,7 +104,7 @@ func TestMapMessageModelAndBack(t *testing.T) {
 
 func TestMapConversationStatus_Bidirectional(t *testing.T) {
 	cases := []struct {
-		dbStatus   string
+		dbStatus     string
 		domainStatus domain.ConversationStatus
 	}{
 		{"active", domain.ConversationStatusActive},

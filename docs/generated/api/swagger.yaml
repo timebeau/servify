@@ -916,6 +916,20 @@ definitions:
       username:
         type: string
     type: object
+  services.AgentBasicInfo:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  services.AgentStatsOverview:
+    properties:
+      available_agents:
+        items:
+          $ref: '#/definitions/services.AgentBasicInfo'
+        type: array
+    type: object
   services.ChannelSummary:
     properties:
       active_sessions:
@@ -1258,6 +1272,8 @@ definitions:
     type: object
   services.WorkspaceOverview:
     properties:
+      agent_stats:
+        $ref: '#/definitions/services.AgentStatsOverview'
       busy_agents:
         type: integer
       channels:

@@ -18,6 +18,7 @@ type HandlerServiceAdapter struct {
 	query        ticketStatsQueryService
 	cmd          *ticketapp.CommandService
 	orchestrator *ticketorchestration.TicketOrchestrator
+	db           *gorm.DB
 }
 
 // HandlerService is the only ticket contract that HTTP handlers should depend on.
@@ -32,6 +33,7 @@ type HandlerService interface {
 	CloseTicket(ctx context.Context, ticketID uint, userID uint, reason string) error
 	GetTicketStats(ctx context.Context, agentID *uint) (*ticketcontract.TicketStats, error)
 	BulkUpdateTickets(ctx context.Context, req *ticketcontract.BulkUpdateTicketRequest, userID uint) (*ticketcontract.BulkUpdateResult, error)
+	GetRelatedConversations(ctx context.Context, ticketID uint) ([]models.Session, error)
 }
 
 type ticketStatsQueryService interface {
@@ -48,6 +50,7 @@ func NewHandlerServiceAdapter(db *gorm.DB, cmd *ticketapp.CommandService, orches
 		query:        ticketapp.NewQueryService(repo),
 		cmd:          cmd,
 		orchestrator: orchestrator,
+		db:           db,
 	}
 }
 
@@ -208,3 +211,15 @@ func (a *HandlerServiceAdapter) BulkUpdateTickets(ctx context.Context, req *tick
 }
 
 var _ HandlerService = (*HandlerServiceAdapter)(nil)
+
+func (a *HandlerServiceAdapter) GetRelatedConversations(ctx context.Context, ticketID uint) ([]models.Session, error) {
+	var sessions []models.Session
+	result := a.db.Preload("User").Preload("Agent").
+		Where("ticket_id = ?", ticketID).
+		Order("started_at DESC").
+		Find(&sessions)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return sessions, nil
+}

@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	conversationapp "servify/apps/server/internal/modules/conversation/application"
 	conversationdelivery "servify/apps/server/internal/modules/conversation/delivery"
 	realtimeplatform "servify/apps/server/internal/platform/realtime"
 
@@ -67,7 +66,7 @@ func (h *ConversationWorkspaceHandler) ListMessages(c *gin.Context) {
 
 	before := c.Query("before")
 
-	var items []conversationapp.ConversationMessageDTO
+	var items []conversationdelivery.ConversationMessageDTO
 	var err error
 	if before != "" {
 		items, err = h.service.ListMessagesBefore(c.Request.Context(), sessionID, before, limit)
@@ -271,5 +270,3 @@ func RegisterConversationWorkspaceRoutes(r *gin.RouterGroup, handler *Conversati
 		omni.POST("/sessions/:id/close", handler.CloseSession)
 	}
 }
-
-

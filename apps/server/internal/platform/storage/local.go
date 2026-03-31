@@ -53,7 +53,7 @@ func (p *LocalProvider) Save(key string, r io.Reader, size int64) (*ObjectInfo, 
 }
 
 func (p *LocalProvider) Open(key string) (io.ReadCloser, error) {
- fullPath := filepath.Join(p.baseDir, key)
+	fullPath := filepath.Join(p.baseDir, key)
 	f, err := os.Open(fullPath)
 	if err != nil {
 		return nil, fmt.Errorf("open file %s: %w", fullPath, err)
