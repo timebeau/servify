@@ -6,6 +6,7 @@ import {
   Empty,
   Input,
   Modal,
+  Result,
   Select,
   Space,
   Spin,
@@ -14,6 +15,9 @@ import {
   Tooltip,
 } from 'antd';
 import {
+  ReloadOutlined,
+} from '@ant-design/icons';
+import {
   getConversationMessages,
   sendConversationMessage,
   assignAgent,
@@ -21,6 +25,7 @@ import {
   closeConversation,
 } from '@/services/conversation';
 import { getWorkspaceOverview } from '@/services/workspace';
+import { useQueryParam } from '@/lib/navigation';
 
 const STATUS_MAP: Record<string, { color: string; label: string }> = {
   active: { color: 'green', label: '进行中' },
@@ -47,8 +52,10 @@ interface ConversationRecord {
 
 const ConversationPage: React.FC = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const preselectedId = useQueryParam('id');
   const [overview, setOverview] = useState<API.WorkspaceOverview | null>(null);
   const [loading, setLoading] = useState(true);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
   const [messageLoading, setMessageLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [messages, setMessages] = useState<API.ConversationMessage[]>([]);
@@ -59,21 +66,30 @@ const ConversationPage: React.FC = () => {
   const [operating, setOperating] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const fetchOverview = async () => {
-      try {
-        const result = await getWorkspaceOverview();
-        if (result) {
-          setOverview(result);
+  const fetchOverview = useCallback(async () => {
+    setLoading(true);
+    setOverviewError(null);
+    try {
+      const result = await getWorkspaceOverview();
+      if (result) {
+        setOverview(result);
+        // URL query param 预选会话
+        if (!selectedId && preselectedId) {
+          setSelectedId(preselectedId);
         }
-      } catch (error) {
-        console.error('获取工作区概览失败:', error);
-      } finally {
-        setLoading(false);
       }
-    };
-    fetchOverview();
+    } catch (error) {
+      console.error('获取工作区概览失败:', error);
+      setOverviewError('获取工作区概览失败，请重试');
+    } finally {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    fetchOverview();
+  }, [fetchOverview]);
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
@@ -118,9 +134,10 @@ const ConversationPage: React.FC = () => {
 
   const handleSend = async () => {
     if (!selectedId || !draft.trim()) return;
+    const content = draft.trim();
     setSending(true);
     try {
-      const payload = await sendConversationMessage(selectedId, { content: draft.trim() });
+      const payload = await sendConversationMessage(selectedId, { content });
       const item = payload?.data as API.ConversationMessage | undefined;
       if (item) {
         setMessages((prev) => [...prev, item]);
@@ -130,17 +147,26 @@ const ConversationPage: React.FC = () => {
       scrollToBottom();
     } catch (error) {
       console.error('发送消息失败:', error);
-      message.error('发送消息失败');
+      message.error('发送消息失败，请重试');
+      // 发送失败保留草稿
     } finally {
       setSending(false);
     }
   };
 
+  const refreshOverview = useCallback(async () => {
+    try {
+      const result = await getWorkspaceOverview();
+      if (result) setOverview(result);
+    } catch {
+      // 静默失败，避免干扰操作
+    }
+  }, []);
+
   const handleAssign = async () => {
     if (!selectedId) return;
     setOperating(true);
     try {
-      // Auto-assign: pick first available agent from overview
       const agents = overview?.agent_stats?.available_agents || [];
       if (agents.length === 0) {
         message.warning('当前没有可用客服');
@@ -148,9 +174,9 @@ const ConversationPage: React.FC = () => {
       }
       await assignAgent(selectedId, { agent_id: agents[0].id });
       message.success('已接管会话');
-      // Refresh messages to get system event
       const result = await getConversationMessages(selectedId, { limit: 50 });
       setMessages(result?.data || []);
+      refreshOverview();
     } catch (error) {
       message.error('接管失败: ' + (error as Error).message);
     } finally {
@@ -168,6 +194,7 @@ const ConversationPage: React.FC = () => {
       setTransferTarget(null);
       const result = await getConversationMessages(selectedId, { limit: 50 });
       setMessages(result?.data || []);
+      refreshOverview();
     } catch (error) {
       message.error('转派失败: ' + (error as Error).message);
     } finally {
@@ -175,19 +202,29 @@ const ConversationPage: React.FC = () => {
     }
   };
 
-  const handleClose = async () => {
+  const handleClose = () => {
     if (!selectedId) return;
-    setOperating(true);
-    try {
-      await closeConversation(selectedId);
-      message.success('会话已结束');
-      const result = await getConversationMessages(selectedId, { limit: 50 });
-      setMessages(result?.data || []);
-    } catch (error) {
-      message.error('关闭失败: ' + (error as Error).message);
-    } finally {
-      setOperating(false);
-    }
+    Modal.confirm({
+      title: '确认结束会话',
+      content: '结束后将无法继续发送消息，确定要结束吗？',
+      okText: '确认结束',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setOperating(true);
+        try {
+          await closeConversation(selectedId);
+          message.success('会话已结束');
+          const result = await getConversationMessages(selectedId, { limit: 50 });
+          setMessages(result?.data || []);
+          refreshOverview();
+        } catch (error) {
+          message.error('关闭失败: ' + (error as Error).message);
+        } finally {
+          setOperating(false);
+        }
+      },
+    });
   };
 
   const columns: ProColumns<ConversationRecord>[] = [
@@ -214,20 +251,35 @@ const ConversationPage: React.FC = () => {
   return (
     <div style={{ display: 'flex', gap: 16, height: 'calc(100vh - 120px)' }}>
       <div style={{ width: 480, flexShrink: 0 }}>
-        <ProTable<ConversationRecord>
-          headerTitle="会话列表"
-          rowKey="id"
-          columns={columns}
-          search={{ filterType: 'light' }}
-          tableAlertRender={false}
-          scroll={{ y: 'calc(100vh - 220px)' }}
-          pagination={{ defaultPageSize: 20 }}
-          onRow={(record) => ({
-            onClick: () => setSelectedId(record.id),
-            style: { cursor: 'pointer', background: selectedId === record.id ? '#e6f7ff' : undefined },
-          })}
-          request={async () => ({ data: sessions, total: sessions.length, success: true })}
-        />
+        {overviewError ? (
+          <Result
+            status="error"
+            title="加载失败"
+            subTitle={overviewError}
+            extra={<Button type="primary" icon={<ReloadOutlined />} onClick={fetchOverview}>重试</Button>}
+          />
+        ) : (
+          <ProTable<ConversationRecord>
+            headerTitle={
+              <Space>
+                <span>会话列表</span>
+                <Button size="small" type="text" icon={<ReloadOutlined />} onClick={refreshOverview} loading={loading} title="刷新列表" />
+              </Space>
+            }
+            rowKey="id"
+            columns={columns}
+            search={{ filterType: 'light' }}
+            tableAlertRender={false}
+            scroll={{ y: 'calc(100vh - 220px)' }}
+            pagination={{ defaultPageSize: 20 }}
+            loading={loading}
+            onRow={(record) => ({
+              onClick: () => setSelectedId(record.id),
+              style: { cursor: 'pointer', background: selectedId === record.id ? '#e6f7ff' : undefined },
+            })}
+            request={async () => ({ data: sessions, total: sessions.length, success: true })}
+          />
+        )}
       </div>
       <div style={{ flex: 1 }}>
         <ProCard
@@ -315,7 +367,7 @@ const ConversationPage: React.FC = () => {
               <>
                 <Input.TextArea
                   rows={3}
-                  placeholder="输入消息..."
+                  placeholder="输入消息... (Enter 发送, Shift+Enter 换行)"
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   style={{ marginTop: 8 }}
@@ -342,13 +394,17 @@ const ConversationPage: React.FC = () => {
         okButtonProps={{ disabled: !transferTarget }}
       >
         <p style={{ marginBottom: 12 }}>选择目标客服：</p>
-        <Select
-          style={{ width: '100%' }}
-          placeholder="选择客服"
-          value={transferTarget}
-          onChange={(v) => setTransferTarget(v)}
-          options={onlineAgents.map((a: any) => ({ label: a.name || `客服 #${a.id}`, value: a.id }))}
-        />
+        {onlineAgents.length === 0 ? (
+          <Empty description="暂无可用客服" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+        ) : (
+          <Select
+            style={{ width: '100%' }}
+            placeholder="选择客服"
+            value={transferTarget}
+            onChange={(v) => setTransferTarget(v)}
+            options={onlineAgents.map((a: any) => ({ label: a.name || `客服 #${a.id}`, value: a.id }))}
+          />
+        )}
       </Modal>
     </div>
   );

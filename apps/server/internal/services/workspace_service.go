@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"servify/apps/server/internal/models"
@@ -39,6 +40,17 @@ type ChannelSummary struct {
 	AvgResponseTime float64 `json:"avg_response_time"`
 }
 
+// AgentStatsOverview 可分配客服概览
+type AgentStatsOverview struct {
+	AvailableAgents []AgentBasicInfo `json:"available_agents"`
+}
+
+// AgentBasicInfo 客服基本信息
+type AgentBasicInfo struct {
+	ID   uint   `json:"id"`
+	Name string `json:"name,omitempty"`
+}
+
 // WorkspaceOverview 全渠道视图
 type WorkspaceOverview struct {
 	TotalActiveSessions int64              `json:"total_active_sessions"`
@@ -47,6 +59,7 @@ type WorkspaceOverview struct {
 	BusyAgents          int64              `json:"busy_agents"`
 	Channels            []ChannelSummary   `json:"channels"`
 	RecentSessions      []WorkspaceSession `json:"recent_sessions"`
+	AgentStats          *AgentStatsOverview `json:"agent_stats,omitempty"`
 }
 
 // WorkspaceSession 最近会话摘要
@@ -136,6 +149,23 @@ func (s *WorkspaceService) GetOverview(ctx context.Context, limit int) (*Workspa
 	}
 	overview.RecentSessions = sessions
 
+	// 填充可分配客服列表
+	if s.agentService != nil {
+		onlineAgents := s.agentService.GetOnlineAgents(ctx)
+		if len(onlineAgents) > 0 {
+			available := make([]AgentBasicInfo, 0, len(onlineAgents))
+			for _, a := range onlineAgents {
+				if a != nil {
+					available = append(available, AgentBasicInfo{
+						ID:   a.UserID,
+						Name: firstNonEmpty(a.Name, a.Username),
+					})
+				}
+			}
+			overview.AgentStats = &AgentStatsOverview{AvailableAgents: available}
+		}
+	}
+
 	return overview, nil
 }
 
@@ -143,4 +173,13 @@ func (s *WorkspaceService) getAvgResponseTime(ctx context.Context) float64 {
 	var avg float64
 	_ = applyScopeFilter(s.db.WithContext(ctx).Model(&models.Agent{}), ctx).Select("AVG(avg_response_time)").Row().Scan(&avg)
 	return avg
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
 }

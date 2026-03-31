@@ -286,6 +286,8 @@ func mapSessionStatusToConversationStatus(status string) domain.ConversationStat
 		return domain.ConversationStatusClosed
 	case "transferred":
 		return domain.ConversationStatusTransferred
+	case "waiting_human":
+		return domain.ConversationStatusWaitingHuman
 	default:
 		return domain.ConversationStatusActive
 	}
@@ -297,6 +299,8 @@ func mapConversationStatusToSessionStatus(status domain.ConversationStatus) stri
 		return "ended"
 	case domain.ConversationStatusTransferred:
 		return "transferred"
+	case domain.ConversationStatusWaitingHuman:
+		return "waiting_human"
 	default:
 		return "active"
 	}

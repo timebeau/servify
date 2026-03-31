@@ -236,3 +236,138 @@ func TestConversationWorkspaceHandler_CloseSession(t *testing.T) {
 		t.Fatalf("expected status closed, got %q", dto.Status)
 	}
 }
+
+func TestConversationWorkspaceHandler_GetSession(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db := newConversationWorkspaceTestDB(t)
+	service := seedConversation(t, db)
+	handler := NewConversationWorkspaceHandler(conversationdelivery.NewHandlerService(service), nil)
+
+	router := gin.New()
+	group := router.Group("/api")
+	RegisterConversationWorkspaceRoutes(group, handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/omni/sessions/sess-1", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	data, ok := resp["data"].(map[string]interface{})
+	if !ok || data["id"] != "sess-1" {
+		t.Fatalf("unexpected session data: %+v", resp)
+	}
+}
+
+func TestConversationWorkspaceHandler_GetSession_NotFound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db := newConversationWorkspaceTestDB(t)
+	service := seedConversation(t, db)
+	handler := NewConversationWorkspaceHandler(conversationdelivery.NewHandlerService(service), nil)
+
+	router := gin.New()
+	group := router.Group("/api")
+	RegisterConversationWorkspaceRoutes(group, handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/omni/sessions/nonexistent", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestConversationWorkspaceHandler_ListMessages_Pagination(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db := newConversationWorkspaceTestDB(t)
+	service := seedConversation(t, db)
+	handler := NewConversationWorkspaceHandler(conversationdelivery.NewHandlerService(service), nil)
+
+	router := gin.New()
+	group := router.Group("/api")
+	RegisterConversationWorkspaceRoutes(group, handler)
+
+	// Seed more messages to test pagination
+	for i := 0; i < 5; i++ {
+		_, _ = service.IngestTextMessage(context.Background(), conversationapp.IngestTextMessageCommand{
+			ConversationID: "sess-1",
+			Sender:         conversationdomain.ParticipantRoleCustomer,
+			Content:        "extra message",
+		})
+	}
+
+	// Get first page with limit=3
+	req := httptest.NewRequest(http.MethodGet, "/api/omni/sessions/sess-1/messages?limit=3", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(resp.Data) != 3 {
+		t.Fatalf("expected 3 messages, got %d", len(resp.Data))
+	}
+
+	// Get second page with before cursor
+	beforeID := resp.Data[0].ID
+	req2 := httptest.NewRequest(http.MethodGet, "/api/omni/sessions/sess-1/messages?limit=3&before="+beforeID, nil)
+	w2 := httptest.NewRecorder()
+	router.ServeHTTP(w2, req2)
+	if w2.Code != http.StatusOK {
+		t.Fatalf("expected 200 for page 2, got %d: %s", w2.Code, w2.Body.String())
+	}
+}
+
+func TestConversationWorkspaceHandler_SendMessage_InvalidBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db := newConversationWorkspaceTestDB(t)
+	service := seedConversation(t, db)
+	handler := NewConversationWorkspaceHandler(conversationdelivery.NewHandlerService(service), nil)
+
+	router := gin.New()
+	group := router.Group("/api")
+	RegisterConversationWorkspaceRoutes(group, handler)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/omni/sessions/sess-1/messages", bytes.NewReader([]byte("invalid json")))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestConversationWorkspaceHandler_AssignAgent_InvalidBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db := newConversationWorkspaceTestDB(t)
+	service := seedConversation(t, db)
+	handler := NewConversationWorkspaceHandler(conversationdelivery.NewHandlerService(service), nil)
+
+	router := gin.New()
+	group := router.Group("/api")
+	RegisterConversationWorkspaceRoutes(group, handler)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/omni/sessions/sess-1/assign", bytes.NewReader([]byte("{bad")))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}

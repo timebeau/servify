@@ -230,3 +230,59 @@ func TestServiceListRecentMessages(t *testing.T) {
 		t.Fatalf("unexpected messages: %+v", got)
 	}
 }
+
+func TestServiceAssignAgent(t *testing.T) {
+	repo := &stubConversationRepo{
+		conversations: map[string]*domain.Conversation{
+			"conv-1": {ID: "conv-1", Status: domain.ConversationStatusWaitingHuman, Participants: []domain.Participant{}},
+		},
+	}
+	publisher := &stubConversationPublisher{}
+	svc := NewService(repo, publisher)
+	svc.now = func() time.Time { return time.Now() }
+
+	got, err := svc.AssignAgent(context.Background(), "conv-1", 1)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got.Status != string(domain.ConversationStatusActive) {
+		t.Fatalf("expected active after assign, got %q", got.Status)
+	}
+	// 验证参与者中包含 agent
+	found := false
+	for _, p := range got.Participants {
+		if p.Role == domain.ParticipantRoleAgent && p.UserID != nil && *p.UserID == 1 {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected agent participant, got %+v", got.Participants)
+	}
+}
+
+func TestServiceTransfer(t *testing.T) {
+	repo := &stubConversationRepo{
+		conversations: map[string]*domain.Conversation{
+			"conv-1": {ID: "conv-1", Status: domain.ConversationStatusActive, Participants: []domain.Participant{
+				{ID: "agent:1", UserID: ptrUint(1), Role: domain.ParticipantRoleAgent},
+			}},
+		},
+	}
+	publisher := &stubConversationPublisher{}
+	svc := NewService(repo, publisher)
+	svc.now = func() time.Time { return time.Now() }
+
+	got, err := svc.Transfer(context.Background(), "conv-1", 2)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got.Status != string(domain.ConversationStatusTransferred) {
+		t.Fatalf("expected transferred, got %q", got.Status)
+	}
+	// 应有系统消息记录转派
+	if len(repo.messages["conv-1"]) == 0 {
+		t.Fatalf("expected system message for transfer")
+	}
+}
+
+func ptrUint(v uint) *uint { return &v }

@@ -1,6 +1,7 @@
 package infra
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -98,5 +99,34 @@ func TestMapMessageModelAndBack(t *testing.T) {
 	})
 	if got.ID != "12" || got.Sender != domain.ParticipantRoleAgent || got.Kind != domain.MessageKindText || got.Content != "hello" {
 		t.Fatalf("unexpected message mapping: %+v", got)
+	}
+}
+
+func TestMapConversationStatus_Bidirectional(t *testing.T) {
+	cases := []struct {
+		dbStatus   string
+		domainStatus domain.ConversationStatus
+	}{
+		{"active", domain.ConversationStatusActive},
+		{"ended", domain.ConversationStatusClosed},
+		{"transferred", domain.ConversationStatusTransferred},
+		{"waiting_human", domain.ConversationStatusWaitingHuman},
+		{"ACTIVE", domain.ConversationStatusActive},
+		{" Waiting_Human ", domain.ConversationStatusWaitingHuman},
+	}
+
+	for _, tc := range cases {
+		got := mapSessionStatusToConversationStatus(tc.dbStatus)
+		if got != tc.domainStatus {
+			t.Errorf("mapSessionStatusToConversationStatus(%q) = %q, want %q", tc.dbStatus, got, tc.domainStatus)
+		}
+
+		// 反向映射（仅小写精确匹配）
+		if tc.dbStatus == strings.TrimSpace(strings.ToLower(tc.dbStatus)) {
+			reverse := mapConversationStatusToSessionStatus(tc.domainStatus)
+			if reverse != tc.dbStatus {
+				t.Errorf("mapConversationStatusToSessionStatus(%q) = %q, want %q", tc.domainStatus, reverse, tc.dbStatus)
+			}
+		}
 	}
 }

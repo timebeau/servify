@@ -8,23 +8,31 @@ cd "$ROOT_DIR"
 echo "=== Phase 1 Smoke Tests ==="
 
 echo
-echo "1/5: Conversation handler — List/Send/Assign/Close"
-go test -count=1 -run 'TestConversationWorkspaceHandler_(ListMessages|SendMessage|AssignAgent|CloseSession)' ./apps/server/internal/handlers/ -v
+echo "1/7: Conversation handler — All endpoints"
+go test -count=1 -run 'TestConversationWorkspaceHandler_' ./apps/server/internal/handlers/ -v
 
 echo
-echo "2/5: Ticket handler — Create/Get/List/Assign/Bulk"
+echo "2/7: Conversation service — Create/Resume/Ingest/List/Assign/Transfer"
+go test -count=1 -run 'TestService' ./apps/server/internal/modules/conversation/application/ -v
+
+echo
+echo "3/7: Conversation infra — Status mapping"
+go test -count=1 -run 'TestMapConversationStatus' ./apps/server/internal/modules/conversation/infra/ -v
+
+echo
+echo "4/7: Ticket handler — Create/Get/List/Assign/Bulk"
 go test -tags=integration -count=1 -run 'TestTicketHandler_Create_Get_List_Assign' ./apps/server/internal/handlers/ -v
 
 echo
-echo "3/5: Ticket handler — Custom Fields + Export"
+echo "5/7: Ticket handler — Custom Fields + Export"
 go test -tags=integration -count=1 -run 'TestTicketHandler_CustomFields' ./apps/server/internal/handlers/ -v
 
 echo
-echo "4/5: Ticket handler — Related Conversations"
+echo "6/7: Ticket handler — Related Conversations"
 go test -tags=integration -count=1 -run 'TestTicketHandler_GetRelatedConversations' ./apps/server/internal/handlers/ -v
 
 echo
-echo "5/5: Go build — full project"
+echo "7/7: Go build — full project"
 go build ./...
 
 echo

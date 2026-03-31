@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ProDescriptions } from '@ant-design/pro-components';
 import { ProCard } from '@ant-design/pro-components';
-import { Tag, Steps, Button, Space, Divider, Input, List, Spin, message, Empty } from 'antd';
+import { Tag, Steps, Button, Space, Divider, Input, List, Spin, message, Empty, Alert } from 'antd';
 import { goBack, useDetailParams } from '@/lib/navigation';
 import { navigateTo } from '@/lib/navigation';
 import { TICKET_STATUS_MAP, TICKET_PRIORITY_MAP } from '@/utils/constants';
@@ -13,8 +13,11 @@ const TicketDetailPage: React.FC = () => {
   const [ticket, setTicket] = useState<API.Ticket | null>(null);
   const [comments, setComments] = useState<any[]>([]);
   const [commentContent, setCommentContent] = useState('');
+  const [commentsError, setCommentsError] = useState<string | null>(null);
+  const [submittingComment, setSubmittingComment] = useState(false);
   const [conversations, setConversations] = useState<any[]>([]);
   const [conversationsLoading, setConversationsLoading] = useState(false);
+  const [conversationsError, setConversationsError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -37,11 +40,13 @@ const TicketDetailPage: React.FC = () => {
   useEffect(() => {
     const fetchComments = async () => {
       if (!id) return;
+      setCommentsError(null);
       try {
         const result = await getComments(Number(id));
         setComments(Array.isArray(result) ? result : result?.data || []);
       } catch (error) {
         console.error('获取评论失败:', error);
+        setCommentsError('获取评论失败，请刷新重试');
       }
     };
     fetchComments();
@@ -51,11 +56,13 @@ const TicketDetailPage: React.FC = () => {
     const fetchConversations = async () => {
       if (!id) return;
       setConversationsLoading(true);
+      setConversationsError(null);
       try {
         const result = await getTicketConversations(Number(id));
         setConversations(result?.data || []);
       } catch (error) {
         console.error('获取关联会话失败:', error);
+        setConversationsError('获取关联会话失败，请刷新重试');
       } finally {
         setConversationsLoading(false);
       }
@@ -106,6 +113,7 @@ const TicketDetailPage: React.FC = () => {
 
   const handleAddComment = async () => {
     if (!commentContent.trim() || !id) return;
+    setSubmittingComment(true);
     try {
       await addComment(Number(id), { content: commentContent });
       message.success('评论已添加');
@@ -114,6 +122,8 @@ const TicketDetailPage: React.FC = () => {
       setComments(Array.isArray(result) ? result : result?.data || []);
     } catch (error) {
       message.error('添加评论失败');
+    } finally {
+      setSubmittingComment(false);
     }
   };
 
@@ -131,7 +141,6 @@ const TicketDetailPage: React.FC = () => {
         extra={
           <Space>
             <Button onClick={goBack}>返回</Button>
-            <Button type="primary">回复</Button>
           </Space>
         }
       >
@@ -174,6 +183,9 @@ const TicketDetailPage: React.FC = () => {
       </ProCard>
 
       <ProCard title="沟通记录" style={{ marginTop: 16 }}>
+        {commentsError && (
+          <Alert type="error" message={commentsError} showIcon style={{ marginBottom: 16 }} />
+        )}
         <List
           dataSource={comments}
           locale={{ emptyText: '暂无评论' }}
@@ -203,7 +215,7 @@ const TicketDetailPage: React.FC = () => {
           style={{ marginTop: 8 }}
         />
         <div style={{ marginTop: 8, textAlign: 'right' }}>
-          <Button type="primary" onClick={handleAddComment} disabled={!commentContent.trim()}>
+          <Button type="primary" onClick={handleAddComment} disabled={!commentContent.trim()} loading={submittingComment}>
             提交评论
           </Button>
         </div>
@@ -211,6 +223,9 @@ const TicketDetailPage: React.FC = () => {
 
       {/* 关联会话 */}
       <ProCard title="关联会话" style={{ marginTop: 16 }}>
+        {conversationsError && (
+          <Alert type="error" message={conversationsError} showIcon style={{ marginBottom: 16 }} />
+        )}
         <Spin spinning={conversationsLoading}>
           {conversations.length === 0 ? (
             <Empty description="该工单没有关联的会话记录" />

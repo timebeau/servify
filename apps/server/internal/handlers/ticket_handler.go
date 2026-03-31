@@ -580,7 +580,8 @@ func (h *TicketHandler) GetRelatedConversations(c *gin.Context) {
 	}
 
 	var sessions []models.Session
-	result := h.db.Where("ticket_id = ?", ticketID).
+	result := h.db.Preload("User").Preload("Agent").
+		Where("ticket_id = ?", ticketID).
 		Order("started_at DESC").
 		Find(&sessions)
 	if result.Error != nil {
