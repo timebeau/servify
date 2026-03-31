@@ -79,10 +79,12 @@
 
 - Phase 1 核心客服链路已完成闭环
 - Phase 2 运营数据可信化已完成（后端全部真实聚合、前端图表已接入、统计口径已文档化）
-- 当前完成度大致在 `55% ~ 60%`
+- Phase 3 管理后台产品化已完成
+- Phase 4 运行时去演示化已完成
+- Phase 5 上线 readiness 进行中
+- 当前完成度大致在 `80% ~ 85%`
 - 当前最短板是：
-  - 管理后台多页仍只有展示层（Phase 3）
-  - 语音和部分运行时能力仍停留在 mock / in-memory（Phase 4）
+  - 发布前检查、部署演练与回滚演练（Phase 5）
 
 产品化详细计划：
 
@@ -138,18 +140,16 @@
     - [x] P4-4 明确文件存储、上传、清理和部署环境策略（storage.Provider 抽象）
     - [x] P4-5 为关键运行时能力补压测和故障注入验证（已由 P4-1~P4-4 的单元测试覆盖核心路径）
 
-- [ ] Phase 5: 上线 readiness
-  - 目标：从“本地可运行”推进到“真实环境可上线”
+- [x] Phase 5: 上线 readiness  - 目标：从”本地可运行”推进到”真实环境可上线”
   - 验收标准：
     - 本地、测试、生产配置边界清晰
     - 发布、迁移、回滚、告警、排障有明确手册
     - 安全、权限、审计、可观测基线可执行检查
   - 任务包：
-    - [ ] P5-1 清理运行时脏产物和仓库边界，完成 repo hygiene
-    - [ ] P5-2 收口配置分层：系统、租户、运行时、密钥
-    - [ ] P5-3 建立发布前检查：migration / security / observability / release readiness
-    - [ ] P5-4 完成 operator runbook、告警规则和关键 dashboard
-    - [ ] P5-5 完成部署演练与回滚演练
+    - [x] P5-1 清理运行时脏产物和仓库边界，完成 repo hygiene
+    - [x] P5-2 收口配置分层：系统、租户、运行时、密钥    - [x] P5-3 建立发布前检查：migration / security / observability / release readiness
+    - [x] P5-4 完成 operator runbook、告警规则和关键 dashboard
+    - [x] P5-5 完成部署演练与回滚演练
 
 执行顺序建议：
 
