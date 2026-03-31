@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { ProDescriptions } from '@ant-design/pro-components';
 import { ProCard } from '@ant-design/pro-components';
-import { Tag, Button, Space, Spin, List } from 'antd';
+import { Tag, Button, Space, Spin, List, message, Modal, Form, Input } from 'antd';
 import { goBack, useDetailParams } from '@/lib/navigation';
 import { CUSTOMER_SOURCE_MAP } from '@/utils/constants';
-import { getCustomer, getCustomerActivity } from '@/services/customer';
+import { getCustomer, getCustomerActivity, updateCustomer } from '@/services/customer';
 
 const CustomerDetailPage: React.FC = () => {
   const { id } = useDetailParams();
   const [loading, setLoading] = useState(true);
   const [customer, setCustomer] = useState<API.Customer | null>(null);
   const [activities, setActivities] = useState<any[]>([]);
+  const [editOpen, setEditOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form] = Form.useForm();
 
   useEffect(() => {
     const fetchCustomer = async () => {
@@ -65,6 +68,33 @@ const CustomerDetailPage: React.FC = () => {
 
   const sourceText = customer.source ? CUSTOMER_SOURCE_MAP[customer.source] : undefined;
 
+  const handleEdit = async () => {
+    try {
+      const values = await form.validateFields();
+      setSaving(true);
+      await updateCustomer(Number(id), values);
+      message.success('客户信息已更新');
+      setEditOpen(false);
+      const result = await getCustomer(Number(id));
+      if (result) setCustomer(result);
+    } catch (error: any) {
+      if (error?.errorFields) return;
+      message.error('更新失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openEditModal = () => {
+    form.setFieldsValue({
+      name: customer?.name,
+      email: customer?.email,
+      phone: customer?.phone,
+      company: customer?.company,
+    });
+    setEditOpen(true);
+  };
+
   return (
     <div>
       <ProCard
@@ -72,7 +102,7 @@ const CustomerDetailPage: React.FC = () => {
         extra={
           <Space>
             <Button onClick={goBack}>返回</Button>
-            <Button>编辑</Button>
+            <Button onClick={openEditModal}>编辑</Button>
             <Button type="primary">新建工单</Button>
           </Space>
         }
@@ -127,6 +157,30 @@ const CustomerDetailPage: React.FC = () => {
           )}
         />
       </ProCard>
+
+      <Modal
+        title="编辑客户"
+        open={editOpen}
+        onCancel={() => setEditOpen(false)}
+        onOk={handleEdit}
+        confirmLoading={saving}
+        okText="保存"
+      >
+        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }]}>
+            <Input placeholder="客户姓名" />
+          </Form.Item>
+          <Form.Item name="email" label="邮箱">
+            <Input placeholder="邮箱" />
+          </Form.Item>
+          <Form.Item name="phone" label="电话">
+            <Input placeholder="电话号码" />
+          </Form.Item>
+          <Form.Item name="company" label="公司">
+            <Input placeholder="公司名称" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

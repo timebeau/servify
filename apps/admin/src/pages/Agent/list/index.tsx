@@ -1,13 +1,43 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import { ProTable } from '@ant-design/pro-components';
-import type { ProColumns } from '@ant-design/pro-components';
-import { Tag, Button, Space, Progress } from 'antd';
+import type { ProColumns, ActionType } from '@ant-design/pro-components';
+import { Tag, Button, Space, Progress, Modal, Form, Input, InputNumber, message, Select } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { navigateTo } from '@/lib/navigation';
 import { AGENT_STATUS_MAP } from '@/utils/constants';
-import { listAgents } from '@/services/agent';
+import { listAgents, createAgent } from '@/services/agent';
 
 const AgentListPage: React.FC = () => {
+  const actionRef = useRef<ActionType>();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [form] = Form.useForm();
+
+  const handleCreate = async () => {
+    try {
+      const values = await form.validateFields();
+      setCreating(true);
+      const skills = values.skills
+        ? values.skills.split(',').map((s: string) => s.trim()).filter(Boolean)
+        : [];
+      await createAgent({
+        name: values.name,
+        email: values.email,
+        skills,
+        max_concurrent: values.max_concurrent || 5,
+      });
+      message.success('客服创建成功');
+      setCreateOpen(false);
+      form.resetFields();
+      actionRef.current?.reload();
+    } catch (error: any) {
+      if (error?.errorFields) return;
+      message.error('创建失败: ' + (error?.message || '未知错误'));
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const columns: ProColumns<API.Agent>[] = [
     {
       title: '姓名',
@@ -65,42 +95,72 @@ const AgentListPage: React.FC = () => {
       render: (_, record) => (
         <Space>
           <a onClick={() => navigateTo(`/agent/detail/${record.id}`)}>查看</a>
-          <a>编辑</a>
+          <a onClick={() => navigateTo(`/agent/detail/${record.id}`)}>编辑</a>
         </Space>
       ),
     },
   ];
 
   return (
-    <ProTable<API.Agent>
-      headerTitle="客服列表"
-      rowKey="id"
-      columns={columns}
-      toolBarRender={() => [
-        <Button key="create" type="primary" icon={<PlusOutlined />}>
-          添加客服
-        </Button>,
-      ]}
-      request={async (params) => {
-        try {
-          const result = await listAgents({
-            page: params.current,
-            page_size: params.pageSize,
-            status: params.status,
-            search: params.name,
-          });
-          return {
-            data: result?.data || [],
-            total: result?.total || 0,
-            success: true,
-          };
-        } catch (error) {
-          console.error('获取客服列表失败:', error);
-          return { data: [], total: 0, success: true };
-        }
-      }}
-      pagination={{ defaultPageSize: 20 }}
-    />
+    <>
+      <ProTable<API.Agent>
+        headerTitle="客服列表"
+        rowKey="id"
+        actionRef={actionRef}
+        columns={columns}
+        toolBarRender={() => [
+          <Button key="create" type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
+            添加客服
+          </Button>,
+        ]}
+        request={async (params) => {
+          try {
+            const result = await listAgents({
+              page: params.current,
+              page_size: params.pageSize,
+              status: params.status,
+              search: params.name,
+            });
+            return {
+              data: result?.data || [],
+              total: result?.total || 0,
+              success: true,
+            };
+          } catch (error) {
+            console.error('获取客服列表失败:', error);
+            return { data: [], total: 0, success: true };
+          }
+        }}
+        pagination={{ defaultPageSize: 20 }}
+      />
+
+      <Modal
+        title="添加客服"
+        open={createOpen}
+        onCancel={() => { setCreateOpen(false); form.resetFields(); }}
+        onOk={handleCreate}
+        confirmLoading={creating}
+        okText="创建"
+      >
+        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }]}>
+            <Input placeholder="请输入客服姓名" />
+          </Form.Item>
+          <Form.Item name="email" label="邮箱" rules={[
+            { required: true, message: '请输入邮箱' },
+            { type: 'email', message: '请输入有效邮箱' },
+          ]}>
+            <Input placeholder="请输入邮箱" />
+          </Form.Item>
+          <Form.Item name="skills" label="技能标签（逗号分隔）">
+            <Input placeholder="如: 售前, 售后, 技术" />
+          </Form.Item>
+          <Form.Item name="max_concurrent" label="最大并发会话数" initialValue={5}>
+            <InputNumber min={1} max={50} style={{ width: '100%' }} />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
   );
 };
 

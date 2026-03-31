@@ -15,6 +15,24 @@ export async function getAgent(id: number) {
   return request<API.Agent>(`${API}/${id}`);
 }
 
+export async function createAgent(data: {
+  name: string;
+  email: string;
+  skills?: string[];
+  max_concurrent?: number;
+}) {
+  return request<API.Agent>(API, { method: 'POST', data });
+}
+
+export async function updateAgent(id: number, data: {
+  name?: string;
+  email?: string;
+  skills?: string[];
+  max_concurrent?: number;
+}) {
+  return request<API.Agent>(`${API}/${id}`, { method: 'PUT', data });
+}
+
 export async function updateAgentStatus(id: number, status: string) {
   return request(`${API}/${id}/status`, { method: 'PUT', data: { status } });
 }

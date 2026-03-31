@@ -120,6 +120,7 @@ declare namespace API {
     content?: string;
     category?: string;
     status: string;
+    tags?: string[];
     created_at: string;
     updated_at: string;
   }

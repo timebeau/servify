@@ -16,11 +16,21 @@ export async function getDoc(id: number) {
   return request<API.KnowledgeDoc>(`${API}/${id}`);
 }
 
-export async function createDoc(data: Partial<API.KnowledgeDoc>) {
+export async function createDoc(data: {
+  title: string;
+  content: string;
+  category?: string;
+  tags?: string[];
+}) {
   return request<API.KnowledgeDoc>(API, { method: 'POST', data });
 }
 
-export async function updateDoc(id: number, data: Partial<API.KnowledgeDoc>) {
+export async function updateDoc(id: number, data: {
+  title?: string;
+  content?: string;
+  category?: string;
+  tags?: string[];
+}) {
   return request<API.KnowledgeDoc>(`${API}/${id}`, { method: 'PUT', data });
 }
 
