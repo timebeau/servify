@@ -135,21 +135,21 @@ func (s *StatisticsService) StartDailyStatsWorkerContext(ctx context.Context, in
 	}
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
-	go func() {
-		if err := s.UpdateDailyStats(context.Background(), time.Now()); err != nil {
-			s.logger.Errorf("Failed to update daily stats: %v", err)
-		}
-	}()
+
+	// Initial run with context respect.
+	if err := s.UpdateDailyStats(ctx, time.Now()); err != nil {
+		s.logger.Errorf("Failed to update daily stats: %v", err)
+	}
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if err := s.UpdateDailyStats(context.Background(), time.Now()); err != nil {
+			if err := s.UpdateDailyStats(ctx, time.Now()); err != nil {
 				s.logger.Errorf("Failed to update daily stats: %v", err)
 			}
 			yesterday := time.Now().AddDate(0, 0, -1)
-			if err := s.UpdateDailyStats(context.Background(), yesterday); err != nil {
+			if err := s.UpdateDailyStats(ctx, yesterday); err != nil {
 				s.logger.Errorf("Failed to update yesterday stats: %v", err)
 			}
 		}

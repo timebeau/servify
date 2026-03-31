@@ -39,6 +39,9 @@ func MigrationModels() []interface{} {
 		&models.AutomationRun{},
 		&models.Macro{},
 		&models.AuditLog{},
+		&models.VoiceCall{},
+		&models.VoiceRecording{},
+		&models.VoiceTranscript{},
 	}
 }
 

@@ -2,25 +2,25 @@ package handlers
 
 import (
 	"fmt"
-	"io"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"servify/apps/server/internal/platform/storage"
+
 	"github.com/gin-gonic/gin"
 )
 
-// FileUploadHandler handles file upload endpoints.
+// FileUploadHandler handles file upload endpoints using the storage.Provider abstraction.
 type FileUploadHandler struct {
-	uploadDir string
-	maxSize   int64 // bytes
+	provider storage.Provider
+	maxSize  int64 // bytes
 }
 
-// NewFileUploadHandler creates a new FileUploadHandler.
-func NewFileUploadHandler(uploadDir string, maxSize int64) *FileUploadHandler {
-	return &FileUploadHandler{uploadDir: uploadDir, maxSize: maxSize}
+// NewFileUploadHandler creates a new FileUploadHandler backed by a storage.Provider.
+func NewFileUploadHandler(provider storage.Provider, maxSize int64) *FileUploadHandler {
+	return &FileUploadHandler{provider: provider, maxSize: maxSize}
 }
 
 // Upload handles file upload.
@@ -48,34 +48,20 @@ func (h *FileUploadHandler) Upload(c *gin.Context) {
 		return
 	}
 
-	// Generate unique filename
+	// Build storage key with date partition
 	dateDir := time.Now().Format("2006/01/02")
-	saveDir := filepath.Join(h.uploadDir, dateDir)
-	if err := os.MkdirAll(saveDir, 0o755); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建目录失败"})
-		return
-	}
+	key := dateDir + "/" + fmt.Sprintf("%d_%s", time.Now().UnixNano(), filepath.Base(header.Filename))
 
-	filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), filepath.Base(header.Filename))
-	savePath := filepath.Join(saveDir, filename)
-
-	dst, err := os.Create(savePath)
+	info, err := h.provider.Save(key, file, header.Size)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存文件失败"})
 		return
 	}
-	defer dst.Close()
 
-	if _, err := io.Copy(dst, file); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "写入文件失败"})
-		return
-	}
-
-	url := "/uploads/" + dateDir + "/" + filename
 	c.JSON(http.StatusCreated, gin.H{
 		"message":  "上传成功",
 		"filename": header.Filename,
-		"url":      url,
-		"size":     header.Size,
+		"url":      info.URL,
+		"size":     info.Size,
 	})
 }

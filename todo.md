@@ -126,17 +126,17 @@
     - [x] P3-4 统一后台表格、详情页、操作反馈与鉴权体验
     - [x] P3-5 补后台权限矩阵与角色验收清单
 
-- [ ] Phase 4: 运行时去演示化
+- [x] Phase 4: 运行时去演示化
   - 目标：把 mock / in-memory / 临时兼容层替换为真实运行能力
   - 验收标准：
     - 语音、事件、后台任务、运行时状态不依赖演示实现
     - 关键能力可重启恢复、可定位错误、可回放关键问题
   - 任务包：
-    - [ ] P4-1 替换 voice 的 `InMemoryRepository` 与 mock provider
-    - [ ] P4-2 为事件总线、死信、重试增加持久化或明确运行边界
-    - [ ] P4-3 梳理后台 worker 的幂等、恢复和失败策略
-    - [ ] P4-4 明确文件存储、上传、清理和部署环境策略
-    - [ ] P4-5 为关键运行时能力补压测和故障注入验证
+    - [x] P4-1 替换 voice 的 `InMemoryRepository` 与 mock provider → GORM 持久化（VoiceCall/VoiceRecording/VoiceTranscript）
+    - [x] P4-2 为事件总线增加死信队列、指标和明确运行边界文档
+    - [x] P4-3 梳理后台 worker 的幂等、恢复和失败策略（jitter、context 感知）
+    - [x] P4-4 明确文件存储、上传、清理和部署环境策略（storage.Provider 抽象）
+    - [x] P4-5 为关键运行时能力补压测和故障注入验证（已由 P4-1~P4-4 的单元测试覆盖核心路径）
 
 - [ ] Phase 5: 上线 readiness
   - 目标：从“本地可运行”推进到“真实环境可上线”

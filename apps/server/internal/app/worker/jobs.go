@@ -2,11 +2,23 @@ package worker
 
 import (
 	"context"
+	"math/rand"
 	"sync"
 	"time"
 
 	"servify/apps/server/internal/app/bootstrap"
+
+	"github.com/sirupsen/logrus"
 )
+
+// jitter returns a random duration in [0, fraction*base).
+// Returns 0 if base is negative or fraction <= 0.
+func jitter(base time.Duration, fraction float64) time.Duration {
+	if fraction <= 0 || base <= 0 {
+		return 0
+	}
+	return time.Duration(float64(base) * fraction * rand.Float64())
+}
 
 type statisticsService interface {
 	StartDailyStatsWorkerContext(context.Context, time.Duration)
@@ -16,6 +28,7 @@ type statisticsService interface {
 type StatisticsWorker struct {
 	service  statisticsService
 	interval time.Duration
+	logger   *logrus.Logger
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -26,7 +39,11 @@ func NewStatisticsWorker(service statisticsService, interval time.Duration) boot
 	if interval <= 0 {
 		interval = time.Hour
 	}
-	return &StatisticsWorker{service: service, interval: interval}
+	return &StatisticsWorker{
+		service:  service,
+		interval: interval,
+		logger:   logrus.StandardLogger(),
+	}
 }
 
 func (w *StatisticsWorker) Name() string { return "statistics-daily-stats" }
@@ -43,6 +60,18 @@ func (w *StatisticsWorker) Start() error {
 	w.done = done
 	go func() {
 		defer close(done)
+		// Add initial jitter to stagger workers on restart.
+		initialDelay := jitter(w.interval, 0.1)
+		if initialDelay > 0 {
+			if w.logger != nil {
+				w.logger.Debugf("statistics worker: initial jitter delay %v", initialDelay)
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(initialDelay):
+			}
+		}
 		w.service.StartDailyStatsWorkerContext(ctx, w.interval)
 	}()
 	return nil
@@ -76,6 +105,7 @@ type slaMonitorService interface {
 type SLAMonitorWorker struct {
 	service  slaMonitorService
 	interval time.Duration
+	logger   *logrus.Logger
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -86,7 +116,11 @@ func NewSLAMonitorWorker(service slaMonitorService, interval time.Duration) boot
 	if interval <= 0 {
 		interval = 5 * time.Minute
 	}
-	return &SLAMonitorWorker{service: service, interval: interval}
+	return &SLAMonitorWorker{
+		service:  service,
+		interval: interval,
+		logger:   logrus.StandardLogger(),
+	}
 }
 
 func (w *SLAMonitorWorker) Name() string { return "sla-monitor" }
@@ -103,6 +137,17 @@ func (w *SLAMonitorWorker) Start() error {
 	w.done = done
 	go func() {
 		defer close(done)
+		initialDelay := jitter(w.interval, 0.1)
+		if initialDelay > 0 {
+			if w.logger != nil {
+				w.logger.Debugf("sla-monitor worker: initial jitter delay %v", initialDelay)
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(initialDelay):
+			}
+		}
 		w.service.StartSLAMonitor(ctx, w.interval)
 	}()
 	return nil

@@ -37,7 +37,7 @@ func TestStatisticsWorkerLifecycle(t *testing.T) {
 	loop := &fakeLoop{started: make(chan struct{}), stopped: make(chan struct{})}
 	w := &StatisticsWorker{
 		service:  &fakeStatisticsService{loop: loop},
-		interval: time.Hour,
+		interval: 100 * time.Millisecond,
 	}
 	if err := w.Start(); err != nil {
 		t.Fatalf("Start() error = %v", err)
@@ -63,7 +63,7 @@ func TestSLAMonitorWorkerLifecycle(t *testing.T) {
 	loop := &fakeLoop{started: make(chan struct{}), stopped: make(chan struct{})}
 	w := &SLAMonitorWorker{
 		service:  &fakeSLAService{loop: loop},
-		interval: time.Minute,
+		interval: 100 * time.Millisecond,
 	}
 	if err := w.Start(); err != nil {
 		t.Fatalf("Start() error = %v", err)

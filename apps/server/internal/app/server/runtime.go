@@ -120,15 +120,15 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	rt.MessageRouter = services.NewMessageRouter(rt.AIService, wsHub, db)
 	wsHub.SetAIService(rt.AIService)
 
-	voiceService := voiceapp.NewService(voiceinfra.NewInMemoryRepository(), bus)
+	voiceService := voiceapp.NewService(voiceinfra.NewGormRepository(db), bus)
 	recordingService := voiceapp.NewRecordingService(
 		voiceprovidermock.NewRecordingProvider(),
-		voiceinfra.NewInMemoryRecordingRepository(),
+		voiceinfra.NewGormRecordingRepository(db),
 		bus,
 	)
 	transcriptService := voiceapp.NewTranscriptService(
 		voiceprovidermock.NewTranscriptProvider(),
-		voiceinfra.NewInMemoryTranscriptRepository(),
+		voiceinfra.NewGormTranscriptRepository(db),
 		bus,
 	)
 	rt.VoiceCoordinator = voicedelivery.NewCoordinator(voiceService, recordingService, transcriptService)

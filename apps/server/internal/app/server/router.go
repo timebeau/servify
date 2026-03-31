@@ -18,6 +18,7 @@ import (
 	auditplatform "servify/apps/server/internal/platform/audit"
 	platformauth "servify/apps/server/internal/platform/auth"
 	realtimeplatform "servify/apps/server/internal/platform/realtime"
+	"servify/apps/server/internal/platform/storage"
 	"servify/apps/server/internal/platform/usersecurity"
 	"servify/apps/server/internal/platform/voiceprotocol"
 	"servify/apps/server/internal/services"
@@ -87,7 +88,8 @@ func registerAuthRoutes(r *gin.Engine, deps Dependencies) {
 	authMe.POST("/refresh", authHandler.RefreshToken)
 
 	// File upload (authenticated)
-	uploadHandler := handlers.NewFileUploadHandler("./uploads", 32<<20) // 32MB max
+	localStorage := storage.NewLocalProvider("./uploads", "/uploads")
+	uploadHandler := handlers.NewFileUploadHandler(localStorage, 32<<20) // 32MB max
 	r.POST("/api/v1/upload", middleware.AuthMiddleware(deps.Config, platformauth.NewUserStateTokenPolicy(deps.DB)), uploadHandler.Upload)
 	r.Static("/uploads", "./uploads")
 }
