@@ -20,7 +20,6 @@ import (
 type TicketHandler struct {
 	ticketService ticketdelivery.HandlerService
 	logger        *logrus.Logger
-
 }
 
 // NewTicketHandler 创建工单处理器
@@ -28,7 +27,6 @@ func NewTicketHandler(ticketService ticketdelivery.HandlerService, logger *logru
 	return &TicketHandler{
 		ticketService: ticketService,
 		logger:        logger,
-
 	}
 }
 
