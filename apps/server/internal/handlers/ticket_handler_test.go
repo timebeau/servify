@@ -83,7 +83,7 @@ func TestTicketHandler_Create_Get_List_Assign(t *testing.T) {
 	h := NewTicketHandler(ticketdelivery.NewHandlerServiceWithDependencies(ticketdelivery.HandlerAssemblyDependencies{
 		DB:     db,
 		Logger: logger,
-	}), logger, db)
+	}), logger)
 
 	r := gin.New()
 	r.POST("/api/tickets", h.CreateTicket)
@@ -249,7 +249,7 @@ func TestTicketHandler_CustomFields_Create_Filter_Export(t *testing.T) {
 	h := NewTicketHandler(ticketdelivery.NewHandlerServiceWithDependencies(ticketdelivery.HandlerAssemblyDependencies{
 		DB:     db,
 		Logger: logger,
-	}), logger, db)
+	}), logger)
 
 	r := gin.New()
 	r.POST("/api/tickets", h.CreateTicket)
@@ -328,7 +328,7 @@ func TestTicketHandler_GetRelatedConversations(t *testing.T) {
 	h := NewTicketHandler(ticketdelivery.NewHandlerServiceWithDependencies(ticketdelivery.HandlerAssemblyDependencies{
 		DB:     db,
 		Logger: logger,
-	}), logger, db)
+	}), logger)
 
 	r := gin.New()
 	r.GET("/api/tickets/:id/conversations", h.GetRelatedConversations)
@@ -403,7 +403,7 @@ func TestTicketHandler_GetRelatedConversations_NoTicket(t *testing.T) {
 	h := NewTicketHandler(ticketdelivery.NewHandlerServiceWithDependencies(ticketdelivery.HandlerAssemblyDependencies{
 		DB:     db,
 		Logger: logger,
-	}), logger, db)
+	}), logger)
 
 	r := gin.New()
 	r.GET("/api/tickets/:id/conversations", h.GetRelatedConversations)
