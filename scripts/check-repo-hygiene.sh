@@ -8,6 +8,7 @@ cd "$ROOT_DIR"
 tracked_forbidden=(
   "server"
   "server.exe"
+  "apps/server/server"
 )
 
 tracked_forbidden_prefixes=(

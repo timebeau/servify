@@ -83,7 +83,7 @@ func TestTicketHandler_Create_Get_List_Assign(t *testing.T) {
 	h := NewTicketHandler(ticketdelivery.NewHandlerServiceWithDependencies(ticketdelivery.HandlerAssemblyDependencies{
 		DB:     db,
 		Logger: logger,
-	}), logger)
+	}), logger, db)
 
 	r := gin.New()
 	r.POST("/api/tickets", h.CreateTicket)
@@ -249,7 +249,7 @@ func TestTicketHandler_CustomFields_Create_Filter_Export(t *testing.T) {
 	h := NewTicketHandler(ticketdelivery.NewHandlerServiceWithDependencies(ticketdelivery.HandlerAssemblyDependencies{
 		DB:     db,
 		Logger: logger,
-	}), logger)
+	}), logger, db)
 
 	r := gin.New()
 	r.POST("/api/tickets", h.CreateTicket)
@@ -311,4 +311,117 @@ func toStr(v uint) string {
 		v /= 10
 	}
 	return string(b[i:])
+}
+
+func TestTicketHandler_GetRelatedConversations(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestDBForTickets(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.WarnLevel)
+
+	// Seed customer
+	if err := db.Create(&models.User{ID: 1, Username: "c1", Name: "c1", Email: "c1@example.com", Role: "customer"}).Error; err != nil {
+		t.Fatalf("seed customer: %v", err)
+	}
+
+	h := NewTicketHandler(ticketdelivery.NewHandlerServiceWithDependencies(ticketdelivery.HandlerAssemblyDependencies{
+		DB:     db,
+		Logger: logger,
+	}), logger, db)
+
+	r := gin.New()
+	r.GET("/api/tickets/:id/conversations", h.GetRelatedConversations)
+
+	// Create a ticket
+	createBody := map[string]any{
+		"title":       "linked ticket",
+		"customer_id": 1,
+		"priority":    "normal",
+	}
+	b, _ := json.Marshal(createBody)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodPost, "/api/tickets", bytes.NewReader(b))
+	req.Header.Set("Content-Type", "application/json")
+
+	r2 := gin.New()
+	r2.POST("/api/tickets", h.CreateTicket)
+	r2.ServeHTTP(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("create status=%d body=%s", w.Code, w.Body.String())
+	}
+	var created models.Ticket
+	json.Unmarshal(w.Body.Bytes(), &created)
+
+	// Create sessions linked to ticket
+	if err := db.Create(&models.Session{
+		ID:       "sess-linked-1",
+		TicketID: &created.ID,
+		UserID:   1,
+		Platform: "web",
+		Status:   "active",
+	}).Error; err != nil {
+		t.Fatalf("seed session: %v", err)
+	}
+	if err := db.Create(&models.Session{
+		ID:       "sess-linked-2",
+		TicketID: &created.ID,
+		UserID:   1,
+		Platform: "wechat",
+		Status:   "closed",
+	}).Error; err != nil {
+		t.Fatalf("seed session 2: %v", err)
+	}
+
+	// Fetch related conversations
+	w2 := httptest.NewRecorder()
+	req2, _ := http.NewRequest(http.MethodGet, "/api/tickets/"+toStr(created.ID)+"/conversations", nil)
+	r.ServeHTTP(w2, req2)
+
+	if w2.Code != http.StatusOK {
+		t.Fatalf("get conversations status=%d body=%s", w2.Code, w2.Body.String())
+	}
+
+	var resp struct {
+		Data []models.Session `json:"data"`
+	}
+	if err := json.Unmarshal(w2.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(resp.Data) != 2 {
+		t.Fatalf("expected 2 linked sessions, got %d", len(resp.Data))
+	}
+}
+
+func TestTicketHandler_GetRelatedConversations_NoTicket(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestDBForTickets(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.WarnLevel)
+
+	h := NewTicketHandler(ticketdelivery.NewHandlerServiceWithDependencies(ticketdelivery.HandlerAssemblyDependencies{
+		DB:     db,
+		Logger: logger,
+	}), logger, db)
+
+	r := gin.New()
+	r.GET("/api/tickets/:id/conversations", h.GetRelatedConversations)
+
+	// Non-existent ticket returns empty list (sessions query returns 0)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/api/tickets/99999/conversations", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Data []models.Session `json:"data"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	if len(resp.Data) != 0 {
+		t.Fatalf("expected 0 sessions for non-existent ticket, got %d", len(resp.Data))
+	}
 }

@@ -501,6 +501,30 @@ monitoring:
 - [ ] `log.format` 设为 `json`
 - [ ] `ai.openai.api_key` 使用环境变量引用
 
+在首次部署或调整安全配置后，先执行严格校验：
+
+```bash
+make security-check CONFIG=config.yml
+```
+
+该检查会对默认 JWT secret、开放 CORS、关闭限流、匿名入口缺少独立路径级限流、空 provider key 等风险返回非零退出码。
+
+若本次部署同时涉及 metrics、tracing 或 observability stack，也建议执行：
+
+```bash
+make observability-check CONFIG=config.yml
+```
+
+该检查会校验 `monitoring.metrics_path`、tracing 基本参数，以及 dashboard / alert / runbook / OTel collector 配置资产是否存在。
+
+如果要在发版前一次性跑完当前最小自检，可直接执行：
+
+```bash
+make release-check CONFIG=config.yml
+```
+
+该入口会串行执行 `local-check`、`security-check`、`observability-check` 和聚焦的 Go 回归测试。
+
 ### 7.4 Docker Secrets 方式
 
 ```bash

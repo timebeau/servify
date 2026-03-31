@@ -102,3 +102,4 @@
 - `deploy/observability/dashboards/servify-business.json` — 业务面板：会话、工单、路由、AI 请求量/延迟/Token
 - `deploy/observability/alerts/rules.yaml` — Prometheus 告警规则：5xx、P99 延迟、系统错误、事件失败、AI 降级、Worker 失败
 - `deploy/observability/runbook/operational-runbook.md` — 运维手册：告警排查步骤、常见操作、Metric 参考
+- 已新增 `servify check-observability-baseline --strict` 与 `scripts/check-observability-baseline.sh`，可在部署前检查 metrics/tracing 配置与 dashboard/alert/runbook/collector 资产是否齐备

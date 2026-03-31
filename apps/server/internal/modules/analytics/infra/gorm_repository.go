@@ -23,6 +23,7 @@ func NewGormRepository(db *gorm.DB) *GormRepository {
 func (r *GormRepository) GetDashboardStats(ctx context.Context) (*analyticsapp.DashboardStats, error) {
 	stats := &analyticsapp.DashboardStats{}
 	today := time.Now().Truncate(24 * time.Hour)
+
 	customerScope(r.db.WithContext(ctx).Model(&models.User{}), ctx).Where("role = ?", "customer").Count(&stats.TotalCustomers)
 	applyEntityScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Count(&stats.TotalAgents)
 	applyEntityScope(r.db.WithContext(ctx).Model(&models.Ticket{}), ctx).Count(&stats.TotalTickets)
@@ -38,10 +39,17 @@ func (r *GormRepository) GetDashboardStats(ctx context.Context) (*analyticsapp.D
 	applyEntityScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Where("status = ?", "busy").Count(&stats.BusyAgents)
 	applyEntityScope(r.db.WithContext(ctx).Model(&models.Session{}), ctx).Where("status = ?", "active").Count(&stats.ActiveSessions)
 	applyEntityScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Select("AVG(avg_response_time)").Row().Scan(&stats.AvgResponseTime)
+
 	var avgResolution float64
 	applyEntityScope(r.db.WithContext(ctx).Model(&models.Ticket{}), ctx).Where("resolved_at IS NOT NULL").Select("AVG(EXTRACT(epoch FROM (resolved_at - created_at)))").Row().Scan(&avgResolution)
 	stats.AvgResolutionTime = avgResolution
-	stats.CustomerSatisfaction = 4.2
+
+	// Real satisfaction: average rating from customer_satisfactions
+	var avgSatisfaction float64
+	applyEntityScope(r.db.WithContext(ctx).Model(&models.CustomerSatisfaction{}), ctx).
+		Select("COALESCE(AVG(rating), 0)").Row().Scan(&avgSatisfaction)
+	stats.CustomerSatisfaction = avgSatisfaction
+
 	var dailyStat models.DailyStats
 	if err := r.db.WithContext(ctx).Where("date = ?", today).First(&dailyStat).Error; err == nil {
 		stats.AIUsageToday = int64(dailyStat.AIUsageCount)
@@ -160,7 +168,14 @@ func (r *GormRepository) UpdateDailyStats(ctx context.Context, date time.Time) e
 	applyEntityScope(r.db.WithContext(ctx).Model(&models.Ticket{}), ctx).Where("resolved_at >= ? AND resolved_at < ? AND resolved_at IS NOT NULL", date, nextDay).Select("AVG(EXTRACT(epoch FROM (resolved_at - created_at)))").Row().Scan(&avgResolutionTime)
 	dailyStats.AvgResponseTime = int(avgResponseTime)
 	dailyStats.AvgResolutionTime = int(avgResolutionTime)
-	dailyStats.CustomerSatisfaction = 4.2
+
+	// Real satisfaction: average rating from customer_satisfactions for this day
+	var avgSat float64
+	applyEntityScope(r.db.WithContext(ctx).Model(&models.CustomerSatisfaction{}), ctx).
+		Where("created_at >= ? AND created_at < ?", date, nextDay).
+		Select("COALESCE(AVG(rating), 0)").Row().Scan(&avgSat)
+	dailyStats.CustomerSatisfaction = avgSat
+
 	if dailyStats.ID == 0 {
 		err = r.db.WithContext(ctx).Create(&dailyStats).Error
 	} else {

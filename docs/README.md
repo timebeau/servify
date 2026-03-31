@@ -31,9 +31,17 @@ footer: Servify documentation site
 - [WeKnora 集成](/WEKNORA_INTEGRATION)
 - [配置作用域规则](/configuration-scopes)
 - [运行安全基线](/security-baseline-operations)
+- [Operator 可观测性](/implementation/12-operator-observability)
 - [Token 生命周期与密钥轮换](/token-lifecycle-and-key-rotation)
 - [开放接口安全清单](/public-surface-security-checklist)
 - [CI / GitHub Hosted Runner](/CI_SELF_HOSTED)
 - [版本发布策略](/release-versioning)
 - [测试金字塔](/testing-pyramid)
 - [Mermaid 兼容性](/MERMAID_COMPATIBILITY)
+
+## 常用校验入口
+
+- `make local-check`
+- `make security-check CONFIG=./config.yml`
+- `make observability-check CONFIG=./config.yml`
+- `make release-check CONFIG=./config.yml`

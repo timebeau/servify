@@ -112,23 +112,54 @@ func (r *GormRepository) ListRecentMessages(ctx context.Context, conversationID 
 	return out, nil
 }
 
+func (r *GormRepository) ListMessagesBefore(ctx context.Context, conversationID string, beforeMessageID string, limit int) ([]domain.ConversationMessage, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	q := applyConversationScope(r.db.WithContext(ctx), ctx).
+		Where("session_id = ?", conversationID)
+	if beforeMessageID != "" {
+		var pivot models.Message
+		if err := r.db.WithContext(ctx).Where("id = ?", beforeMessageID).First(&pivot).Error; err != nil {
+			return nil, err
+		}
+		q = q.Where("created_at < ?", pivot.CreatedAt)
+	}
+	var items []models.Message
+	if err := q.Order("created_at DESC").
+		Limit(limit).
+		Find(&items).Error; err != nil {
+		return nil, err
+	}
+	out := make([]domain.ConversationMessage, 0, len(items))
+	for _, item := range items {
+		out = append(out, mapMessage(item))
+	}
+	return out, nil
+}
+
 func mapConversation(model models.Session) domain.Conversation {
 	participants := make([]domain.Participant, 0, 2)
 	if model.UserID != 0 {
+		name := firstNonEmpty(model.User.Name, model.User.Username)
 		participants = append(participants, domain.Participant{
 			ID:          fmt.Sprintf("user:%d", model.UserID),
 			UserID:      &model.UserID,
 			Role:        domain.ParticipantRoleCustomer,
-			DisplayName: firstNonEmpty(model.User.Name, model.User.Username),
+			DisplayName: name,
 		})
 	}
 	if model.AgentID != nil {
 		agentID := *model.AgentID
+		name := ""
+		if model.Agent != nil {
+			name = firstNonEmpty(model.Agent.Name, model.Agent.Username)
+		}
 		participants = append(participants, domain.Participant{
 			ID:          fmt.Sprintf("agent:%d", agentID),
 			UserID:      &agentID,
 			Role:        domain.ParticipantRoleAgent,
-			DisplayName: firstNonEmpty(model.Agent.Name, model.Agent.Username),
+			DisplayName: name,
 		})
 	}
 

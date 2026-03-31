@@ -3,7 +3,8 @@
 /server
 /server.exe
 *.exe
-/server
+apps/server/server
+apps/admin/dist/
 
 # 配置文件
 .env

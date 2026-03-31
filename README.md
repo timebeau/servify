@@ -51,6 +51,13 @@ Servify 是一个面向客服、工单、AI 协同和实时会话的服务平台
 `-- sdk/                     # SDK 工作区
 ```
 
+## 🧪 常用校验入口
+
+- `make local-check`
+- `make security-check CONFIG=./config.yml`
+- `make observability-check CONFIG=./config.yml`
+- `make release-check CONFIG=./config.yml`
+
 ## 📂 根目录职责
 
 ### 应包含的内容

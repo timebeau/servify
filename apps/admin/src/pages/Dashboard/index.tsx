@@ -1,70 +1,168 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { PageContainer } from '@ant-design/pro-components';
 import { ProCard, StatisticCard } from '@ant-design/pro-components';
-import { Col, Row, Spin } from 'antd';
-import { getDashboardStats } from '@/services/statistics';
+import { Row, Col, DatePicker, Button, Result, Spin, Segmented, message } from 'antd';
+import { Line } from '@ant-design/charts';
+import {
+  TeamOutlined,
+  UserOutlined,
+  MessageOutlined,
+  FileTextOutlined,
+  ClockCircleOutlined,
+  SmileOutlined,
+  RobotOutlined,
+  ReloadOutlined,
+} from '@ant-design/icons';
+import dayjs, { Dayjs } from 'dayjs';
+import {
+  getDashboardStats,
+  getTimeRangeStats,
+  getTicketCategoryStats,
+  getTicketPriorityStats,
+  getCustomerSourceStats,
+} from '@/services/statistics';
 
-const DashboardPage: React.FC = () => {
+const { RangePicker } = DatePicker;
+
+const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<API.DashboardStats>({
-    total_sessions: 0,
-    total_tickets: 0,
-    total_customers: 0,
-    total_agents: 0,
-    today_tickets: 0,
-    today_sessions: 0,
-    today_messages: 0,
-    open_tickets: 0,
-    assigned_tickets: 0,
-    resolved_tickets: 0,
-    closed_tickets: 0,
-    online_agents: 0,
-    busy_agents: 0,
-    active_sessions: 0,
-    avg_response_time: 0,
-    avg_resolution_time: 0,
-    customer_satisfaction: 0,
-    ai_usage_today: 0,
-    weknora_usage_today: 0,
-  });
+  const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<API.DashboardStats | null>(null);
+  const [timeRangeData, setTimeRangeData] = useState<any[]>([]);
+  const [timeRangeLoading, setTimeRangeLoading] = useState(false);
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
+    dayjs().subtract(7, 'day'),
+    dayjs(),
+  ]);
+  const [preset, setPreset] = useState<string>('7天');
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      setLoading(true);
-      try {
-        const result = await getDashboardStats();
-        if (result) {
-          setStats(result);
-        }
-      } catch (error) {
-        console.error('获取仪表板统计失败:', error);
-      } finally {
-        setLoading(false);
+  const fetchDashboard = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await getDashboardStats();
+      if (result) {
+        setStats(result);
       }
-    };
-    fetchStats();
+    } catch (err: any) {
+      setError(err?.message || '获取仪表板数据失败');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  if (loading) {
+  const fetchTimeRange = useCallback(async (start: Dayjs, end: Dayjs) => {
+    setTimeRangeLoading(true);
+    try {
+      const result = await getTimeRangeStats({
+        start_date: start.format('YYYY-MM-DD'),
+        end_date: end.format('YYYY-MM-DD'),
+      });
+      if (result) {
+        // 转换为图表数据（多线合并）
+        const chartData: any[] = [];
+        (result as any[]).forEach((item: any) => {
+          chartData.push(
+            { date: item.date, value: item.tickets || 0, type: '工单' },
+            { date: item.date, value: item.sessions || 0, type: '会话' },
+            { date: item.date, value: item.messages || 0, type: '消息' },
+          );
+        });
+        setTimeRangeData(chartData);
+      }
+    } catch {
+      message.error('获取趋势数据失败');
+    } finally {
+      setTimeRangeLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
+
+  useEffect(() => {
+    fetchTimeRange(dateRange[0], dateRange[1]);
+  }, [dateRange, fetchTimeRange]);
+
+  const handlePresetChange = (value: string) => {
+    setPreset(value);
+    const end = dayjs();
+    let start: Dayjs;
+    switch (value) {
+      case '7天':
+        start = end.subtract(7, 'day');
+        break;
+      case '30天':
+        start = end.subtract(30, 'day');
+        break;
+      case '90天':
+        start = end.subtract(90, 'day');
+        break;
+      default:
+        start = end.subtract(7, 'day');
+    }
+    setDateRange([start, end]);
+  };
+
+  if (error) {
     return (
-      <div style={{ textAlign: 'center', padding: 80 }}>
-        <Spin size="large" tip="加载中..." />
-      </div>
+      <PageContainer>
+        <Result
+          status="error"
+          title="加载失败"
+          subTitle={error}
+          extra={
+            <Button type="primary" icon={<ReloadOutlined />} onClick={fetchDashboard}>
+              重试
+            </Button>
+          }
+        />
+      </PageContainer>
     );
   }
 
+  if (loading || !stats) {
+    return (
+      <PageContainer>
+        <div style={{ textAlign: 'center', padding: 80 }}>
+          <Spin size="large" tip="加载中..." />
+        </div>
+      </PageContainer>
+    );
+  }
+
+  const formatSeconds = (seconds: number) => {
+    if (!seconds || seconds <= 0) return '-';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return mins > 0 ? `${mins}分${secs}秒` : `${secs}秒`;
+  };
+
+  const lineConfig = {
+    data: timeRangeData,
+    xField: 'date',
+    yField: 'value',
+    colorField: 'type',
+    point: { shapeField: 'square', sizeField: 4 },
+    interaction: { tooltip: { marker: false } },
+    style: { lineWidth: 2 },
+  };
+
   return (
-    <div>
+    <PageContainer>
+      {/* 今日概览 */}
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} lg={6}>
           <StatisticCard
             statistic={{
-              title: '总会话数',
-              value: stats.total_sessions,
+              title: '今日工单',
+              value: stats.today_tickets,
+              icon: <FileTextOutlined style={{ fontSize: 24, color: '#1890ff' }} />,
               description: (
-                <StatisticCard.Statistic
-                  title="今日新增"
-                  value={stats.today_sessions}
-                />
+                <span>
+                  总计 {stats.total_tickets} / 开放 {stats.open_tickets}
+                </span>
               ),
             }}
           />
@@ -72,13 +170,13 @@ const DashboardPage: React.FC = () => {
         <Col xs={24} sm={12} lg={6}>
           <StatisticCard
             statistic={{
-              title: '工单数',
-              value: stats.total_tickets,
+              title: '今日会话',
+              value: stats.today_sessions,
+              icon: <MessageOutlined style={{ fontSize: 24, color: '#52c41a' }} />,
               description: (
-                <StatisticCard.Statistic
-                  title="今日新增"
-                  value={stats.today_tickets}
-                />
+                <span>
+                  活跃 {stats.active_sessions} / 总计 {stats.total_sessions}
+                </span>
               ),
             }}
           />
@@ -86,63 +184,121 @@ const DashboardPage: React.FC = () => {
         <Col xs={24} sm={12} lg={6}>
           <StatisticCard
             statistic={{
-              title: '客户数',
-              value: stats.total_customers,
-              description: (
-                <StatisticCard.Statistic
-                  title="在线客服"
-                  value={stats.online_agents}
-                />
-              ),
+              title: '今日消息',
+              value: stats.today_messages,
+              icon: <MessageOutlined style={{ fontSize: 24, color: '#722ed1' }} />,
             }}
           />
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <StatisticCard
             statistic={{
-              title: '满意度',
-              value: stats.customer_satisfaction
-                ? `${(stats.customer_satisfaction * 20).toFixed(1)}%`
-                : '0%',
-              description: (
-                <StatisticCard.Statistic
-                  title="活跃会话"
-                  value={stats.active_sessions}
-                />
-              ),
+              title: '客户满意度',
+              value: stats.customer_satisfaction?.toFixed(1) || '0.0',
+              suffix: '/ 5.0',
+              icon: <SmileOutlined style={{ fontSize: 24, color: '#faad14' }} />,
             }}
           />
         </Col>
       </Row>
 
+      {/* 资源概览 */}
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        <Col xs={24} sm={12} lg={6}>
+          <StatisticCard
+            statistic={{
+              title: '在线客服',
+              value: stats.online_agents,
+              icon: <UserOutlined style={{ fontSize: 24, color: '#13c2c2' }} />,
+              description: (
+                <span>
+                  在线 {stats.online_agents} / 忙碌 {stats.busy_agents} / 总计{' '}
+                  {stats.total_agents}
+                </span>
+              ),
+            }}
+          />
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <StatisticCard
+            statistic={{
+              title: '总客户数',
+              value: stats.total_customers,
+              icon: <TeamOutlined style={{ fontSize: 24, color: '#eb2f96' }} />,
+            }}
+          />
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <StatisticCard
+            statistic={{
+              title: '平均响应时间',
+              value: formatSeconds(stats.avg_response_time),
+              icon: <ClockCircleOutlined style={{ fontSize: 24, color: '#fa8c16' }} />,
+            }}
+          />
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <StatisticCard
+            statistic={{
+              title: 'AI 使用次数(今日)',
+              value: stats.ai_usage_today || 0,
+              icon: <RobotOutlined style={{ fontSize: 24, color: '#2f54eb' }} />,
+            }}
+          />
+        </Col>
+      </Row>
+
+      {/* 工单状态分布 */}
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        <Col xs={24} sm={12} lg={6}>
+          <StatisticCard statistic={{ title: '开放工单', value: stats.open_tickets }} />
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <StatisticCard statistic={{ title: '已分配工单', value: stats.assigned_tickets }} />
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <StatisticCard statistic={{ title: '已解决工单', value: stats.resolved_tickets }} />
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <StatisticCard statistic={{ title: '已关闭工单', value: stats.closed_tickets }} />
+        </Col>
+      </Row>
+
+      {/* 趋势图 */}
       <ProCard
-        title="趋势图表"
+        title="趋势分析"
         style={{ marginTop: 16 }}
-        collapsible
-      >
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={8}>
-            <StatisticCard
-              statistic={{ title: '今日消息量', value: stats.today_messages }}
+        extra={
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Segmented
+              options={['7天', '30天', '90天']}
+              value={preset}
+              onChange={(val) => handlePresetChange(val as string)}
             />
-          </Col>
-          <Col xs={24} sm={8}>
-            <StatisticCard
-              statistic={{ title: '已解决工单', value: stats.resolved_tickets }}
-            />
-          </Col>
-          <Col xs={24} sm={8}>
-            <StatisticCard
-              statistic={{
-                title: '平均响应时长',
-                value: `${stats.avg_response_time.toFixed(1)}s`,
+            <RangePicker
+              value={dateRange}
+              onChange={(dates) => {
+                if (dates && dates[0] && dates[1]) {
+                  setPreset('');
+                  setDateRange([dates[0], dates[1]]);
+                }
               }}
             />
-          </Col>
-        </Row>
+          </div>
+        }
+      >
+        <Spin spinning={timeRangeLoading}>
+          {timeRangeData.length > 0 ? (
+            <Line {...lineConfig} />
+          ) : (
+            <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>
+              暂无趋势数据
+            </div>
+          )}
+        </Spin>
       </ProCard>
-    </div>
+    </PageContainer>
   );
 };
 
-export default DashboardPage;
+export default Dashboard;

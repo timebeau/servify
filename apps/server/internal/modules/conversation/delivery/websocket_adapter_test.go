@@ -59,6 +59,10 @@ func (s *stubConversationRepo) ListRecentMessages(ctx context.Context, conversat
 	return out, nil
 }
 
+func (s *stubConversationRepo) ListMessagesBefore(ctx context.Context, conversationID string, beforeMessageID string, limit int) ([]conversationdomain.ConversationMessage, error) {
+	return s.ListRecentMessages(ctx, conversationID, limit)
+}
+
 func TestWebSocketMessageAdapterCreatesConversationOnDemand(t *testing.T) {
 	repo := &stubConversationRepo{}
 	adapter := NewWebSocketMessageAdapter(conversationapp.NewService(repo, nil))

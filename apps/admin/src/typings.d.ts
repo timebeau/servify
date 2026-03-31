@@ -247,6 +247,23 @@ declare namespace API {
       avg_response_time: number;
     }>;
     recent_sessions: WorkspaceSession[];
+    agent_stats?: {
+      available_agents: Array<{ id: number; name?: string }>;
+    };
+  }
+
+  /** 会话（来自 ticket 关联查询） */
+  interface Session {
+    id: string;
+    platform?: string;
+    status?: string;
+    customer_id?: number;
+    customer_name?: string;
+    agent_id?: number;
+    agent_name?: string;
+    ticket_id?: number;
+    started_at?: string;
+    ended_at?: string;
   }
 
   // ---- AI ----

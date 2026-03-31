@@ -30,6 +30,7 @@
   - `make release-changelog FROM=<previous-tag-or-commit> TO=HEAD`
   - `make repo-hygiene`
   - `make local-check`
+  - `make release-check CONFIG=./config.yml`
   - `make clean-runtime`
   - `./scripts/verify-generated-assets.sh`
 
@@ -68,6 +69,7 @@ git config --global --add safe.directory /mnt/c/Users/cui/Workspaces/servify
 
 - 推荐先跑：
   - `make local-check`
+  - 发布前再补：`make release-check CONFIG=./config.yml`
 - `go test ./apps/server/internal/config ./apps/server/internal/handlers`
 - `sh scripts/check-repo-hygiene.sh`
 - 如果改了生成物流程，再补：

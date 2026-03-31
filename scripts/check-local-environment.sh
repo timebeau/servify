@@ -46,7 +46,7 @@ fi
 
 echo
 echo "==> Checking repository hygiene"
-sh "$ROOT_DIR/scripts/check-repo-hygiene.sh" || failures=1
+bash "$ROOT_DIR/scripts/check-repo-hygiene.sh" || failures=1
 
 echo
 echo "==> Checking generated assets manifest"

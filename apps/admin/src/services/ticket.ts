@@ -45,3 +45,7 @@ export async function bulkUpdateTickets(data: { ticket_ids: number[]; action: st
 export async function exportTickets(params: API.TicketListParams) {
   return request(`${API}/export`, { params, responseType: 'blob' });
 }
+
+export async function getTicketConversations(id: number) {
+  return request<{ data: API.Session[] }>(`${API}/${id}/conversations`);
+}

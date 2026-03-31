@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { ProDescriptions } from '@ant-design/pro-components';
 import { ProCard } from '@ant-design/pro-components';
-import { Tag, Steps, Button, Space, Divider, Input, List, Spin, message } from 'antd';
+import { Tag, Steps, Button, Space, Divider, Input, List, Spin, message, Empty } from 'antd';
 import { goBack, useDetailParams } from '@/lib/navigation';
+import { navigateTo } from '@/lib/navigation';
 import { TICKET_STATUS_MAP, TICKET_PRIORITY_MAP } from '@/utils/constants';
-import { getTicket, getComments, addComment } from '@/services/ticket';
+import { getTicket, getComments, addComment, getTicketConversations } from '@/services/ticket';
 
 const TicketDetailPage: React.FC = () => {
   const { id } = useDetailParams();
@@ -12,6 +13,8 @@ const TicketDetailPage: React.FC = () => {
   const [ticket, setTicket] = useState<API.Ticket | null>(null);
   const [comments, setComments] = useState<any[]>([]);
   const [commentContent, setCommentContent] = useState('');
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [conversationsLoading, setConversationsLoading] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -42,6 +45,22 @@ const TicketDetailPage: React.FC = () => {
       }
     };
     fetchComments();
+  }, [id]);
+
+  useEffect(() => {
+    const fetchConversations = async () => {
+      if (!id) return;
+      setConversationsLoading(true);
+      try {
+        const result = await getTicketConversations(Number(id));
+        setConversations(result?.data || []);
+      } catch (error) {
+        console.error('获取关联会话失败:', error);
+      } finally {
+        setConversationsLoading(false);
+      }
+    };
+    fetchConversations();
   }, [id]);
 
   if (loading) {
@@ -96,6 +115,13 @@ const TicketDetailPage: React.FC = () => {
     } catch (error) {
       message.error('添加评论失败');
     }
+  };
+
+  const platformColorMap: Record<string, string> = {
+    web: 'blue',
+    wechat: 'green',
+    whatsapp: 'cyan',
+    voice: 'purple',
   };
 
   return (
@@ -181,6 +207,50 @@ const TicketDetailPage: React.FC = () => {
             提交评论
           </Button>
         </div>
+      </ProCard>
+
+      {/* 关联会话 */}
+      <ProCard title="关联会话" style={{ marginTop: 16 }}>
+        <Spin spinning={conversationsLoading}>
+          {conversations.length === 0 ? (
+            <Empty description="该工单没有关联的会话记录" />
+          ) : (
+            <List
+              dataSource={conversations}
+              locale={{ emptyText: '暂无关联会话' }}
+              renderItem={(session: any) => (
+                <List.Item
+                  actions={[
+                    <Button
+                      key="view"
+                      size="small"
+                      type="link"
+                      onClick={() => navigateTo(`/conversation?id=${session.id}`)}
+                    >
+                      查看消息
+                    </Button>,
+                  ]}
+                >
+                  <List.Item.Meta
+                    title={
+                      <Space>
+                        <Tag color={platformColorMap[session.platform] || 'default'}>
+                          {session.platform || '未知'}
+                        </Tag>
+                        <span>{session.customer_name || '未知客户'}</span>
+                        {session.started_at && (
+                          <span style={{ color: '#999', fontSize: 12 }}>
+                            {session.started_at}
+                          </span>
+                        )}
+                      </Space>
+                    }
+                  />
+                </List.Item>
+              )}
+            />
+          )}
+        </Spin>
       </ProCard>
     </div>
   );

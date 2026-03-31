@@ -70,6 +70,14 @@ export async function request<T = any>(url: string, options: RequestOptions = {}
     throw new Error('登录已失效，请重新登录');
   }
 
+  if (response.status === 403) {
+    throw new Error('权限不足，无法执行此操作');
+  }
+
+  if (response.status >= 500) {
+    throw new Error('服务器错误，请稍后重试');
+  }
+
   if (!response.ok) {
     throw new Error(await parseErrorMessage(response));
   }

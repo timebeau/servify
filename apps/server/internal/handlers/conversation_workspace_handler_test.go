@@ -156,3 +156,83 @@ func TestConversationWorkspaceHandler_SendMessage(t *testing.T) {
 		t.Fatalf("expected realtime agent-message broadcast, got %+v", realtime.messages)
 	}
 }
+
+func TestConversationWorkspaceHandler_AssignAgent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db := newConversationWorkspaceTestDB(t)
+	service := seedConversation(t, db)
+	handler := NewConversationWorkspaceHandler(conversationdelivery.NewHandlerService(service), nil)
+
+	router := gin.New()
+	group := router.Group("/api")
+	RegisterConversationWorkspaceRoutes(group, handler)
+
+	body, _ := json.Marshal(map[string]uint{"agent_id": 1})
+	req := httptest.NewRequest(http.MethodPost, "/api/omni/sessions/sess-1/assign", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestConversationWorkspaceHandler_Transfer(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db := newConversationWorkspaceTestDB(t)
+	service := seedConversation(t, db)
+	handler := NewConversationWorkspaceHandler(conversationdelivery.NewHandlerService(service), nil)
+
+	router := gin.New()
+	group := router.Group("/api")
+	RegisterConversationWorkspaceRoutes(group, handler)
+
+	// Assign first so transfer has an agent to transfer from
+	assignBody, _ := json.Marshal(map[string]uint{"agent_id": 1})
+	req0 := httptest.NewRequest(http.MethodPost, "/api/omni/sessions/sess-1/assign", bytes.NewReader(assignBody))
+	req0.Header.Set("Content-Type", "application/json")
+	w0 := httptest.NewRecorder()
+	router.ServeHTTP(w0, req0)
+	if w0.Code != http.StatusOK {
+		t.Fatalf("assign precondition failed: %d %s", w0.Code, w0.Body.String())
+	}
+
+	body, _ := json.Marshal(map[string]uint{"to_agent_id": 2})
+	req := httptest.NewRequest(http.MethodPost, "/api/omni/sessions/sess-1/transfer", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestConversationWorkspaceHandler_CloseSession(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db := newConversationWorkspaceTestDB(t)
+	service := seedConversation(t, db)
+	handler := NewConversationWorkspaceHandler(conversationdelivery.NewHandlerService(service), nil)
+
+	router := gin.New()
+	group := router.Group("/api")
+	RegisterConversationWorkspaceRoutes(group, handler)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/omni/sessions/sess-1/close", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Verify conversation is now closed
+	dto, err := service.GetConversation(context.Background(), "sess-1")
+	if err != nil {
+		t.Fatalf("get conversation: %v", err)
+	}
+	if dto.Status != "closed" {
+		t.Fatalf("expected status closed, got %q", dto.Status)
+	}
+}

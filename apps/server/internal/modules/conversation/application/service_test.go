@@ -70,6 +70,30 @@ func (s *stubConversationRepo) ListRecentMessages(ctx context.Context, conversat
 	return out, nil
 }
 
+func (s *stubConversationRepo) ListMessagesBefore(ctx context.Context, conversationID string, beforeMessageID string, limit int) ([]domain.ConversationMessage, error) {
+	items := s.messages[conversationID]
+	if beforeMessageID != "" {
+		cutoff := -1
+		for i, m := range items {
+			if m.ID == beforeMessageID {
+				cutoff = i
+				break
+			}
+		}
+		if cutoff > 0 {
+			items = items[:cutoff]
+		} else if cutoff == 0 {
+			return []domain.ConversationMessage{}, nil
+		}
+	}
+	if len(items) > limit {
+		items = items[len(items)-limit:]
+	}
+	out := make([]domain.ConversationMessage, 0, len(items))
+	out = append(out, items...)
+	return out, nil
+}
+
 type stubConversationPublisher struct {
 	events []eventbus.Event
 	err    error

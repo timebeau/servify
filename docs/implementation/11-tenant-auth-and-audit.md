@@ -97,10 +97,10 @@
 
 ## T5 security-baseline-for-operations
 
-- [ ] 盘点高风险接口和高风险操作
-- [ ] 增加关键操作的速率限制、权限兜底和日志
-- [ ] 为 token 生命周期、密钥轮换、敏感字段脱敏补最小规范
-- [ ] 为对外开放接口补基础安全清单
+- [x] 盘点高风险接口和高风险操作
+- [x] 增加关键操作的速率限制、权限兜底和日志
+- [x] 为 token 生命周期、密钥轮换、敏感字段脱敏补最小规范
+- [x] 为对外开放接口补基础安全清单
 
 验收：
 
@@ -123,4 +123,5 @@
 - customer 管理面现已新增 `POST /api/customers/:id/revoke-tokens`，可对受作用域约束的客户账号主动触发旧 token 失效
 - token 主动失效底层逻辑现已收敛到 `internal/platform/usersecurity`，agent/customer 两条管理面路径复用同一套 `token_valid_after + token_version` 更新实现
 - 管理面现已新增统一 `security` surface：`GET /api/security/users/:id` 可查询用户安全状态，`POST /api/security/users/:id/revoke-tokens` 可执行通用 user revoke，分别由 `security.read` / `security.write` 权限保护
+- 已新增 `servify check-security-baseline --strict` 与 `scripts/check-security-baseline.sh`，可在部署前将现有 security warning 规则升级为显式失败检查，不再只依赖启动日志提醒
 - 当前仍缺 refresh token / revoke list 等更细粒度失效实现，以及批量失效、审批回滚等更完整的 user security 操作能力

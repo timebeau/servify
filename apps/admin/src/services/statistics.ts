@@ -7,26 +7,35 @@ export async function getDashboardStats() {
 
 /** 时间范围统计 */
 export async function getTimeRangeStats(params: {
-  start: string;
-  end: string;
-  interval?: string;
+  start_date: string;
+  end_date: string;
 }) {
   return request('/api/statistics/time-range', { params });
 }
 
 /** 工单分类统计 */
-export async function getTicketCategoryStats() {
-  return request('/api/statistics/ticket-category');
+export async function getTicketCategoryStats(params?: {
+  start_date?: string;
+  end_date?: string;
+}) {
+  return request('/api/statistics/ticket-category', { params });
 }
 
 /** 工单优先级统计 */
-export async function getTicketPriorityStats() {
-  return request('/api/statistics/ticket-priority');
+export async function getTicketPriorityStats(params?: {
+  start_date?: string;
+  end_date?: string;
+}) {
+  return request('/api/statistics/ticket-priority', { params });
 }
 
 /** 客服绩效 */
-export async function getAgentPerformanceStats() {
-  return request('/api/statistics/agent-performance');
+export async function getAgentPerformanceStats(params: {
+  start_date: string;
+  end_date: string;
+  limit?: number;
+}) {
+  return request('/api/statistics/agent-performance', { params });
 }
 
 /** 客户来源分布 */

@@ -9,24 +9,28 @@ import (
 	"strings"
 	"time"
 
+	"servify/apps/server/internal/models"
 	ticketcontract "servify/apps/server/internal/modules/ticket/contract"
 	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 )
 
 // TicketHandler 工单处理器
 type TicketHandler struct {
 	ticketService ticketdelivery.HandlerService
 	logger        *logrus.Logger
+	db            *gorm.DB
 }
 
 // NewTicketHandler 创建工单处理器
-func NewTicketHandler(ticketService ticketdelivery.HandlerService, logger *logrus.Logger) *TicketHandler {
+func NewTicketHandler(ticketService ticketdelivery.HandlerService, logger *logrus.Logger, db *gorm.DB) *TicketHandler {
 	return &TicketHandler{
 		ticketService: ticketService,
 		logger:        logger,
+		db:            db,
 	}
 }
 
@@ -559,7 +563,37 @@ func RegisterTicketRoutes(r *gin.RouterGroup, handler *TicketHandler) {
 		tickets.POST("/:id/assign", handler.AssignTicket)
 		tickets.POST("/:id/comments", handler.AddComment)
 		tickets.POST("/:id/close", handler.CloseTicket)
+		tickets.GET("/:id/conversations", handler.GetRelatedConversations)
 	}
+}
+
+// GetRelatedConversations 获取工单关联的会话列表
+func (h *TicketHandler) GetRelatedConversations(c *gin.Context) {
+	idStr := c.Param("id")
+	ticketID, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "Invalid ticket ID",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	var sessions []models.Session
+	result := h.db.Where("ticket_id = ?", ticketID).
+		Order("started_at DESC").
+		Find(&sessions)
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "Failed to load related conversations",
+			Message: result.Error.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": sessions,
+	})
 }
 
 func extractCustomFieldFilters(c *gin.Context) map[string]string {

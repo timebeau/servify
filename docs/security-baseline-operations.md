@@ -90,6 +90,13 @@
 - 若启用了限流但没有为 `/public/` 与 `/api/v1/ws` 配置独立路径级限流，也会输出 warning，避免匿名入口只落在全局限流下
 - 当前为 warning-only，不阻断本地开发或测试启动
 
+### 部署前校验入口
+
+- CLI：`go -C apps/server run ./cmd -c config.yml check-security-baseline --strict`
+- 脚本：`sh ./scripts/check-security-baseline.sh config.yml`
+- Make：`make security-check CONFIG=config.production.secure.example.yml`
+- 该检查复用启动期 `SecurityWarnings` 规则，但在 `--strict` 下会以非零退出，适合 CI、CD 或上线前人工校验
+
 ## 建议的最小生产配置
 
 建议至少开启以下限流基线：
@@ -121,3 +128,4 @@
 - 速率限制：`apps/server/internal/middleware/ratelimit.go`
 - 审计中间件：`apps/server/internal/platform/audit/gin_middleware.go`
 - 启动安全告警：`apps/server/internal/app/bootstrap/security.go`
+- 部署前严格校验：`apps/server/cmd/cli/check_security_baseline.go`

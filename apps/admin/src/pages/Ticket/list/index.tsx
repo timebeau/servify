@@ -141,7 +141,8 @@ const TicketListPage: React.FC = () => {
             };
           } catch (error) {
             console.error('获取工单列表失败:', error);
-            return { data: [], total: 0, success: true };
+            message.error('获取工单列表失败');
+            return { data: [], total: 0, success: false };
           }
         }}
         pagination={{ defaultPageSize: 20 }}

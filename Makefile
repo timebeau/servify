@@ -1,6 +1,6 @@
 # Servify Makefile
 
-.PHONY: help build build-cli build-weknora run run-cli run-weknora migrate migrate-seed test clean clean-runtime docker-build docker-run docker-up-weknora docker-down docker-logs-weknora docker-up-observ docker-down-observ dev-setup fmt lint update-deps docs changelog release-changelog sdk-sync-versions sdk-check-versions repo-hygiene generated-assets local-check
+.PHONY: help build build-cli build-weknora run run-cli run-weknora migrate migrate-seed test clean clean-runtime docker-build docker-run docker-up-weknora docker-down docker-logs-weknora docker-up-observ docker-down-observ dev-setup fmt lint update-deps docs changelog release-changelog sdk-sync-versions sdk-check-versions repo-hygiene generated-assets local-check security-check observability-check release-check
 
 # Default target
 help:
@@ -31,6 +31,9 @@ help:
 	@echo "  repo-hygiene  - Validate runtime/build artifacts are not tracked"
 	@echo "  generated-assets - Regenerate and verify committed generated assets"
 	@echo "  local-check   - Run the minimal local environment verification"
+	@echo "  security-check - Validate the config security baseline in strict mode"
+	@echo "  observability-check - Validate the observability baseline in strict mode"
+	@echo "  release-check - Run the minimal release-readiness verification"
 
 # Build the application
 build:
@@ -53,11 +56,11 @@ run:
 
 run-cli:
 	@echo "Running CLI (standard)..."
-	go -C apps/server run ./cmd/cli -c $(or $(CONFIG),../../config.yml) run
+	go -C apps/server run ./cmd -c $(or $(CONFIG),../../config.yml) run
 
 run-weknora:
 	@echo "Running CLI (weknora)..."
-	go -C apps/server run -tags weknora ./cmd/cli -c $(or $(CONFIG),../../config.weknora.yml) run
+	go -C apps/server run -tags weknora ./cmd -c $(or $(CONFIG),../../config.weknora.yml) run
 
 # Run database migrations
 migrate:
@@ -172,7 +175,7 @@ sdk-check-versions:
 
 repo-hygiene:
 	@echo "Running repository hygiene checks..."
-	sh ./scripts/check-repo-hygiene.sh
+	bash ./scripts/check-repo-hygiene.sh
 
 generated-assets:
 	@echo "Regenerating committed generated assets..."
@@ -181,6 +184,18 @@ generated-assets:
 local-check:
 	@echo "Running local environment verification..."
 	sh ./scripts/check-local-environment.sh
+
+security-check:
+	@echo "Running security baseline validation..."
+	sh ./scripts/check-security-baseline.sh $(or $(CONFIG),config.yml)
+
+observability-check:
+	@echo "Running observability baseline validation..."
+	sh ./scripts/check-observability-baseline.sh $(or $(CONFIG),config.yml)
+
+release-check:
+	@echo "Running release-readiness validation..."
+	sh ./scripts/check-release-readiness.sh $(or $(CONFIG),config.yml)
 
 # Internal targets with ldflags (version info)
 VERSION ?= dev
@@ -191,13 +206,13 @@ LDFLAGS := -X 'servify/apps/server/internal/version.Version=$(VERSION)' -X 'serv
 _build-with-ldflags:
 	go -C apps/server build -ldflags "$(LDFLAGS)" -o ../../bin/servify ./cmd/server
 	go -C apps/server build -ldflags "$(LDFLAGS)" -o ../../bin/migrate ./cmd/migrate
-	go -C apps/server build -ldflags "$(LDFLAGS)" -o ../../bin/servify-cli ./cmd/cli
+	go -C apps/server build -ldflags "$(LDFLAGS)" -o ../../bin/servify-cli ./cmd
 
 _build-cli-with-ldflags:
-	go -C apps/server build -ldflags "$(LDFLAGS)" -o ../../bin/servify-cli ./cmd/cli
+	go -C apps/server build -ldflags "$(LDFLAGS)" -o ../../bin/servify-cli ./cmd
 
 _build-cli-weknora-with-ldflags:
-	go -C apps/server build -ldflags "$(LDFLAGS)" -tags weknora -o ../../bin/servify-cli-weknora ./cmd/cli
+	go -C apps/server build -ldflags "$(LDFLAGS)" -tags weknora -o ../../bin/servify-cli-weknora ./cmd
 
 # Database operations
 db-reset: migrate-seed

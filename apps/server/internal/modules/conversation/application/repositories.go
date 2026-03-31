@@ -12,4 +12,5 @@ type ConversationRepository interface {
 	UpdateConversation(ctx context.Context, conversation *domain.Conversation) error
 	AppendMessage(ctx context.Context, message *domain.ConversationMessage) error
 	ListRecentMessages(ctx context.Context, conversationID string, limit int) ([]domain.ConversationMessage, error)
+	ListMessagesBefore(ctx context.Context, conversationID string, beforeMessageID string, limit int) ([]domain.ConversationMessage, error)
 }

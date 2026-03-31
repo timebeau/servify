@@ -109,7 +109,7 @@ func registerManagementRoutes(r *gin.Engine, deps Dependencies) {
 
 	ticketsAPI := api.Group("/")
 	ticketsAPI.Use(middleware.RequireResourcePermission("tickets"))
-	handlers.RegisterTicketRoutes(ticketsAPI, handlers.NewTicketHandler(deps.TicketHandlerService, deps.Logger))
+	handlers.RegisterTicketRoutes(ticketsAPI, handlers.NewTicketHandler(deps.TicketHandlerService, deps.Logger, deps.DB))
 
 	sessionTransferAPI := api.Group("/")
 	sessionTransferAPI.Use(middleware.RequireResourcePermission("session_transfer"))
