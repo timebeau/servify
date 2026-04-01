@@ -43,8 +43,8 @@ func BuildAIAssembly(cfg *config.Config, logger *logrus.Logger, opts AIAssemblyO
 		logger = logrus.StandardLogger()
 	}
 	resolver := configscope.NewResolver(cfg)
-	openAIConfig := resolver.ResolveOpenAI(nil)
-	weKnoraConfig := resolver.ResolveWeKnora(nil)
+	openAIConfig := resolver.ResolveOpenAI(context.Background(), nil)
+	weKnoraConfig := resolver.ResolveWeKnora(context.Background(), nil)
 
 	baseAI := services.NewAIService(openAIConfig.APIKey, openAIConfig.BaseURL)
 	baseAI.InitializeKnowledgeBase()

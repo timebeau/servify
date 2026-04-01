@@ -43,8 +43,9 @@
 当前状态：
 
 - `01` 到 `08` 全部 backlog 已清零
-- `09` 到 `12` 全部 backlog 已清零
-- 所有已规划 backlog 均已完成
+- `09`、`10`、`12` 已完成
+- `11` 已完成核心骨架，但仍有剩余收口项
+- 所有已规划 backlog 已从“实施项”收敛到“少量收尾项”
 
 产品收口新增待办：
 
@@ -81,10 +82,11 @@
 - Phase 2 运营数据可信化已完成（后端全部真实聚合、前端图表已接入、统计口径已文档化）
 - Phase 3 管理后台产品化已完成
 - Phase 4 运行时去演示化已完成
-- Phase 5 上线 readiness 进行中
-- 当前完成度大致在 `80% ~ 85%`
+- Phase 5 上线 readiness 基础能力已完成，默认配置与文档收尾进行中
+- 当前完成度大致在 `85% ~ 90%`
 - 当前最短板是：
-  - 发布前检查、部署演练与回滚演练（Phase 5）
+  - `11-tenant-auth-and-audit` 的剩余收口项
+  - 生产配置与发布前检查的最终对齐（Phase 5）
 
 产品化详细计划：
 
@@ -140,16 +142,20 @@
     - [x] P4-4 明确文件存储、上传、清理和部署环境策略（storage.Provider 抽象）
     - [x] P4-5 为关键运行时能力补压测和故障注入验证（已由 P4-1~P4-4 的单元测试覆盖核心路径）
 
-- [x] Phase 5: 上线 readiness  - 目标：从”本地可运行”推进到”真实环境可上线”
+- [-] Phase 5: 上线 readiness  - 目标：从”本地可运行”推进到”真实环境可上线”
   - 验收标准：
     - 本地、测试、生产配置边界清晰
     - 发布、迁移、回滚、告警、排障有明确手册
     - 安全、权限、审计、可观测基线可执行检查
   - 任务包：
     - [x] P5-1 清理运行时脏产物和仓库边界，完成 repo hygiene
-    - [x] P5-2 收口配置分层：系统、租户、运行时、密钥    - [x] P5-3 建立发布前检查：migration / security / observability / release readiness
+    - [x] P5-2 收口配置分层：系统、租户、运行时、密钥
+    - [x] P5-3 建立发布前检查：migration / security / observability / release readiness
     - [x] P5-4 完成 operator runbook、告警规则和关键 dashboard
     - [x] P5-5 完成部署演练与回滚演练
+  - 当前剩余：
+    - [ ] 默认开发配置与 strict security baseline 的期望仍需持续区分
+    - [ ] backlog / scorecard / readiness 文档状态仍需继续同步，避免再次漂移
 
 执行顺序建议：
 
@@ -161,7 +167,7 @@
 
 - [x] 下一任务包 A：Conversation 工作台右侧消息详情与发送能力
 - [x] 下一任务包 B：Ticket 详情页关联会话与客服操作
-- [ ] 下一任务包 C：Dashboard 与 Satisfaction 的真实统计图表（Phase 2）
+- [x] 下一任务包 C：Dashboard 与 Satisfaction 的真实统计图表（Phase 2）
 
 下一阶段建议专题：
 

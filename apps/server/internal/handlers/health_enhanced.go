@@ -88,7 +88,7 @@ func (h *EnhancedHealthHandler) Health(c *gin.Context) {
 	}
 
 	// 检查 WeKnora（如果启用）
-	weKnoraConfig := configscope.NewResolver(h.config).ResolveWeKnora(nil)
+	weKnoraConfig := configscope.NewResolver(h.config).ResolveWeKnora(context.Background(), nil)
 	if h.config.Monitoring.HealthChecks.WeKnora && weKnoraConfig.Enabled {
 		h.checkWeKnora(ctx, &response, &allHealthy)
 	}
@@ -262,7 +262,7 @@ func (h *EnhancedHealthHandler) checkRedis(ctx context.Context, response *Health
 // checkWeKnora 检查 WeKnora 状态
 func (h *EnhancedHealthHandler) checkWeKnora(ctx context.Context, response *HealthResponse, allHealthy *bool) {
 	start := time.Now()
-	weKnoraConfig := configscope.NewResolver(h.config).ResolveWeKnora(nil)
+	weKnoraConfig := configscope.NewResolver(h.config).ResolveWeKnora(context.Background(), nil)
 
 	// 如果是增强 AI 服务，获取 WeKnora 状态
 	if _, ok := h.aiService.GetMetrics(); ok {

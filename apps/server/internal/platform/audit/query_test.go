@@ -2,6 +2,7 @@ package audit
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -13,7 +14,8 @@ import (
 
 func openTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", t.Name())
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -27,9 +29,9 @@ func TestGormQueryServiceList(t *testing.T) {
 	db := openTestDB(t)
 	now := time.Now().UTC()
 	logs := []models.AuditLog{
-		{PrincipalKind: "agent", Action: "tickets.create", ResourceType: "tickets", ResourceID: "1", Success: true, CreatedAt: now.Add(-2 * time.Hour)},
-		{PrincipalKind: "service", Action: "metrics_ingest.create", ResourceType: "metrics_ingest", ResourceID: "job-1", Success: true, CreatedAt: now.Add(-1 * time.Hour)},
-		{PrincipalKind: "admin", Action: "tickets.assign", ResourceType: "tickets", ResourceID: "2", Success: false, CreatedAt: now},
+		{PrincipalKind: "agent", Action: "tickets.create", ResourceType: "tickets", ResourceID: "1", Success: true, TenantID: "tenant-a", WorkspaceID: "workspace-1", CreatedAt: now.Add(-2 * time.Hour)},
+		{PrincipalKind: "service", Action: "metrics_ingest.create", ResourceType: "metrics_ingest", ResourceID: "job-1", Success: true, TenantID: "tenant-b", WorkspaceID: "workspace-2", CreatedAt: now.Add(-1 * time.Hour)},
+		{PrincipalKind: "admin", Action: "tickets.assign", ResourceType: "tickets", ResourceID: "2", Success: false, TenantID: "tenant-a", WorkspaceID: "workspace-2", CreatedAt: now},
 	}
 	if err := db.Create(&logs).Error; err != nil {
 		t.Fatalf("seed: %v", err)
@@ -40,6 +42,8 @@ func TestGormQueryServiceList(t *testing.T) {
 	items, total, err := svc.List(context.Background(), ListQuery{
 		ResourceType: "tickets",
 		Success:      &success,
+		TenantID:     "tenant-a",
+		WorkspaceID:  "workspace-1",
 		Page:         1,
 		PageSize:     10,
 	})

@@ -16,14 +16,22 @@ type ListQuery struct {
 	PrincipalKind string
 	ActorUserID   *uint
 	Success       *bool
+	TenantID      string
+	WorkspaceID   string
 	From          *time.Time
 	To            *time.Time
 	Page          int
 	PageSize      int
 }
 
+type QueryScope struct {
+	TenantID    string
+	WorkspaceID string
+}
+
 type QueryService interface {
 	List(ctx context.Context, query ListQuery) ([]models.AuditLog, int64, error)
+	Get(ctx context.Context, id uint, scope QueryScope) (*models.AuditLog, error)
 }
 
 type GormQueryService struct {
@@ -35,6 +43,29 @@ func NewGormQueryService(db *gorm.DB) *GormQueryService {
 		return nil
 	}
 	return &GormQueryService{db: db}
+}
+
+func (s *GormQueryService) Get(ctx context.Context, id uint, scope QueryScope) (*models.AuditLog, error) {
+	if s == nil || s.db == nil || id == 0 {
+		return nil, nil
+	}
+
+	tx := s.db.WithContext(ctx).Model(&models.AuditLog{}).Where("id = ?", id)
+	if scope.TenantID != "" {
+		tx = tx.Where("tenant_id = ?", scope.TenantID)
+	}
+	if scope.WorkspaceID != "" {
+		tx = tx.Where("workspace_id = ?", scope.WorkspaceID)
+	}
+
+	var log models.AuditLog
+	if err := tx.First(&log).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &log, nil
 }
 
 func (s *GormQueryService) List(ctx context.Context, query ListQuery) ([]models.AuditLog, int64, error) {
@@ -72,6 +103,12 @@ func (s *GormQueryService) List(ctx context.Context, query ListQuery) ([]models.
 	}
 	if query.Success != nil {
 		tx = tx.Where("success = ?", *query.Success)
+	}
+	if query.TenantID != "" {
+		tx = tx.Where("tenant_id = ?", query.TenantID)
+	}
+	if query.WorkspaceID != "" {
+		tx = tx.Where("workspace_id = ?", query.WorkspaceID)
 	}
 	if query.From != nil {
 		tx = tx.Where("created_at >= ?", *query.From)

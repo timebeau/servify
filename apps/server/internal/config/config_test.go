@@ -349,3 +349,20 @@ func TestConfig_PathRateLimits(t *testing.T) {
 		t.Error("expected burst to be set")
 	}
 }
+
+func TestConfig_AuditRetentionDefaults(t *testing.T) {
+	cfg := GetDefaultConfig()
+
+	if !cfg.Security.Audit.Enabled {
+		t.Error("expected audit cleanup to be enabled by default")
+	}
+	if cfg.Security.Audit.Retention != 180*24*time.Hour {
+		t.Fatalf("unexpected audit retention: %v", cfg.Security.Audit.Retention)
+	}
+	if cfg.Security.Audit.CleanupInterval != 24*time.Hour {
+		t.Fatalf("unexpected audit cleanup interval: %v", cfg.Security.Audit.CleanupInterval)
+	}
+	if cfg.Security.Audit.CleanupBatchSize <= 0 {
+		t.Fatalf("expected positive audit cleanup batch size, got %d", cfg.Security.Audit.CleanupBatchSize)
+	}
+}

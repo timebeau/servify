@@ -17,6 +17,26 @@ func (s stubPortalProvider) LoadPortalConfig(ctx context.Context) (config.Portal
 	return s.value, s.ok, s.err
 }
 
+type stubOpenAIProvider struct {
+	value config.OpenAIConfig
+	ok    bool
+	err   error
+}
+
+func (s stubOpenAIProvider) LoadOpenAIConfig(ctx context.Context) (config.OpenAIConfig, bool, error) {
+	return s.value, s.ok, s.err
+}
+
+type stubWeKnoraProvider struct {
+	value config.WeKnoraConfig
+	ok    bool
+	err   error
+}
+
+func (s stubWeKnoraProvider) LoadWeKnoraConfig(ctx context.Context) (config.WeKnoraConfig, bool, error) {
+	return s.value, s.ok, s.err
+}
+
 func TestResolverResolvePortalPrecedence(t *testing.T) {
 	resolver := NewResolver(
 		&config.Config{
@@ -94,7 +114,7 @@ func TestResolverResolveOpenAI(t *testing.T) {
 		},
 	})
 
-	got := resolver.ResolveOpenAI(&config.OpenAIConfig{
+	got := resolver.ResolveOpenAI(context.Background(), &config.OpenAIConfig{
 		Model:       "gpt-runtime",
 		Temperature: 0.7,
 	})
@@ -122,7 +142,7 @@ func TestResolverResolveWeKnora(t *testing.T) {
 		},
 	})
 
-	got := resolver.ResolveWeKnora(&config.WeKnoraConfig{
+	got := resolver.ResolveWeKnora(context.Background(), &config.WeKnoraConfig{
 		KnowledgeBaseID: "kb-runtime",
 		MaxRetries:      5,
 	})
@@ -135,5 +155,93 @@ func TestResolverResolveWeKnora(t *testing.T) {
 	}
 	if got.MaxRetries != 5 {
 		t.Fatalf("max retries = %d want 5", got.MaxRetries)
+	}
+}
+
+func TestResolverResolveOpenAIPrecedence(t *testing.T) {
+	resolver := NewResolver(
+		&config.Config{
+			AI: config.AIConfig{
+				OpenAI: config.OpenAIConfig{
+					APIKey:      "system-key",
+					BaseURL:     "https://system.example",
+					Model:       "gpt-system",
+					Temperature: 0.2,
+				},
+			},
+		},
+		WithTenantOpenAIProvider(stubOpenAIProvider{
+			ok: true,
+			value: config.OpenAIConfig{
+				Model:       "gpt-tenant",
+				Temperature: 0.3,
+			},
+		}),
+		WithWorkspaceOpenAIProvider(stubOpenAIProvider{
+			ok: true,
+			value: config.OpenAIConfig{
+				Model: "gpt-workspace",
+			},
+		}),
+	)
+
+	got := resolver.ResolveOpenAI(context.Background(), &config.OpenAIConfig{
+		Temperature: 0.8,
+	})
+
+	if got.APIKey != "system-key" {
+		t.Fatalf("api key = %q want system-key", got.APIKey)
+	}
+	if got.Model != "gpt-workspace" {
+		t.Fatalf("model = %q want workspace override", got.Model)
+	}
+	if got.Temperature != 0.8 {
+		t.Fatalf("temperature = %v want 0.8", got.Temperature)
+	}
+}
+
+func TestResolverResolveWeKnoraPrecedence(t *testing.T) {
+	resolver := NewResolver(
+		&config.Config{
+			WeKnora: config.WeKnoraConfig{
+				Enabled:         true,
+				BaseURL:         "https://wk-system.example",
+				APIKey:          "system-key",
+				TenantID:        "tenant-system",
+				KnowledgeBaseID: "kb-system",
+				MaxRetries:      2,
+			},
+		},
+		WithTenantWeKnoraProvider(stubWeKnoraProvider{
+			ok: true,
+			value: config.WeKnoraConfig{
+				TenantID:        "tenant-tenant",
+				KnowledgeBaseID: "kb-tenant",
+			},
+		}),
+		WithWorkspaceWeKnoraProvider(stubWeKnoraProvider{
+			ok: true,
+			value: config.WeKnoraConfig{
+				KnowledgeBaseID: "kb-workspace",
+				MaxRetries:      4,
+			},
+		}),
+	)
+
+	got := resolver.ResolveWeKnora(context.Background(), &config.WeKnoraConfig{
+		MaxRetries: 6,
+	})
+
+	if got.BaseURL != "https://wk-system.example" {
+		t.Fatalf("base url = %q want system", got.BaseURL)
+	}
+	if got.TenantID != "tenant-tenant" {
+		t.Fatalf("tenant id = %q want tenant override", got.TenantID)
+	}
+	if got.KnowledgeBaseID != "kb-workspace" {
+		t.Fatalf("kb = %q want workspace override", got.KnowledgeBaseID)
+	}
+	if got.MaxRetries != 6 {
+		t.Fatalf("max retries = %d want 6", got.MaxRetries)
 	}
 }

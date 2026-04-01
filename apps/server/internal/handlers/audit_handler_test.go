@@ -9,6 +9,7 @@ import (
 
 	"servify/apps/server/internal/models"
 	auditplatform "servify/apps/server/internal/platform/audit"
+	platformauth "servify/apps/server/internal/platform/auth"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,6 +24,15 @@ type stubAuditQueryService struct {
 func (s *stubAuditQueryService) List(_ context.Context, query auditplatform.ListQuery) ([]models.AuditLog, int64, error) {
 	s.query = query
 	return s.items, s.total, s.err
+}
+
+func (s *stubAuditQueryService) Get(_ context.Context, id uint, _ auditplatform.QueryScope) (*models.AuditLog, error) {
+	for i := range s.items {
+		if s.items[i].ID == id {
+			return &s.items[i], s.err
+		}
+	}
+	return nil, s.err
 }
 
 func TestAuditHandlerList(t *testing.T) {
@@ -46,5 +56,30 @@ func TestAuditHandlerList(t *testing.T) {
 	}
 	if svc.query.Success == nil || !*svc.query.Success {
 		t.Fatalf("expected success filter true, got %+v", svc.query.Success)
+	}
+}
+
+func TestAuditHandlerListProjectsScopeFromContext(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := &stubAuditQueryService{
+		items: []models.AuditLog{{ID: 1, Action: "tickets.create"}},
+		total: 1,
+	}
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Request = c.Request.WithContext(platformauth.ContextWithScope(c.Request.Context(), "tenant-a", "workspace-1"))
+		c.Next()
+	})
+	RegisterAuditRoutes(&r.RouterGroup, NewAuditHandler(svc))
+
+	req := httptest.NewRequest(http.MethodGet, "/audit/logs", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d body=%s", w.Code, w.Body.String())
+	}
+	if svc.query.TenantID != "tenant-a" || svc.query.WorkspaceID != "workspace-1" {
+		t.Fatalf("unexpected scope query: %+v", svc.query)
 	}
 }

@@ -1,0 +1,124 @@
+package server
+
+import (
+	"context"
+
+	"servify/apps/server/internal/config"
+	aidelivery "servify/apps/server/internal/modules/ai/delivery"
+	"servify/apps/server/internal/platform/configscope"
+	weknorakp "servify/apps/server/internal/platform/knowledgeprovider/weknora"
+	"servify/apps/server/internal/platform/llm/openai"
+	"servify/apps/server/internal/services"
+	"servify/apps/server/pkg/weknora"
+
+	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
+)
+
+type scopedAIHandlerService struct {
+	cfg      *config.Config
+	logger   *logrus.Logger
+	resolver *configscope.Resolver
+	fallback aidelivery.HandlerService
+}
+
+func NewScopedAIHandlerService(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, fallback aidelivery.HandlerService) aidelivery.HandlerService {
+	if logger == nil {
+		logger = logrus.StandardLogger()
+	}
+	resolver := configscope.NewResolver(
+		cfg,
+		configscope.WithTenantOpenAIProvider(configscope.NewGormTenantConfigProvider(db)),
+		configscope.WithWorkspaceOpenAIProvider(configscope.NewGormWorkspaceConfigProvider(db)),
+		configscope.WithTenantWeKnoraProvider(configscope.NewGormTenantConfigProvider(db)),
+		configscope.WithWorkspaceWeKnoraProvider(configscope.NewGormWorkspaceConfigProvider(db)),
+	)
+	return &scopedAIHandlerService{cfg: cfg, logger: logger, resolver: resolver, fallback: fallback}
+}
+
+func (s *scopedAIHandlerService) ProcessQuery(ctx context.Context, query string, sessionID string) (interface{}, error) {
+	service := s.buildService(ctx)
+	return aidelivery.NewHandlerServiceAdapter(service).ProcessQuery(ctx, query, sessionID)
+}
+
+func (s *scopedAIHandlerService) GetStatus(ctx context.Context) map[string]interface{} {
+	service := s.buildService(ctx)
+	return aidelivery.NewHandlerServiceAdapter(service).GetStatus(ctx)
+}
+
+func (s *scopedAIHandlerService) GetMetrics() (*services.AIMetrics, bool) {
+	if s == nil || s.fallback == nil {
+		return nil, false
+	}
+	return s.fallback.GetMetrics()
+}
+
+func (s *scopedAIHandlerService) UploadDocumentToWeKnora(ctx context.Context, title, content string, tags []string) error {
+	service := s.buildService(ctx)
+	return aidelivery.NewHandlerServiceAdapter(service).UploadDocumentToWeKnora(ctx, title, content, tags)
+}
+
+func (s *scopedAIHandlerService) SyncKnowledgeBase(ctx context.Context) error {
+	service := s.buildService(ctx)
+	return aidelivery.NewHandlerServiceAdapter(service).SyncKnowledgeBase(ctx)
+}
+
+func (s *scopedAIHandlerService) SetWeKnoraEnabled(enabled bool) bool {
+	if s == nil || s.fallback == nil {
+		return false
+	}
+	return s.fallback.SetWeKnoraEnabled(enabled)
+}
+
+func (s *scopedAIHandlerService) ResetCircuitBreaker() bool {
+	if s == nil || s.fallback == nil {
+		return false
+	}
+	return s.fallback.ResetCircuitBreaker()
+}
+
+func (s *scopedAIHandlerService) buildService(ctx context.Context) aidelivery.RuntimeService {
+	if s == nil {
+		return nil
+	}
+	if s.resolver == nil {
+		return runtimeServiceFromResolvedConfig(config.OpenAIConfig{}, config.WeKnoraConfig{}, s.logger)
+	}
+	openAIConfig := s.resolver.ResolveOpenAI(ctx, nil)
+	weKnoraConfig := s.resolver.ResolveWeKnora(ctx, nil)
+	return runtimeServiceFromResolvedConfig(openAIConfig, weKnoraConfig, s.logger)
+}
+
+func runtimeServiceFromResolvedConfig(openAIConfig config.OpenAIConfig, weKnoraConfig config.WeKnoraConfig, logger *logrus.Logger) aidelivery.RuntimeService {
+	if logger == nil {
+		logger = logrus.StandardLogger()
+	}
+	baseAI := services.NewAIService(openAIConfig.APIKey, openAIConfig.BaseURL)
+	baseAI.InitializeKnowledgeBase()
+	defaultService := services.NewOrchestratedEnhancedAIService(
+		baseAI,
+		openai.NewProvider(openAIConfig.APIKey, openAIConfig.BaseURL),
+		nil,
+		nil,
+		"",
+		logger,
+	)
+	if !weKnoraConfig.Enabled {
+		return defaultService
+	}
+	client := weknora.NewClient(&weknora.Config{
+		BaseURL:    weKnoraConfig.BaseURL,
+		APIKey:     weKnoraConfig.APIKey,
+		TenantID:   weKnoraConfig.TenantID,
+		Timeout:    weKnoraConfig.Timeout,
+		MaxRetries: weKnoraConfig.MaxRetries,
+	}, logger)
+	return services.NewOrchestratedEnhancedAIService(
+		baseAI,
+		openai.NewProvider(openAIConfig.APIKey, openAIConfig.BaseURL),
+		weknorakp.NewProvider(client, weKnoraConfig.KnowledgeBaseID),
+		client,
+		weKnoraConfig.KnowledgeBaseID,
+		logger,
+	)
+}

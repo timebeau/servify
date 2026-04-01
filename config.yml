@@ -25,7 +25,7 @@ webrtc:
 
 ai:
   openai:
-    api_key: ""
+    api_key: "${OPENAI_API_KEY}"
     base_url: "https://api.openai.com/v1"
     model: "gpt-3.5-turbo"
     temperature: 0.7
@@ -33,7 +33,7 @@ ai:
     timeout: 30s
 
 jwt:
-  secret: "default-secret-key"
+  secret: "${SERVIFY_JWT_SECRET}"
   expires_in: "24h"
 
 portal:
@@ -58,7 +58,7 @@ log:
 security:
   cors:
     enabled: true
-    allowed_origins: ["*"]
+    allowed_origins: ["http://localhost:3000", "http://localhost:8000"]
     allowed_methods: ["GET","POST","PUT","DELETE"]
     allowed_headers: ["*"]
   rbac:
@@ -90,6 +90,14 @@ security:
     whitelist_keys: []
     paths:
       - enabled: true
+        prefix: "/public/"
+        requests_per_minute: 120
+        burst: 30
+      - enabled: true
+        prefix: "/api/v1/ws"
+        requests_per_minute: 40
+        burst: 20
+      - enabled: true
         prefix: "/api/v1/ai/query"
         requests_per_minute: 30
         burst: 10
@@ -101,6 +109,11 @@ security:
         prefix: "/api/"
         requests_per_minute: 60
         burst: 15
+  audit:
+    enabled: true
+    retention: 4320h
+    cleanup_interval: 24h
+    cleanup_batch_size: 500
 
 upload:
   enabled: true

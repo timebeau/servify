@@ -237,6 +237,13 @@
 - routing policy
 - workspace 级 integrations enablement
 
+当前代码骨架：
+
+- `internal/platform/configscope.Resolver` 已支持 `portal`、`OpenAI`、`WeKnora` 的 `tenant -> workspace -> runtime` provider 覆盖顺序
+- 已新增数据库持久化的 `TenantConfig` / `WorkspaceConfig` GORM provider；当前 public portal 已接入这套读取链路
+- 管理面已具备 tenant/workspace scoped config 的最小读写入口，当前覆盖 `portal` / `OpenAI` / `WeKnora`
+- scoped config 写接口现已记录 before/after 快照，并提供 tenant/workspace 级变更历史列表元数据、单条历史详情的字段路径级差异预览与带 `added/removed/updated` 类型的 current/snapshot 值对，以及要求显式确认的按审计记录回滚入口
+
 ### 当前数据库配置对象的建议定位
 
 - `SLAConfig`：`workspace`

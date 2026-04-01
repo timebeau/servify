@@ -57,35 +57,35 @@ type AIConfig struct {
 }
 
 type OpenAIConfig struct {
-	APIKey      string        `yaml:"api_key"`
-	BaseURL     string        `yaml:"base_url"`
-	Model       string        `yaml:"model"`
-	Temperature float64       `yaml:"temperature"`
-	MaxTokens   int           `yaml:"max_tokens"`
-	Timeout     time.Duration `yaml:"timeout"`
+	APIKey      string        `yaml:"api_key" json:"api_key,omitempty"`
+	BaseURL     string        `yaml:"base_url" json:"base_url,omitempty"`
+	Model       string        `yaml:"model" json:"model,omitempty"`
+	Temperature float64       `yaml:"temperature" json:"temperature,omitempty"`
+	MaxTokens   int           `yaml:"max_tokens" json:"max_tokens,omitempty"`
+	Timeout     time.Duration `yaml:"timeout" json:"timeout,omitempty"`
 }
 
 type WeKnoraConfig struct {
-	Enabled         bool                `yaml:"enabled"`
-	BaseURL         string              `yaml:"base_url"`
-	APIKey          string              `yaml:"api_key"`
-	TenantID        string              `yaml:"tenant_id"`
-	KnowledgeBaseID string              `yaml:"knowledge_base_id"`
-	Timeout         time.Duration       `yaml:"timeout"`
-	MaxRetries      int                 `yaml:"max_retries"`
-	Search          WeKnoraSearchConfig `yaml:"search"`
-	HealthCheck     WeKnoraHealthConfig `yaml:"health_check"`
+	Enabled         bool                `yaml:"enabled" json:"enabled,omitempty"`
+	BaseURL         string              `yaml:"base_url" json:"base_url,omitempty"`
+	APIKey          string              `yaml:"api_key" json:"api_key,omitempty"`
+	TenantID        string              `yaml:"tenant_id" json:"tenant_id,omitempty"`
+	KnowledgeBaseID string              `yaml:"knowledge_base_id" json:"knowledge_base_id,omitempty"`
+	Timeout         time.Duration       `yaml:"timeout" json:"timeout,omitempty"`
+	MaxRetries      int                 `yaml:"max_retries" json:"max_retries,omitempty"`
+	Search          WeKnoraSearchConfig `yaml:"search" json:"search,omitempty"`
+	HealthCheck     WeKnoraHealthConfig `yaml:"health_check" json:"health_check,omitempty"`
 }
 
 type WeKnoraSearchConfig struct {
-	DefaultLimit   int     `yaml:"default_limit"`
-	ScoreThreshold float64 `yaml:"score_threshold"`
-	Strategy       string  `yaml:"strategy"`
+	DefaultLimit   int     `yaml:"default_limit" json:"default_limit,omitempty"`
+	ScoreThreshold float64 `yaml:"score_threshold" json:"score_threshold,omitempty"`
+	Strategy       string  `yaml:"strategy" json:"strategy,omitempty"`
 }
 
 type WeKnoraHealthConfig struct {
-	Interval time.Duration `yaml:"interval"`
-	Timeout  time.Duration `yaml:"timeout"`
+	Interval time.Duration `yaml:"interval" json:"interval,omitempty"`
+	Timeout  time.Duration `yaml:"timeout" json:"timeout,omitempty"`
 }
 
 type FallbackConfig struct {
@@ -150,6 +150,7 @@ type SecurityConfig struct {
 	CORS         CORSConfig         `yaml:"cors"`
 	RateLimiting RateLimitingConfig `yaml:"rate_limiting"`
 	RBAC         RBACConfig         `yaml:"rbac"`
+	Audit        AuditConfig        `yaml:"audit"`
 }
 
 type CORSConfig struct {
@@ -162,6 +163,13 @@ type CORSConfig struct {
 type RBACConfig struct {
 	Enabled bool                `yaml:"enabled"`
 	Roles   map[string][]string `yaml:"roles"`
+}
+
+type AuditConfig struct {
+	Enabled          bool          `yaml:"enabled"`
+	Retention        time.Duration `yaml:"retention"`
+	CleanupInterval  time.Duration `yaml:"cleanup_interval"`
+	CleanupBatchSize int           `yaml:"cleanup_batch_size"`
 }
 
 type RateLimitingConfig struct {
@@ -188,13 +196,13 @@ type PathRateLimitConfig struct {
 
 // PortalConfig controls public portal branding and i18n defaults for static pages.
 type PortalConfig struct {
-	BrandName      string   `yaml:"brand_name"`
-	LogoURL        string   `yaml:"logo_url"`
-	PrimaryColor   string   `yaml:"primary_color"`
-	SecondaryColor string   `yaml:"secondary_color"`
-	DefaultLocale  string   `yaml:"default_locale"` // e.g. zh-CN, en-US
-	Locales        []string `yaml:"locales"`        // allowed locales
-	SupportEmail   string   `yaml:"support_email"`
+	BrandName      string   `yaml:"brand_name" json:"brand_name,omitempty"`
+	LogoURL        string   `yaml:"logo_url" json:"logo_url,omitempty"`
+	PrimaryColor   string   `yaml:"primary_color" json:"primary_color,omitempty"`
+	SecondaryColor string   `yaml:"secondary_color" json:"secondary_color,omitempty"`
+	DefaultLocale  string   `yaml:"default_locale" json:"default_locale,omitempty"` // e.g. zh-CN, en-US
+	Locales        []string `yaml:"locales" json:"locales,omitempty"`               // allowed locales
+	SupportEmail   string   `yaml:"support_email" json:"support_email,omitempty"`
 }
 type UploadConfig struct {
 	Enabled      bool     `yaml:"enabled"`
@@ -329,6 +337,12 @@ func GetDefaultConfig() *Config {
 				Enabled:           false,
 				RequestsPerMinute: 300,
 				Burst:             50,
+			},
+			Audit: AuditConfig{
+				Enabled:          true,
+				Retention:        180 * 24 * time.Hour,
+				CleanupInterval:  24 * time.Hour,
+				CleanupBatchSize: 500,
 			},
 		},
 		Portal: PortalConfig{

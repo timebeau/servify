@@ -11,10 +11,22 @@ type PortalConfigProvider interface {
 	LoadPortalConfig(ctx context.Context) (config.PortalConfig, bool, error)
 }
 
+type OpenAIConfigProvider interface {
+	LoadOpenAIConfig(ctx context.Context) (config.OpenAIConfig, bool, error)
+}
+
+type WeKnoraConfigProvider interface {
+	LoadWeKnoraConfig(ctx context.Context) (config.WeKnoraConfig, bool, error)
+}
+
 type Resolver struct {
-	system          *config.Config
-	tenantPortal    PortalConfigProvider
-	workspacePortal PortalConfigProvider
+	system           *config.Config
+	tenantPortal     PortalConfigProvider
+	workspacePortal  PortalConfigProvider
+	tenantOpenAI     OpenAIConfigProvider
+	workspaceOpenAI  OpenAIConfigProvider
+	tenantWeKnora    WeKnoraConfigProvider
+	workspaceWeKnora WeKnoraConfigProvider
 }
 
 func NewResolver(cfg *config.Config, opts ...Option) *Resolver {
@@ -38,6 +50,30 @@ func WithTenantPortalProvider(provider PortalConfigProvider) Option {
 func WithWorkspacePortalProvider(provider PortalConfigProvider) Option {
 	return func(r *Resolver) {
 		r.workspacePortal = provider
+	}
+}
+
+func WithTenantOpenAIProvider(provider OpenAIConfigProvider) Option {
+	return func(r *Resolver) {
+		r.tenantOpenAI = provider
+	}
+}
+
+func WithWorkspaceOpenAIProvider(provider OpenAIConfigProvider) Option {
+	return func(r *Resolver) {
+		r.workspaceOpenAI = provider
+	}
+}
+
+func WithTenantWeKnoraProvider(provider WeKnoraConfigProvider) Option {
+	return func(r *Resolver) {
+		r.tenantWeKnora = provider
+	}
+}
+
+func WithWorkspaceWeKnoraProvider(provider WeKnoraConfigProvider) Option {
+	return func(r *Resolver) {
+		r.workspaceWeKnora = provider
 	}
 }
 
@@ -108,10 +144,20 @@ func applyPortalDefaults(p config.PortalConfig) config.PortalConfig {
 	return p
 }
 
-func (r *Resolver) ResolveOpenAI(runtime *config.OpenAIConfig) config.OpenAIConfig {
+func (r *Resolver) ResolveOpenAI(ctx context.Context, runtime *config.OpenAIConfig) config.OpenAIConfig {
 	var resolved config.OpenAIConfig
 	if r != nil && r.system != nil {
 		resolved = r.system.AI.OpenAI
+	}
+	if r != nil && r.tenantOpenAI != nil {
+		if next, ok, err := r.tenantOpenAI.LoadOpenAIConfig(ctx); err == nil && ok {
+			resolved = mergeOpenAIConfig(resolved, next)
+		}
+	}
+	if r != nil && r.workspaceOpenAI != nil {
+		if next, ok, err := r.workspaceOpenAI.LoadOpenAIConfig(ctx); err == nil && ok {
+			resolved = mergeOpenAIConfig(resolved, next)
+		}
 	}
 	if runtime != nil {
 		resolved = mergeOpenAIConfig(resolved, *runtime)
@@ -119,10 +165,20 @@ func (r *Resolver) ResolveOpenAI(runtime *config.OpenAIConfig) config.OpenAIConf
 	return resolved
 }
 
-func (r *Resolver) ResolveWeKnora(runtime *config.WeKnoraConfig) config.WeKnoraConfig {
+func (r *Resolver) ResolveWeKnora(ctx context.Context, runtime *config.WeKnoraConfig) config.WeKnoraConfig {
 	var resolved config.WeKnoraConfig
 	if r != nil && r.system != nil {
 		resolved = r.system.WeKnora
+	}
+	if r != nil && r.tenantWeKnora != nil {
+		if next, ok, err := r.tenantWeKnora.LoadWeKnoraConfig(ctx); err == nil && ok {
+			resolved = mergeWeKnoraConfig(resolved, next)
+		}
+	}
+	if r != nil && r.workspaceWeKnora != nil {
+		if next, ok, err := r.workspaceWeKnora.LoadWeKnoraConfig(ctx); err == nil && ok {
+			resolved = mergeWeKnoraConfig(resolved, next)
+		}
 	}
 	if runtime != nil {
 		resolved = mergeWeKnoraConfig(resolved, *runtime)

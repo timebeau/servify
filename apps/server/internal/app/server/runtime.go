@@ -99,8 +99,8 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	if err != nil {
 		return nil, err
 	}
-	rt.AIService = aiAssembly.RuntimeService
-	rt.AIHandlerService = aiAssembly.Service
+	rt.AIService = NewScopedAIRuntimeService(cfg, logger, db, aiAssembly.RuntimeService)
+	rt.AIHandlerService = NewScopedAIHandlerService(cfg, logger, db, aiAssembly.Service)
 
 	wsHub := services.NewWebSocketHub()
 	rt.wsRuntime = wsHub

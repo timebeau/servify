@@ -47,6 +47,11 @@ security:
         prefix: "/api/"
         requests_per_minute: 90
         burst: 20
+  audit:
+    enabled: true
+    retention: 4320h
+    cleanup_interval: 24h
+    cleanup_batch_size: 500
 
 ai:
   openai:

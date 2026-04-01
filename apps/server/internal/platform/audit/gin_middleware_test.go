@@ -139,3 +139,39 @@ func TestMiddlewareRedactsSensitiveFields(t *testing.T) {
 		t.Fatalf("expected redaction markers, got request=%q before=%q after=%q", entry.RequestJSON, entry.BeforeJSON, entry.AfterJSON)
 	}
 }
+
+func TestMiddlewareAllowsAuditOverrides(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := &stubRecorder{}
+
+	r := gin.New()
+	r.Use(Middleware(recorder))
+	r.PUT("/security/config/tenant", func(c *gin.Context) {
+		SetAction(c, "scoped_config.tenant.update")
+		SetResourceType(c, "scoped_config")
+		SetResourceID(c, "tenant-a")
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/security/config/tenant", strings.NewReader(`{"portal":{"brand_name":"Tenant"}}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d body=%s", w.Code, w.Body.String())
+	}
+	if len(recorder.entries) != 1 {
+		t.Fatalf("expected 1 audit entry got %d", len(recorder.entries))
+	}
+	entry := recorder.entries[0]
+	if entry.Action != "scoped_config.tenant.update" {
+		t.Fatalf("action = %q want scoped_config.tenant.update", entry.Action)
+	}
+	if entry.ResourceType != "scoped_config" {
+		t.Fatalf("resource_type = %q want scoped_config", entry.ResourceType)
+	}
+	if entry.ResourceID != "tenant-a" {
+		t.Fatalf("resource_id = %q want tenant-a", entry.ResourceID)
+	}
+}

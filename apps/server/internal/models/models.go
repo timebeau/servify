@@ -436,6 +436,29 @@ type VoiceTranscript struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// TenantConfig stores tenant-scoped configuration overrides.
+type TenantConfig struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	TenantID    string    `gorm:"uniqueIndex;not null" json:"tenant_id"`
+	PortalJSON  string    `gorm:"type:text" json:"portal_json"`
+	OpenAIJSON  string    `gorm:"type:text" json:"openai_json"`
+	WeKnoraJSON string    `gorm:"type:text" json:"weknora_json"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// WorkspaceConfig stores workspace-scoped configuration overrides.
+type WorkspaceConfig struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	TenantID    string    `gorm:"uniqueIndex:idx_workspace_configs_scope;not null" json:"tenant_id"`
+	WorkspaceID string    `gorm:"uniqueIndex:idx_workspace_configs_scope;not null" json:"workspace_id"`
+	PortalJSON  string    `gorm:"type:text" json:"portal_json"`
+	OpenAIJSON  string    `gorm:"type:text" json:"openai_json"`
+	WeKnoraJSON string    `gorm:"type:text" json:"weknora_json"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
 // AuditLog records management-surface write operations for traceability.
 type AuditLog struct {
 	ID            uint      `gorm:"primaryKey" json:"id"`

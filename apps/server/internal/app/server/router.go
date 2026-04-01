@@ -17,6 +17,7 @@ import (
 	svcmetrics "servify/apps/server/internal/observability/metrics"
 	auditplatform "servify/apps/server/internal/platform/audit"
 	platformauth "servify/apps/server/internal/platform/auth"
+	"servify/apps/server/internal/platform/configscope"
 	realtimeplatform "servify/apps/server/internal/platform/realtime"
 	"servify/apps/server/internal/platform/storage"
 	"servify/apps/server/internal/platform/usersecurity"
@@ -177,13 +178,19 @@ func registerManagementRoutes(r *gin.Engine, deps Dependencies) {
 	securityAPI := api.Group("/")
 	securityAPI.Use(middleware.RequireResourcePermission("security"))
 	handlers.RegisterUserSecurityRoutes(securityAPI, handlers.NewUserSecurityHandler(usersecurity.NewService(deps.DB, deps.Logger), deps.Logger))
+	handlers.RegisterScopedConfigRoutes(securityAPI, handlers.NewScopedConfigHandler(configscope.NewGormConfigStore(deps.DB), auditplatform.NewGormQueryService(deps.DB)))
 }
 
 func registerPublicRoutes(r *gin.Engine, deps Dependencies) {
 	public := r.Group("/public")
 	handlers.RegisterCSATSurveyRoutes(public, handlers.NewCSATSurveyHandler(deps.SatisfactionService))
 	handlers.RegisterPublicKnowledgeBaseRoutes(public, handlers.NewKnowledgeDocHandler(deps.KnowledgeDocHandler))
-	public.GET("/portal/config", handlers.NewPortalConfigHandler(deps.Config).Get)
+	portalResolver := configscope.NewResolver(
+		deps.Config,
+		configscope.WithTenantPortalProvider(configscope.NewGormTenantConfigProvider(deps.DB)),
+		configscope.WithWorkspacePortalProvider(configscope.NewGormWorkspaceConfigProvider(deps.DB)),
+	)
+	public.GET("/portal/config", handlers.NewPortalConfigHandlerWithResolver(deps.Config, portalResolver).Get)
 }
 
 func registerRealtimeRoutes(r *gin.Engine, deps Dependencies) {

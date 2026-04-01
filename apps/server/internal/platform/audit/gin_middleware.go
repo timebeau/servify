@@ -12,8 +12,11 @@ import (
 )
 
 const (
-	beforeKey = "audit.before"
-	afterKey  = "audit.after"
+	beforeKey       = "audit.before"
+	afterKey        = "audit.after"
+	actionKey       = "audit.action"
+	resourceTypeKey = "audit.resource_type"
+	resourceIDKey   = "audit.resource_id"
 )
 
 func Middleware(recorder Recorder) gin.HandlerFunc {
@@ -33,9 +36,9 @@ func Middleware(recorder Recorder) gin.HandlerFunc {
 		entry := Entry{
 			ActorUserID:   actorUserID(c),
 			PrincipalKind: stringValue(c, "principal_kind"),
-			Action:        inferAction(c.FullPath(), c.Request.Method),
-			ResourceType:  inferResourceType(c.FullPath()),
-			ResourceID:    inferResourceID(c),
+			Action:        contextOrDefault(c, actionKey, inferAction(c.FullPath(), c.Request.Method)),
+			ResourceType:  contextOrDefault(c, resourceTypeKey, inferResourceType(c.FullPath())),
+			ResourceID:    contextOrDefault(c, resourceIDKey, inferResourceID(c)),
 			Route:         c.FullPath(),
 			Method:        strings.ToUpper(strings.TrimSpace(c.Request.Method)),
 			StatusCode:    c.Writer.Status(),
@@ -65,6 +68,24 @@ func SetBefore(c *gin.Context, value interface{}) {
 func SetAfter(c *gin.Context, value interface{}) {
 	if c != nil {
 		c.Set(afterKey, value)
+	}
+}
+
+func SetAction(c *gin.Context, value string) {
+	if c != nil {
+		c.Set(actionKey, strings.TrimSpace(value))
+	}
+}
+
+func SetResourceType(c *gin.Context, value string) {
+	if c != nil {
+		c.Set(resourceTypeKey, strings.TrimSpace(value))
+	}
+}
+
+func SetResourceID(c *gin.Context, value string) {
+	if c != nil {
+		c.Set(resourceIDKey, strings.TrimSpace(value))
 	}
 }
 
@@ -114,6 +135,13 @@ func stringValue(c *gin.Context, key string) string {
 	}
 	s, _ := v.(string)
 	return strings.TrimSpace(s)
+}
+
+func contextOrDefault(c *gin.Context, key, fallback string) string {
+	if value := stringValue(c, key); value != "" {
+		return value
+	}
+	return fallback
 }
 
 func contextJSON(c *gin.Context, key string) string {

@@ -1,0 +1,73 @@
+package server
+
+import (
+	"context"
+
+	"servify/apps/server/internal/config"
+	"servify/apps/server/internal/models"
+	aidelivery "servify/apps/server/internal/modules/ai/delivery"
+	"servify/apps/server/internal/platform/configscope"
+	"servify/apps/server/internal/services"
+
+	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
+)
+
+type scopedAIRuntimeService struct {
+	logger   *logrus.Logger
+	resolver *configscope.Resolver
+	fallback aidelivery.RuntimeService
+}
+
+func NewScopedAIRuntimeService(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, fallback aidelivery.RuntimeService) aidelivery.RuntimeService {
+	if logger == nil {
+		logger = logrus.StandardLogger()
+	}
+	resolver := configscope.NewResolver(
+		cfg,
+		configscope.WithTenantOpenAIProvider(configscope.NewGormTenantConfigProvider(db)),
+		configscope.WithWorkspaceOpenAIProvider(configscope.NewGormWorkspaceConfigProvider(db)),
+		configscope.WithTenantWeKnoraProvider(configscope.NewGormTenantConfigProvider(db)),
+		configscope.WithWorkspaceWeKnoraProvider(configscope.NewGormWorkspaceConfigProvider(db)),
+	)
+	return &scopedAIRuntimeService{logger: logger, resolver: resolver, fallback: fallback}
+}
+
+func (s *scopedAIRuntimeService) ProcessQuery(ctx context.Context, query string, sessionID string) (*services.AIResponse, error) {
+	service := s.buildService(ctx)
+	if service == nil {
+		return nil, nil
+	}
+	return service.ProcessQuery(ctx, query, sessionID)
+}
+
+func (s *scopedAIRuntimeService) ShouldTransferToHuman(query string, sessionHistory []models.Message) bool {
+	if s == nil || s.fallback == nil {
+		return false
+	}
+	return s.fallback.ShouldTransferToHuman(query, sessionHistory)
+}
+
+func (s *scopedAIRuntimeService) GetSessionSummary(messages []models.Message) (string, error) {
+	if s == nil || s.fallback == nil {
+		return "", nil
+	}
+	return s.fallback.GetSessionSummary(messages)
+}
+
+func (s *scopedAIRuntimeService) GetStatus(ctx context.Context) map[string]interface{} {
+	service := s.buildService(ctx)
+	if service == nil {
+		return nil
+	}
+	return service.GetStatus(ctx)
+}
+
+func (s *scopedAIRuntimeService) buildService(ctx context.Context) aidelivery.RuntimeService {
+	if s == nil || s.resolver == nil {
+		return s.fallback
+	}
+	openAIConfig := s.resolver.ResolveOpenAI(ctx, nil)
+	weKnoraConfig := s.resolver.ResolveWeKnora(ctx, nil)
+	return runtimeServiceFromResolvedConfig(openAIConfig, weKnoraConfig, s.logger)
+}

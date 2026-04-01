@@ -11,6 +11,7 @@ import (
 	appbootstrap "servify/apps/server/internal/app/bootstrap"
 	appserver "servify/apps/server/internal/app/server"
 	appworker "servify/apps/server/internal/app/worker"
+	auditplatform "servify/apps/server/internal/platform/audit"
 	"servify/apps/server/internal/platform/eventbus"
 
 	"github.com/sirupsen/logrus"
@@ -134,6 +135,12 @@ func main() {
 
 	app.RegisterWorker(appworker.NewStatisticsWorker(runtime.StatisticsServiceForWorker(), time.Hour))
 	app.RegisterWorker(appworker.NewSLAMonitorWorker(runtime.SLAServiceForWorker(), 5*time.Minute))
+	if cfg.Security.Audit.Enabled {
+		app.RegisterWorker(appworker.NewAuditCleanupWorker(
+			auditplatform.NewGormRetentionService(db, cfg.Security.Audit.Retention, cfg.Security.Audit.CleanupBatchSize),
+			cfg.Security.Audit.CleanupInterval,
+		))
+	}
 	if err := app.StartWorkers(); err != nil {
 		appLogger.Fatalf("Failed to start workers: %v", err)
 	}

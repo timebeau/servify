@@ -6,6 +6,7 @@ import (
 	"time"
 
 	auditplatform "servify/apps/server/internal/platform/audit"
+	platformauth "servify/apps/server/internal/platform/auth"
 
 	"github.com/gin-gonic/gin"
 )
@@ -29,6 +30,8 @@ func (h *AuditHandler) List(c *gin.Context) {
 		ResourceType:  c.Query("resource_type"),
 		ResourceID:    c.Query("resource_id"),
 		PrincipalKind: c.Query("principal_kind"),
+		TenantID:      platformauth.TenantIDFromContext(c.Request.Context()),
+		WorkspaceID:   platformauth.WorkspaceIDFromContext(c.Request.Context()),
 		Page:          intQuery(c, "page", 1),
 		PageSize:      intQuery(c, "page_size", 20),
 	}

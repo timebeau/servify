@@ -10,10 +10,10 @@
 
 ## T1 tenant-and-workspace-boundaries
 
-- [x] 梳理 tenant、workspace、agent、customer、knowledge base 的归属关系
-- [x] 定义跨租户访问禁止规则
-- [x] 定义查询、写入、导出、后台任务的租户隔离语义
-- [x] 为核心模型补租户字段与索引策略审查
+- [-] 梳理 tenant、workspace、agent、customer、knowledge base 的归属关系
+- [-] 定义跨租户访问禁止规则
+- [-] 定义查询、写入、导出、后台任务的租户隔离语义
+- [-] 为核心模型补租户字段与索引策略审查
 
 验收：
 
@@ -55,11 +55,11 @@
 
 ## T3 audit-log-foundation
 
-- [x] 定义审计事件模型
-- [x] 覆盖关键写操作，例如工单变更、路由分配、配置变更、权限变更
-- [x] 记录 actor、tenant、resource、before/after、request metadata
-- [x] 设计查询接口与保留策略
-- [x] 为敏感操作提供最小可追溯能力
+- [-] 定义审计事件模型
+- [-] 覆盖关键写操作，例如工单变更、路由分配、配置变更、权限变更
+- [-] 记录 actor、tenant、resource、before/after、request metadata
+- [-] 设计查询接口与保留策略
+- [-] 为敏感操作提供最小可追溯能力
 
 验收：
 
@@ -72,14 +72,15 @@
 - `before/after` 已预留中间件扩展点，后续可为高价值 handler 补充精细状态快照
 - 已新增 `GET /api/audit/logs` 查询接口，支持按 action/resource/principal/actor/success/time-range 过滤
 - 审计查询与保留基线已文档化，见 `docs/audit-log-policy.md`
-- 当前仍未接入归档/清理 worker，保留策略暂为文档约束而非自动执行
+- 已接入后台审计清理 worker，默认按 180 天保留窗口批量删除过期记录
+- 当前仍未接入冷热分层归档存储，长期保留策略仍以文档约束为主
 
 ## T4 configuration-scopes
 
-- [x] 区分系统级、租户级、工作区级、运行时级配置
-- [x] 为 AI provider、knowledge provider、routing policy 等配置定义作用域
-- [x] 明确配置加载、覆盖、回退规则
-- [x] 为配置变更补审计与回滚约束
+- [-] 区分系统级、租户级、工作区级、运行时级配置
+- [-] 为 AI provider、knowledge provider、routing policy 等配置定义作用域
+- [-] 明确配置加载、覆盖、回退规则
+- [-] 为配置变更补审计与回滚约束
 
 验收：
 
@@ -93,14 +94,21 @@
 - 已定义配置变更的审计与回滚约束，区分系统级发布回滚与租户/工作区配置恢复
 - 已新增 `internal/platform/configscope` 作为统一 resolver 骨架，当前已覆盖 portal config、OpenAI config 与 WeKnora config 的分层解析
 - 门户公开配置读取、AI runtime 装配与增强健康检查中的 WeKnora 展示信息已切到 resolver，不再各自拼接 system default / runtime override
-- 当前仍未实现通用 `TenantConfig` / `WorkspaceConfig` 持久化 provider；租户 / 工作区级覆盖规则已文档化，但代码层仍以 system config + 少量 scoped data path 为主
+- 已为 `portal` / `OpenAI` / `WeKnora` resolver 补齐 tenant/workspace provider 接口与覆盖顺序骨架，后续可接数据库持久化 provider
+- 已新增 `TenantConfig` / `WorkspaceConfig` 持久化模型与 GORM provider，当前已接入 `portal` 的 tenant/workspace 覆盖读取
+- `OpenAI` / `WeKnora` 的 resolver 已可消费同一批持久化 provider；管理面 `AI` handler 主路径与 `RuntimeService` 主路径都已按 request scope 解析 scoped provider
+- 对于 `context.Background()` 或匿名 websocket 等未携带 scope 的调用，仍会自然回退到 system config
+- 管理面已新增 tenant/workspace scoped config 的最小 `GET/PUT` 接口，可读写 `portal` / `OpenAI` / `WeKnora` override
+- scoped config 现已新增 `history` / `rollback` 管理接口，配置写入与恢复都会写入 `AuditLog`，并保留 before/after 快照；rollback 需显式提交确认参数才会执行
+- 管理面现已支持在 scoped config history 列表中直接返回 `operation` / preview / rollback 元数据，并可按单条审计记录查看字段路径级差异预览，直接获得带 `added/removed/updated` 类型的 current/snapshot 值对，便于回滚前确认变更影响
+- 当前仍缺更通用的跨配置域写接口，以及更完整的审批流/双人复核约束
 
 ## T5 security-baseline-for-operations
 
-- [x] 盘点高风险接口和高风险操作
-- [x] 增加关键操作的速率限制、权限兜底和日志
-- [x] 为 token 生命周期、密钥轮换、敏感字段脱敏补最小规范
-- [x] 为对外开放接口补基础安全清单
+- [-] 盘点高风险接口和高风险操作
+- [-] 增加关键操作的速率限制、权限兜底和日志
+- [-] 为 token 生命周期、密钥轮换、敏感字段脱敏补最小规范
+- [-] 为对外开放接口补基础安全清单
 
 验收：
 
