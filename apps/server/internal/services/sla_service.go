@@ -344,7 +344,7 @@ func (s *SLAService) UpdateSLAConfig(ctx context.Context, id uint, req *SLAConfi
 
 	// 组合唯一性：优先级 + 客户级别
 	var conflict models.SLAConfig
-	if err := s.db.WithContext(ctx).
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).
 		Where("priority = ? AND customer_tier = ? AND id != ?", config.Priority, config.CustomerTier, id).
 		First(&conflict).Error; err == nil {
 		return nil, fmt.Errorf("SLA config for priority '%s' and tier '%s' already exists", config.Priority, config.CustomerTier)
@@ -373,7 +373,7 @@ func (s *SLAService) DeleteSLAConfig(ctx context.Context, id uint) error {
 
 	// 检查是否有关联的违约记录
 	var violationCount int64
-	if err := s.db.WithContext(ctx).Model(&models.SLAViolation{}).Where("sla_config_id = ?", id).Count(&violationCount).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx).Model(&models.SLAViolation{}), ctx).Where("sla_config_id = ?", id).Count(&violationCount).Error; err != nil {
 		span.RecordError(err)
 		return fmt.Errorf("failed to check SLA violations: %w", err)
 	}
@@ -382,7 +382,7 @@ func (s *SLAService) DeleteSLAConfig(ctx context.Context, id uint) error {
 		return fmt.Errorf("cannot delete SLA config: it has %d associated violations", violationCount)
 	}
 
-	result := s.db.WithContext(ctx).Delete(&models.SLAConfig{}, id)
+	result := applyScopeFilter(s.db.WithContext(ctx), ctx).Delete(&models.SLAConfig{}, id)
 	if result.Error != nil {
 		span.RecordError(result.Error)
 		return fmt.Errorf("failed to delete SLA config: %w", result.Error)
@@ -410,7 +410,7 @@ func (s *SLAService) GetSLAConfigByPriority(ctx context.Context, priority string
 	// 优先匹配特定客户级别
 	var config models.SLAConfig
 	if tier != "" {
-		if err := s.db.WithContext(ctx).
+		if err := applyScopeFilter(s.db.WithContext(ctx), ctx).
 			Where("priority = ? AND customer_tier = ? AND active = true", priority, tier).
 			First(&config).Error; err == nil {
 			return &config, nil
@@ -421,7 +421,7 @@ func (s *SLAService) GetSLAConfigByPriority(ctx context.Context, priority string
 	}
 
 	// 回退默认配置（未指定客户级别）
-	if err := s.db.WithContext(ctx).
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).
 		Where("priority = ? AND (customer_tier = '' OR customer_tier IS NULL) AND active = true", priority).
 		First(&config).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -466,7 +466,7 @@ func (s *SLAService) CheckSLAViolation(ctx context.Context, ticket *models.Ticke
 
 	// 检查同类型的违约是否已经存在
 	var existingViolation models.SLAViolation
-	if err := s.db.WithContext(ctx).Where(
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).Where(
 		"ticket_id = ? AND sla_config_id = ? AND violation_type = ?",
 		ticket.ID, slaConfig.ID, violation.ViolationType,
 	).First(&existingViolation).Error; err == nil {
@@ -512,6 +512,8 @@ func (s *SLAService) detectViolation(ticket *models.Ticket, slaConfig *models.SL
 	// 检查首次响应时间违约（尚未分配坐席）
 	if ticket.AgentID == nil && now.After(firstResponseDeadline) {
 		return &models.SLAViolation{
+			TenantID:      ticket.TenantID,
+			WorkspaceID:   ticket.WorkspaceID,
 			TicketID:      ticket.ID,
 			SLAConfigID:   slaConfig.ID,
 			ViolationType: "first_response",
@@ -526,6 +528,8 @@ func (s *SLAService) detectViolation(ticket *models.Ticket, slaConfig *models.SL
 	// 检查解决时间违约
 	if ticket.Status != "resolved" && ticket.Status != "closed" && now.After(resolutionDeadline) {
 		return &models.SLAViolation{
+			TenantID:      ticket.TenantID,
+			WorkspaceID:   ticket.WorkspaceID,
 			TicketID:      ticket.ID,
 			SLAConfigID:   slaConfig.ID,
 			ViolationType: "resolution",
@@ -553,6 +557,9 @@ func (s *SLAService) CreateSLAViolation(ctx context.Context, violation *models.S
 
 	violation.CreatedAt = time.Now()
 	violation.UpdatedAt = time.Now()
+	if violation.TenantID == "" && violation.WorkspaceID == "" {
+		violation.TenantID, violation.WorkspaceID = tenantAndWorkspace(ctx)
+	}
 
 	if err := s.db.WithContext(ctx).Create(violation).Error; err != nil {
 		span.RecordError(err)
@@ -569,7 +576,7 @@ func (s *SLAService) ListSLAViolations(ctx context.Context, req *SLAViolationLis
 	ctx, span := s.tracer.Start(ctx, "sla.list_violations")
 	defer span.End()
 
-	query := s.db.WithContext(ctx).Model(&models.SLAViolation{}).Preload("Ticket").Preload("SLAConfig")
+	query := applyScopeFilter(s.db.WithContext(ctx).Model(&models.SLAViolation{}), ctx).Preload("Ticket").Preload("SLAConfig")
 
 	// 应用筛选
 	if req.TicketID != nil {
@@ -632,7 +639,7 @@ func (s *SLAService) ResolveSLAViolation(ctx context.Context, id uint) error {
 
 	span.SetAttributes(attribute.Int64("sla.violation.id", int64(id)))
 
-	result := s.db.WithContext(ctx).Model(&models.SLAViolation{}).Where("id = ?", id).Updates(map[string]interface{}{
+	result := applyScopeFilter(s.db.WithContext(ctx).Model(&models.SLAViolation{}), ctx).Where("id = ?", id).Updates(map[string]interface{}{
 		"resolved":    true,
 		"resolved_at": time.Now(),
 		"updated_at":  time.Now(),
@@ -655,7 +662,7 @@ func (s *SLAService) ResolveViolationsByTicket(ctx context.Context, ticketID uin
 	ctx, span := s.tracer.Start(ctx, "sla.resolve_ticket_violations")
 	defer span.End()
 
-	query := s.db.WithContext(ctx).Model(&models.SLAViolation{}).
+	query := applyScopeFilter(s.db.WithContext(ctx).Model(&models.SLAViolation{}), ctx).
 		Where("ticket_id = ? AND resolved = false", ticketID)
 	if len(violationTypes) > 0 {
 		query = query.Where("violation_type IN ?", violationTypes)
@@ -694,14 +701,14 @@ func (s *SLAService) GetSLAStats(ctx context.Context) (*SLAStatsResponse, error)
 
 	// 统计SLA配置数量
 	var totalConfigs int64
-	if err := s.db.WithContext(ctx).Model(&models.SLAConfig{}).Count(&totalConfigs).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx).Model(&models.SLAConfig{}), ctx).Count(&totalConfigs).Error; err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("failed to count SLA configs: %w", err)
 	}
 	stats.TotalConfigs = int(totalConfigs)
 
 	var activeConfigs int64
-	if err := s.db.WithContext(ctx).Model(&models.SLAConfig{}).Where("active = true").Count(&activeConfigs).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx).Model(&models.SLAConfig{}), ctx).Where("active = true").Count(&activeConfigs).Error; err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("failed to count active SLA configs: %w", err)
 	}
@@ -709,14 +716,14 @@ func (s *SLAService) GetSLAStats(ctx context.Context) (*SLAStatsResponse, error)
 
 	// 统计违约数量
 	var totalViolations int64
-	if err := s.db.WithContext(ctx).Model(&models.SLAViolation{}).Count(&totalViolations).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx).Model(&models.SLAViolation{}), ctx).Count(&totalViolations).Error; err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("failed to count total violations: %w", err)
 	}
 	stats.TotalViolations = int(totalViolations)
 
 	var unresolvedViolations int64
-	if err := s.db.WithContext(ctx).Model(&models.SLAViolation{}).Where("resolved = false").Count(&unresolvedViolations).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx).Model(&models.SLAViolation{}), ctx).Where("resolved = false").Count(&unresolvedViolations).Error; err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("failed to count unresolved violations: %w", err)
 	}
@@ -727,7 +734,7 @@ func (s *SLAService) GetSLAStats(ctx context.Context) (*SLAStatsResponse, error)
 		ViolationType string `json:"violation_type"`
 		Count         int    `json:"count"`
 	}
-	if err := s.db.WithContext(ctx).Model(&models.SLAViolation{}).
+	if err := applyScopeFilter(s.db.WithContext(ctx).Model(&models.SLAViolation{}), ctx).
 		Select("violation_type, COUNT(*) as count").
 		Group("violation_type").
 		Scan(&violationTypeStats).Error; err != nil {
@@ -744,11 +751,18 @@ func (s *SLAService) GetSLAStats(ctx context.Context) (*SLAStatsResponse, error)
 		Priority string `json:"priority"`
 		Count    int    `json:"count"`
 	}
-	if err := s.db.WithContext(ctx).Table("sla_violations").
+	violationStatsQuery := s.db.WithContext(ctx).Table("sla_violations").
 		Select("sla_configs.priority, COUNT(*) as count").
-		Joins("JOIN sla_configs ON sla_violations.sla_config_id = sla_configs.id").
-		Group("sla_configs.priority").
-		Scan(&violationPriorityStats).Error; err != nil {
+		Joins("JOIN sla_configs ON sla_violations.sla_config_id = sla_configs.id")
+	if tenantID, workspaceID := tenantAndWorkspace(ctx); tenantID != "" || workspaceID != "" {
+		if tenantID != "" {
+			violationStatsQuery = violationStatsQuery.Where("sla_violations.tenant_id = ?", tenantID)
+		}
+		if workspaceID != "" {
+			violationStatsQuery = violationStatsQuery.Where("sla_violations.workspace_id = ?", workspaceID)
+		}
+	}
+	if err := violationStatsQuery.Group("sla_configs.priority").Scan(&violationPriorityStats).Error; err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("failed to get violation priority stats: %w", err)
 	}
@@ -762,11 +776,18 @@ func (s *SLAService) GetSLAStats(ctx context.Context) (*SLAStatsResponse, error)
 		Tier  string `json:"customer_tier"`
 		Count int    `json:"count"`
 	}
-	if err := s.db.WithContext(ctx).Table("sla_violations").
+	violationTierQuery := s.db.WithContext(ctx).Table("sla_violations").
 		Select("COALESCE(sla_configs.customer_tier, '') as customer_tier, COUNT(*) as count").
-		Joins("JOIN sla_configs ON sla_violations.sla_config_id = sla_configs.id").
-		Group("sla_configs.customer_tier").
-		Scan(&violationTierStats).Error; err == nil {
+		Joins("JOIN sla_configs ON sla_violations.sla_config_id = sla_configs.id")
+	if tenantID, workspaceID := tenantAndWorkspace(ctx); tenantID != "" || workspaceID != "" {
+		if tenantID != "" {
+			violationTierQuery = violationTierQuery.Where("sla_violations.tenant_id = ?", tenantID)
+		}
+		if workspaceID != "" {
+			violationTierQuery = violationTierQuery.Where("sla_violations.workspace_id = ?", workspaceID)
+		}
+	}
+	if err := violationTierQuery.Group("sla_configs.customer_tier").Scan(&violationTierStats).Error; err == nil {
 		for _, stat := range violationTierStats {
 			stats.ViolationsByTier[stat.Tier] = stat.Count
 		}
@@ -774,7 +795,7 @@ func (s *SLAService) GetSLAStats(ctx context.Context) (*SLAStatsResponse, error)
 
 	// 计算合规率
 	var totalTickets int64
-	if err := s.db.WithContext(ctx).Model(&models.Ticket{}).Count(&totalTickets).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx).Model(&models.Ticket{}), ctx).Count(&totalTickets).Error; err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("failed to count total tickets: %w", err)
 	}
@@ -812,7 +833,7 @@ func (s *SLAService) getSLATrendData(ctx context.Context, days int) ([]SLACompli
 
 		// 统计当天创建的工单数
 		var totalTickets int64
-		if err := s.db.WithContext(ctx).Model(&models.Ticket{}).
+		if err := applyScopeFilter(s.db.WithContext(ctx).Model(&models.Ticket{}), ctx).
 			Where("DATE(created_at) = ?", dateStr).
 			Count(&totalTickets).Error; err != nil {
 			return nil, fmt.Errorf("failed to count tickets for date %s: %w", dateStr, err)
@@ -820,7 +841,7 @@ func (s *SLAService) getSLATrendData(ctx context.Context, days int) ([]SLACompli
 
 		// 统计当天的违约数
 		var violations int64
-		if err := s.db.WithContext(ctx).Model(&models.SLAViolation{}).
+		if err := applyScopeFilter(s.db.WithContext(ctx).Model(&models.SLAViolation{}), ctx).
 			Where("DATE(violated_at) = ?", dateStr).
 			Count(&violations).Error; err != nil {
 			return nil, fmt.Errorf("failed to count violations for date %s: %w", dateStr, err)
@@ -884,7 +905,7 @@ func (s *SLAService) resolveCustomerTier(ctx context.Context, customerUserID uin
 		return ""
 	}
 	var customer models.Customer
-	if err := s.db.WithContext(ctx).Where("user_id = ?", customerUserID).First(&customer).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).Where("user_id = ?", customerUserID).First(&customer).Error; err != nil {
 		return ""
 	}
 	return normalizeTier(customer.Priority)
@@ -917,7 +938,7 @@ func (s *SLAService) monitorSLAViolations(ctx context.Context) error {
 
 	// 获取所有未关闭的工单
 	var tickets []models.Ticket
-	if err := s.db.WithContext(ctx).Where("status NOT IN ?", []string{"resolved", "closed"}).Find(&tickets).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).Where("status NOT IN ?", []string{"resolved", "closed"}).Find(&tickets).Error; err != nil {
 		span.RecordError(err)
 		return fmt.Errorf("failed to get active tickets: %w", err)
 	}

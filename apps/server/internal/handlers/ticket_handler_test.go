@@ -5,6 +5,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -19,7 +20,17 @@ import (
 
 	"servify/apps/server/internal/models"
 	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
+	auditplatform "servify/apps/server/internal/platform/audit"
 )
+
+type ticketAuditRecorder struct {
+	entries []auditplatform.Entry
+}
+
+func (r *ticketAuditRecorder) Record(_ context.Context, entry auditplatform.Entry) error {
+	r.entries = append(r.entries, entry)
+	return nil
+}
 
 func newTestDBForTickets(t *testing.T) *gorm.DB {
 	t.Helper()
@@ -295,6 +306,102 @@ func TestTicketHandler_CustomFields_Create_Filter_Export(t *testing.T) {
 	}
 	if !strings.Contains(csvText, ",large") {
 		t.Fatalf("expected csv to include custom field value, got: %s", csvText)
+	}
+}
+
+func TestTicketHandler_AuditSnapshotsForUpdateAssignClose(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestDBForTickets(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.WarnLevel)
+
+	if err := db.Create(&models.User{ID: 1, Username: "c1", Name: "c1", Email: "c1@example.com", Role: "customer"}).Error; err != nil {
+		t.Fatalf("seed customer user: %v", err)
+	}
+	if err := db.Create(&models.User{ID: 2, Username: "a1", Name: "a1", Email: "a1@example.com", Role: "agent"}).Error; err != nil {
+		t.Fatalf("seed agent user 1: %v", err)
+	}
+	if err := db.Create(&models.User{ID: 3, Username: "a2", Name: "a2", Email: "a2@example.com", Role: "agent"}).Error; err != nil {
+		t.Fatalf("seed agent user 2: %v", err)
+	}
+	if err := db.Create(&models.Agent{UserID: 2, Status: "online", MaxConcurrent: 5}).Error; err != nil {
+		t.Fatalf("seed agent 1: %v", err)
+	}
+	if err := db.Create(&models.Agent{UserID: 3, Status: "online", MaxConcurrent: 5}).Error; err != nil {
+		t.Fatalf("seed agent 2: %v", err)
+	}
+	ticket := &models.Ticket{
+		Title:      "before-title",
+		CustomerID: 1,
+		Status:     "open",
+		Priority:   "normal",
+		Category:   "general",
+	}
+	if err := db.Create(ticket).Error; err != nil {
+		t.Fatalf("seed ticket: %v", err)
+	}
+
+	h := NewTicketHandler(ticketdelivery.NewHandlerServiceWithDependencies(ticketdelivery.HandlerAssemblyDependencies{
+		DB:     db,
+		Logger: logger,
+	}), logger)
+
+	recorder := &ticketAuditRecorder{}
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", uint(99))
+		c.Set("principal_kind", "agent")
+		c.Next()
+	})
+	r.Use(auditplatform.Middleware(recorder))
+	r.PUT("/api/tickets/:id", h.UpdateTicket)
+	r.POST("/api/tickets/:id/assign", h.AssignTicket)
+	r.POST("/api/tickets/:id/close", h.CloseTicket)
+
+	updateBody, _ := json.Marshal(map[string]any{"title": "after-title"})
+	w1 := httptest.NewRecorder()
+	req1 := httptest.NewRequest(http.MethodPut, "/api/tickets/"+toStr(ticket.ID), bytes.NewReader(updateBody))
+	req1.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w1, req1)
+	if w1.Code != http.StatusOK {
+		t.Fatalf("update status=%d body=%s", w1.Code, w1.Body.String())
+	}
+
+	assignBody, _ := json.Marshal(map[string]any{"agent_id": 2})
+	w2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest(http.MethodPost, "/api/tickets/"+toStr(ticket.ID)+"/assign", bytes.NewReader(assignBody))
+	req2.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w2, req2)
+	if w2.Code != http.StatusOK {
+		t.Fatalf("assign status=%d body=%s", w2.Code, w2.Body.String())
+	}
+
+	closeBody, _ := json.Marshal(map[string]any{"reason": "done"})
+	w3 := httptest.NewRecorder()
+	req3 := httptest.NewRequest(http.MethodPost, "/api/tickets/"+toStr(ticket.ID)+"/close", bytes.NewReader(closeBody))
+	req3.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w3, req3)
+	if w3.Code != http.StatusOK {
+		t.Fatalf("close status=%d body=%s", w3.Code, w3.Body.String())
+	}
+
+	if len(recorder.entries) != 3 {
+		t.Fatalf("expected 3 audit entries got %d", len(recorder.entries))
+	}
+	for _, entry := range recorder.entries {
+		if entry.BeforeJSON == "" || entry.AfterJSON == "" {
+			t.Fatalf("expected before/after snapshot for action %s, got before=%q after=%q", entry.Action, entry.BeforeJSON, entry.AfterJSON)
+		}
+	}
+	if !strings.Contains(recorder.entries[0].BeforeJSON, "before-title") || !strings.Contains(recorder.entries[0].AfterJSON, "after-title") {
+		t.Fatalf("unexpected update audit snapshots: before=%s after=%s", recorder.entries[0].BeforeJSON, recorder.entries[0].AfterJSON)
+	}
+	if !strings.Contains(recorder.entries[1].AfterJSON, "\"agent_id\":2") {
+		t.Fatalf("unexpected assign audit after snapshot: %s", recorder.entries[1].AfterJSON)
+	}
+	if !strings.Contains(recorder.entries[2].AfterJSON, "\"status\":\"closed\"") {
+		t.Fatalf("unexpected close audit after snapshot: %s", recorder.entries[2].AfterJSON)
 	}
 }
 

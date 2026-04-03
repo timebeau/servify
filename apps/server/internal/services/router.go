@@ -268,18 +268,21 @@ func (r *MessageRouter) persistMessage(message UnifiedMessage) error {
 	if sid == "" {
 		sid = uuid.NewString()
 	}
-	if err := r.ensureSession(sid, message.PlatformID); err != nil {
-		logrus.Warnf("ensure session failed: %v", err)
+	tenantID, workspaceID := routerScopeFromMetadata(message.Metadata)
+	if err := r.ensureSession(sid, message.PlatformID, tenantID, workspaceID); err != nil {
+		return fmt.Errorf("ensure session: %w", err)
 	}
 
 	// 映射到持久化模型
 	m := &models.Message{
-		SessionID: sid,
-		UserID:    0, // 未绑定用户ID时留空
-		Content:   message.Content,
-		Type:      string(message.Type),
-		Sender:    "user",
-		CreatedAt: time.Now(),
+		TenantID:    tenantID,
+		WorkspaceID: workspaceID,
+		SessionID:   sid,
+		UserID:      0, // 未绑定用户ID时留空
+		Content:     message.Content,
+		Type:        string(message.Type),
+		Sender:      "user",
+		CreatedAt:   time.Now(),
 	}
 
 	if err := r.db.Create(m).Error; err != nil {
@@ -290,7 +293,7 @@ func (r *MessageRouter) persistMessage(message UnifiedMessage) error {
 }
 
 // ensureSession 确保会话记录存在
-func (r *MessageRouter) ensureSession(sessionID string, platform string) error {
+func (r *MessageRouter) ensureSession(sessionID string, platform string, tenantID string, workspaceID string) error {
 	if r.db == nil || sessionID == "" {
 		return nil
 	}
@@ -298,12 +301,14 @@ func (r *MessageRouter) ensureSession(sessionID string, platform string) error {
 	if err := r.db.First(&s, "id = ?", sessionID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			s = models.Session{
-				ID:        sessionID,
-				Status:    "active",
-				Platform:  platform,
-				StartedAt: time.Now(),
-				CreatedAt: time.Now(),
-				UpdatedAt: time.Now(),
+				ID:          sessionID,
+				TenantID:    tenantID,
+				WorkspaceID: workspaceID,
+				Status:      "active",
+				Platform:    platform,
+				StartedAt:   time.Now(),
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
 			}
 			if err := r.db.Create(&s).Error; err != nil {
 				return fmt.Errorf("create session: %w", err)
@@ -312,7 +317,50 @@ func (r *MessageRouter) ensureSession(sessionID string, platform string) error {
 		}
 		return err
 	}
+	if tenantID != "" && s.TenantID != "" && s.TenantID != tenantID {
+		return fmt.Errorf("session %s tenant scope mismatch", sessionID)
+	}
+	if workspaceID != "" && s.WorkspaceID != "" && s.WorkspaceID != workspaceID {
+		return fmt.Errorf("session %s workspace scope mismatch", sessionID)
+	}
+	if (s.TenantID == "" && tenantID != "") || (s.WorkspaceID == "" && workspaceID != "") {
+		updates := map[string]interface{}{"updated_at": time.Now()}
+		if s.TenantID == "" && tenantID != "" {
+			updates["tenant_id"] = tenantID
+		}
+		if s.WorkspaceID == "" && workspaceID != "" {
+			updates["workspace_id"] = workspaceID
+		}
+		if err := r.db.Model(&models.Session{}).Where("id = ?", sessionID).Updates(updates).Error; err != nil {
+			return fmt.Errorf("update session scope: %w", err)
+		}
+	}
 	return nil
+}
+
+func routerScopeFromMetadata(metadata map[string]interface{}) (string, string) {
+	if metadata == nil {
+		return "", ""
+	}
+	return metadataString(metadata, "tenant_id"), metadataString(metadata, "workspace_id")
+}
+
+func metadataString(metadata map[string]interface{}, key string) string {
+	if metadata == nil {
+		return ""
+	}
+	v, ok := metadata[key]
+	if !ok || v == nil {
+		return ""
+	}
+	switch val := v.(type) {
+	case string:
+		return val
+	case fmt.Stringer:
+		return val.String()
+	default:
+		return fmt.Sprint(val)
+	}
 }
 
 // Telegram 适配器示例

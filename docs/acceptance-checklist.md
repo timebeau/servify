@@ -94,8 +94,8 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 | 健康检查 | `GET /health` | 服务启动后直接请求 | `200` 且返回健康信息 | [health_enhanced_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/health_enhanced_test.go) | 未验 |
 | 就绪检查 | `GET /ready` | 在依赖就绪后请求 | `200`；依赖异常时不应误报健康 | [health_enhanced_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/health_enhanced_test.go) | 未验 |
 | Prometheus 指标 | `GET <metricsPath>` | 启动后访问 metrics | 返回文本指标；包含 runtime/AI/DB 指标 | [ai_handler.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler.go) | 未验 |
-| 安全基线严格校验 | `make security-check CONFIG=...` | 使用部署配置执行校验 | 无 warning 时返回 `0`；有高风险配置时非零退出 | [check_security_baseline_test.go](/Users/cui/Workspaces/servify/apps/server/cmd/cli/check_security_baseline_test.go) | 未验 |
-| 可观测性基线严格校验 | `make observability-check CONFIG=...` | 使用部署配置执行校验 | metrics/tracing 配置与 dashboard/alert/runbook/collector 资产齐备时返回 `0` | [check_observability_baseline_test.go](/Users/cui/Workspaces/servify/apps/server/cmd/cli/check_observability_baseline_test.go) | 未验 |
+| 安全基线严格校验 | `make security-check CONFIG=...` | 使用部署配置执行校验 | 无 warning 时返回 `0`；有高风险配置时非零退出 | [check_security_baseline_test.go](/Users/cui/Workspaces/servify/apps/server/cmd/cli/check_security_baseline_test.go) | 通过 |
+| 可观测性基线严格校验 | `make observability-check CONFIG=...` | 使用部署配置执行校验 | metrics/tracing 配置与 dashboard/alert/runbook/collector 资产齐备时返回 `0` | [check_observability_baseline_test.go](/Users/cui/Workspaces/servify/apps/server/cmd/cli/check_observability_baseline_test.go) | 通过 |
 | 发布前最小自检 | `make release-check CONFIG=...` | 执行统一自检脚本 | local/security/observability/focused Go tests 全部通过 | [check-release-readiness.sh](/Users/cui/Workspaces/servify/scripts/check-release-readiness.sh) | 未验 |
 | CLI 标准构建 | `make build` | 执行构建 | 生成二进制，无编译错误 | `make build` | 未验 |
 | CLI WeKnora 构建 | `make build-weknora` | 执行构建 | 生成二进制，无编译错误 | `make build-weknora` | 通过 |

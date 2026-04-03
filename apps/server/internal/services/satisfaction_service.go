@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"servify/apps/server/internal/models"
+	platformauth "servify/apps/server/internal/platform/auth"
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -119,11 +120,12 @@ func (s *SatisfactionService) ScheduleSurvey(ctx context.Context, ticket *models
 	if ticket == nil {
 		return nil, fmt.Errorf("ticket required for survey scheduling")
 	}
+	scopeCtx := contextWithRecordScope(ctx, ticket.TenantID, ticket.WorkspaceID)
 
 	// 如果已有评价则不再发送调查
 	var satisfactionCount int64
-	if err := s.db.WithContext(ctx).
-		Model(&models.CustomerSatisfaction{}).
+	if err := applyScopeFilter(s.db.WithContext(ctx).
+		Model(&models.CustomerSatisfaction{}), scopeCtx).
 		Where("ticket_id = ?", ticket.ID).
 		Count(&satisfactionCount).Error; err != nil {
 		return nil, fmt.Errorf("failed to check satisfaction status: %w", err)
@@ -134,7 +136,7 @@ func (s *SatisfactionService) ScheduleSurvey(ctx context.Context, ticket *models
 
 	// 如果存在待发送调查则直接复用
 	var existing models.SatisfactionSurvey
-	if err := s.db.WithContext(ctx).
+	if err := applyScopeFilter(s.db.WithContext(ctx), scopeCtx).
 		Where("ticket_id = ? AND status IN ?", ticket.ID, []string{"queued", "sent"}).
 		Order("created_at DESC").
 		First(&existing).Error; err == nil {
@@ -148,6 +150,8 @@ func (s *SatisfactionService) ScheduleSurvey(ctx context.Context, ticket *models
 	channel := detectSurveyChannel(ticket.Source)
 
 	survey := &models.SatisfactionSurvey{
+		TenantID:    platformauth.TenantIDFromContext(scopeCtx),
+		WorkspaceID: platformauth.WorkspaceIDFromContext(scopeCtx),
 		TicketID:    ticket.ID,
 		CustomerID:  ticket.CustomerID,
 		AgentID:     ticket.AgentID,
@@ -168,7 +172,7 @@ func (s *SatisfactionService) ScheduleSurvey(ctx context.Context, ticket *models
 
 // ListSurveys 获取 CSAT 调查列表
 func (s *SatisfactionService) ListSurveys(ctx context.Context, req *SatisfactionSurveyListRequest) ([]models.SatisfactionSurvey, int64, error) {
-	query := s.db.WithContext(ctx).Model(&models.SatisfactionSurvey{})
+	query := applyScopeFilter(s.db.WithContext(ctx).Model(&models.SatisfactionSurvey{}), ctx)
 
 	if req.Page < 1 {
 		req.Page = 1
@@ -221,9 +225,10 @@ func (s *SatisfactionService) GetSurveyPreviewByToken(ctx context.Context, token
 		}
 		return nil, fmt.Errorf("failed to load survey: %w", err)
 	}
+	scopeCtx := contextWithRecordScope(ctx, survey.TenantID, survey.WorkspaceID)
 
 	var ticket models.Ticket
-	if err := s.db.WithContext(ctx).Preload("Agent").First(&ticket, survey.TicketID).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx).Preload("Agent"), scopeCtx).First(&ticket, survey.TicketID).Error; err != nil {
 		return nil, fmt.Errorf("failed to load ticket for survey: %w", err)
 	}
 
@@ -257,12 +262,13 @@ func (s *SatisfactionService) RespondSurvey(ctx context.Context, token string, r
 		}
 		return nil, fmt.Errorf("failed to load survey: %w", err)
 	}
+	scopeCtx := contextWithRecordScope(ctx, survey.TenantID, survey.WorkspaceID)
 
 	if survey.Status == "completed" {
 		return nil, ErrSurveyCompleted
 	}
 	if survey.ExpiresAt != nil && time.Now().After(*survey.ExpiresAt) {
-		_ = s.db.WithContext(ctx).Model(&models.SatisfactionSurvey{}).
+		_ = applyScopeFilter(s.db.WithContext(ctx).Model(&models.SatisfactionSurvey{}), scopeCtx).
 			Where("id = ?", survey.ID).
 			Update("status", "expired")
 		return nil, ErrSurveyExpired
@@ -277,7 +283,7 @@ func (s *SatisfactionService) RespondSurvey(ctx context.Context, token string, r
 		Category:   "overall",
 	}
 
-	satisfaction, err := s.CreateSatisfaction(ctx, req)
+	satisfaction, err := s.CreateSatisfaction(scopeCtx, req)
 	if err != nil {
 		// 若已有评价则返回已存在的记录
 		if strings.Contains(err.Error(), "already exists") {
@@ -290,8 +296,8 @@ func (s *SatisfactionService) RespondSurvey(ctx context.Context, token string, r
 	}
 
 	completed := time.Now()
-	if err := s.db.WithContext(ctx).
-		Model(&models.SatisfactionSurvey{}).
+	if err := applyScopeFilter(s.db.WithContext(ctx).
+		Model(&models.SatisfactionSurvey{}), scopeCtx).
 		Where("id = ?", survey.ID).
 		Updates(map[string]interface{}{
 			"status":          "completed",
@@ -307,7 +313,7 @@ func (s *SatisfactionService) RespondSurvey(ctx context.Context, token string, r
 // ResendSurvey 重新发送调查邮件/链接
 func (s *SatisfactionService) ResendSurvey(ctx context.Context, id uint) (*models.SatisfactionSurvey, error) {
 	var survey models.SatisfactionSurvey
-	if err := s.db.WithContext(ctx).First(&survey, id).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).First(&survey, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, ErrSurveyNotFound
 		}
@@ -345,13 +351,13 @@ func (s *SatisfactionService) ResendSurvey(ctx context.Context, id uint) (*model
 func (s *SatisfactionService) CreateSatisfaction(ctx context.Context, req *SatisfactionCreateRequest) (*models.CustomerSatisfaction, error) {
 	// 验证工单是否存在
 	var ticket models.Ticket
-	if err := s.db.First(&ticket, req.TicketID).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).First(&ticket, req.TicketID).Error; err != nil {
 		return nil, fmt.Errorf("ticket not found: %w", err)
 	}
 
-	// 验证客户是否存在
-	var customer models.User
-	if err := s.db.First(&customer, req.CustomerID).Error; err != nil {
+	// 验证客户是否在当前 scope 内存在
+	var customer models.Customer
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).Where("user_id = ?", req.CustomerID).First(&customer).Error; err != nil {
 		return nil, fmt.Errorf("customer not found: %w", err)
 	}
 
@@ -362,14 +368,14 @@ func (s *SatisfactionService) CreateSatisfaction(ctx context.Context, req *Satis
 
 	// 检查是否已经有评价
 	var existingSatisfaction models.CustomerSatisfaction
-	if err := s.db.Where("ticket_id = ? AND customer_id = ?", req.TicketID, req.CustomerID).First(&existingSatisfaction).Error; err == nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).Where("ticket_id = ? AND customer_id = ?", req.TicketID, req.CustomerID).First(&existingSatisfaction).Error; err == nil {
 		return nil, fmt.Errorf("satisfaction rating already exists for this ticket")
 	}
 
 	// 验证客服（如果提供）
 	if req.AgentID != nil {
-		var agent models.User
-		if err := s.db.First(&agent, *req.AgentID).Error; err != nil {
+		var agent models.Agent
+		if err := applyScopeFilter(s.db.WithContext(ctx), ctx).Where("user_id = ?", *req.AgentID).First(&agent).Error; err != nil {
 			return nil, fmt.Errorf("agent not found: %w", err)
 		}
 	}
@@ -381,13 +387,15 @@ func (s *SatisfactionService) CreateSatisfaction(ctx context.Context, req *Satis
 
 	// 创建满意度评价
 	satisfaction := &models.CustomerSatisfaction{
-		TicketID:   req.TicketID,
-		CustomerID: req.CustomerID,
-		AgentID:    req.AgentID,
-		Rating:     req.Rating,
-		Comment:    req.Comment,
-		Category:   req.Category,
-		CreatedAt:  time.Now(),
+		TenantID:    ticket.TenantID,
+		WorkspaceID: ticket.WorkspaceID,
+		TicketID:    req.TicketID,
+		CustomerID:  req.CustomerID,
+		AgentID:     req.AgentID,
+		Rating:      req.Rating,
+		Comment:     req.Comment,
+		Category:    req.Category,
+		CreatedAt:   time.Now(),
 	}
 
 	if err := s.db.Create(satisfaction).Error; err != nil {
@@ -396,7 +404,7 @@ func (s *SatisfactionService) CreateSatisfaction(ctx context.Context, req *Satis
 	}
 
 	// 预加载关联数据
-	if err := s.db.Preload("Ticket").Preload("Customer").Preload("Agent").First(satisfaction, satisfaction.ID).Error; err != nil {
+	if err := applyScopeFilter(s.db.Preload("Ticket").Preload("Customer").Preload("Agent"), ctx).First(satisfaction, satisfaction.ID).Error; err != nil {
 		s.logger.Warnf("Failed to preload satisfaction data: %v", err)
 	}
 
@@ -409,7 +417,7 @@ func (s *SatisfactionService) CreateSatisfaction(ctx context.Context, req *Satis
 // GetSatisfaction 获取满意度评价
 func (s *SatisfactionService) GetSatisfaction(ctx context.Context, id uint) (*models.CustomerSatisfaction, error) {
 	var satisfaction models.CustomerSatisfaction
-	if err := s.db.Preload("Ticket").Preload("Customer").Preload("Agent").First(&satisfaction, id).Error; err != nil {
+	if err := applyScopeFilter(s.db.Preload("Ticket").Preload("Customer").Preload("Agent"), ctx).First(&satisfaction, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, fmt.Errorf("satisfaction not found")
 		}
@@ -421,7 +429,7 @@ func (s *SatisfactionService) GetSatisfaction(ctx context.Context, id uint) (*mo
 
 // ListSatisfactions 获取满意度评价列表
 func (s *SatisfactionService) ListSatisfactions(ctx context.Context, req *SatisfactionListRequest) ([]models.CustomerSatisfaction, int64, error) {
-	query := s.db.Model(&models.CustomerSatisfaction{})
+	query := applyScopeFilter(s.db.WithContext(ctx).Model(&models.CustomerSatisfaction{}), ctx)
 
 	// 应用筛选
 	if req.TicketID != nil {
@@ -480,7 +488,7 @@ func (s *SatisfactionService) ListSatisfactions(ctx context.Context, req *Satisf
 // GetSatisfactionByTicket 根据工单获取满意度评价
 func (s *SatisfactionService) GetSatisfactionByTicket(ctx context.Context, ticketID uint) (*models.CustomerSatisfaction, error) {
 	var satisfaction models.CustomerSatisfaction
-	if err := s.db.Where("ticket_id = ?", ticketID).Preload("Ticket").Preload("Customer").Preload("Agent").First(&satisfaction).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx).Where("ticket_id = ?", ticketID).Preload("Ticket").Preload("Customer").Preload("Agent"), ctx).First(&satisfaction).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil // 返回 nil 表示未找到，这是正常情况
 		}
@@ -492,7 +500,7 @@ func (s *SatisfactionService) GetSatisfactionByTicket(ctx context.Context, ticke
 
 // GetSatisfactionStats 获取满意度统计
 func (s *SatisfactionService) GetSatisfactionStats(ctx context.Context, dateFrom, dateTo *time.Time) (*SatisfactionStatsResponse, error) {
-	query := s.db.Model(&models.CustomerSatisfaction{})
+	query := applyScopeFilter(s.db.WithContext(ctx).Model(&models.CustomerSatisfaction{}), ctx)
 
 	// 应用日期筛选
 	if dateFrom != nil {
@@ -562,7 +570,7 @@ func (s *SatisfactionService) GetSatisfactionStats(ctx context.Context, dateFrom
 		Average float64
 	}
 
-	trendQuery := s.db.Model(&models.CustomerSatisfaction{}).
+	trendQuery := applyScopeFilter(s.db.WithContext(ctx).Model(&models.CustomerSatisfaction{}), ctx).
 		Select(fmt.Sprintf("%s as date, COUNT(*) as count, AVG(rating) as average", dateFormat)).
 		Group("date").
 		Order("date")
@@ -598,7 +606,7 @@ func (s *SatisfactionService) GetSatisfactionStats(ctx context.Context, dateFrom
 
 // DeleteSatisfaction 删除满意度评价
 func (s *SatisfactionService) DeleteSatisfaction(ctx context.Context, id uint) error {
-	result := s.db.Delete(&models.CustomerSatisfaction{}, id)
+	result := applyScopeFilter(s.db.WithContext(ctx), ctx).Delete(&models.CustomerSatisfaction{}, id)
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete satisfaction: %w", result.Error)
 	}
@@ -613,7 +621,7 @@ func (s *SatisfactionService) DeleteSatisfaction(ctx context.Context, id uint) e
 // UpdateSatisfaction 更新满意度评价（仅允许更新评论）
 func (s *SatisfactionService) UpdateSatisfaction(ctx context.Context, id uint, comment string) (*models.CustomerSatisfaction, error) {
 	var satisfaction models.CustomerSatisfaction
-	if err := s.db.First(&satisfaction, id).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).First(&satisfaction, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, fmt.Errorf("satisfaction not found")
 		}
@@ -629,7 +637,7 @@ func (s *SatisfactionService) UpdateSatisfaction(ctx context.Context, id uint, c
 	}
 
 	// 重新加载关联数据
-	if err := s.db.Preload("Ticket").Preload("Customer").Preload("Agent").First(&satisfaction, id).Error; err != nil {
+	if err := applyScopeFilter(s.db.Preload("Ticket").Preload("Customer").Preload("Agent"), ctx).First(&satisfaction, id).Error; err != nil {
 		s.logger.Warnf("Failed to preload satisfaction data: %v", err)
 	}
 
@@ -648,4 +656,15 @@ func detectSurveyChannel(source string) string {
 	default:
 		return "email"
 	}
+}
+
+func contextWithRecordScope(ctx context.Context, tenantID, workspaceID string) context.Context {
+	currentTenant, currentWorkspace := tenantAndWorkspace(ctx)
+	if currentTenant == "" {
+		currentTenant = tenantID
+	}
+	if currentWorkspace == "" {
+		currentWorkspace = workspaceID
+	}
+	return platformauth.ContextWithScope(ctx, currentTenant, currentWorkspace)
 }

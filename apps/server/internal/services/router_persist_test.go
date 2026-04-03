@@ -5,6 +5,9 @@ import (
 	"servify/apps/server/internal/models"
 	"testing"
 	"time"
+
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 // stub AI to avoid external calls
@@ -47,5 +50,96 @@ func TestMessageRouter_RouteMessage_DBNil_FallbackAndContinue(t *testing.T) {
 		}
 	case <-time.After(1 * time.Second):
 		t.Fatalf("no response delivered to client")
+	}
+}
+
+func newRouterPersistTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.AutoMigrate(&models.Session{}, &models.Message{}); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
+	return db
+}
+
+func TestMessageRouter_PersistMessage_StoresScope(t *testing.T) {
+	db := newRouterPersistTestDB(t)
+	r := NewMessageRouter(stubAI2{reply: "ok"}, NewWebSocketHub(), db)
+
+	msg := UnifiedMessage{
+		UserID:     "session-a",
+		PlatformID: "web",
+		Content:    "hi",
+		Type:       MessageTypeText,
+		Timestamp:  time.Now(),
+		Metadata: map[string]interface{}{
+			"tenant_id":    "tenant-a",
+			"workspace_id": "workspace-a",
+		},
+	}
+	if err := r.persistMessage(msg); err != nil {
+		t.Fatalf("persistMessage error: %v", err)
+	}
+
+	var session models.Session
+	if err := db.First(&session, "id = ?", "session-a").Error; err != nil {
+		t.Fatalf("load session: %v", err)
+	}
+	if session.TenantID != "tenant-a" || session.WorkspaceID != "workspace-a" {
+		t.Fatalf("unexpected session scope: %+v", session)
+	}
+
+	var stored models.Message
+	if err := db.First(&stored).Error; err != nil {
+		t.Fatalf("load message: %v", err)
+	}
+	if stored.TenantID != "tenant-a" || stored.WorkspaceID != "workspace-a" {
+		t.Fatalf("unexpected message scope: %+v", stored)
+	}
+}
+
+func TestMessageRouter_PersistMessage_RejectsCrossWorkspaceReuse(t *testing.T) {
+	db := newRouterPersistTestDB(t)
+	r := NewMessageRouter(stubAI2{reply: "ok"}, NewWebSocketHub(), db)
+
+	first := UnifiedMessage{
+		UserID:     "session-shared",
+		PlatformID: "web",
+		Content:    "a",
+		Type:       MessageTypeText,
+		Timestamp:  time.Now(),
+		Metadata: map[string]interface{}{
+			"tenant_id":    "tenant-a",
+			"workspace_id": "workspace-a",
+		},
+	}
+	if err := r.persistMessage(first); err != nil {
+		t.Fatalf("persist first message: %v", err)
+	}
+
+	second := UnifiedMessage{
+		UserID:     "session-shared",
+		PlatformID: "web",
+		Content:    "b",
+		Type:       MessageTypeText,
+		Timestamp:  time.Now(),
+		Metadata: map[string]interface{}{
+			"tenant_id":    "tenant-a",
+			"workspace_id": "workspace-b",
+		},
+	}
+	if err := r.persistMessage(second); err == nil {
+		t.Fatal("expected cross-workspace session reuse to fail")
+	}
+
+	var count int64
+	if err := db.Model(&models.Message{}).Count(&count).Error; err != nil {
+		t.Fatalf("count messages: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected only first message persisted, got %d", count)
 	}
 }

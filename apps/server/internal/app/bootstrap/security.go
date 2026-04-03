@@ -11,6 +11,20 @@ import (
 
 const defaultJWTSecret = "default-secret-key"
 
+type requiredRateLimitPath struct {
+	prefix string
+	reason string
+}
+
+var requiredSecurityRateLimitPaths = []requiredRateLimitPath{
+	{prefix: "/public/", reason: "anonymous public surface baseline"},
+	{prefix: "/public/kb/", reason: "public knowledge base enumeration and crawl risk"},
+	{prefix: "/public/csat/", reason: "public survey token access and submission risk"},
+	{prefix: "/api/v1/ws", reason: "anonymous realtime connection surface"},
+	{prefix: "/api/v1/metrics/ingest", reason: "service ingestion surface"},
+	{prefix: "/api/", reason: "management surface"},
+}
+
 func SecurityWarnings(cfg *config.Config) []string {
 	if cfg == nil {
 		return []string{"config is nil; security defaults may be unsafe"}
@@ -27,11 +41,10 @@ func SecurityWarnings(cfg *config.Config) []string {
 	if !cfg.Security.RateLimiting.Enabled {
 		warnings = append(warnings, "security.rate_limiting is disabled")
 	} else {
-		if !hasRateLimitPrefix(cfg.Security.RateLimiting.Paths, "/public/") {
-			warnings = append(warnings, "security.rate_limiting.paths has no dedicated limit for /public/")
-		}
-		if !hasRateLimitPrefix(cfg.Security.RateLimiting.Paths, "/api/v1/ws") {
-			warnings = append(warnings, "security.rate_limiting.paths has no dedicated limit for /api/v1/ws")
+		for _, required := range requiredSecurityRateLimitPaths {
+			if !hasRateLimitPrefix(cfg.Security.RateLimiting.Paths, required.prefix) {
+				warnings = append(warnings, fmt.Sprintf("security.rate_limiting.paths has no dedicated limit for %s (%s)", required.prefix, required.reason))
+			}
 		}
 	}
 	if strings.TrimSpace(cfg.AI.OpenAI.APIKey) == "" {

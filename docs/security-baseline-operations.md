@@ -81,14 +81,15 @@
 
 - `registerBaseMiddleware` 已统一挂载 `RateLimitMiddlewareFromConfig`
 - 支持全局限流、按路径前缀限流、按 header key 限流，以及 IP / key 白名单
-- 默认配置仍为关闭状态，部署环境需要显式打开
+- 默认开发配置 `config.yml` 已启用基础限流，并为 `/public/`、`/public/kb/`、`/public/csat/`、`/api/v1/ws`、`/api/v1/ai/query`、`/api/v1/metrics/ingest`、`/api/` 提供独立路径级限流
+- 生产环境仍应基于 `config.production.secure.example.yml` 或等价部署配置收紧阈值、域名和 secrets 注入方式，而不是直接把开发配置原样上线
 
 ### 启动期告警
 
 - `InitLogging` 现在会在启动时输出基础安全告警
 - 当前已覆盖默认或空 `jwt.secret`、开放式 `CORS=*`、关闭限流、空 OpenAI API key、启用 WeKnora 但未配置 API key 等场景
-- 若启用了限流但没有为 `/public/` 与 `/api/v1/ws` 配置独立路径级限流，也会输出 warning，避免匿名入口只落在全局限流下
-- 当前为 warning-only，不阻断本地开发或测试启动
+- 若启用了限流但没有为 `/public/`、`/public/kb/`、`/public/csat/`、`/api/v1/ws`、`/api/v1/metrics/ingest`、`/api/` 配置独立路径级限流，也会输出 warning，避免公开入口、高成本 service 面和管理面只落在全局限流下
+- 启动期仍为 warning-only，不阻断本地开发或测试启动；部署前应再执行 `check-security-baseline --strict` 做显式失败校验
 
 ### 部署前校验入口
 
@@ -117,7 +118,7 @@
 
 ## 仍待补齐的缺口
 
-- token 吊销、refresh token 与 session version 等更细粒度失效机制仍未实现
+- 已具备单用户查询、批量安全态预览、单用户 / 批量用户 token 吊销，以及 auth session 列表查询与单 session 吊销入口；独立 refresh token、revoke list 与更完整的 session 家族治理仍未实现
 - 外部开放接口仍缺少代码层强制检查，当前 checklist 主要依赖评审与文档约束
 - 关键配置变更尚未形成“执行前审批 / 执行后验证 / 回滚记录”操作手册
 

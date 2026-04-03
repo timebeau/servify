@@ -150,3 +150,110 @@ func TestSLAService_ResolveViolationsByTicket(t *testing.T) {
 		t.Fatalf("expected resolved violations, got zero")
 	}
 }
+
+func TestSLAService_ViolationsScopedByWorkspace(t *testing.T) {
+	db := newSLATestDB(t)
+	svc := NewSLAService(db, logrus.New())
+
+	now := time.Now()
+	ctxA := scopedContext("tenant-a", "workspace-a")
+	ctxB := scopedContext("tenant-a", "workspace-b")
+
+	cfgA, err := svc.CreateSLAConfig(ctxA, &SLAConfigCreateRequest{
+		Name: "A", Priority: "high", FirstResponseTime: 5, ResolutionTime: 60, EscalationTime: 30,
+	})
+	if err != nil {
+		t.Fatalf("create config A failed: %v", err)
+	}
+	cfgB, err := svc.CreateSLAConfig(ctxB, &SLAConfigCreateRequest{
+		Name: "B", Priority: "urgent", FirstResponseTime: 5, ResolutionTime: 60, EscalationTime: 30,
+	})
+	if err != nil {
+		t.Fatalf("create config B failed: %v", err)
+	}
+
+	ticketA := &models.Ticket{
+		ID:          21,
+		Title:       "Ticket A",
+		Priority:    "high",
+		Status:      "open",
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-a",
+		CreatedAt:   now.Add(-2 * time.Hour),
+		UpdatedAt:   now.Add(-2 * time.Hour),
+	}
+	ticketB := &models.Ticket{
+		ID:          22,
+		Title:       "Ticket B",
+		Priority:    "urgent",
+		Status:      "open",
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-b",
+		CreatedAt:   now.Add(-2 * time.Hour),
+		UpdatedAt:   now.Add(-2 * time.Hour),
+	}
+	if err := db.Create(ticketA).Error; err != nil {
+		t.Fatalf("create ticket A failed: %v", err)
+	}
+	if err := db.Create(ticketB).Error; err != nil {
+		t.Fatalf("create ticket B failed: %v", err)
+	}
+
+	violationA, err := svc.CheckSLAViolation(ctxA, ticketA)
+	if err != nil {
+		t.Fatalf("check violation A failed: %v", err)
+	}
+	if violationA == nil || violationA.WorkspaceID != "workspace-a" || violationA.SLAConfigID != cfgA.ID {
+		t.Fatalf("unexpected violation A: %+v", violationA)
+	}
+	violationB, err := svc.CheckSLAViolation(ctxB, ticketB)
+	if err != nil {
+		t.Fatalf("check violation B failed: %v", err)
+	}
+	if violationB == nil || violationB.WorkspaceID != "workspace-b" || violationB.SLAConfigID != cfgB.ID {
+		t.Fatalf("unexpected violation B: %+v", violationB)
+	}
+
+	itemsA, totalA, err := svc.ListSLAViolations(ctxA, &SLAViolationListRequest{Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatalf("list violations A failed: %v", err)
+	}
+	if totalA != 1 || len(itemsA) != 1 || itemsA[0].WorkspaceID != "workspace-a" {
+		t.Fatalf("unexpected scoped violations: total=%d items=%+v", totalA, itemsA)
+	}
+
+	statsA, err := svc.GetSLAStats(ctxA)
+	if err != nil {
+		t.Fatalf("stats A failed: %v", err)
+	}
+	if statsA.TotalConfigs != 1 || statsA.TotalViolations != 1 || statsA.ViolationsByPriority["high"] != 1 {
+		t.Fatalf("unexpected scoped stats: %+v", statsA)
+	}
+
+	if config, err := svc.GetSLAConfigByPriority(ctxA, "urgent", ""); err != nil {
+		t.Fatalf("get urgent config in scope A errored: %v", err)
+	} else if config != nil {
+		t.Fatalf("expected urgent config to be hidden from workspace A, got %+v", config)
+	}
+
+	if err := svc.ResolveSLAViolation(ctxB, violationA.ID); err == nil {
+		t.Fatal("expected cross-workspace resolve to fail")
+	}
+	if err := svc.DeleteSLAConfig(ctxB, cfgA.ID); err == nil {
+		t.Fatal("expected cross-workspace delete config to fail")
+	}
+
+	if err := svc.ResolveSLAViolation(ctxA, violationA.ID); err != nil {
+		t.Fatalf("resolve violation A failed: %v", err)
+	}
+	resolved := true
+	resolvedItems, resolvedTotal, err := svc.ListSLAViolations(ctxA, &SLAViolationListRequest{
+		Page: 1, PageSize: 20, Resolved: &resolved,
+	})
+	if err != nil {
+		t.Fatalf("list resolved violations failed: %v", err)
+	}
+	if resolvedTotal != 1 || len(resolvedItems) != 1 || !resolvedItems[0].Resolved {
+		t.Fatalf("unexpected resolved items: total=%d items=%+v", resolvedTotal, resolvedItems)
+	}
+}

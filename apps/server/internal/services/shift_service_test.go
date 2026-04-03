@@ -112,3 +112,60 @@ func TestShiftService_Update_and_Delete(t *testing.T) {
 		t.Fatalf("expected error deleting non-existent shift")
 	}
 }
+
+func TestShiftService_ScopedByWorkspace(t *testing.T) {
+	db := newTestDB(t, &models.ShiftSchedule{})
+	svc := NewShiftService(db, logrus.New())
+
+	now := time.Now()
+	ctxA := scopedContext("tenant-a", "workspace-a")
+	ctxB := scopedContext("tenant-a", "workspace-b")
+
+	shiftA, err := svc.CreateShift(ctxA, &ShiftCreateRequest{
+		AgentID:   1,
+		ShiftType: "morning",
+		StartTime: now.Add(time.Hour),
+		EndTime:   now.Add(2 * time.Hour),
+		Status:    "scheduled",
+	})
+	if err != nil {
+		t.Fatalf("create A failed: %v", err)
+	}
+	if shiftA.TenantID != "tenant-a" || shiftA.WorkspaceID != "workspace-a" {
+		t.Fatalf("unexpected scope on create: %+v", shiftA)
+	}
+
+	if _, err := svc.CreateShift(ctxB, &ShiftCreateRequest{
+		AgentID:   2,
+		ShiftType: "night",
+		StartTime: now.Add(3 * time.Hour),
+		EndTime:   now.Add(5 * time.Hour),
+		Status:    "scheduled",
+	}); err != nil {
+		t.Fatalf("create B failed: %v", err)
+	}
+
+	items, total, err := svc.ListShifts(ctxA, &ShiftListRequest{Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatalf("list scoped shifts failed: %v", err)
+	}
+	if total != 1 || len(items) != 1 || items[0].WorkspaceID != "workspace-a" {
+		t.Fatalf("unexpected scoped shifts: total=%d items=%+v", total, items)
+	}
+
+	stats, err := svc.GetShiftStats(ctxA)
+	if err != nil {
+		t.Fatalf("get scoped stats failed: %v", err)
+	}
+	if stats.Total != 1 || stats.ByType["morning"] != 1 {
+		t.Fatalf("unexpected scoped stats: %+v", stats)
+	}
+
+	newStatus := "active"
+	if _, err := svc.UpdateShift(ctxB, shiftA.ID, &ShiftUpdateRequest{Status: &newStatus}); err == nil {
+		t.Fatal("expected scoped update to reject cross-workspace shift")
+	}
+	if err := svc.DeleteShift(ctxB, shiftA.ID); err == nil {
+		t.Fatal("expected scoped delete to reject cross-workspace shift")
+	}
+}

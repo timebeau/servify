@@ -126,7 +126,7 @@ type ticketCandidateRow struct {
 }
 
 func (s *SuggestionService) suggestTickets(ctx context.Context, query string, tokens []string, limit int, candidateMax int) ([]TicketSuggestion, map[string]interface{}, error) {
-	q := s.db.WithContext(ctx).Model(&models.Ticket{}).
+	q := applyScopeFilter(s.db.WithContext(ctx).Model(&models.Ticket{}), ctx).
 		Select("id, title, description, status, category, priority, created_at").
 		Order("created_at DESC")
 
@@ -178,7 +178,7 @@ type docCandidateRow struct {
 }
 
 func (s *SuggestionService) suggestKnowledgeDocs(ctx context.Context, query string, tokens []string, limit int) ([]KnowledgeDocSuggestion, map[string]interface{}, error) {
-	q := s.db.WithContext(ctx).Model(&models.KnowledgeDoc{}).
+	q := applyScopeFilter(s.db.WithContext(ctx).Model(&models.KnowledgeDoc{}), ctx).
 		Select("id, title, content, category, tags").
 		Order("created_at DESC")
 

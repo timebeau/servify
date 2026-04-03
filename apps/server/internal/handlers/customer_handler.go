@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	customerdelivery "servify/apps/server/internal/modules/customer/delivery"
+	auditplatform "servify/apps/server/internal/platform/audit"
 	"servify/apps/server/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -127,6 +128,8 @@ func (h *CustomerHandler) UpdateCustomer(c *gin.Context) {
 		return
 	}
 
+	h.setCustomerAuditSnapshot(c, uint(id), true)
+
 	customer, err := h.customerService.UpdateCustomer(c.Request.Context(), uint(id), &req)
 	if err != nil {
 		h.logger.Errorf("Failed to update customer %d: %v", id, err)
@@ -137,6 +140,7 @@ func (h *CustomerHandler) UpdateCustomer(c *gin.Context) {
 		return
 	}
 
+	auditplatform.SetAfter(c, customer)
 	c.JSON(http.StatusOK, customer)
 }
 
@@ -162,6 +166,8 @@ func (h *CustomerHandler) RevokeCustomerTokens(c *gin.Context) {
 		return
 	}
 
+	h.setCustomerAuditSnapshot(c, uint(id), true)
+
 	version, err := h.customerService.RevokeCustomerTokens(c.Request.Context(), uint(id))
 	if err != nil {
 		h.logger.Errorf("Failed to revoke customer %d tokens: %v", id, err)
@@ -171,6 +177,8 @@ func (h *CustomerHandler) RevokeCustomerTokens(c *gin.Context) {
 		})
 		return
 	}
+
+	h.setCustomerAuditSnapshot(c, uint(id), false)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":       "Customer tokens revoked successfully",
@@ -314,6 +322,8 @@ func (h *CustomerHandler) AddCustomerNote(c *gin.Context) {
 		return
 	}
 
+	h.setCustomerAuditSnapshot(c, uint(id), true)
+
 	if err := h.customerService.AddCustomerNote(c.Request.Context(), uint(id), req.Note, userID.(uint)); err != nil {
 		h.logger.Errorf("Failed to add note to customer %d: %v", id, err)
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
@@ -321,6 +331,12 @@ func (h *CustomerHandler) AddCustomerNote(c *gin.Context) {
 			Message: err.Error(),
 		})
 		return
+	}
+	if customer, err := h.customerService.GetCustomerByID(c.Request.Context(), uint(id)); err == nil && customer != nil {
+		auditplatform.SetAfter(c, gin.H{
+			"customer":   customer,
+			"added_note": req.Note,
+		})
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -363,6 +379,8 @@ func (h *CustomerHandler) UpdateCustomerTags(c *gin.Context) {
 		return
 	}
 
+	h.setCustomerAuditSnapshot(c, uint(id), true)
+
 	if err := h.customerService.UpdateCustomerTags(c.Request.Context(), uint(id), req.Tags); err != nil {
 		h.logger.Errorf("Failed to update tags for customer %d: %v", id, err)
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
@@ -371,12 +389,33 @@ func (h *CustomerHandler) UpdateCustomerTags(c *gin.Context) {
 		})
 		return
 	}
+	if customer, err := h.customerService.GetCustomerByID(c.Request.Context(), uint(id)); err == nil && customer != nil {
+		auditplatform.SetAfter(c, gin.H{
+			"customer": customer,
+			"tags":     req.Tags,
+		})
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":     "Tags updated successfully",
 		"customer_id": id,
 		"tags":        req.Tags,
 	})
+}
+
+func (h *CustomerHandler) setCustomerAuditSnapshot(c *gin.Context, customerID uint, before bool) {
+	if h == nil || h.customerService == nil || c == nil || customerID == 0 {
+		return
+	}
+	customer, err := h.customerService.GetCustomerByID(c.Request.Context(), customerID)
+	if err != nil || customer == nil {
+		return
+	}
+	if before {
+		auditplatform.SetBefore(c, customer)
+		return
+	}
+	auditplatform.SetAfter(c, customer)
 }
 
 // GetCustomerStats 获取客户统计

@@ -14,6 +14,11 @@
   - 当前已在权限语义中出现 `workspace.read`
   - 当前仓库存在工作台概览能力，但尚未形成独立 `workspace` 持久化模型
 
+补充说明：
+
+- 当前主业务模型与主运营聚合路径，已基本可以回答“属于哪个 tenant/workspace”
+- 仍未完全收口的，主要是少量 legacy 聚合尾项，以及 `DailyStats` 这类系统级全局汇总表是否需要 tenant/workspace 维度拆分的问题
+
 ## 核心对象归属现状
 
 ### 直接或隐式属于 workspace / tenant 的对象
@@ -58,9 +63,37 @@
   - 已补显式 scope 字段
   - service 默认按上下文过滤
 
+- `SLAViolation`
+  - 已补显式 `tenant_id` / `workspace_id`
+  - `sla` service 的违约创建、列表、解决、统计与监控扫描路径已默认按上下文过滤
+
 - `AppIntegration`
   - 已补显式 scope 字段
   - service 默认按上下文过滤
+
+- `ShiftSchedule`
+  - 已补显式 `tenant_id` / `workspace_id`
+  - `shift` service 的创建、列表、更新、删除与统计路径已默认按上下文过滤
+
+- `Macro`
+  - 已补显式 `tenant_id` / `workspace_id`
+  - `macro` service 的列表、创建、更新、删除与应用入口已默认按上下文过滤
+
+- `CustomerSatisfaction` / `SatisfactionSurvey`
+  - 已补显式 `tenant_id` / `workspace_id`
+  - `satisfaction` service 的调查发送、响应、列表、统计、更新与删除路径已默认按上下文过滤
+
+- `SuggestionService`
+  - 依赖已 scope 化的 `Ticket` / `KnowledgeDoc`
+  - 相似工单与知识库候选查询现已按请求上下文默认过滤，避免跨 workspace 建议结果泄漏
+
+- `GamificationService`
+  - 排行榜聚合现已按请求上下文过滤 `Agent` / `Ticket` / `CustomerSatisfaction`
+  - 避免跨 workspace 汇总客服绩效与满意度数据
+
+- `MessageRouter` 兼容落库路径
+  - 现已从 `UnifiedMessage.Metadata` 提取 `tenant_id` / `workspace_id` 写入 `Session` / `Message`
+  - 同一 `sessionID` 若尝试跨 workspace 复用会直接拒绝持久化，避免旧兼容链路串会话
 
 ## 当前运行时上下文
 
@@ -90,7 +123,12 @@ JWT claims 已支持透传：
   - `KnowledgeDoc`
   - `CustomField`
   - `SLAConfig`
+  - `SLAViolation`
   - `AppIntegration`
+  - `ShiftSchedule`
+  - `Macro`
+  - `CustomerSatisfaction` / `SatisfactionSurvey`
+  - `SuggestionService` 的候选查询
 - 以下会话链路对象现已补显式 scope 字段，并在 `conversation/routing` 仓储默认按上下文过滤：
   - `Session`
   - `Message`
@@ -99,15 +137,14 @@ JWT claims 已支持透传：
 - `Ticket` 现已补显式 scope 字段，并在 `ticket` 仓储的主查询、统计与创建路径按上下文过滤
 - `Customer` 现已补显式 scope 字段；`customer` 仓储通过 `customers` 扩展表 join 收口用户读取、列表、统计与活动查询
 - `Agent` 现已补显式 scope 字段，并在 `agent` 仓储的创建、读取、列表与统计路径按上下文过滤
-- `WorkspaceService`、`analytics` 模块聚合仓储、agent transfer load 同步路径已开始按上下文过滤已 scope 化主数据
+- `WorkspaceService`、`analytics` 模块聚合仓储、`gamification` 排行榜聚合、agent transfer load 同步路径已开始按上下文过滤已 scope 化主数据
 - 尚未统一 scope 化的主要剩余面：
-  - `ShiftSchedule` 等尚未补显式 scope 字段的运营类模型
-  - 仍保留在旧 `services/*` 中、未完全迁移到 modules 的零散聚合查询
+  - 仍保留在旧 `services/*` 中、未完全迁移到 modules 的少量 legacy 聚合查询
   - `DailyStats` 这类跨租户全局聚合表，当前仍按系统级统计处理，而非 tenant/workspace 维度拆分
 
 ## 下一步建议
 
 1. 将 `T4 configuration-scopes` 作为下一阶段重点，明确系统级与租户级配置边界
-2. 为 `ShiftSchedule` 等剩余运营模型评估是否需要显式 `tenant_id` / `workspace_id`
-3. 继续压缩旧 `services/*` 中残留的聚合查询，避免新增绕过 modules scope 的读写路径
-4. 若后续需要租户级报表，补 `DailyStats` 等全局汇总表的 tenant/workspace 维度设计
+2. 继续压缩旧 `services/*` 中残留的少量 legacy 聚合查询，避免新增绕过 modules scope 的读写路径
+3. 若后续需要租户级报表，补 `DailyStats` 等全局汇总表的 tenant/workspace 维度设计
+4. 若要继续降低兼容层风险，逐步把旧 `MessageRouter` / 旧 service 聚合路径迁到 modules 边界

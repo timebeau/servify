@@ -6,6 +6,7 @@ import (
 
 	"servify/apps/server/internal/models"
 	agentdelivery "servify/apps/server/internal/modules/agent/delivery"
+	auditplatform "servify/apps/server/internal/platform/audit"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -168,6 +169,8 @@ func (h *AgentHandler) UpdateAgentStatus(c *gin.Context) {
 		return
 	}
 
+	h.setAgentAuditSnapshot(c, uint(id), true)
+
 	if err := h.agentService.UpdateAgentStatus(c.Request.Context(), uint(id), req.Status); err != nil {
 		h.logger.Errorf("Failed to update agent %d status: %v", id, err)
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
@@ -176,6 +179,7 @@ func (h *AgentHandler) UpdateAgentStatus(c *gin.Context) {
 		})
 		return
 	}
+	h.setAgentAuditSnapshot(c, uint(id), false)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":  "Agent status updated successfully",
@@ -206,6 +210,8 @@ func (h *AgentHandler) AgentGoOnline(c *gin.Context) {
 		return
 	}
 
+	h.setAgentAuditSnapshot(c, uint(id), true)
+
 	if err := h.agentService.AgentGoOnline(c.Request.Context(), uint(id)); err != nil {
 		h.logger.Errorf("Failed to set agent %d online: %v", id, err)
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
@@ -214,6 +220,7 @@ func (h *AgentHandler) AgentGoOnline(c *gin.Context) {
 		})
 		return
 	}
+	h.setAgentAuditSnapshot(c, uint(id), false)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":  "Agent is now online",
@@ -243,6 +250,8 @@ func (h *AgentHandler) AgentGoOffline(c *gin.Context) {
 		return
 	}
 
+	h.setAgentAuditSnapshot(c, uint(id), true)
+
 	if err := h.agentService.AgentGoOffline(c.Request.Context(), uint(id)); err != nil {
 		h.logger.Errorf("Failed to set agent %d offline: %v", id, err)
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
@@ -251,11 +260,27 @@ func (h *AgentHandler) AgentGoOffline(c *gin.Context) {
 		})
 		return
 	}
+	h.setAgentAuditSnapshot(c, uint(id), false)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":  "Agent is now offline",
 		"agent_id": id,
 	})
+}
+
+func (h *AgentHandler) setAgentAuditSnapshot(c *gin.Context, userID uint, before bool) {
+	if h == nil || h.agentService == nil || c == nil || userID == 0 {
+		return
+	}
+	agent, err := h.agentService.GetAgentByUserID(c.Request.Context(), userID)
+	if err != nil || agent == nil {
+		return
+	}
+	if before {
+		auditplatform.SetBefore(c, agent)
+		return
+	}
+	auditplatform.SetAfter(c, agent)
 }
 
 // GetOnlineAgents 获取在线客服列表

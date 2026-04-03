@@ -93,10 +93,10 @@ func (s *GamificationService) GetLeaderboard(ctx context.Context, req *Leaderboa
 		limit = 100
 	}
 
-	agentsQ := s.db.WithContext(ctx).
+	agentsQ := applyScopeFilter(s.db.WithContext(ctx).
 		Model(&models.Agent{}).
 		Select("agents.user_id as user_id, users.username as username, users.name as name, agents.department as department, agents.avg_response_time as avg_response_time").
-		Joins("LEFT JOIN users ON users.id = agents.user_id")
+		Joins("LEFT JOIN users ON users.id = agents.user_id"), ctx)
 	if dept := strings.TrimSpace(req.Department); dept != "" {
 		agentsQ = agentsQ.Where("agents.department = ?", dept)
 	}
@@ -107,14 +107,14 @@ func (s *GamificationService) GetLeaderboard(ctx context.Context, req *Leaderboa
 
 	// Aggregate resolved tickets in range.
 	var resolved []agentAggRow
-	if err := s.db.WithContext(ctx).
+	if err := applyScopeFilter(s.db.WithContext(ctx).
 		Model(&models.Ticket{}).
 		Select("agent_id as agent_id, COUNT(*) as count").
 		Where("agent_id IS NOT NULL").
 		Where("resolved_at IS NOT NULL").
 		Where("resolved_at >= ? AND resolved_at <= ?", start, end).
 		Where("status IN ?", []string{"resolved", "closed"}).
-		Group("agent_id").
+		Group("agent_id"), ctx).
 		Scan(&resolved).Error; err != nil {
 		return nil, err
 	}
@@ -130,12 +130,12 @@ func (s *GamificationService) GetLeaderboard(ctx context.Context, req *Leaderboa
 		Count   int64
 	}
 	var csats []csatRow
-	if err := s.db.WithContext(ctx).
+	if err := applyScopeFilter(s.db.WithContext(ctx).
 		Model(&models.CustomerSatisfaction{}).
 		Select("agent_id as agent_id, AVG(rating) as avg, COUNT(*) as count").
 		Where("agent_id IS NOT NULL").
 		Where("created_at >= ? AND created_at <= ?", start, end).
-		Group("agent_id").
+		Group("agent_id"), ctx).
 		Scan(&csats).Error; err != nil {
 		return nil, err
 	}

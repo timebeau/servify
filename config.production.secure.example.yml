@@ -28,6 +28,14 @@ security:
         requests_per_minute: 120
         burst: 30
       - enabled: true
+        prefix: "/public/kb/"
+        requests_per_minute: 60
+        burst: 15
+      - enabled: true
+        prefix: "/public/csat/"
+        requests_per_minute: 30
+        burst: 10
+      - enabled: true
         prefix: "/api/v1/ws"
         requests_per_minute: 40
         burst: 20

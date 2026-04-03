@@ -38,7 +38,7 @@ type MacroUpdateRequest struct {
 
 func (s *MacroService) List(ctx context.Context) ([]models.Macro, error) {
 	var macros []models.Macro
-	if err := s.db.WithContext(ctx).Order("updated_at DESC").Find(&macros).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).Order("updated_at DESC").Find(&macros).Error; err != nil {
 		return nil, err
 	}
 	return macros, nil
@@ -49,6 +49,8 @@ func (s *MacroService) Create(ctx context.Context, req *MacroCreateRequest) (*mo
 		return nil, errors.New("request required")
 	}
 	macro := &models.Macro{
+		TenantID:    "",
+		WorkspaceID: "",
 		Name:        req.Name,
 		Description: req.Description,
 		Content:     req.Content,
@@ -56,6 +58,7 @@ func (s *MacroService) Create(ctx context.Context, req *MacroCreateRequest) (*mo
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
+	macro.TenantID, macro.WorkspaceID = tenantAndWorkspace(ctx)
 	if err := s.db.WithContext(ctx).Create(macro).Error; err != nil {
 		return nil, err
 	}
@@ -67,7 +70,7 @@ func (s *MacroService) Update(ctx context.Context, id uint, req *MacroUpdateRequ
 		return nil, errors.New("request required")
 	}
 	var macro models.Macro
-	if err := s.db.WithContext(ctx).First(&macro, id).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).First(&macro, id).Error; err != nil {
 		return nil, err
 	}
 	if req.Description != nil {
@@ -90,7 +93,7 @@ func (s *MacroService) Update(ctx context.Context, id uint, req *MacroUpdateRequ
 }
 
 func (s *MacroService) Delete(ctx context.Context, id uint) error {
-	result := s.db.WithContext(ctx).Delete(&models.Macro{}, id)
+	result := applyScopeFilter(s.db.WithContext(ctx), ctx).Delete(&models.Macro{}, id)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -102,7 +105,7 @@ func (s *MacroService) Delete(ctx context.Context, id uint) error {
 
 func (s *MacroService) ApplyToTicket(ctx context.Context, macroID, ticketID, actorID uint) (*models.TicketComment, error) {
 	var macro models.Macro
-	if err := s.db.WithContext(ctx).First(&macro, macroID).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).First(&macro, macroID).Error; err != nil {
 		return nil, err
 	}
 	if !macro.Active {

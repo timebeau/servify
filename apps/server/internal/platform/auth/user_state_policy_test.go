@@ -180,3 +180,105 @@ func TestUserStateTokenPolicyAllowsCurrentActiveUser(t *testing.T) {
 		t.Fatalf("expected 200 got %d body=%s", w.Code, w.Body.String())
 	}
 }
+
+func TestUserStateTokenPolicyRejectsRevokedSession(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	db := testAuthDB(t)
+	revokedAt := now.Add(-5 * time.Minute)
+	if err := db.AutoMigrate(&models.UserAuthSession{}); err != nil {
+		t.Fatalf("migrate auth session: %v", err)
+	}
+	if err := db.Create(&models.User{
+		ID:       11,
+		Username: "u11",
+		Email:    "u11@example.com",
+		Status:   "active",
+	}).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	if err := db.Create(&models.UserAuthSession{
+		ID:           "auth-session-1",
+		UserID:       11,
+		Status:       "revoked",
+		TokenVersion: 2,
+		RevokedAt:    &revokedAt,
+	}).Error; err != nil {
+		t.Fatalf("seed auth session: %v", err)
+	}
+
+	secret := "test-secret"
+	token := createTestHS256JWT(t, map[string]interface{}{
+		"user_id":               11,
+		"session_id":            "auth-session-1",
+		"session_token_version": 2,
+		"iat":                   now.Unix(),
+		"exp":                   now.Add(10 * time.Minute).Unix(),
+	}, secret)
+
+	r := gin.New()
+	r.Use(AuthMiddleware(MiddlewareConfig{
+		Secret: secret,
+		Now:    func() time.Time { return now },
+		Policy: NewUserStateTokenPolicy(db),
+	}))
+	r.GET("/claims", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/claims", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestUserStateTokenPolicyRejectsStaleSessionTokenVersion(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	db := testAuthDB(t)
+	if err := db.AutoMigrate(&models.UserAuthSession{}); err != nil {
+		t.Fatalf("migrate auth session: %v", err)
+	}
+	if err := db.Create(&models.User{
+		ID:       12,
+		Username: "u12",
+		Email:    "u12@example.com",
+		Status:   "active",
+	}).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	if err := db.Create(&models.UserAuthSession{
+		ID:           "auth-session-2",
+		UserID:       12,
+		Status:       "active",
+		TokenVersion: 3,
+	}).Error; err != nil {
+		t.Fatalf("seed auth session: %v", err)
+	}
+
+	secret := "test-secret"
+	token := createTestHS256JWT(t, map[string]interface{}{
+		"user_id":               12,
+		"session_id":            "auth-session-2",
+		"session_token_version": 2,
+		"iat":                   now.Unix(),
+		"exp":                   now.Add(10 * time.Minute).Unix(),
+	}, secret)
+
+	r := gin.New()
+	r.Use(AuthMiddleware(MiddlewareConfig{
+		Secret: secret,
+		Now:    func() time.Time { return now },
+		Policy: NewUserStateTokenPolicy(db),
+	}))
+	r.GET("/claims", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/claims", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 got %d body=%s", w.Code, w.Body.String())
+	}
+}

@@ -180,6 +180,11 @@ go -C apps/server test ./cmd/cli ./internal/app/bootstrap
 | Observability: Dashboard | 资产缺失 | 确认 `deploy/observability/dashboards/` 文件存在 |
 | Repo hygiene | 追踪了运行时产物 | 执行 `make clean-runtime` 并更新 `.gitignore` |
 
+补充说明：
+
+- `config.yml` 现在用于本地开发的同时，也保持通过当前 `security` / `observability` strict baseline 检查，便于在本地直接跑通自检。
+- 这不意味着可以把 `config.yml` 直接视为生产配置；生产仍应从 `config.production.secure.example.yml` 或等价部署配置出发，显式收紧 CORS、密钥注入和限流阈值。
+
 ---
 
 ## 4. 配置管理
@@ -750,13 +755,19 @@ security:
     requests_per_minute: 300
     burst: 50
     # 路径级限流
-    path_overrides:
+    paths:
       - prefix: "/api/v1/ai/"
         requests_per_minute: 60
         burst: 10
       - prefix: "/public/"
         requests_per_minute: 120
         burst: 20
+      - prefix: "/public/kb/"
+        requests_per_minute: 60
+        burst: 15
+      - prefix: "/public/csat/"
+        requests_per_minute: 30
+        burst: 10
 ```
 
 ### 13.4 安全基线检查

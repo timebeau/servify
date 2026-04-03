@@ -17,6 +17,7 @@ import (
 	"gorm.io/gorm"
 
 	"servify/apps/server/internal/models"
+	auditplatform "servify/apps/server/internal/platform/audit"
 	"servify/apps/server/internal/services"
 )
 
@@ -137,5 +138,88 @@ func TestAgentHandler_Create_Online_Status_Offline(t *testing.T) {
 	r.ServeHTTP(w6, req6)
 	if w6.Code != http.StatusOK {
 		t.Fatalf("revoke tokens status=%d body=%s", w6.Code, w6.Body.String())
+	}
+}
+
+func TestAgentHandler_AuditSnapshotsForStatusChanges(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestDBForAgents(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.WarnLevel)
+
+	if err := db.Create(&models.User{
+		ID:       20,
+		Username: "agent20",
+		Email:    "agent20@example.com",
+		Name:     "agent20",
+		Role:     "agent",
+		Status:   "active",
+	}).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	if err := db.Create(&models.Agent{
+		UserID:        20,
+		Status:        "offline",
+		MaxConcurrent: 3,
+	}).Error; err != nil {
+		t.Fatalf("seed agent: %v", err)
+	}
+
+	svc := services.NewAgentService(db, logger)
+	h := NewAgentHandler(svc, logger)
+	recorder := &ticketAuditRecorder{}
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", uint(99))
+		c.Set("principal_kind", "admin")
+		c.Next()
+	})
+	r.Use(auditplatform.Middleware(recorder))
+	r.POST("/api/agents/:id/online", h.AgentGoOnline)
+	r.PUT("/api/agents/:id/status", h.UpdateAgentStatus)
+	r.POST("/api/agents/:id/offline", h.AgentGoOffline)
+
+	w1 := httptest.NewRecorder()
+	req1, _ := http.NewRequest(http.MethodPost, "/api/agents/20/online", nil)
+	r.ServeHTTP(w1, req1)
+	if w1.Code != http.StatusOK {
+		t.Fatalf("online status=%d body=%s", w1.Code, w1.Body.String())
+	}
+
+	updateBody := map[string]any{"status": "busy"}
+	bu, _ := json.Marshal(updateBody)
+	w2 := httptest.NewRecorder()
+	req2, _ := http.NewRequest(http.MethodPut, "/api/agents/20/status", bytes.NewReader(bu))
+	req2.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w2, req2)
+	if w2.Code != http.StatusOK {
+		t.Fatalf("status update=%d body=%s", w2.Code, w2.Body.String())
+	}
+
+	w3 := httptest.NewRecorder()
+	req3, _ := http.NewRequest(http.MethodPost, "/api/agents/20/offline", nil)
+	r.ServeHTTP(w3, req3)
+	if w3.Code != http.StatusOK {
+		t.Fatalf("offline status=%d body=%s", w3.Code, w3.Body.String())
+	}
+
+	if len(recorder.entries) != 3 {
+		t.Fatalf("expected 3 audit entries got %d", len(recorder.entries))
+	}
+	for _, entry := range recorder.entries {
+		if entry.BeforeJSON == "" || entry.AfterJSON == "" {
+			t.Fatalf("expected before/after snapshot for %s, got before=%q after=%q", entry.Action, entry.BeforeJSON, entry.AfterJSON)
+		}
+	}
+	if !strings.Contains(recorder.entries[0].BeforeJSON, `"status":"offline"`) || !strings.Contains(recorder.entries[0].AfterJSON, `"status":"online"`) {
+		t.Fatalf("unexpected online snapshots: before=%s after=%s", recorder.entries[0].BeforeJSON, recorder.entries[0].AfterJSON)
+	}
+	if !strings.Contains(recorder.entries[1].AfterJSON, `"status":"busy"`) {
+		t.Fatalf("unexpected update snapshot: %s", recorder.entries[1].AfterJSON)
+	}
+	if !strings.Contains(recorder.entries[2].AfterJSON, `"status":"offline"`) {
+		t.Fatalf("unexpected offline snapshot: %s", recorder.entries[2].AfterJSON)
 	}
 }

@@ -225,6 +225,16 @@ func TestMessageRouter_ensureSession(t *testing.T) {
 	t.Skip("ensureSession is tested indirectly through HandleWebMessage")
 }
 
+func TestRouterScopeFromMetadata(t *testing.T) {
+	tenantID, workspaceID := routerScopeFromMetadata(map[string]interface{}{
+		"tenant_id":    "tenant-a",
+		"workspace_id": "workspace-a",
+	})
+	if tenantID != "tenant-a" || workspaceID != "workspace-a" {
+		t.Fatalf("unexpected scope: tenant=%q workspace=%q", tenantID, workspaceID)
+	}
+}
+
 // mockPlatformAdapter is a mock implementation of PlatformAdapter
 type mockPlatformAdapter struct {
 	name string

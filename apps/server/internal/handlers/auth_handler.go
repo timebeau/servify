@@ -21,7 +21,7 @@ type authService interface {
 	Register(ctx context.Context, req services.RegisterInput) (*services.AuthResult, error)
 	Login(ctx context.Context, req services.LoginInput) (*services.AuthResult, error)
 	GetCurrentUser(ctx context.Context, userID uint) (*models.User, error)
-	RefreshToken(ctx context.Context, userID uint) (*services.AuthResult, error)
+	RefreshToken(ctx context.Context, userID uint, sessionID string) (*services.AuthResult, error)
 }
 
 // NewAuthHandler creates a new AuthHandler.
@@ -159,7 +159,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	result, err := h.service.RefreshToken(c.Request.Context(), userID)
+	result, err := h.service.RefreshToken(c.Request.Context(), userID, authSessionID(c))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
 		return
@@ -188,6 +188,15 @@ func authUserID(c *gin.Context) (uint, bool) {
 	default:
 		return 0, false
 	}
+}
+
+func authSessionID(c *gin.Context) string {
+	if raw, ok := c.Get("session_id"); ok {
+		if sessionID, ok := raw.(string); ok {
+			return strings.TrimSpace(sessionID)
+		}
+	}
+	return ""
 }
 
 // Request/Response types

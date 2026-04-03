@@ -127,6 +127,47 @@ func TestMacroService_Create(t *testing.T) {
 	}
 }
 
+func TestMacroService_ScopedByWorkspace(t *testing.T) {
+	db := newMacroTestDB(t)
+	svc := NewMacroService(db)
+
+	ctxA := scopedContext("tenant-a", "workspace-a")
+	ctxB := scopedContext("tenant-a", "workspace-b")
+
+	macroA, err := svc.Create(ctxA, &MacroCreateRequest{
+		Name:    "宏-A",
+		Content: "A",
+	})
+	if err != nil {
+		t.Fatalf("create A failed: %v", err)
+	}
+	if macroA.TenantID != "tenant-a" || macroA.WorkspaceID != "workspace-a" {
+		t.Fatalf("unexpected scope on macro A: %+v", macroA)
+	}
+
+	if _, err := svc.Create(ctxB, &MacroCreateRequest{
+		Name:    "宏-B",
+		Content: "B",
+	}); err != nil {
+		t.Fatalf("create B failed: %v", err)
+	}
+
+	listA, err := svc.List(ctxA)
+	if err != nil {
+		t.Fatalf("list A failed: %v", err)
+	}
+	if len(listA) != 1 || listA[0].WorkspaceID != "workspace-a" {
+		t.Fatalf("unexpected scoped macros: %+v", listA)
+	}
+
+	if _, err := svc.Update(ctxB, macroA.ID, &MacroUpdateRequest{Content: stringPtr("cross-workspace")}); err == nil {
+		t.Fatal("expected scoped update to reject cross-workspace macro")
+	}
+	if err := svc.Delete(ctxB, macroA.ID); err == nil {
+		t.Fatal("expected scoped delete to reject cross-workspace macro")
+	}
+}
+
 func TestMacroService_Update(t *testing.T) {
 	db := newMacroTestDB(t)
 	svc := NewMacroService(db)

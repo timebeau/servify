@@ -44,7 +44,7 @@
 
 - `01` 到 `08` 全部 backlog 已清零
 - `09`、`10`、`12` 已完成
-- `11` 已完成核心骨架，但仍有剩余收口项
+- `11` 已完成核心骨架与 T1 大部分 scope 收口，但仍有少量收尾项
 - 所有已规划 backlog 已从“实施项”收敛到“少量收尾项”
 
 产品收口新增待办：
@@ -85,7 +85,7 @@
 - Phase 5 上线 readiness 基础能力已完成，默认配置与文档收尾进行中
 - 当前完成度大致在 `85% ~ 90%`
 - 当前最短板是：
-  - `11-tenant-auth-and-audit` 的剩余收口项
+  - `11-tenant-auth-and-audit` 中 T4/T5 的剩余收口项（主要是更完整 refresh-token / revoke-list / 运维手册尾项），以及少量 legacy 聚合尾项
   - 生产配置与发布前检查的最终对齐（Phase 5）
 
 产品化详细计划：
@@ -154,8 +154,8 @@
     - [x] P5-4 完成 operator runbook、告警规则和关键 dashboard
     - [x] P5-5 完成部署演练与回滚演练
   - 当前剩余：
-    - [ ] 默认开发配置与 strict security baseline 的期望仍需持续区分
-    - [ ] backlog / scorecard / readiness 文档状态仍需继续同步，避免再次漂移
+    - [x] 默认开发配置与 strict security baseline 的期望已补充说明：`config.yml` 可通过 strict check，但生产仍应使用更收紧的部署配置
+    - [x] backlog / scorecard / readiness 文档状态已同步一轮，修正文档对默认基线与验收状态的漂移
 
 执行顺序建议：
 

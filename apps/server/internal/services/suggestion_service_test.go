@@ -122,6 +122,67 @@ func TestSuggestionService_Suggest_CustomLimits(t *testing.T) {
 	}
 }
 
+func TestSuggestionService_Suggest_ScopedByWorkspace(t *testing.T) {
+	db := newSuggestionServiceTestDB(t)
+	svc := NewSuggestionService(db)
+
+	if err := db.Create(&models.Ticket{
+		Title:       "Login error A",
+		Description: "User cannot login to workspace A",
+		Status:      "open",
+		Category:    "technical",
+		Priority:    "high",
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-a",
+	}).Error; err != nil {
+		t.Fatalf("create ticket A: %v", err)
+	}
+	if err := db.Create(&models.Ticket{
+		Title:       "Login error B",
+		Description: "User cannot login to workspace B",
+		Status:      "open",
+		Category:    "technical",
+		Priority:    "high",
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-b",
+	}).Error; err != nil {
+		t.Fatalf("create ticket B: %v", err)
+	}
+	if err := db.Create(&models.KnowledgeDoc{
+		Title:       "Workspace A login guide",
+		Content:     "Reset password in workspace A",
+		Category:    "Technical",
+		Tags:        "login,workspace-a",
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-a",
+	}).Error; err != nil {
+		t.Fatalf("create doc A: %v", err)
+	}
+	if err := db.Create(&models.KnowledgeDoc{
+		Title:       "Workspace B login guide",
+		Content:     "Reset password in workspace B",
+		Category:    "Technical",
+		Tags:        "login,workspace-b",
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-b",
+	}).Error; err != nil {
+		t.Fatalf("create doc B: %v", err)
+	}
+
+	resp, err := svc.Suggest(scopedContext("tenant-a", "workspace-a"), &SuggestionRequest{
+		Query: "login workspace",
+	})
+	if err != nil {
+		t.Fatalf("Suggest() scoped error = %v", err)
+	}
+	if len(resp.SimilarTickets) != 1 || resp.SimilarTickets[0].Title != "Login error A" {
+		t.Fatalf("unexpected scoped tickets: %+v", resp.SimilarTickets)
+	}
+	if len(resp.KnowledgeDocs) != 1 || resp.KnowledgeDocs[0].Title != "Workspace A login guide" {
+		t.Fatalf("unexpected scoped docs: %+v", resp.KnowledgeDocs)
+	}
+}
+
 func TestExtractTokens(t *testing.T) {
 	tests := []struct {
 		name     string

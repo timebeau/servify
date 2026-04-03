@@ -46,6 +46,32 @@ func NewUserStateTokenPolicy(db *gorm.DB) TokenPolicy {
 			}
 		}
 
+		if claims.SessionID == "" {
+			return nil
+		}
+
+		var session models.UserAuthSession
+		if err := db.WithContext(ContextWithScope(nil, claims.TenantID, claims.WorkspaceID)).
+			Select("id", "user_id", "status", "token_version", "revoked_at").
+			First(&session, "id = ? AND user_id = ?", claims.SessionID, claims.UserID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("token session no longer exists")
+			}
+			return errors.New("failed to evaluate token session state")
+		}
+		if strings.ToLower(strings.TrimSpace(session.Status)) != "active" || session.RevokedAt != nil {
+			return errors.New("token session is not active")
+		}
+		if session.TokenVersion > 0 {
+			version, ok := int64Claim(payload, "session_token_version", "stv")
+			if !ok {
+				return errors.New("token missing session_token_version required by session policy")
+			}
+			if version < int64(session.TokenVersion) {
+				return errors.New("token has been revoked by session policy")
+			}
+		}
+
 		return nil
 	}
 }

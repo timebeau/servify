@@ -5,6 +5,8 @@
 ## 查询入口
 
 - 管理面查询：`GET /api/audit/logs`
+- 管理面单条查询：`GET /api/audit/logs/:id`
+- 管理面差异预览：`GET /api/audit/logs/:id/diff`
 
 支持过滤：
 
@@ -32,7 +34,19 @@
 - 匿名 public surface
 - 仅只读查询请求
 - 每个 handler 的精细 `before/after` 业务快照
-- 审计查询导出
+- 审计查询导出的更高级格式或离线任务化能力
+
+差异预览说明：
+
+- `GET /api/audit/logs/:id/diff` 会在当前 request scope 下读取单条审计记录
+- 若 `before_json` / `after_json` 可解析为 JSON，对象字段级变更会返回 `changed_paths` 与 `changes`
+- 当前为通用 JSON diff，适合排障与快速预览；更细的领域级 diff 仍可按资源类型继续增强
+
+导出说明：
+
+- `GET /api/audit/logs/export` 复用与列表接口一致的过滤参数，并额外支持 `limit`
+- 当前导出格式为 CSV，适合临时排查、留档或交给运营侧做轻量二次分析
+- 若后续导出量继续增大，建议补异步导出任务、对象存储落盘和权限水印
 
 ## 保留策略
 

@@ -80,6 +80,7 @@ func (s *ShiftService) CreateShift(ctx context.Context, req *ShiftCreateRequest)
 		Status:    "scheduled",
 		Date:      req.StartTime.Truncate(24 * time.Hour),
 	}
+	shift.TenantID, shift.WorkspaceID = tenantAndWorkspace(ctx)
 	if req.Status != "" {
 		shift.Status = req.Status
 	}
@@ -93,7 +94,7 @@ func (s *ShiftService) CreateShift(ctx context.Context, req *ShiftCreateRequest)
 
 // ListShifts 获取班次列表
 func (s *ShiftService) ListShifts(ctx context.Context, req *ShiftListRequest) ([]models.ShiftSchedule, int64, error) {
-	query := s.db.WithContext(ctx).Model(&models.ShiftSchedule{}).Preload("Agent")
+	query := applyScopeFilter(s.db.WithContext(ctx).Model(&models.ShiftSchedule{}), ctx).Preload("Agent")
 
 	if req.AgentID != nil {
 		query = query.Where("agent_id = ?", *req.AgentID)
@@ -143,7 +144,7 @@ func (s *ShiftService) ListShifts(ctx context.Context, req *ShiftListRequest) ([
 // UpdateShift 更新班次
 func (s *ShiftService) UpdateShift(ctx context.Context, id uint, req *ShiftUpdateRequest) (*models.ShiftSchedule, error) {
 	var shift models.ShiftSchedule
-	if err := s.db.WithContext(ctx).First(&shift, id).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).First(&shift, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, fmt.Errorf("shift not found")
 		}
@@ -177,7 +178,7 @@ func (s *ShiftService) UpdateShift(ctx context.Context, id uint, req *ShiftUpdat
 
 // DeleteShift 删除班次
 func (s *ShiftService) DeleteShift(ctx context.Context, id uint) error {
-	result := s.db.WithContext(ctx).Delete(&models.ShiftSchedule{}, id)
+	result := applyScopeFilter(s.db.WithContext(ctx), ctx).Delete(&models.ShiftSchedule{}, id)
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete shift: %w", result.Error)
 	}
@@ -195,7 +196,7 @@ func (s *ShiftService) GetShiftStats(ctx context.Context) (*ShiftStatsResponse, 
 	}
 
 	var total int64
-	if err := s.db.WithContext(ctx).Model(&models.ShiftSchedule{}).Count(&total).Error; err != nil {
+	if err := applyScopeFilter(s.db.WithContext(ctx).Model(&models.ShiftSchedule{}), ctx).Count(&total).Error; err != nil {
 		return nil, fmt.Errorf("failed to count shifts: %w", err)
 	}
 	stats.Total = int(total)
@@ -204,7 +205,7 @@ func (s *ShiftService) GetShiftStats(ctx context.Context) (*ShiftStatsResponse, 
 		ShiftType string
 		Count     int
 	}
-	if err := s.db.WithContext(ctx).Model(&models.ShiftSchedule{}).
+	if err := applyScopeFilter(s.db.WithContext(ctx).Model(&models.ShiftSchedule{}), ctx).
 		Select("shift_type, COUNT(*) as count").
 		Group("shift_type").Scan(&byType).Error; err != nil {
 		return nil, fmt.Errorf("failed to aggregate by shift_type: %w", err)
@@ -217,7 +218,7 @@ func (s *ShiftService) GetShiftStats(ctx context.Context) (*ShiftStatsResponse, 
 		Status string
 		Count  int
 	}
-	if err := s.db.WithContext(ctx).Model(&models.ShiftSchedule{}).
+	if err := applyScopeFilter(s.db.WithContext(ctx).Model(&models.ShiftSchedule{}), ctx).
 		Select("status, COUNT(*) as count").
 		Group("status").Scan(&byStatus).Error; err != nil {
 		return nil, fmt.Errorf("failed to aggregate by status: %w", err)
@@ -229,7 +230,7 @@ func (s *ShiftService) GetShiftStats(ctx context.Context) (*ShiftStatsResponse, 
 	// upcoming: start in the future
 	now := time.Now()
 	var upcoming int64
-	if err := s.db.WithContext(ctx).Model(&models.ShiftSchedule{}).
+	if err := applyScopeFilter(s.db.WithContext(ctx).Model(&models.ShiftSchedule{}), ctx).
 		Where("start_time > ?", now).
 		Count(&upcoming).Error; err != nil {
 		return nil, fmt.Errorf("failed to count upcoming shifts: %w", err)
@@ -240,7 +241,7 @@ func (s *ShiftService) GetShiftStats(ctx context.Context) (*ShiftStatsResponse, 
 	dayStart := time.Now().Truncate(24 * time.Hour)
 	dayEnd := dayStart.Add(24 * time.Hour)
 	var todayActive int64
-	if err := s.db.WithContext(ctx).Model(&models.ShiftSchedule{}).
+	if err := applyScopeFilter(s.db.WithContext(ctx).Model(&models.ShiftSchedule{}), ctx).
 		Where("start_time < ? AND end_time > ?", dayEnd, dayStart).
 		Count(&todayActive).Error; err != nil {
 		return nil, fmt.Errorf("failed to count today active shifts: %w", err)

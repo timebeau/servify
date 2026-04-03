@@ -53,8 +53,11 @@ func TestSecurityWarnings_PublicSurfaceRateLimitCoverage(t *testing.T) {
 	joined := strings.Join(warnings, "\n")
 
 	for _, want := range []string{
-		"security.rate_limiting.paths has no dedicated limit for /public/",
-		"security.rate_limiting.paths has no dedicated limit for /api/v1/ws",
+		"security.rate_limiting.paths has no dedicated limit for /public/ (anonymous public surface baseline)",
+		"security.rate_limiting.paths has no dedicated limit for /public/kb/ (public knowledge base enumeration and crawl risk)",
+		"security.rate_limiting.paths has no dedicated limit for /public/csat/ (public survey token access and submission risk)",
+		"security.rate_limiting.paths has no dedicated limit for /api/v1/ws (anonymous realtime connection surface)",
+		"security.rate_limiting.paths has no dedicated limit for /api/v1/metrics/ingest (service ingestion surface)",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("missing warning %q in %q", want, joined)
@@ -76,15 +79,85 @@ func TestSecurityWarnings_PublicSurfaceRateLimitCoverageSatisfied(t *testing.T) 
 		},
 		{
 			Enabled:           true,
+			Prefix:            "/public/kb/",
+			RequestsPerMinute: 60,
+			Burst:             15,
+		},
+		{
+			Enabled:           true,
+			Prefix:            "/public/csat/",
+			RequestsPerMinute: 30,
+			Burst:             10,
+		},
+		{
+			Enabled:           true,
 			Prefix:            "/api/v1/ws",
 			RequestsPerMinute: 30,
 			Burst:             10,
+		},
+		{
+			Enabled:           true,
+			Prefix:            "/api/v1/metrics/ingest",
+			RequestsPerMinute: 120,
+			Burst:             30,
+		},
+		{
+			Enabled:           true,
+			Prefix:            "/api/",
+			RequestsPerMinute: 90,
+			Burst:             20,
 		},
 	}
 	cfg.AI.OpenAI.APIKey = "openai-key"
 
 	warnings := strings.Join(SecurityWarnings(cfg), "\n")
-	if strings.Contains(warnings, "/public/") || strings.Contains(warnings, "/api/v1/ws") {
+	for _, denied := range []string{"/public/", "/public/kb/", "/public/csat/", "/api/v1/ws", "/api/v1/metrics/ingest", "/api/"} {
+		if strings.Contains(warnings, denied) {
+			t.Fatalf("unexpected public/service/management surface warning for %s in %q", denied, warnings)
+		}
+	}
+}
+
+func TestSecurityWarnings_PublicSurfaceInheritedLimitDoesNotCountAsDedicated(t *testing.T) {
+	cfg := config.GetDefaultConfig()
+	cfg.JWT.Secret = "prod-secret"
+	cfg.Security.CORS.AllowedOrigins = []string{"https://app.example.com"}
+	cfg.Security.RateLimiting.Enabled = true
+	cfg.Security.RateLimiting.Paths = []config.PathRateLimitConfig{
+		{
+			Enabled:           true,
+			Prefix:            "/public/",
+			RequestsPerMinute: 120,
+			Burst:             30,
+		},
+		{
+			Enabled:           true,
+			Prefix:            "/api/v1/ws",
+			RequestsPerMinute: 30,
+			Burst:             10,
+		},
+		{
+			Enabled:           true,
+			Prefix:            "/api/v1/metrics/ingest",
+			RequestsPerMinute: 120,
+			Burst:             30,
+		},
+		{
+			Enabled:           true,
+			Prefix:            "/api/",
+			RequestsPerMinute: 90,
+			Burst:             20,
+		},
+	}
+	cfg.AI.OpenAI.APIKey = "openai-key"
+
+	warnings := strings.Join(SecurityWarnings(cfg), "\n")
+	for _, want := range []string{"/public/kb/", "/public/csat/"} {
+		if !strings.Contains(warnings, want) {
+			t.Fatalf("expected dedicated-path warning for %s in %q", want, warnings)
+		}
+	}
+	if strings.Contains(warnings, "/public/ (anonymous public surface baseline)") {
 		t.Fatalf("unexpected public surface warning in %q", warnings)
 	}
 }

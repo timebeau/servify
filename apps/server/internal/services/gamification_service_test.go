@@ -50,6 +50,28 @@ func createTestAgent(db *gorm.DB, userID uint, name, department string, avgRespo
 	return db.Create(agent).Error
 }
 
+func createScopedTestAgent(db *gorm.DB, userID uint, name, department, tenantID, workspaceID string, avgResponseTimeSec int) error {
+	user := &models.User{
+		ID:       userID,
+		Username: "user_" + name,
+		Email:    name + "@test.com",
+		Name:     name,
+		Role:     "agent",
+	}
+	if err := db.Create(user).Error; err != nil {
+		return err
+	}
+	agent := &models.Agent{
+		UserID:          userID,
+		TenantID:        tenantID,
+		WorkspaceID:     workspaceID,
+		Department:      department,
+		AvgResponseTime: avgResponseTimeSec,
+		Status:          "online",
+	}
+	return db.Create(agent).Error
+}
+
 func TestGamificationService_GetLeaderboard(t *testing.T) {
 	db := newGamificationTestDB(t)
 	svc := NewGamificationService(db)
@@ -283,6 +305,90 @@ func TestGamificationService_GetLeaderboard_NoActivity(t *testing.T) {
 	// 没有活动的客服不应该出现在排行榜
 	if len(resp.Entries) != 0 {
 		t.Fatalf("expected 0 entries for agents with no activity, got %d", len(resp.Entries))
+	}
+}
+
+func TestGamificationService_GetLeaderboard_ScopedByWorkspace(t *testing.T) {
+	db := newGamificationTestDB(t)
+	svc := NewGamificationService(db)
+
+	start := time.Now().Add(-48 * time.Hour)
+	end := time.Now()
+
+	if err := createScopedTestAgent(db, 11, "AgentA", "技术支持", "tenant-a", "workspace-a", 120); err != nil {
+		t.Fatalf("create agent A: %v", err)
+	}
+	if err := createScopedTestAgent(db, 12, "AgentB", "技术支持", "tenant-a", "workspace-b", 180); err != nil {
+		t.Fatalf("create agent B: %v", err)
+	}
+
+	ticketA := models.Ticket{
+		ID:          101,
+		CustomerID:  1,
+		AgentID:     uintPtr(11),
+		Status:      "resolved",
+		ResolvedAt:  &[]time.Time{time.Now().Add(-24 * time.Hour)}[0],
+		Priority:    "high",
+		Title:       "ticket-a",
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-a",
+	}
+	ticketB := models.Ticket{
+		ID:          102,
+		CustomerID:  2,
+		AgentID:     uintPtr(12),
+		Status:      "resolved",
+		ResolvedAt:  &[]time.Time{time.Now().Add(-20 * time.Hour)}[0],
+		Priority:    "high",
+		Title:       "ticket-b",
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-b",
+	}
+	if err := db.Create(&ticketA).Error; err != nil {
+		t.Fatalf("create ticket A: %v", err)
+	}
+	if err := db.Create(&ticketB).Error; err != nil {
+		t.Fatalf("create ticket B: %v", err)
+	}
+
+	csatA := models.CustomerSatisfaction{
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-a",
+		TicketID:    ticketA.ID,
+		CustomerID:  1,
+		AgentID:     uintPtr(11),
+		Rating:      5,
+		CreatedAt:   time.Now().Add(-23 * time.Hour),
+	}
+	csatB := models.CustomerSatisfaction{
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-b",
+		TicketID:    ticketB.ID,
+		CustomerID:  2,
+		AgentID:     uintPtr(12),
+		Rating:      4,
+		CreatedAt:   time.Now().Add(-19 * time.Hour),
+	}
+	if err := db.Create(&csatA).Error; err != nil {
+		t.Fatalf("create csat A: %v", err)
+	}
+	if err := db.Create(&csatB).Error; err != nil {
+		t.Fatalf("create csat B: %v", err)
+	}
+
+	resp, err := svc.GetLeaderboard(scopedContext("tenant-a", "workspace-a"), &LeaderboardRequest{
+		StartDate: start,
+		EndDate:   end,
+		Limit:     10,
+	})
+	if err != nil {
+		t.Fatalf("GetLeaderboard scoped failed: %v", err)
+	}
+	if len(resp.Entries) != 1 {
+		t.Fatalf("expected 1 scoped entry, got %d (%+v)", len(resp.Entries), resp.Entries)
+	}
+	if resp.Entries[0].AgentID != 11 {
+		t.Fatalf("expected workspace A agent only, got %+v", resp.Entries[0])
 	}
 }
 

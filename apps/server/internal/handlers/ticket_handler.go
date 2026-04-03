@@ -11,6 +11,7 @@ import (
 
 	ticketcontract "servify/apps/server/internal/modules/ticket/contract"
 	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
+	auditplatform "servify/apps/server/internal/platform/audit"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -138,6 +139,11 @@ func (h *TicketHandler) UpdateTicket(c *gin.Context) {
 		userID = uint(0) // 系统操作
 	}
 
+	before, err := h.ticketService.GetTicketByID(c.Request.Context(), uint(id))
+	if err == nil && before != nil {
+		auditplatform.SetBefore(c, before)
+	}
+
 	ticket, err := h.ticketService.UpdateTicket(c.Request.Context(), uint(id), &req, userID.(uint))
 	if err != nil {
 		h.logger.Errorf("Failed to update ticket %d: %v", id, err)
@@ -148,6 +154,7 @@ func (h *TicketHandler) UpdateTicket(c *gin.Context) {
 		return
 	}
 
+	auditplatform.SetAfter(c, ticket)
 	c.JSON(http.StatusOK, ticket)
 }
 
@@ -341,6 +348,11 @@ func (h *TicketHandler) AssignTicket(c *gin.Context) {
 		assignerID = uint(0)
 	}
 
+	before, err := h.ticketService.GetTicketByID(c.Request.Context(), uint(id))
+	if err == nil && before != nil {
+		auditplatform.SetBefore(c, before)
+	}
+
 	if err := h.ticketService.AssignTicket(c.Request.Context(), uint(id), req.AgentID, assignerID.(uint)); err != nil {
 		h.logger.Errorf("Failed to assign ticket %d to agent %d: %v", id, req.AgentID, err)
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
@@ -350,6 +362,9 @@ func (h *TicketHandler) AssignTicket(c *gin.Context) {
 		return
 	}
 
+	if after, err := h.ticketService.GetTicketByID(c.Request.Context(), uint(id)); err == nil && after != nil {
+		auditplatform.SetAfter(c, after)
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"message":   "Ticket assigned successfully",
 		"ticket_id": id,
@@ -459,6 +474,11 @@ func (h *TicketHandler) CloseTicket(c *gin.Context) {
 		return
 	}
 
+	before, err := h.ticketService.GetTicketByID(c.Request.Context(), uint(id))
+	if err == nil && before != nil {
+		auditplatform.SetBefore(c, before)
+	}
+
 	if err := h.ticketService.CloseTicket(c.Request.Context(), uint(id), userID.(uint), req.Reason); err != nil {
 		h.logger.Errorf("Failed to close ticket %d: %v", id, err)
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
@@ -468,6 +488,9 @@ func (h *TicketHandler) CloseTicket(c *gin.Context) {
 		return
 	}
 
+	if after, err := h.ticketService.GetTicketByID(c.Request.Context(), uint(id)); err == nil && after != nil {
+		auditplatform.SetAfter(c, after)
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"message":   "Ticket closed successfully",
 		"ticket_id": id,

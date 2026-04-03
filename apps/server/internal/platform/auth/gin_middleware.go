@@ -85,6 +85,10 @@ func AuthMiddleware(cfg MiddlewareConfig) gin.HandlerFunc {
 		if claims.WorkspaceID != "" {
 			c.Set("workspace_id", claims.WorkspaceID)
 		}
+		if claims.SessionID != "" {
+			c.Set("session_id", claims.SessionID)
+		}
+		c.Set("auth_claims", claims.Values)
 
 		c.Next()
 	}

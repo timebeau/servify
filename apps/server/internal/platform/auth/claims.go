@@ -11,6 +11,7 @@ type Claims struct {
 	UserID        uint
 	HasUserID     bool
 	UserIDRaw     interface{}
+	SessionID     string
 	Roles         []string
 	Permissions   []string
 	PrincipalKind string
@@ -26,6 +27,7 @@ func extractClaims(payload map[string]interface{}, resolver Resolver) Claims {
 	claims.PrincipalKind = derivePrincipalKind(payload, claims.Roles)
 	claims.TenantID = normalizeOptionalString(firstValue(payload["tenant_id"], payload["tenant"], payload["tid"]))
 	claims.WorkspaceID = normalizeOptionalString(firstValue(payload["workspace_id"], payload["workspace"], payload["wid"]))
+	claims.SessionID = normalizeOptionalString(firstValue(payload["session_id"], payload["sid"]))
 
 	if uid, ok := firstNonNil(payload["user_id"], payload["sub"]); ok {
 		switch t := uid.(type) {

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -17,6 +18,7 @@ import (
 
 	"servify/apps/server/internal/models"
 	customerdelivery "servify/apps/server/internal/modules/customer/delivery"
+	auditplatform "servify/apps/server/internal/platform/audit"
 )
 
 func newTestDBForCustomers(t *testing.T) *gorm.DB {
@@ -239,5 +241,90 @@ func TestCustomerHandler_GetCustomerStats(t *testing.T) {
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d, body: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestCustomerHandler_AuditSnapshotsForWrites(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestDBForCustomers(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.WarnLevel)
+
+	svc := customerdelivery.NewHandlerService(db)
+	h := NewCustomerHandler(svc, logger)
+	recorder := &ticketAuditRecorder{}
+
+	user := &models.User{ID: 10, Username: "cust-audit", Email: "cust-audit@example.com", Name: "Cust Audit", Role: "customer", TokenVersion: 1}
+	if err := db.Create(user).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	customer := &models.Customer{UserID: user.ID, Company: "OldCo", Tags: "old", Notes: "old-note"}
+	if err := db.Create(customer).Error; err != nil {
+		t.Fatalf("seed customer: %v", err)
+	}
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", uint(99))
+		c.Set("principal_kind", "admin")
+		c.Next()
+	})
+	r.Use(auditplatform.Middleware(recorder))
+	r.PUT("/api/customers/:id", h.UpdateCustomer)
+	r.POST("/api/customers/:id/revoke-tokens", h.RevokeCustomerTokens)
+	r.POST("/api/customers/:id/notes", h.AddCustomerNote)
+	r.PUT("/api/customers/:id/tags", h.UpdateCustomerTags)
+
+	updateBody, _ := json.Marshal(map[string]any{"name": "Cust Audit Updated", "company": "NewCo"})
+	w1 := httptest.NewRecorder()
+	req1, _ := http.NewRequest(http.MethodPut, "/api/customers/10", bytes.NewReader(updateBody))
+	req1.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w1, req1)
+	if w1.Code != http.StatusOK {
+		t.Fatalf("update status=%d body=%s", w1.Code, w1.Body.String())
+	}
+
+	w2 := httptest.NewRecorder()
+	req2, _ := http.NewRequest(http.MethodPost, "/api/customers/10/revoke-tokens", nil)
+	r.ServeHTTP(w2, req2)
+	if w2.Code != http.StatusOK {
+		t.Fatalf("revoke status=%d body=%s", w2.Code, w2.Body.String())
+	}
+
+	noteBody, _ := json.Marshal(map[string]any{"note": "fresh note"})
+	w3 := httptest.NewRecorder()
+	req3, _ := http.NewRequest(http.MethodPost, "/api/customers/10/notes", bytes.NewReader(noteBody))
+	req3.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w3, req3)
+	if w3.Code != http.StatusOK {
+		t.Fatalf("note status=%d body=%s", w3.Code, w3.Body.String())
+	}
+
+	tagsBody, _ := json.Marshal(map[string]any{"tags": []string{"vip", "enterprise"}})
+	w4 := httptest.NewRecorder()
+	req4, _ := http.NewRequest(http.MethodPut, "/api/customers/10/tags", bytes.NewReader(tagsBody))
+	req4.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w4, req4)
+	if w4.Code != http.StatusOK {
+		t.Fatalf("tags status=%d body=%s", w4.Code, w4.Body.String())
+	}
+
+	if len(recorder.entries) != 4 {
+		t.Fatalf("expected 4 audit entries got %d", len(recorder.entries))
+	}
+	for _, entry := range recorder.entries {
+		if entry.BeforeJSON == "" || entry.AfterJSON == "" {
+			t.Fatalf("expected before/after snapshot for %s, got before=%q after=%q", entry.Action, entry.BeforeJSON, entry.AfterJSON)
+		}
+	}
+	if !strings.Contains(recorder.entries[0].BeforeJSON, "Cust Audit") || !strings.Contains(recorder.entries[0].AfterJSON, "Cust Audit Updated") {
+		t.Fatalf("unexpected update snapshots: before=%s after=%s", recorder.entries[0].BeforeJSON, recorder.entries[0].AfterJSON)
+	}
+	if !strings.Contains(recorder.entries[1].BeforeJSON, `"token_version":1`) || !strings.Contains(recorder.entries[1].AfterJSON, `"token_version":2`) {
+		t.Fatalf("unexpected revoke snapshots: before=%s after=%s", recorder.entries[1].BeforeJSON, recorder.entries[1].AfterJSON)
+	}
+	if !strings.Contains(recorder.entries[3].AfterJSON, "vip") || !strings.Contains(recorder.entries[3].AfterJSON, "enterprise") {
+		t.Fatalf("unexpected tags snapshot: %s", recorder.entries[3].AfterJSON)
 	}
 }

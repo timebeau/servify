@@ -26,12 +26,19 @@
 - 认证中间件会将 `tenant_id` / `workspace_id` 投影到请求上下文，供审计、provider 调用和后续数据过滤使用
 - 管理面 `/api/*` 与受保护的 `/api/v1/*` 已增加统一 request-scope 守卫，拒绝 token scope 与 header/query scope 冲突的请求，并限制非 admin/service principal 通过请求扩大作用域
 - `KnowledgeDoc`、`CustomField`、`SLAConfig`、`AppIntegration` 已补显式 scope 字段，并在 service/repository 层默认按上下文过滤
+- `SLAViolation` 已补显式 `tenant_id/workspace_id` 字段，并在 `sla` service 的违约创建、列表、解决、统计与监控扫描路径按上下文过滤
+- `ShiftSchedule` 已补显式 `tenant_id/workspace_id` 字段，并在 `shift` service 的创建、列表、更新、删除与统计路径按上下文过滤
+- `Macro` 已补显式 `tenant_id/workspace_id` 字段，并在 `macro` service 的列表、创建、更新、删除与应用入口按上下文过滤
+- `CustomerSatisfaction` / `SatisfactionSurvey` 已补显式 `tenant_id/workspace_id` 字段，并在 `satisfaction` service 的调查发送、响应、列表、统计、更新与删除路径按上下文过滤
+- `SuggestionService` 已补按上下文过滤的相似工单/知识库候选查询，不再跨 workspace 读取已 scope 化的 `Ticket` / `KnowledgeDoc`
+- `GamificationService` 的排行榜聚合已改为按上下文过滤 `Agent` / `Ticket` / `CustomerSatisfaction`，避免跨 workspace 汇总客服绩效
 - `Session`、`Message`、`TransferRecord`、`WaitingRecord` 已补显式 `tenant_id/workspace_id` 字段与基础索引，并在 `conversation/routing` 仓储默认按上下文过滤
+- 旧 `MessageRouter` 兼容落库路径已开始从 `UnifiedMessage.Metadata` 提取 `tenant_id/workspace_id` 写入 `Session/Message`，并拒绝同一 `sessionID` 跨 workspace 复用
 - `Ticket` 已补显式 `tenant_id/workspace_id` 字段与基础索引，并在 `ticket` 仓储主查询、统计与创建路径按上下文过滤
 - `Customer` 已补显式 `tenant_id/workspace_id` 字段，并在 `customer` 仓储读取、列表、统计与活动查询通过扩展表 scope 收口
 - `Agent` 已补显式 `tenant_id/workspace_id` 字段，并在 `agent` 仓储创建、读取、列表与统计路径按上下文过滤
 - `WorkspaceService`、`analytics` 模块聚合仓储与 agent transfer runtime load 同步路径已开始按上下文过滤 `Session/Agent/Ticket/Message/Customer` 等已 scope 化主数据
-- 当前剩余缺口已从“核心主数据未建模”收敛到“部分运营模型与旧 service 聚合查询未继续 scope 化”，详见 `docs/tenant-workspace-boundaries.md`
+- 当前剩余缺口已从“核心主数据未建模”进一步收敛到“少量 legacy 聚合尾项与 `DailyStats` 这类系统级全局汇总表的维度设计”，详见 `docs/tenant-workspace-boundaries.md`
 
 ## T2 auth-and-rbac-convergence
 
@@ -69,8 +76,11 @@
 
 - 已新增 `AuditLog` 持久化模型，并纳入应用迁移集合
 - 管理面 `/api/*` 写请求已统一接入审计中间件，成功写操作会记录 actor、principal、action、resource、request metadata 与请求载荷
-- `before/after` 已预留中间件扩展点，后续可为高价值 handler 补充精细状态快照
+- `before/after` 已有中间件扩展点，`scoped config`、`ticket` 的更新/分配/关闭、`agent` 的上线/下线/状态切换、`customer` 的更新/备注/标签/token revoke，以及 `security` user revoke token 等高价值写操作已开始写入精细状态快照
 - 已新增 `GET /api/audit/logs` 查询接口，支持按 action/resource/principal/actor/success/time-range 过滤
+- 管理面现已补 `GET /api/audit/logs/:id` 单条查询接口，并沿用 request scope 约束，支持按租户/工作区读取具体审计记录
+- 管理面现已补 `GET /api/audit/logs/:id/diff` 通用差异预览接口，可直接查看 `before/after` 的字段级变化
+- 管理面现已补 `GET /api/audit/logs/export` CSV 导出接口，复用列表过滤参数并支持带作用域约束的轻量导出
 - 审计查询与保留基线已文档化，见 `docs/audit-log-policy.md`
 - 已接入后台审计清理 worker，默认按 180 天保留窗口批量删除过期记录
 - 当前仍未接入冷热分层归档存储，长期保留策略仍以文档约束为主
@@ -124,12 +134,13 @@
 - 已新增 `config.production.secure.example.yml`，提供启用限流、收紧 CORS、使用环境变量注入 secrets 的生产示例模板
 - 已新增 `docs/public-surface-security-checklist.md`，收口匿名 / 对外开放接口的最小评审项与逐类入口检查清单
 - 已新增 bootstrap 启动安全告警，对默认 `jwt.secret`、开放式 CORS、关闭限流、空 provider key 等高风险配置输出 warning
-- 启动安全告警现已进一步覆盖匿名入口限流基线，若 `/public/` 或 `/api/v1/ws` 未配置独立路径级 rate limit，会在启动时明确告警
+- 启动安全告警与 `check-security-baseline --strict` 现已进一步覆盖公开 / 高风险入口限流基线，若 `/public/`、`/public/kb/`、`/public/csat/`、`/api/v1/ws`、`/api/v1/metrics/ingest` 或 `/api/` 未配置独立路径级 rate limit，会在启动与部署前校验阶段明确告警
+- 默认开发配置 `config.yml` 现已保持通过 `security` / `observability` strict baseline 检查，但文档已明确其用途仍是本地开发，不应替代生产部署配置模板
 - `internal/platform/auth` 现已新增可组合 token policy 钩子，支持按 `iat` 做 issued-before 失效、按 `token_version` 做最小会话版本淘汰，为后续账号级吊销策略预留接入点
-- `internal/platform/auth` 现已新增基于 `users` 表状态的 token policy，并接入 router auth middleware：非 active 用户会被拒绝，设置 `token_valid_after` / `token_version` 后可使旧 token 失效
+- `internal/platform/auth` 现已新增基于 `users` 表状态与 `user_auth_sessions` 的 token policy，并接入 router auth middleware：非 active 用户会被拒绝，设置 `token_valid_after` / `token_version` 后可使旧 token 失效；登录与 refresh 现在也会携带 `session_id + session_token_version`，支持同一 auth session 的旧 token 在 refresh 或 targeted revoke 后失效
 - agent 管理面现已新增 `POST /api/agents/:id/revoke-tokens`，可主动提升用户 `token_version` 并刷新 `token_valid_after`，将旧 token 作废
 - customer 管理面现已新增 `POST /api/customers/:id/revoke-tokens`，可对受作用域约束的客户账号主动触发旧 token 失效
 - token 主动失效底层逻辑现已收敛到 `internal/platform/usersecurity`，agent/customer 两条管理面路径复用同一套 `token_valid_after + token_version` 更新实现
-- 管理面现已新增统一 `security` surface：`GET /api/security/users/:id` 可查询用户安全状态，`POST /api/security/users/:id/revoke-tokens` 可执行通用 user revoke，分别由 `security.read` / `security.write` 权限保护
+- 管理面现已新增统一 `security` surface：`GET /api/security/users/:id` 可查询单用户安全状态，`POST /api/security/users/query` 可批量预览用户当前安全态与下一次 revoke 后的 `token_version`，`GET /api/security/users/:id/sessions` 与 `POST /api/security/users/:id/sessions/revoke` 可查看并失效单个 auth session，`POST /api/security/users/:id/revoke-tokens` 与 `POST /api/security/users/revoke-tokens` 可分别执行单用户 / 批量 user revoke，统一由 `security.read` / `security.write` 权限保护
 - 已新增 `servify check-security-baseline --strict` 与 `scripts/check-security-baseline.sh`，可在部署前将现有 security warning 规则升级为显式失败检查，不再只依赖启动日志提醒
-- 当前仍缺 refresh token / revoke list 等更细粒度失效实现，以及批量失效、审批回滚等更完整的 user security 操作能力
+- 当前仍缺 refresh token / revoke list 等更细粒度失效实现，以及审批回滚等更完整的 user security 操作能力

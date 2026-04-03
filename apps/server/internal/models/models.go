@@ -24,8 +24,24 @@ type User struct {
 	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
 
 	// 关联关系
-	Sessions []Session `gorm:"foreignKey:UserID" json:"sessions,omitempty"`
-	Tickets  []Ticket  `gorm:"foreignKey:CustomerID" json:"tickets,omitempty"`
+	Sessions     []Session         `gorm:"foreignKey:UserID" json:"sessions,omitempty"`
+	Tickets      []Ticket          `gorm:"foreignKey:CustomerID" json:"tickets,omitempty"`
+	AuthSessions []UserAuthSession `gorm:"foreignKey:UserID" json:"auth_sessions,omitempty"`
+}
+
+// UserAuthSession tracks login/refresh session state for JWT issuance and targeted revocation.
+type UserAuthSession struct {
+	ID              string         `gorm:"primaryKey;size:64" json:"id"`
+	UserID          uint           `gorm:"index;not null" json:"user_id"`
+	Status          string         `gorm:"default:'active';index" json:"status"` // active, revoked
+	TokenVersion    int            `gorm:"default:0" json:"token_version"`
+	LastRefreshedAt *time.Time     `json:"last_refreshed_at,omitempty"`
+	RevokedAt       *time.Time     `json:"revoked_at,omitempty"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
+
+	User User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
 
 // 客户信息扩展
@@ -299,6 +315,8 @@ type SLAConfig struct {
 // SLA 违约记录
 type SLAViolation struct {
 	ID            uint       `gorm:"primaryKey" json:"id"`
+	TenantID      string     `gorm:"index" json:"tenant_id"`
+	WorkspaceID   string     `gorm:"index" json:"workspace_id"`
 	TicketID      uint       `gorm:"index" json:"ticket_id"`
 	SLAConfigID   uint       `gorm:"index" json:"sla_config_id"`
 	ViolationType string     `gorm:"not null" json:"violation_type"` // first_response, resolution, escalation
@@ -315,14 +333,16 @@ type SLAViolation struct {
 
 // 客户满意度评价
 type CustomerSatisfaction struct {
-	ID         uint      `gorm:"primaryKey" json:"id"`
-	TicketID   uint      `gorm:"index" json:"ticket_id"`
-	CustomerID uint      `gorm:"index" json:"customer_id"`
-	AgentID    *uint     `gorm:"index" json:"agent_id"`
-	Rating     int       `gorm:"not null;check:rating >= 1 AND rating <= 5" json:"rating"` // 1-5星
-	Comment    string    `gorm:"type:text" json:"comment"`
-	Category   string    `json:"category"` // service_quality, response_time, resolution_quality, overall
-	CreatedAt  time.Time `json:"created_at"`
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	TenantID    string    `gorm:"index" json:"tenant_id"`
+	WorkspaceID string    `gorm:"index" json:"workspace_id"`
+	TicketID    uint      `gorm:"index" json:"ticket_id"`
+	CustomerID  uint      `gorm:"index" json:"customer_id"`
+	AgentID     *uint     `gorm:"index" json:"agent_id"`
+	Rating      int       `gorm:"not null;check:rating >= 1 AND rating <= 5" json:"rating"` // 1-5星
+	Comment     string    `gorm:"type:text" json:"comment"`
+	Category    string    `json:"category"` // service_quality, response_time, resolution_quality, overall
+	CreatedAt   time.Time `json:"created_at"`
 
 	Ticket   Ticket   `gorm:"foreignKey:TicketID" json:"ticket,omitempty"`
 	Customer Customer `gorm:"foreignKey:CustomerID" json:"customer,omitempty"`
@@ -332,6 +352,8 @@ type CustomerSatisfaction struct {
 // SatisfactionSurvey CSAT 调查发送与响应记录
 type SatisfactionSurvey struct {
 	ID             uint       `gorm:"primaryKey" json:"id"`
+	TenantID       string     `gorm:"index" json:"tenant_id"`
+	WorkspaceID    string     `gorm:"index" json:"workspace_id"`
 	TicketID       uint       `gorm:"index" json:"ticket_id"`
 	CustomerID     uint       `gorm:"index" json:"customer_id"`
 	AgentID        *uint      `gorm:"index" json:"agent_id"`
@@ -368,15 +390,17 @@ type AppIntegration struct {
 
 // 班次管理
 type ShiftSchedule struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	AgentID   uint      `gorm:"index" json:"agent_id"`
-	ShiftType string    `gorm:"not null" json:"shift_type"` // morning, afternoon, evening, night
-	StartTime time.Time `gorm:"not null" json:"start_time"`
-	EndTime   time.Time `gorm:"not null" json:"end_time"`
-	Date      time.Time `gorm:"index" json:"date"`
-	Status    string    `gorm:"default:'scheduled'" json:"status"` // scheduled, active, completed, cancelled
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	TenantID    string    `gorm:"index" json:"tenant_id"`
+	WorkspaceID string    `gorm:"index" json:"workspace_id"`
+	AgentID     uint      `gorm:"index" json:"agent_id"`
+	ShiftType   string    `gorm:"not null" json:"shift_type"` // morning, afternoon, evening, night
+	StartTime   time.Time `gorm:"not null" json:"start_time"`
+	EndTime     time.Time `gorm:"not null" json:"end_time"`
+	Date        time.Time `gorm:"index" json:"date"`
+	Status      string    `gorm:"default:'scheduled'" json:"status"` // scheduled, active, completed, cancelled
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 
 	Agent User `gorm:"foreignKey:AgentID" json:"agent,omitempty"`
 }
