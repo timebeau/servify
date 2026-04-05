@@ -28,6 +28,7 @@ func NewHandlerServiceWithDependencies(deps HandlerAssemblyDependencies) *Handle
 		repo:  repo,
 		query: ticketapp.NewQueryService(repo),
 		cmd:   cmd,
+		db:    deps.DB,
 	}
 	orchestrator := ticketorchestration.NewTicketOrchestrator(
 		deps.DB,

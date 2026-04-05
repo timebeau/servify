@@ -1614,6 +1614,180 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/security/tokens/revoke": {
+            "post": {
+                "description": "将指定 JWT 的 jti 加入 revoke list，使其在过期前立即失效",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "安全管理"
+                ],
+                "summary": "显式吊销单个 JWT",
+                "parameters": [
+                    {
+                        "description": "token",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/security/tokens/revoked": {
+            "get": {
+                "description": "返回显式加入 denylist 的 JWT 记录，支持按 jti/user/session/token_use 过滤",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "安全管理"
+                ],
+                "summary": "查询 revoke list",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/security/users/query": {
+            "post": {
+                "description": "返回多个用户当前安全状态，并给出下一次 revoke 后的 token_version 预览",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "安全管理"
+                ],
+                "summary": "批量查询用户安全状态预览",
+                "parameters": [
+                    {
+                        "description": "用户 ID 列表",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/security/users/revoke-tokens": {
+            "post": {
+                "description": "批量提升 token_version 并刷新 token_valid_after，使这些用户旧 token 失效",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "安全管理"
+                ],
+                "summary": "批量强制失效用户 token",
+                "parameters": [
+                    {
+                        "description": "用户 ID 列表",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/security/users/{id}": {
             "get": {
                 "description": "返回用户当前状态、token_version、token_valid_after 和最近登录时间",
@@ -1682,6 +1856,173 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/security/users/{id}/sessions": {
+            "get": {
+                "description": "返回用户当前 auth session 状态，用于更细粒度 session 失效操作",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "安全管理"
+                ],
+                "summary": "获取用户 auth session 列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "用户ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/security/users/{id}/sessions/revoke": {
+            "post": {
+                "description": "吊销单个登录/刷新 session，使其后续 token 校验失败",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "安全管理"
+                ],
+                "summary": "失效单个 auth session",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "用户ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "session_id",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/security/users/{id}/sessions/revoke-all": {
+            "post": {
+                "description": "吊销指定用户的全部活跃 session，可选保留一个 session",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "安全管理"
+                ],
+                "summary": "失效用户全部 auth session",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "用户ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "except_session_id",
+                        "name": "payload",
+                        "in": "body",
+                        "schema": {
+                            "type": "object"
+                        }
                     }
                 ],
                 "responses": {
@@ -3691,6 +4032,108 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/api/v1/auth/sessions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "List current user auth sessions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/sessions/logout-current": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Logout current auth session",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/sessions/logout-others": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Logout other auth sessions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -4254,6 +4697,12 @@ const docTemplate = `{
                 "expires_in": {
                     "type": "integer"
                 },
+                "refresh_expires_in": {
+                    "type": "integer"
+                },
+                "refresh_token": {
+                    "type": "string"
+                },
                 "token": {
                     "type": "string"
                 },
@@ -4486,11 +4935,17 @@ const docTemplate = `{
                     "description": "1-5星",
                     "type": "integer"
                 },
+                "tenant_id": {
+                    "type": "string"
+                },
                 "ticket": {
                     "$ref": "#/definitions/models.Ticket"
                 },
                 "ticket_id": {
                     "type": "integer"
+                },
+                "workspace_id": {
+                    "type": "string"
                 }
             }
         },
@@ -4615,6 +5070,9 @@ const docTemplate = `{
                 "sla_config_id": {
                     "type": "integer"
                 },
+                "tenant_id": {
+                    "type": "string"
+                },
                 "ticket": {
                     "$ref": "#/definitions/models.Ticket"
                 },
@@ -4629,6 +5087,9 @@ const docTemplate = `{
                 },
                 "violation_type": {
                     "description": "first_response, resolution, escalation",
+                    "type": "string"
+                },
+                "workspace_id": {
                     "type": "string"
                 }
             }
@@ -4670,10 +5131,16 @@ const docTemplate = `{
                 "survey_token": {
                     "type": "string"
                 },
+                "tenant_id": {
+                    "type": "string"
+                },
                 "ticket_id": {
                     "type": "integer"
                 },
                 "updated_at": {
+                    "type": "string"
+                },
+                "workspace_id": {
                     "type": "string"
                 }
             }
@@ -5002,6 +5469,12 @@ const docTemplate = `{
         "models.User": {
             "type": "object",
             "properties": {
+                "auth_sessions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.UserAuthSession"
+                    }
+                },
                 "avatar": {
                     "type": "string"
                 },
@@ -5055,6 +5528,51 @@ const docTemplate = `{
                 },
                 "username": {
                     "type": "string"
+                }
+            }
+        },
+        "models.UserAuthSession": {
+            "type": "object",
+            "properties": {
+                "client_ip": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "device_fingerprint": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "last_refreshed_at": {
+                    "type": "string"
+                },
+                "last_seen_at": {
+                    "type": "string"
+                },
+                "revoked_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "description": "active, revoked",
+                    "type": "string"
+                },
+                "token_version": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/models.User"
+                },
+                "user_agent": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
                 }
             }
         },
@@ -5176,6 +5694,12 @@ const docTemplate = `{
         "services.CustomerInfo": {
             "type": "object",
             "properties": {
+                "auth_sessions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.UserAuthSession"
+                    }
+                },
                 "avatar": {
                     "type": "string"
                 },

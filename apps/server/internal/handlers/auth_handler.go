@@ -378,16 +378,16 @@ type sessionRiskContext struct {
 }
 
 type sessionRiskPolicy struct {
-	HotRefreshWindow         time.Duration
-	RecentRefreshWindow      time.Duration
-	TodayRefreshWindow       time.Duration
-	RapidChangeWindow        time.Duration
-	StaleActivityWindow      time.Duration
-	MultiPublicIPThreshold   int
-	ManySessionsThreshold    int
+	HotRefreshWindow          time.Duration
+	RecentRefreshWindow       time.Duration
+	TodayRefreshWindow        time.Duration
+	RapidChangeWindow         time.Duration
+	StaleActivityWindow       time.Duration
+	MultiPublicIPThreshold    int
+	ManySessionsThreshold     int
 	HotRefreshFamilyThreshold int
-	MediumRiskScore          int
-	HighRiskScore            int
+	MediumRiskScore           int
+	HighRiskScore             int
 }
 
 func defaultSessionRiskPolicy() sessionRiskPolicy {
@@ -483,34 +483,34 @@ func mapSessionResponse(session models.UserAuthSession, isCurrent bool, riskCont
 	riskScore, riskLevel, riskReasons, networkLabel, locationLabel, drift := describeSessionRisk(session, isCurrent, riskContext, policy)
 	refreshRecency, rapidRefresh := classifyRefreshActivity(session, riskContext, policy)
 	return gin.H{
-		"session_id":         session.ID,
-		"status":             session.Status,
-		"token_version":      session.TokenVersion,
-		"device_fingerprint": session.DeviceFingerprint,
-		"network_label":      networkLabel,
-		"location_label":     locationLabel,
-		"risk_score":         riskScore,
-		"risk_level":         riskLevel,
-		"risk_reasons":       riskReasons,
-		"family_public_ip_count": riskContext.PublicIPCount,
-		"family_device_count":    riskContext.DeviceCount,
-		"active_session_count":   riskContext.ActiveSessionCount,
+		"session_id":               session.ID,
+		"status":                   session.Status,
+		"token_version":            session.TokenVersion,
+		"device_fingerprint":       session.DeviceFingerprint,
+		"network_label":            networkLabel,
+		"location_label":           locationLabel,
+		"risk_score":               riskScore,
+		"risk_level":               riskLevel,
+		"risk_reasons":             riskReasons,
+		"family_public_ip_count":   riskContext.PublicIPCount,
+		"family_device_count":      riskContext.DeviceCount,
+		"active_session_count":     riskContext.ActiveSessionCount,
 		"family_hot_refresh_count": riskContext.HotRefreshCount,
-		"reference_session_id":   drift.ReferenceSessionID,
-		"ip_drift":               drift.IPDrift,
-		"device_drift":           drift.DeviceDrift,
-		"rapid_ip_change":        drift.RapidIPChange,
-		"rapid_device_change":    drift.RapidDeviceChange,
-		"refresh_recency":        refreshRecency,
-		"rapid_refresh_activity": rapidRefresh,
-		"user_agent":         session.UserAgent,
-		"client_ip":          session.ClientIP,
-		"last_seen_at":       session.LastSeenAt,
-		"last_refreshed_at":  session.LastRefreshedAt,
-		"revoked_at":         session.RevokedAt,
-		"created_at":         session.CreatedAt,
-		"updated_at":         session.UpdatedAt,
-		"is_current":         isCurrent,
+		"reference_session_id":     drift.ReferenceSessionID,
+		"ip_drift":                 drift.IPDrift,
+		"device_drift":             drift.DeviceDrift,
+		"rapid_ip_change":          drift.RapidIPChange,
+		"rapid_device_change":      drift.RapidDeviceChange,
+		"refresh_recency":          refreshRecency,
+		"rapid_refresh_activity":   rapidRefresh,
+		"user_agent":               session.UserAgent,
+		"client_ip":                session.ClientIP,
+		"last_seen_at":             session.LastSeenAt,
+		"last_refreshed_at":        session.LastRefreshedAt,
+		"revoked_at":               session.RevokedAt,
+		"created_at":               session.CreatedAt,
+		"updated_at":               session.UpdatedAt,
+		"is_current":               isCurrent,
 	}
 }
 
