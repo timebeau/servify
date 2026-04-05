@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Servify - 开源智能客服与工单系统</title>
-  <meta name="description" content="Servify：模块化客服与工单系统，已完成核心模块拆分并接入管理面安全基线，支持 AI、多渠道接入与实时会话。" />
-  <meta property="og:title" content="Servify - 开源智能客服与工单系统" />
-  <meta property="og:description" content="集成 AI 智能问答、多渠道接入与实时会话，打造极致客户体验。" />
+  <title>Servify - 开源智能客服系统</title>
+  <meta name="description" content="Servify 是面向企业独立部署的开源智能客服系统，提供 Web 接入、AI 协同接待、人工接管、转接协作与工单闭环。" />
+  <meta property="og:title" content="Servify - 开源智能客服系统" />
+  <meta property="og:description" content="Web 优先、AI 协同、人工接管、工单闭环，面向企业独立部署。" />
   <meta property="og:type" content="website" />
   <meta property="og:image" content="./assets/img/hero-ill.svg" />
   <meta name="twitter:card" content="summary_large_image" />
@@ -24,9 +24,9 @@
         <span class="brand-text">Servify</span>
       </div>
       <nav class="nav">
-        <a href="#features">核心功能</a>
-        <a href="#quickstart">快速开始</a>
-        <a href="#architecture">系统架构</a>
+        <a href="#product">产品能力</a>
+        <a href="#scenarios">适用场景</a>
+        <a href="#evolution">当前演化</a>
         <a href="#docs">文档</a>
         <a href="https://github.com/Toconvo/servify" target="_blank" rel="noopener">GitHub</a>
       </nav>
@@ -34,622 +34,314 @@
   </header>
 
   <main>
-    <!-- Hero Section -->
     <section class="hero">
       <div class="container hero-wrap">
         <div class="hero-copy">
-          <div class="hero-badge">12 个实施 backlog 全部完成</div>
-          <h1>开源智能<br><span>客服与工单系统</span></h1>
-          <p class="subtitle">Servify 已完成全部核心模块化拆分与管理面安全基线，落地 AI/知识库基础抽象、tenant/workspace scope、RBAC、审计与令牌状态管理，并建立完整的可观测性体系（Prometheus 指标、错误分类、事件总线观测与 Grafana 面板）。</p>
+          <div class="hero-badge">面向企业独立部署</div>
+          <h1>开源智能客服系统<br><span>AI 协同接待，人工接管闭环</span></h1>
+          <p class="subtitle">Servify 以 Web 为第一入口，围绕客户咨询、AI 首答、人工接管、转接协作和工单流转构建完整客服链路，适合需要独立部署、可控接入和持续演化的企业客服场景。</p>
           <div class="cta">
             <a class="btn primary" href="https://toconvo.github.io/servify/" target="_blank" rel="noopener">查看文档</a>
             <a class="btn secondary" href="https://github.com/Toconvo/servify" target="_blank" rel="noopener">GitHub &rarr;</a>
           </div>
           <div class="tech-badges">
-            <span class="tech-badge">Go 1.25</span>
-            <span class="tech-badge">Gin</span>
-            <span class="tech-badge">WebSocket</span>
-            <span class="tech-badge">OTel</span>
-            <span class="tech-badge">OpenAI</span>
+            <span class="tech-badge">Web 优先</span>
+            <span class="tech-badge">AI 协同</span>
+            <span class="tech-badge">人工接管</span>
+            <span class="tech-badge">工单闭环</span>
+            <span class="tech-badge">独立部署</span>
           </div>
         </div>
         <div class="hero-ill">
-          <img src="./assets/img/hero-ill.svg" alt="Servify Illustration" />
+          <img src="./assets/img/hero-ill.svg" alt="Servify 产品示意图" />
         </div>
       </div>
     </section>
 
-    <!-- Stats Section -->
     <section class="stats">
       <div class="container stats-wrap">
         <div class="stat-item">
-          <div class="stat-value">10</div>
-          <div class="stat-label">已收口业务模块</div>
+          <div class="stat-value">1</div>
+          <div class="stat-label">Web 发起咨询</div>
         </div>
         <div class="stat-item">
-          <div class="stat-value">RBAC</div>
-          <div class="stat-label">管理面权限控制</div>
+          <div class="stat-value">2</div>
+          <div class="stat-label">AI 首答与分流</div>
         </div>
         <div class="stat-item">
-          <div class="stat-value">Prometheus</div>
-          <div class="stat-label">指标采集与告警</div>
+          <div class="stat-value">3</div>
+          <div class="stat-label">人工接管与协作</div>
         </div>
         <div class="stat-item">
-          <div class="stat-value">Grafana</div>
-          <div class="stat-label">运营面板与排障</div>
+          <div class="stat-value">4</div>
+          <div class="stat-label">工单持续跟进</div>
         </div>
       </div>
     </section>
 
-    <!-- Use Cases Section -->
-    <section class="section alt">
+    <section id="product" class="section">
       <div class="container">
         <div class="section-header">
-          <span class="section-tag">应用场景</span>
-          <h2>适用于多种业务场景</h2>
-          <p>灵活的模块化设计，满足不同规模企业的客服需求</p>
+          <span class="section-tag">产品能力</span>
+          <h2>围绕客服主链路构建</h2>
+          <p>不是堆叠零散功能，而是把客户接入、AI 协同、人工处理和后续跟进串成一套完整产品。</p>
         </div>
         <div class="grid features">
           <div class="card">
-            <div class="card-icon"><i data-lucide="store"></i></div>
-            <h3>电商客服</h3>
-            <p>订单咨询、售后处理、智能推荐，7×24小时在线服务。</p>
-          </div>
-          <div class="card">
-            <div class="card-icon"><i data-lucide="building-2"></i></div>
-            <h3>SaaS 企业</h3>
-            <p>工单流转、客户分层、SLA 管理，提升客户满意度。</p>
-          </div>
-          <div class="card">
-            <div class="card-icon"><i data-lucide="graduation-cap"></i></div>
-            <h3>在线教育</h3>
-            <p>学员答疑、课程咨询、实时互动，降低运营成本。</p>
-          </div>
-          <div class="card">
-            <div class="card-icon"><i data-lucide="puzzle"></i></div>
-            <h3>系统集成</h3>
-            <p>开放 API，轻松集成到现有系统，支持私有化部署。</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Features Section -->
-    <section id="features" class="section">
-      <div class="container">
-        <div class="section-header">
-          <span class="section-tag">核心能力</span>
-          <h2>为什么选择 Servify</h2>
-          <p>模块化架构设计，每个业务能力独立演进，支持从单体到微服务的平滑过渡</p>
-        </div>
-        <div class="grid features">
-          <div class="card">
-            <div class="card-icon"><i data-lucide="clipboard-list"></i></div>
-            <h3>工单系统</h3>
-            <p>完整的工单生命周期管理，支持自定义字段、状态流转、SLA 策略与事务边界。</p>
-          </div>
-          <div class="card">
-            <div class="card-icon"><i data-lucide="message-circle"></i></div>
-            <h3>实时会话</h3>
-            <p>WebSocket 长连接支持，消息持久化，最近会话历史快速读取。</p>
-          </div>
-          <div class="card">
-            <div class="card-icon"><i data-lucide="git-branch"></i></div>
-            <h3>智能路由</h3>
-            <p>人工接管、排队管理、技能组匹配、会话转接，灵活的分配策略。</p>
+            <div class="card-icon"><i data-lucide="globe"></i></div>
+            <h3>Web 客户接入</h3>
+            <p>让访客从网站直接发起咨询，建立实时会话，并逐步接入更多终端与渠道。</p>
           </div>
           <div class="card">
             <div class="card-icon"><i data-lucide="cpu"></i></div>
-            <h3>AI 集成</h3>
-            <p>统一 LLM Provider 抽象，支持 OpenAI、Claude 等多模型切换。</p>
+            <h3>AI 协同接待</h3>
+            <p>通过知识库和模型能力完成首答、澄清和建议，让 AI 成为客服链路里的协作角色。</p>
           </div>
           <div class="card">
-            <div class="card-icon"><i data-lucide="database"></i></div>
-            <h3>知识库管理</h3>
-            <p>企业知识库集成，支持文档管理、索引任务与多 Provider 适配。</p>
+            <div class="card-icon"><i data-lucide="users"></i></div>
+            <h3>人工接管</h3>
+            <p>复杂问题可由坐席随时接管，保持上下文连续，避免机器人和人工割裂。</p>
           </div>
           <div class="card">
-            <div class="card-icon"><i data-lucide="activity"></i></div>
-            <h3>可观测性</h3>
-            <p>OpenTelemetry 追踪，Prometheus 指标，结构化日志，完整的运营诊断能力。</p>
+            <div class="card-icon"><i data-lucide="git-branch"></i></div>
+            <h3>转接与协作</h3>
+            <p>支持排队、分配、转接和团队协作，让问题进入最合适的处理路径。</p>
+          </div>
+          <div class="card">
+            <div class="card-icon"><i data-lucide="clipboard-list"></i></div>
+            <h3>工单闭环</h3>
+            <p>即时会话解决不了的问题可转入工单，继续推进处理、跟踪状态和责任归属。</p>
           </div>
           <div class="card">
             <div class="card-icon"><i data-lucide="shield-check"></i></div>
-            <h3>管理面安全基线</h3>
-            <p>管理类接口统一叠加 scope、RBAC、审计与 token state policy，并提供通用 user security 管理入口。</p>
+            <h3>后台运营</h3>
+            <p>在同一套后台里管理坐席、知识库、权限、安全策略和基础运营配置。</p>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Quick Start Section -->
-    <section id="quickstart" class="section alt">
+    <section class="section alt">
+      <div class="container two-col">
+        <div>
+          <span class="section-tag">工作方式</span>
+          <h2>从访客发起，到问题闭环</h2>
+          <p class="subtitle">Servify 的重点不是单独某个模块，而是把客服真正高频使用的流程串起来，先让产品主链路成立，再持续扩展能力边界。</p>
+          <ul class="list">
+            <li><i data-lucide="check"></i> 网站访客发起咨询，快速建立实时会话</li>
+            <li><i data-lucide="check"></i> AI 先做首答、知识召回和问题澄清</li>
+            <li><i data-lucide="check"></i> 坐席随时接管，并查看上下文与客户信息</li>
+            <li><i data-lucide="check"></i> 需要时可转接、协作或继续补充处理信息</li>
+            <li><i data-lucide="check"></i> 无法即时解决的问题流转到工单继续跟进</li>
+          </ul>
+        </div>
+        <div class="img-col">
+          <img src="./assets/img/ai-ill.svg" alt="Servify 客服链路示意图" />
+        </div>
+      </div>
+    </section>
+
+    <section id="scenarios" class="section">
       <div class="container">
         <div class="section-header">
-          <span class="section-tag">快速开始</span>
-          <h2>5 分钟部署完成</h2>
-          <p>最小化依赖，开箱即用</p>
+          <span class="section-tag">适用场景</span>
+          <h2>适合这些服务团队</h2>
+          <p>优先覆盖需要独立部署、统一接待和 AI 协同处理的客服场景，而不是先做平台化包装。</p>
         </div>
-        <div class="code-block">
-          <div class="code-header">
-            <span class="code-title">Terminal</span>
-            <button class="copy-btn" onclick="copyCode(this)">
-              <i data-lucide="copy"></i> 复制
-            </button>
+        <div class="grid features">
+          <div class="card">
+            <div class="card-icon"><i data-lucide="building-2"></i></div>
+            <h3>企业官网在线客服</h3>
+            <p>让官网访客快速发起咨询，先由 AI 接待，再由人工跟进复杂问题。</p>
           </div>
-          <pre><code># 1. 克隆仓库
-git clone https://github.com/Toconvo/servify.git
-cd servify
-
-# 2. 启动服务（依赖 Docker）
-docker-compose up -d
-
-# 3. 访问控制台
-open http://localhost:8080
-
-# 4. 配置 AI（可选）
-export OPENAI_API_KEY=your_key_here</code></pre>
-        </div>
-        <div class="quickstart-steps">
-          <div class="step">
-            <div class="step-number">1</div>
-            <div class="step-content">
-              <h4>克隆代码</h4>
-              <p>从 GitHub 获取最新代码</p>
-            </div>
+          <div class="card">
+            <div class="card-icon"><i data-lucide="building-2"></i></div>
+            <h3>SaaS 客户支持</h3>
+            <p>把产品咨询、使用问题和升级支持统一进会话与工单链路。</p>
           </div>
-          <div class="step">
-            <div class="step-number">2</div>
-            <div class="step-content">
-              <h4>启动服务</h4>
-              <p>使用 Docker Compose 一键启动</p>
-            </div>
+          <div class="card">
+            <div class="card-icon"><i data-lucide="shopping-bag"></i></div>
+            <h3>电商售前售后</h3>
+            <p>覆盖咨询、订单、售后和异步处理需求，减少多套工具来回切换。</p>
           </div>
-          <div class="step">
-            <div class="step-number">3</div>
-            <div class="step-content">
-              <h4>开始使用</h4>
-              <p>访问控制台，体验完整功能</p>
-            </div>
+          <div class="card">
+            <div class="card-icon"><i data-lucide="life-buoy"></i></div>
+            <h3>内部服务台</h3>
+            <p>也可以用于内部运营、IT 或业务支持，让请求受理和处理链路更清晰。</p>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Architecture Section -->
-    <section id="architecture" class="section architecture">
+    <section id="evolution" class="section alt">
       <div class="container">
         <div class="section-header">
-          <span class="section-tag">系统架构</span>
-          <h2>模块化单体架构</h2>
-          <p>清晰的业务边界，平台能力独立抽象，支持渐进式演进</p>
-        </div>
-        <div class="arch-diagram">
-          <div class="mermaid">
-flowchart TB
-    subgraph SDK["SDK & Channels"]
-        WEB["Web SDK<br/>Vanilla/React/Vue"]
-        API["Future API/App SDK"]
-        CH["Channel Adapters<br/>微信/Telegram"]
-    end
-
-    subgraph DL["Delivery Layer"]
-        GIN["Gin Router<br/>HTTP/WebSocket"]
-    end
-
-    subgraph BM["Business Modules"]
-        TICKET["ticket<br/>工单系统"]
-        CONV["conversation<br/>实时会话"]
-        ROUTE["routing<br/>智能路由"]
-        AGENT["agent<br/>客服管理"]
-        CUST["customer<br/>客户管理"]
-        AI["ai<br/>AI编排"]
-        KNOW["knowledge<br/>知识库"]
-        VOICE["voice<br/>语音能力"]
-        AUTO["automation<br/>自动化"]
-        ANALYTICS["analytics<br/>统计分析"]
-    end
-
-    subgraph PL["Platform Layer"]
-        BUS["Event Bus"]
-        AUTH["Auth"]
-        CFG["Config"]
-        TRC["Tracing"]
-    end
-
-    subgraph PV["Providers"]
-        LLM["LLM Provider<br/>OpenAI/Claude"]
-        KP["Knowledge Provider<br/>WeKnora/向量库"]
-        SIP["SIP/WebRTC<br/>Adapter"]
-    end
-
-    WEB --> GIN
-    API --> GIN
-    CH --> GIN
-
-    GIN --> TICKET
-    GIN --> CONV
-    GIN --> ROUTE
-    GIN --> AGENT
-    GIN --> CUST
-
-    CONV --> AI
-    AI --> LLM
-    AI --> KP
-    ROUTE --> AGENT
-
-    TICKET --> BUS
-    CONV --> BUS
-    ROUTE --> BUS
-    BUS --> AUTO
-    BUS --> ANALYTICS
-
-    classDef sdkStyle fill:#4f46e5,stroke:#4338ca,color:#fff
-    classDef dlStyle fill:#6366f1,stroke:#4f46e5,color:#fff
-    classDef bmStyle fill:#0ea5e9,stroke:#0284c7,color:#fff
-    classDef plStyle fill:#f59e0b,stroke:#d97706,color:#fff
-    classDef pvStyle fill:#64748b,stroke:#475569,color:#fff
-
-    class WEB,API,CH sdkStyle
-    class GIN dlStyle
-    class TICKET,CONV,ROUTE,AGENT,CUST,AI,KNOW,VOICE,AUTO,ANALYTICS bmStyle
-    class BUS,AUTH,CFG,TRC plStyle
-    class LLM,KP,SIP pvStyle
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Modules Section -->
-    <section id="modules" class="section alt">
-      <div class="container">
-        <div class="section-header">
-          <span class="section-tag">业务模块</span>
-          <h2>模块化演进路线</h2>
-          <p>清晰的模块边界，渐进式迁移，支持从单体到微服务的平滑演进</p>
+          <span class="section-tag">当前演化</span>
+          <h2>先把产品主线做扎实，再继续扩展</h2>
+          <p>Servify 当前已经具备智能客服产品的骨架，正在从“能力可用”继续收敛到“产品更成熟”。</p>
         </div>
 
-        <!-- Phase 1: Completed -->
         <div class="phase-block">
           <div class="phase-header">
             <div class="phase-indicator done"></div>
-            <h3>第一阶段 - 当前轮模块收口</h3>
-            <span class="phase-status done">已完成</span>
+            <h3>当前已形成的产品骨架</h3>
+            <span class="phase-status done">已具备</span>
           </div>
           <div class="modules-expanded">
             <div class="module-card done">
               <div class="module-header">
-                <i data-lucide="clipboard-list"></i>
-                <div>
-                  <h4>ticket</h4>
-                  <span class="module-badge completed">v0.1</span>
-                </div>
-              </div>
-              <p>工单生命周期管理、状态流转、SLA 策略、事务边界</p>
-            </div>
-            <div class="module-card done">
-              <div class="module-header">
                 <i data-lucide="message-circle"></i>
                 <div>
-                  <h4>conversation</h4>
-                  <span class="module-badge completed">v0.1</span>
+                  <h4>会话与消息</h4>
+                  <span class="module-badge completed">当前基础</span>
                 </div>
               </div>
-              <p>WebSocket 长连接、消息持久化、会话历史</p>
-            </div>
-            <div class="module-card done">
-              <div class="module-header">
-                <i data-lucide="git-branch"></i>
-                <div>
-                  <h4>routing</h4>
-                  <span class="module-badge completed">v0.1</span>
-                </div>
-              </div>
-              <p>人工接管、排队管理、技能组匹配、会话转接</p>
+              <p>已具备会话、消息、实时交互和上下文承接能力，是整条客服链路的入口。</p>
             </div>
             <div class="module-card done">
               <div class="module-header">
                 <i data-lucide="cpu"></i>
                 <div>
-                  <h4>ai</h4>
-                  <span class="module-badge completed">v0.1</span>
+                  <h4>AI 与知识库</h4>
+                  <span class="module-badge completed">当前基础</span>
                 </div>
               </div>
-              <p>Query Orchestrator、LLM Provider、Prompt Builder</p>
+              <p>已经可以支撑智能问答、知识召回和客服协同，是产品差异化的重要部分。</p>
             </div>
             <div class="module-card done">
               <div class="module-header">
-                <i data-lucide="database"></i>
+                <i data-lucide="clipboard-list"></i>
                 <div>
-                  <h4>knowledge</h4>
-                  <span class="module-badge completed">v0.1</span>
+                  <h4>工单与后台能力</h4>
+                  <span class="module-badge completed">当前基础</span>
                 </div>
               </div>
-              <p>文档管理、索引任务、Knowledge Provider 抽象</p>
-            </div>
-            <div class="module-card done">
-              <div class="module-header">
-                <i data-lucide="users"></i>
-                <div>
-                  <h4>agent</h4>
-                  <span class="module-badge completed">v0.1</span>
-                </div>
-              </div>
-              <p>客服档案、认证接入、统一 user security 与令牌失效控制</p>
-            </div>
-            <div class="module-card done">
-              <div class="module-header">
-                <i data-lucide="user-circle"></i>
-                <div>
-                  <h4>customer</h4>
-                  <span class="module-badge completed">v0.1</span>
-                </div>
-              </div>
-              <p>客户档案、标签备注、管理面边界迁移与受保护查询入口</p>
+              <p>支持问题沉淀、后续推进和后台运营，是从即时咨询走向持续服务的关键闭环。</p>
             </div>
           </div>
         </div>
 
-        <!-- Phase 2: Completed -->
         <div class="phase-block">
           <div class="phase-header">
-            <div class="phase-indicator done"></div>
-            <h3>第二阶段 - 扩展业务模块</h3>
-            <span class="phase-status done">已完成</span>
+            <div class="phase-indicator wip"></div>
+            <h3>正在继续打磨的方向</h3>
+            <span class="phase-status wip">持续完善</span>
           </div>
           <div class="modules-expanded">
-            <div class="module-card done">
-              <div class="module-header">
-                <i data-lucide="workflow"></i>
-                <div>
-                  <h4>automation</h4>
-                  <span class="module-badge completed">v0.1</span>
-                </div>
-              </div>
-              <p>基于事件总线的自动化执行引擎与规则编排能力</p>
-            </div>
-            <div class="module-card done">
-              <div class="module-header">
-                <i data-lucide="bar-chart-3"></i>
-                <div>
-                  <h4>analytics</h4>
-                  <span class="module-badge completed">v0.1</span>
-                </div>
-              </div>
-              <p>统计读模型、增量聚合、运营指标与数据看板</p>
-            </div>
-            <div class="module-card done">
-              <div class="module-header">
-                <i data-lucide="phone"></i>
-                <div>
-                  <h4>voice</h4>
-                  <span class="module-badge completed">v0.1</span>
-                </div>
-              </div>
-              <p>呼叫会话、媒体事件、录音转写与 SIP / WebRTC 适配</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Phase 3: Completed -->
-        <div class="phase-block">
-          <div class="phase-header">
-            <div class="phase-indicator done"></div>
-            <h3>第三阶段 - 管理面安全基线</h3>
-            <span class="phase-status done">已完成</span>
-          </div>
-          <div class="modules-expanded">
-            <div class="module-card done">
-              <div class="module-header">
-                <i data-lucide="shield-check"></i>
-                <div>
-                  <h4>security baseline</h4>
-                  <span class="module-badge completed">v0.1</span>
-                </div>
-              </div>
-              <p>tenant/workspace scope、RBAC、audit、token state policy 与统一 user security surface</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Phase 4: Observability -->
-        <div class="phase-block">
-          <div class="phase-header">
-            <div class="phase-indicator done"></div>
-            <h3>第四阶段 - 可观测性体系</h3>
-            <span class="phase-status done">已完成</span>
-          </div>
-          <div class="modules-expanded">
-            <div class="module-card done">
-              <div class="module-header">
-                <i data-lucide="activity"></i>
-                <div>
-                  <h4>telemetry</h4>
-                  <span class="module-badge completed">v0.1</span>
-                </div>
-              </div>
-              <p>统一指标/追踪/日志命名规范、上下文传播、RequestID 中间件</p>
-            </div>
-            <div class="module-card done">
-              <div class="module-header">
-                <i data-lucide="bar-chart-2"></i>
-                <div>
-                  <h4>metrics</h4>
-                  <span class="module-badge completed">v0.1</span>
-                </div>
-              </div>
-              <p>Prometheus Registry、HTTP 指标中间件、业务指标（会话/工单/路由/AI）</p>
-            </div>
-            <div class="module-card done">
-              <div class="module-header">
-                <i data-lucide="alert-triangle"></i>
-                <div>
-                  <h4>error taxonomy</h4>
-                  <span class="module-badge completed">v0.1</span>
-                </div>
-              </div>
-              <p>4 级严重度 × 8 类别错误分类、自动映射、错误计数与用户安全消息</p>
-            </div>
-            <div class="module-card done">
-              <div class="module-header">
-                <i data-lucide="repeat"></i>
-                <div>
-                  <h4>async observability</h4>
-                  <span class="module-badge completed">v0.1</span>
-                </div>
-              </div>
-              <p>事件总线装饰器、Worker 追踪、死信记录、Replay 接口预留</p>
-            </div>
-            <div class="module-card done">
+            <div class="module-card wip">
               <div class="module-header">
                 <i data-lucide="monitor"></i>
                 <div>
-                  <h4>dashboards & alerts</h4>
-                  <span class="module-badge completed">v0.1</span>
+                  <h4>更成熟的工作台体验</h4>
+                  <span class="module-badge progress">体验优化</span>
                 </div>
               </div>
-              <p>Grafana Dashboard JSON、Prometheus 告警规则、运维排障手册</p>
+              <p>继续强化坐席高频使用体验，让接待、接管、协作和处理信息更自然地集中在一个界面里。</p>
+            </div>
+            <div class="module-card wip">
+              <div class="module-header">
+                <i data-lucide="route"></i>
+                <div>
+                  <h4>更完整的接待流程</h4>
+                  <span class="module-badge progress">流程收敛</span>
+                </div>
+              </div>
+              <p>把从访客入口到工单流转的默认产品行为继续钉实，让产品更易理解、更容易落地。</p>
+            </div>
+            <div class="module-card wip">
+              <div class="module-header">
+                <i data-lucide="box"></i>
+                <div>
+                  <h4>多端与更多入口</h4>
+                  <span class="module-badge progress">后续扩展</span>
+                </div>
+              </div>
+              <p>在 Web 主线稳定的基础上，继续预留 App、API、语音和更多渠道的接入方向。</p>
             </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- AI Section -->
-    <section id="ai" class="section">
-      <div class="container two-col">
-        <div>
-          <span class="section-tag">AI 能力</span>
-          <h2>智能问答引擎</h2>
-          <p class="subtitle">统一 LLM Provider 抽象，支持多模型切换与知识库检索</p>
-          <ul class="list">
-            <li><i data-lucide="check"></i> Query Orchestrator 统一编排层</li>
-            <li><i data-lucide="check"></i> Prompt Builder 与 Guardrails</li>
-            <li><i data-lucide="check"></i> Knowledge Provider 检索集成</li>
-            <li><i data-lucide="check"></i> 降级与熔断保护机制</li>
-            <li><i data-lucide="check"></i> 支持 OpenAI、Claude、DeepSeek</li>
-          </ul>
+    <section id="architecture" class="section architecture">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag">产品支撑</span>
+          <h2>用清晰的模块边界支撑持续演化</h2>
+          <p>首页只保留产品理解所需的简化结构，详细实现和技术文档放到文档站里展开。</p>
         </div>
-        <div class="img-col">
-          <img src="./assets/img/ai-ill.svg" alt="AI Architecture" />
+        <div class="arch-diagram">
+          <div class="mermaid">
+flowchart LR
+    WEB["Web 接入"]
+    CH["更多终端 / 渠道"]
+    ADMIN["后台运营"]
+
+    subgraph CORE["Servify Core"]
+        CONV["会话"]
+        ROUTE["路由"]
+        AI["AI 协同"]
+        KNOW["知识库"]
+        TICKET["工单"]
+    end
+
+    WEB --> CONV
+    CH --> CONV
+    ADMIN --> ROUTE
+    CONV --> AI
+    AI --> KNOW
+    CONV --> ROUTE
+    ROUTE --> TICKET
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- Realtime Section -->
-    <section id="rtc" class="section alt">
-      <div class="container two-col reverse">
-        <div>
-          <span class="section-tag">实时通信</span>
-          <h2>WebSocket & WebRTC</h2>
-          <p class="subtitle">浏览器原生支持，低延迟 P2P 传输</p>
-          <ul class="list">
-            <li><i data-lucide="check"></i> WebSocket 长连接，消息实时推送</li>
-            <li><i data-lucide="check"></i> WebRTC 屏幕共享与远程协助</li>
-            <li><i data-lucide="check"></i> 端到端监控与事件上报</li>
-            <li><i data-lucide="check"></i> SIP 协议适配器（语音能力）</li>
-          </ul>
-        </div>
-        <div class="img-col">
-          <img src="./assets/img/rtc-ill.svg" alt="Realtime Communication" />
-        </div>
-      </div>
-    </section>
-
-    <!-- SDK Section -->
     <section id="docs" class="section">
       <div class="container">
         <div class="section-header">
-          <span class="section-tag">开发者友好</span>
-          <h2>多端 SDK 支持</h2>
-          <p>统一的核心合约，跨端 Transport 实现</p>
+          <span class="section-tag">文档入口</span>
+          <h2>继续了解 Servify</h2>
+          <p>如果你想进一步了解产品现状、架构设计和本地运行方式，可以从这里继续。</p>
         </div>
         <div class="grid features">
           <div class="card">
-            <div class="card-icon"><i data-lucide="globe"></i></div>
-            <h3>Web SDK</h3>
-            <p>Vanilla JS、React、Vue 三种绑定，开箱即用。</p>
+            <div class="card-icon"><i data-lucide="book-open"></i></div>
+            <h3>产品与文档</h3>
+            <p>查看项目文档、架构说明和当前实现范围，了解 Servify 正在形成怎样的产品。</p>
           </div>
           <div class="card">
             <div class="card-icon"><i data-lucide="radio"></i></div>
-            <h3>Transport</h3>
-            <p>WebSocket、HTTP 双 Transport，自动重连与降级。</p>
+            <h3>本地运行</h3>
+            <p>通过现有仓库和运行说明快速启动项目，在本地继续体验和评估。</p>
           </div>
           <div class="card">
-            <div class="card-icon"><i data-lucide="box"></i></div>
-            <h3>Core Contract</h3>
-            <p>跨端统一接口，消息类型、事件模型一致。</p>
+            <div class="card-icon"><i data-lucide="github"></i></div>
+            <h3>GitHub 仓库</h3>
+            <p>直接查看源码、提交记录和后续演化，了解项目如何持续推进。</p>
           </div>
+        </div>
+
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-title">Quick Start</span>
+            <button class="copy-btn" onclick="copyCode(this)">
+              <i data-lucide="copy"></i> 复制
+            </button>
+          </div>
+          <pre><code>git clone https://github.com/Toconvo/servify.git
+cd servify
+
+# 参考项目文档进行本地运行与配置
+open https://toconvo.github.io/servify/</code></pre>
         </div>
       </div>
     </section>
 
-    <!-- Tech Stack Section -->
-    <section class="section alt">
-      <div class="container">
-        <div class="section-header">
-          <span class="section-tag">技术栈</span>
-          <h2>云原生技术架构</h2>
-          <p>采用成熟稳定的技术栈，确保系统可靠性与可维护性</p>
-        </div>
-        <div class="tech-grid">
-          <div class="tech-item">
-            <h4>后端框架</h4>
-            <div class="tech-tags">
-              <span>Go 1.25</span>
-              <span>Gin</span>
-              <span>GORM</span>
-            </div>
-          </div>
-          <div class="tech-item">
-            <h4>实时通信</h4>
-            <div class="tech-tags">
-              <span>WebSocket</span>
-              <span>WebRTC</span>
-              <span>SIP</span>
-            </div>
-          </div>
-          <div class="tech-item">
-            <h4>AI 能力</h4>
-            <div class="tech-tags">
-              <span>OpenAI</span>
-              <span>Claude</span>
-              <span>DeepSeek</span>
-            </div>
-          </div>
-          <div class="tech-item">
-            <h4>可观测性</h4>
-            <div class="tech-tags">
-              <span>OpenTelemetry</span>
-              <span>Prometheus</span>
-              <span>Grafana</span>
-            </div>
-          </div>
-          <div class="tech-item">
-            <h4>数据存储</h4>
-            <div class="tech-tags">
-              <span>PostgreSQL</span>
-              <span>Redis</span>
-              <span>S3</span>
-            </div>
-          </div>
-          <div class="tech-item">
-            <h4>部署运维</h4>
-            <div class="tech-tags">
-              <span>Docker</span>
-              <span>Kubernetes</span>
-              <span>Helm</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- CTA Section -->
     <section class="cta-section">
       <div class="container">
-        <h2>开始使用 Servify</h2>
-        <p>开源免费，自托管部署，数据完全掌控</p>
+        <h2>开始了解 Servify</h2>
+        <p>这是一个持续演化中的开源智能客服产品，重点始终是把客服主链路做成真正可用的产品。</p>
         <div class="cta-buttons">
           <a class="btn primary" href="https://github.com/Toconvo/servify" target="_blank" rel="noopener">
             <i data-lucide="github"></i> GitHub 仓库
@@ -668,27 +360,24 @@ flowchart TB
         <div class="footer-links">
           <a href="https://github.com/Toconvo/servify" target="_blank" rel="noopener">GitHub</a>
           <a href="https://toconvo.github.io/servify/" target="_blank" rel="noopener">文档</a>
-          <a href="/sdk-demo.html">SDK Demo</a>
-          <a href="/ws-demo.html">WS Demo</a>
+          <a href="#product">产品能力</a>
+          <a href="#evolution">当前演化</a>
         </div>
         <div style="color: var(--gray-light);">
           © <span id="y"></span> Servify
         </div>
       </div>
       <div class="footer-bottom">
-        模块化客服与工单系统 · 开源 · 易集成 · 可观测
+        开源智能客服系统 · Web 优先 · AI 协同 · 独立部署
       </div>
     </div>
   </footer>
 
   <script>
-    // Set current year
     document.getElementById('y').textContent = new Date().getFullYear();
 
-    // Initialize Lucide icons
     lucide.createIcons();
 
-    // Initialize Mermaid
     mermaid.initialize({
       startOnLoad: true,
       theme: 'dark',
@@ -710,7 +399,6 @@ flowchart TB
       }
     });
 
-    // Header scroll effect
     const header = document.querySelector('.site-header');
     window.addEventListener('scroll', () => {
       if (window.scrollY > 50) {
@@ -720,7 +408,6 @@ flowchart TB
       }
     });
 
-    // Intersection Observer for fade-in animations
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
@@ -729,13 +416,11 @@ flowchart TB
       });
     }, { threshold: 0.1 });
 
-    // Observe all cards and sections
     document.querySelectorAll('.card, .module-card, .stat-item').forEach(el => {
       el.classList.add('fade-in');
       observer.observe(el);
     });
 
-    // Copy code function
     function copyCode(btn) {
       const code = btn.closest('.code-block').querySelector('code').textContent;
       navigator.clipboard.writeText(code).then(() => {

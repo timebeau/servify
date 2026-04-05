@@ -1,6 +1,6 @@
 # Servify Website
 
-Static website (marketing/landing) for Servify. Built as plain HTML/CSS/JS for simple hosting behind any static server or CDN.
+Static product landing page for Servify. The website should present Servify primarily as an independently deployed intelligent customer service product, not as an implementation status dashboard.
 
 Structure:
 - index.html            Landing page
@@ -16,4 +16,3 @@ Local preview:
 Production hosting:
 - Any static hosting (Nginx/Apache/CDN/Pages)
 - Set cache headers for /assets/**
-

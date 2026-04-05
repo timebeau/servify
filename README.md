@@ -6,7 +6,7 @@
 
 # 🛟 Servify
 
-**开源智能客服与工单系统** — 模块化单体架构，AI 协同，多渠道接入
+**开源智能客服系统** — Web 优先，AI 协同，人工接管，工单闭环
 
 [![Go Version](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
@@ -18,21 +18,37 @@
 
 ---
 
-Servify 是一个面向客服、工单、AI 协同和实时会话的服务平台。
+Servify 是一个面向企业独立部署的开源智能客服系统。
 
-当前仓库已经从”单体 service 堆逻辑”重构为”**模块化单体**”方向，核心目标是先把业务边界拆清，再逐步演进到更多渠道、更多 SDK 和语音能力。
+它当前的产品重心不是“平台化多租户”，而是先把客服主链路做完整：`Web 接入 -> AI 首答 -> 人工接管 -> 转接协作 -> 工单闭环`。
+
+当前仓库已经收敛到 `模块化单体` 架构，重点围绕会话、路由、工单、AI、知识库和后台运营持续演化；多端 SDK、更多渠道和语音能力属于后续扩展边界，而不是当前产品中心。
 
 ---
 
 ## 📊 当前状态
 
-- ✅ 已完成核心模块化拆分：`ticket`、`conversation`、`routing`
-- ✅ 已完成管理面模块迁移：`agent`、`customer` 已具备独立 application / delivery / infra 边界
-- ✅ 已完成 AI/知识库基础抽象：`LLMProvider`、`KnowledgeProvider`、`ai` module、`knowledge` module
-- ✅ 已完成事件总线基础设施：`internal/platform/eventbus`
-- ✅ 已完成管理面安全基线首轮收口：tenant/workspace scope、RBAC、audit、token state revoke、security surface
-- ✅ 已明确未来扩展边界：Web SDK、未来 API/App SDK、渠道适配器、SIP/voice
-- 🔄 当前仍在继续拆分：`automation`、`analytics`、`voice`
+- ✅ 已形成智能客服产品骨架：`conversation`、`routing`、`ticket`
+- ✅ 已具备 AI 与知识库基础能力：`ai`、`knowledge`
+- ✅ 已完成客服后台关键模块迁移：`agent`、`customer`
+- ✅ 已补齐管理面安全基线首轮能力：认证、审计、token state revoke、session security surface
+- ✅ 已明确 Web 优先、多端预留的演化方向
+- 🔄 当前继续完善产品体验：工作台密度、接待流程收敛、运营与扩展能力
+
+---
+
+## 🎯 产品定位
+
+Servify 当前更适合这样理解：
+
+- 一个企业部署一套 Servify
+- 访客从 Web 页面发起咨询
+- AI 先做首答、澄清和知识召回
+- 坐席随时接管、协作、转接
+- 无法即时解决的问题进入工单继续跟进
+- 管理员在后台管理坐席、知识库、权限和基础配置
+
+这意味着 `tenant/workspace` 更接近治理和隔离能力，而不是产品主叙事。
 
 ---
 
@@ -88,6 +104,19 @@ Servify 是一个面向客服、工单、AI 协同和实时会话的服务平台
 - 🌐 **多端 SDK 预留**：Web 先落地，API/App 预留 contract，不做伪实现
 - 📞 **语音能力隔离**：通过 `voice` 模块和 SIP adapter 接入，不耦合聊天链路
 - 🔄 **Provider 可替换**：WeKnora 只是 `KnowledgeProvider` 的一种实现
+
+---
+
+## 🧭 当前重点
+
+当前阶段，Servify 优先做好这些事情：
+
+- 把 Web 接入做成正式产品入口
+- 把 AI 协同和人工接管打通
+- 把转接、协作和工单闭环收完整
+- 把后台运营和安全基线稳定下来
+
+当前不会把“平台化租户能力”作为产品中心持续扩张，而是先把独立部署客服产品做扎实。
 
 ---
 
