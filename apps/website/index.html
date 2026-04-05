@@ -4,9 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Servify - 开源智能客服系统</title>
-  <meta name="description" content="Servify 是面向企业独立部署的开源智能客服系统，提供 Web 接入、AI 协同接待、人工接管、转接协作与工单闭环。" />
+  <meta name="description" content="Servify 是面向企业独立部署的开源智能客服系统，提供 Web 接入、AI 协同接待、远程协助、人工接管与工单闭环。" />
   <meta property="og:title" content="Servify - 开源智能客服系统" />
-  <meta property="og:description" content="Web 优先、AI 协同、人工接管、工单闭环，面向企业独立部署。" />
+  <meta property="og:description" content="Web 优先、AI 协同、远程协助、人工接管与工单闭环，面向企业独立部署。" />
   <meta property="og:type" content="website" />
   <meta property="og:image" content="./assets/img/hero-ill.svg" />
   <meta name="twitter:card" content="summary_large_image" />
@@ -38,8 +38,8 @@
       <div class="container hero-wrap">
         <div class="hero-copy">
           <div class="hero-badge">面向企业独立部署</div>
-          <h1>开源智能客服系统<br><span>AI 协同接待，人工接管闭环</span></h1>
-          <p class="subtitle">Servify 以 Web 为第一入口，围绕客户咨询、AI 首答、人工接管、转接协作和工单流转构建完整客服链路，适合需要独立部署、可控接入和持续演化的企业客服场景。</p>
+          <h1>开源智能客服系统<br><span>AI 协同接待，远程协助闭环</span></h1>
+          <p class="subtitle">Servify 以 Web 为第一入口，围绕客户咨询、AI 首答、远程协助、人工接管、转接协作和工单流转构建完整客服链路，适合需要独立部署、可控接入和持续演化的企业客服场景。</p>
           <div class="cta">
             <a class="btn primary" href="https://toconvo.github.io/servify/" target="_blank" rel="noopener">查看文档</a>
             <a class="btn secondary" href="https://github.com/Toconvo/servify" target="_blank" rel="noopener">GitHub &rarr;</a>
@@ -47,7 +47,7 @@
           <div class="tech-badges">
             <span class="tech-badge">Web 优先</span>
             <span class="tech-badge">AI 协同</span>
-            <span class="tech-badge">人工接管</span>
+            <span class="tech-badge">远程协助</span>
             <span class="tech-badge">工单闭环</span>
             <span class="tech-badge">独立部署</span>
           </div>
@@ -70,7 +70,7 @@
         </div>
         <div class="stat-item">
           <div class="stat-value">3</div>
-          <div class="stat-label">人工接管与协作</div>
+          <div class="stat-label">远程协助与接管</div>
         </div>
         <div class="stat-item">
           <div class="stat-value">4</div>
@@ -103,19 +103,24 @@
             <p>复杂问题可由坐席随时接管，保持上下文连续，避免机器人和人工割裂。</p>
           </div>
           <div class="card">
+            <div class="card-icon"><i data-lucide="monitor"></i></div>
+            <h3>远程协助</h3>
+            <p>针对需要演示、指引和协同处理的场景，支持基于实时能力的远程协助，而不只停留在文字问答。</p>
+          </div>
+          <div class="card">
             <div class="card-icon"><i data-lucide="git-branch"></i></div>
             <h3>转接与协作</h3>
             <p>支持排队、分配、转接和团队协作，让问题进入最合适的处理路径。</p>
           </div>
           <div class="card">
-            <div class="card-icon"><i data-lucide="clipboard-list"></i></div>
-            <h3>工单闭环</h3>
-            <p>即时会话解决不了的问题可转入工单，继续推进处理、跟踪状态和责任归属。</p>
-          </div>
-          <div class="card">
             <div class="card-icon"><i data-lucide="shield-check"></i></div>
             <h3>后台运营</h3>
             <p>在同一套后台里管理坐席、知识库、权限、安全策略和基础运营配置。</p>
+          </div>
+          <div class="card">
+            <div class="card-icon"><i data-lucide="clipboard-list"></i></div>
+            <h3>工单闭环</h3>
+            <p>即时会话解决不了的问题可转入工单，继续推进处理、跟踪状态和责任归属。</p>
           </div>
         </div>
       </div>
@@ -131,7 +136,8 @@
             <li><i data-lucide="check"></i> 网站访客发起咨询，快速建立实时会话</li>
             <li><i data-lucide="check"></i> AI 先做首答、知识召回和问题澄清</li>
             <li><i data-lucide="check"></i> 坐席随时接管，并查看上下文与客户信息</li>
-            <li><i data-lucide="check"></i> 需要时可转接、协作或继续补充处理信息</li>
+            <li><i data-lucide="check"></i> 需要时可发起远程协助，帮助客户更快完成操作和排查</li>
+            <li><i data-lucide="check"></i> 还可继续转接、协作或补充处理信息</li>
             <li><i data-lucide="check"></i> 无法即时解决的问题流转到工单继续跟进</li>
           </ul>
         </div>
@@ -169,6 +175,11 @@
             <h3>内部服务台</h3>
             <p>也可以用于内部运营、IT 或业务支持，让请求受理和处理链路更清晰。</p>
           </div>
+          <div class="card">
+            <div class="card-icon"><i data-lucide="monitor"></i></div>
+            <h3>远程指导场景</h3>
+            <p>当客户需要被一步步引导操作时，远程协助能力比纯聊天更贴近真实服务过程。</p>
+          </div>
         </div>
       </div>
     </section>
@@ -196,7 +207,7 @@
                   <span class="module-badge completed">当前基础</span>
                 </div>
               </div>
-              <p>已具备会话、消息、实时交互和上下文承接能力，是整条客服链路的入口。</p>
+              <p>已具备会话、消息、实时交互和上下文承接能力，也是远程协助体验的基础入口。</p>
             </div>
             <div class="module-card done">
               <div class="module-header">
