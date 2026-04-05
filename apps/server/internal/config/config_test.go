@@ -3,6 +3,8 @@ package config
 import (
 	"testing"
 	"time"
+
+	"github.com/spf13/viper"
 )
 
 func TestGetDefaultConfig(t *testing.T) {
@@ -68,6 +70,72 @@ func TestConfig_SecurityDefaults(t *testing.T) {
 	}
 	if cfg.Security.RateLimiting.Enabled {
 		t.Error("expected rate limiting to be disabled by default")
+	}
+	if cfg.Security.SessionRisk.HotRefreshWindowMinutes != 15 {
+		t.Fatalf("expected default hot refresh window to be 15 minutes, got %d", cfg.Security.SessionRisk.HotRefreshWindowMinutes)
+	}
+	if cfg.Security.SessionRisk.HighRiskScore != 4 {
+		t.Fatalf("expected default high risk score to be 4, got %d", cfg.Security.SessionRisk.HighRiskScore)
+	}
+}
+
+func TestConfig_SessionRiskDefaults(t *testing.T) {
+	cfg := GetDefaultConfig()
+
+	if cfg.Security.SessionRisk.RecentRefreshWindowMinutes != 60 {
+		t.Fatalf("expected recent refresh window = 60, got %d", cfg.Security.SessionRisk.RecentRefreshWindowMinutes)
+	}
+	if cfg.Security.SessionRisk.TodayRefreshWindowHours != 24 {
+		t.Fatalf("expected today refresh window = 24h, got %d", cfg.Security.SessionRisk.TodayRefreshWindowHours)
+	}
+	if cfg.Security.SessionRisk.RapidChangeWindowHours != 24 {
+		t.Fatalf("expected rapid change window = 24h, got %d", cfg.Security.SessionRisk.RapidChangeWindowHours)
+	}
+	if cfg.Security.SessionRisk.StaleActivityWindowDays != 30 {
+		t.Fatalf("expected stale activity window = 30d, got %d", cfg.Security.SessionRisk.StaleActivityWindowDays)
+	}
+	if cfg.Security.SessionRisk.MultiPublicIPThreshold != 2 {
+		t.Fatalf("expected multi public ip threshold = 2, got %d", cfg.Security.SessionRisk.MultiPublicIPThreshold)
+	}
+	if cfg.Security.SessionRisk.ManySessionsThreshold != 3 {
+		t.Fatalf("expected many sessions threshold = 3, got %d", cfg.Security.SessionRisk.ManySessionsThreshold)
+	}
+	if cfg.Security.SessionRisk.HotRefreshFamilyThreshold != 2 {
+		t.Fatalf("expected hot refresh family threshold = 2, got %d", cfg.Security.SessionRisk.HotRefreshFamilyThreshold)
+	}
+	if cfg.Security.SessionRisk.MediumRiskScore != 2 {
+		t.Fatalf("expected medium risk score = 2, got %d", cfg.Security.SessionRisk.MediumRiskScore)
+	}
+	if cfg.Security.SessionRisk.HighRiskScore != 4 {
+		t.Fatalf("expected high risk score = 4, got %d", cfg.Security.SessionRisk.HighRiskScore)
+	}
+}
+
+func TestLoad_SessionRiskOverrides(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+
+	viper.Set("security.session_risk.hot_refresh_window_minutes", 7)
+	viper.Set("security.session_risk.rapid_change_window_hours", 6)
+	viper.Set("security.session_risk.multi_public_ip_threshold", 4)
+	viper.Set("security.session_risk.high_risk_score", 6)
+
+	cfg := Load()
+
+	if cfg.Security.SessionRisk.HotRefreshWindowMinutes != 7 {
+		t.Fatalf("expected overridden hot refresh window = 7, got %d", cfg.Security.SessionRisk.HotRefreshWindowMinutes)
+	}
+	if cfg.Security.SessionRisk.RapidChangeWindowHours != 6 {
+		t.Fatalf("expected overridden rapid change window = 6, got %d", cfg.Security.SessionRisk.RapidChangeWindowHours)
+	}
+	if cfg.Security.SessionRisk.MultiPublicIPThreshold != 4 {
+		t.Fatalf("expected overridden multi public ip threshold = 4, got %d", cfg.Security.SessionRisk.MultiPublicIPThreshold)
+	}
+	if cfg.Security.SessionRisk.HighRiskScore != 6 {
+		t.Fatalf("expected overridden high risk score = 6, got %d", cfg.Security.SessionRisk.HighRiskScore)
+	}
+	if cfg.Security.SessionRisk.MediumRiskScore != 2 {
+		t.Fatalf("expected unspecified medium risk score to keep default 2, got %d", cfg.Security.SessionRisk.MediumRiskScore)
 	}
 }
 
@@ -364,5 +432,19 @@ func TestConfig_AuditRetentionDefaults(t *testing.T) {
 	}
 	if cfg.Security.Audit.CleanupBatchSize <= 0 {
 		t.Fatalf("expected positive audit cleanup batch size, got %d", cfg.Security.Audit.CleanupBatchSize)
+	}
+}
+
+func TestConfig_TokenRevocationDefaults(t *testing.T) {
+	cfg := GetDefaultConfig()
+
+	if !cfg.Security.TokenRevocation.Enabled {
+		t.Error("expected token revocation cleanup to be enabled by default")
+	}
+	if cfg.Security.TokenRevocation.CleanupInterval != 24*time.Hour {
+		t.Fatalf("unexpected token revocation cleanup interval: %v", cfg.Security.TokenRevocation.CleanupInterval)
+	}
+	if cfg.Security.TokenRevocation.CleanupBatchSize <= 0 {
+		t.Fatalf("expected positive token revocation cleanup batch size, got %d", cfg.Security.TokenRevocation.CleanupBatchSize)
 	}
 }

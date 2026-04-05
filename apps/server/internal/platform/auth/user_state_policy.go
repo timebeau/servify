@@ -75,3 +75,31 @@ func NewUserStateTokenPolicy(db *gorm.DB) TokenPolicy {
 		return nil
 	}
 }
+
+func NewRevokedTokenPolicy(db *gorm.DB) TokenPolicy {
+	if db == nil {
+		return nil
+	}
+
+	return func(payload map[string]interface{}, claims Claims, now time.Time) error {
+		if claims.TokenID == "" {
+			return nil
+		}
+
+		var revoked models.RevokedToken
+		err := db.WithContext(ContextWithScope(nil, claims.TenantID, claims.WorkspaceID)).
+			Select("id", "jti", "expires_at", "revoked_at").
+			Where("jti = ?", claims.TokenID).
+			First(&revoked).Error
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			return errors.New("failed to evaluate revoked token state")
+		}
+		if revoked.ExpiresAt != nil && !revoked.ExpiresAt.IsZero() && !revoked.ExpiresAt.After(now) {
+			return nil
+		}
+		return errors.New("token has been explicitly revoked")
+	}
+}

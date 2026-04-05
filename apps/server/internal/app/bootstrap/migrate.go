@@ -14,6 +14,7 @@ func MigrationModels() []interface{} {
 	return []interface{}{
 		&models.User{},
 		&models.UserAuthSession{},
+		&models.RevokedToken{},
 		&models.Customer{},
 		&models.Agent{},
 		&models.Session{},
@@ -75,6 +76,8 @@ func CreateIndexes(db *gorm.DB) error {
 		"CREATE INDEX IF NOT EXISTS idx_tickets_customer_created ON tickets(customer_id, created_at)",
 		"CREATE INDEX IF NOT EXISTS idx_sessions_user_created ON sessions(user_id, created_at)",
 		"CREATE INDEX IF NOT EXISTS idx_user_auth_sessions_user_status ON user_auth_sessions(user_id, status, updated_at)",
+		"CREATE INDEX IF NOT EXISTS idx_revoked_tokens_jti_revoked ON revoked_tokens(jti, revoked_at)",
+		"CREATE INDEX IF NOT EXISTS idx_revoked_tokens_expires_at ON revoked_tokens(expires_at)",
 		"CREATE INDEX IF NOT EXISTS idx_sessions_agent_status ON sessions(agent_id, status)",
 		"CREATE INDEX IF NOT EXISTS idx_customers_priority ON customers(priority)",
 		"CREATE INDEX IF NOT EXISTS idx_customers_source ON customers(source)",

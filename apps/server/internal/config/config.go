@@ -102,8 +102,9 @@ type CircuitBreakerConfig struct {
 }
 
 type JWTConfig struct {
-	Secret    string        `yaml:"secret"`
-	ExpiresIn time.Duration `yaml:"expires_in"`
+	Secret           string        `yaml:"secret"`
+	ExpiresIn        time.Duration `yaml:"expires_in"`
+	RefreshExpiresIn time.Duration `yaml:"refresh_expires_in"`
 }
 
 type LogConfig struct {
@@ -147,10 +148,12 @@ type TracingConfig struct {
 }
 
 type SecurityConfig struct {
-	CORS         CORSConfig         `yaml:"cors"`
-	RateLimiting RateLimitingConfig `yaml:"rate_limiting"`
-	RBAC         RBACConfig         `yaml:"rbac"`
-	Audit        AuditConfig        `yaml:"audit"`
+	CORS            CORSConfig              `yaml:"cors"`
+	RateLimiting    RateLimitingConfig      `yaml:"rate_limiting"`
+	RBAC            RBACConfig              `yaml:"rbac"`
+	Audit           AuditConfig             `yaml:"audit"`
+	TokenRevocation TokenRevocationConfig   `yaml:"token_revocation"`
+	SessionRisk     SessionRiskPolicyConfig `yaml:"session_risk"`
 }
 
 type CORSConfig struct {
@@ -170,6 +173,25 @@ type AuditConfig struct {
 	Retention        time.Duration `yaml:"retention"`
 	CleanupInterval  time.Duration `yaml:"cleanup_interval"`
 	CleanupBatchSize int           `yaml:"cleanup_batch_size"`
+}
+
+type TokenRevocationConfig struct {
+	Enabled          bool          `yaml:"enabled"`
+	CleanupInterval  time.Duration `yaml:"cleanup_interval"`
+	CleanupBatchSize int           `yaml:"cleanup_batch_size"`
+}
+
+type SessionRiskPolicyConfig struct {
+	HotRefreshWindowMinutes    int `yaml:"hot_refresh_window_minutes"`
+	RecentRefreshWindowMinutes int `yaml:"recent_refresh_window_minutes"`
+	TodayRefreshWindowHours    int `yaml:"today_refresh_window_hours"`
+	RapidChangeWindowHours     int `yaml:"rapid_change_window_hours"`
+	StaleActivityWindowDays    int `yaml:"stale_activity_window_days"`
+	MultiPublicIPThreshold     int `yaml:"multi_public_ip_threshold"`
+	ManySessionsThreshold      int `yaml:"many_sessions_threshold"`
+	HotRefreshFamilyThreshold  int `yaml:"hot_refresh_family_threshold"`
+	MediumRiskScore            int `yaml:"medium_risk_score"`
+	HighRiskScore              int `yaml:"high_risk_score"`
 }
 
 type RateLimitingConfig struct {
@@ -292,8 +314,9 @@ func GetDefaultConfig() *Config {
 			},
 		},
 		JWT: JWTConfig{
-			Secret:    "default-secret-key",
-			ExpiresIn: 24 * time.Hour,
+			Secret:           "default-secret-key",
+			ExpiresIn:        24 * time.Hour,
+			RefreshExpiresIn: 7 * 24 * time.Hour,
 		},
 		Log: LogConfig{
 			Level:      "info",
@@ -343,6 +366,23 @@ func GetDefaultConfig() *Config {
 				Retention:        180 * 24 * time.Hour,
 				CleanupInterval:  24 * time.Hour,
 				CleanupBatchSize: 500,
+			},
+			TokenRevocation: TokenRevocationConfig{
+				Enabled:          true,
+				CleanupInterval:  24 * time.Hour,
+				CleanupBatchSize: 500,
+			},
+			SessionRisk: SessionRiskPolicyConfig{
+				HotRefreshWindowMinutes:    15,
+				RecentRefreshWindowMinutes: 60,
+				TodayRefreshWindowHours:    24,
+				RapidChangeWindowHours:     24,
+				StaleActivityWindowDays:    30,
+				MultiPublicIPThreshold:     2,
+				ManySessionsThreshold:      3,
+				HotRefreshFamilyThreshold:  2,
+				MediumRiskScore:            2,
+				HighRiskScore:              4,
 			},
 		},
 		Portal: PortalConfig{

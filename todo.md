@@ -82,10 +82,10 @@
 - Phase 2 运营数据可信化已完成（后端全部真实聚合、前端图表已接入、统计口径已文档化）
 - Phase 3 管理后台产品化已完成
 - Phase 4 运行时去演示化已完成
-- Phase 5 上线 readiness 基础能力已完成，默认配置与文档收尾进行中
+- Phase 5 上线 readiness 基础能力已完成，T4/T5 基础安全治理已完成，剩余主要是文档与发布前对齐
 - 当前完成度大致在 `85% ~ 90%`
 - 当前最短板是：
-  - `11-tenant-auth-and-audit` 中 T4/T5 的剩余收口项（主要是更完整 refresh-token / revoke-list / 运维手册尾项），以及少量 legacy 聚合尾项
+  - `11-tenant-auth-and-audit` 的后续增强项（主要是真实 Geo/IP 情报接入、按环境/租户细化 session risk policy），以及少量 legacy 聚合尾项
   - 生产配置与发布前检查的最终对齐（Phase 5）
 
 产品化详细计划：

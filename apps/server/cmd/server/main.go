@@ -13,6 +13,7 @@ import (
 	appworker "servify/apps/server/internal/app/worker"
 	auditplatform "servify/apps/server/internal/platform/audit"
 	"servify/apps/server/internal/platform/eventbus"
+	"servify/apps/server/internal/platform/usersecurity"
 
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
@@ -139,6 +140,12 @@ func main() {
 		app.RegisterWorker(appworker.NewAuditCleanupWorker(
 			auditplatform.NewGormRetentionService(db, cfg.Security.Audit.Retention, cfg.Security.Audit.CleanupBatchSize),
 			cfg.Security.Audit.CleanupInterval,
+		))
+	}
+	if cfg.Security.TokenRevocation.Enabled {
+		app.RegisterWorker(appworker.NewRevokedTokenCleanupWorker(
+			usersecurity.NewGormRevokedTokenRetentionService(db, cfg.Security.TokenRevocation.CleanupBatchSize),
+			cfg.Security.TokenRevocation.CleanupInterval,
 		))
 	}
 	if err := app.StartWorkers(); err != nil {

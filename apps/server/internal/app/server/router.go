@@ -75,29 +75,39 @@ func BuildRouter(deps Dependencies) *gin.Engine {
 	return r
 }
 
+func authPolicies(db *gorm.DB) []platformauth.TokenPolicy {
+	return []platformauth.TokenPolicy{
+		platformauth.NewRevokedTokenPolicy(db),
+		platformauth.NewUserStateTokenPolicy(db),
+	}
+}
+
 func registerAuthRoutes(r *gin.Engine, deps Dependencies) {
 	auth := r.Group("/api/v1/auth")
-	authHandler := handlers.NewAuthHandler(services.NewAuthService(deps.DB, deps.Config))
+	authHandler := handlers.NewAuthHandler(services.NewAuthService(deps.DB, deps.Config)).WithSessionRiskPolicyConfig(deps.Config.Security.SessionRisk)
 
 	auth.POST("/register", authHandler.Register)
 	auth.POST("/login", authHandler.Login)
+	auth.POST("/refresh", authHandler.RefreshToken)
 
 	// Authenticated auth routes
 	authMe := auth.Group("")
-	authMe.Use(middleware.AuthMiddleware(deps.Config, platformauth.NewUserStateTokenPolicy(deps.DB)))
+	authMe.Use(middleware.AuthMiddleware(deps.Config, authPolicies(deps.DB)...))
 	authMe.GET("/me", authHandler.GetCurrentUser)
-	authMe.POST("/refresh", authHandler.RefreshToken)
+	authMe.GET("/sessions", authHandler.ListSessions)
+	authMe.POST("/sessions/logout-current", authHandler.LogoutCurrentSession)
+	authMe.POST("/sessions/logout-others", authHandler.LogoutOtherSessions)
 
 	// File upload (authenticated)
 	localStorage := storage.NewLocalProvider("./uploads", "/uploads")
 	uploadHandler := handlers.NewFileUploadHandler(localStorage, 32<<20) // 32MB max
-	r.POST("/api/v1/upload", middleware.AuthMiddleware(deps.Config, platformauth.NewUserStateTokenPolicy(deps.DB)), uploadHandler.Upload)
+	r.POST("/api/v1/upload", middleware.AuthMiddleware(deps.Config, authPolicies(deps.DB)...), uploadHandler.Upload)
 	r.Static("/uploads", "./uploads")
 }
 
 func registerManagementRoutes(r *gin.Engine, deps Dependencies) {
 	api := r.Group("/api")
-	api.Use(middleware.AuthMiddleware(deps.Config, platformauth.NewUserStateTokenPolicy(deps.DB)))
+	api.Use(middleware.AuthMiddleware(deps.Config, authPolicies(deps.DB)...))
 	api.Use(middleware.EnforceRequestScope())
 	api.Use(middleware.RequirePrincipalKinds("agent", "admin", "service"))
 	api.Use(middleware.AuditMiddleware(deps.DB))
@@ -177,7 +187,7 @@ func registerManagementRoutes(r *gin.Engine, deps Dependencies) {
 
 	securityAPI := api.Group("/")
 	securityAPI.Use(middleware.RequireResourcePermission("security"))
-	handlers.RegisterUserSecurityRoutes(securityAPI, handlers.NewUserSecurityHandler(usersecurity.NewService(deps.DB, deps.Logger), deps.Logger))
+	handlers.RegisterUserSecurityRoutes(securityAPI, handlers.NewUserSecurityHandler(usersecurity.NewService(deps.DB, deps.Logger), deps.Logger).WithJWTSecret(deps.Config.JWT.Secret).WithSessionRiskPolicyConfig(deps.Config.Security.SessionRisk))
 	handlers.RegisterScopedConfigRoutes(securityAPI, handlers.NewScopedConfigHandler(configscope.NewGormConfigStore(deps.DB), auditplatform.NewGormQueryService(deps.DB)))
 }
 
@@ -203,7 +213,7 @@ func registerRealtimeRoutes(r *gin.Engine, deps Dependencies) {
 	aiHandler := handlers.NewAIHandler(deps.AIHandlerService)
 
 	managementV1 := r.Group("/api/v1")
-	managementV1.Use(middleware.AuthMiddleware(deps.Config, platformauth.NewUserStateTokenPolicy(deps.DB)))
+	managementV1.Use(middleware.AuthMiddleware(deps.Config, authPolicies(deps.DB)...))
 	managementV1.Use(middleware.EnforceRequestScope())
 	managementV1.Use(middleware.RequirePrincipalKinds("agent", "admin", "service"))
 	managementV1.GET("/ws/stats", wsHandler.GetStats)
@@ -224,7 +234,7 @@ func registerRealtimeRoutes(r *gin.Engine, deps Dependencies) {
 
 	ingest := handlers.NewMetricsIngestHandler(handlers.NewMetricsAggregator())
 	serviceV1 := r.Group("/api/v1")
-	serviceV1.Use(middleware.AuthMiddleware(deps.Config, platformauth.NewUserStateTokenPolicy(deps.DB)))
+	serviceV1.Use(middleware.AuthMiddleware(deps.Config, authPolicies(deps.DB)...))
 	serviceV1.Use(middleware.EnforceRequestScope())
 	serviceV1.Use(middleware.RequirePrincipalKinds("service"))
 	serviceV1.POST("/metrics/ingest", ingest.Ingest)

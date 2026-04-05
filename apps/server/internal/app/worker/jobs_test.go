@@ -46,6 +46,19 @@ func (f *fakeAuditRetentionService) Cleanup(ctx context.Context, now time.Time) 
 	return 0, ctx.Err()
 }
 
+type fakeRevokedTokenRetentionService struct {
+	calls chan struct{}
+}
+
+func (f *fakeRevokedTokenRetentionService) Cleanup(ctx context.Context, now time.Time) (int64, error) {
+	select {
+	case f.calls <- struct{}{}:
+	default:
+	}
+	<-ctx.Done()
+	return 0, ctx.Err()
+}
+
 func TestStatisticsWorkerLifecycle(t *testing.T) {
 	loop := &fakeLoop{started: make(chan struct{}), stopped: make(chan struct{})}
 	w := &StatisticsWorker{
@@ -102,6 +115,28 @@ func TestAuditCleanupWorkerLifecycle(t *testing.T) {
 	calls := make(chan struct{}, 1)
 	w := &AuditCleanupWorker{
 		service:  &fakeAuditRetentionService{calls: calls},
+		interval: 100 * time.Millisecond,
+		now:      time.Now,
+	}
+	if err := w.Start(); err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	select {
+	case <-calls:
+	case <-time.After(time.Second):
+		t.Fatal("worker did not execute cleanup")
+	}
+	stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := w.Stop(stopCtx); err != nil {
+		t.Fatalf("Stop() error = %v", err)
+	}
+}
+
+func TestRevokedTokenCleanupWorkerLifecycle(t *testing.T) {
+	calls := make(chan struct{}, 1)
+	w := &RevokedTokenCleanupWorker{
+		service:  &fakeRevokedTokenRetentionService{calls: calls},
 		interval: 100 * time.Millisecond,
 		now:      time.Now,
 	}

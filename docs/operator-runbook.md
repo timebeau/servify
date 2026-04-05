@@ -236,6 +236,17 @@ security:
     enabled: true
     requests_per_minute: 300
     burst: 50
+  session_risk:
+    hot_refresh_window_minutes: 10
+    recent_refresh_window_minutes: 30
+    today_refresh_window_hours: 24
+    rapid_change_window_hours: 12
+    stale_activity_window_days: 14
+    multi_public_ip_threshold: 2
+    many_sessions_threshold: 3
+    hot_refresh_family_threshold: 2
+    medium_risk_score: 2
+    high_risk_score: 4
 
 monitoring:
   enabled: true
@@ -781,6 +792,31 @@ sh ./scripts/check-security-baseline.sh config.yml
 
 # Make 入口
 make security-check CONFIG=config.yml
+```
+
+### 13.5 Session Risk 阈值调整
+
+`security.session_risk` 控制 auth session 风险启发式的时间窗口与分级阈值。建议：
+
+- 生产环境优先收紧 `hot_refresh_window_minutes` 与 `rapid_change_window_hours`
+- 若业务经常经过共享出口或 NAT 网关，谨慎调整 `multi_public_ip_threshold`
+- 若要更早将 session 标为高风险，可降低 `high_risk_score`
+
+示例：
+
+```yaml
+security:
+  session_risk:
+    hot_refresh_window_minutes: 10
+    recent_refresh_window_minutes: 30
+    today_refresh_window_hours: 24
+    rapid_change_window_hours: 12
+    stale_activity_window_days: 14
+    multi_public_ip_threshold: 2
+    many_sessions_threshold: 3
+    hot_refresh_family_threshold: 2
+    medium_risk_score: 2
+    high_risk_score: 4
 ```
 
 ---

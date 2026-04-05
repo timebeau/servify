@@ -2,6 +2,10 @@ package usersecurity
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -131,4 +135,149 @@ func TestServiceListAndRevokeSession(t *testing.T) {
 	if session.RevokedAt == nil || session.RevokedAt.IsZero() {
 		t.Fatalf("expected revoked_at to be set")
 	}
+}
+
+func TestServiceRevokeAllSessions(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:usersecurity_revoke_all_sessions?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.AutoMigrate(&models.User{}, &models.UserAuthSession{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	if err := db.Create(&models.User{
+		ID:       31,
+		Username: "u31",
+		Email:    "u31@example.com",
+		Status:   "active",
+	}).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	if err := db.Create([]models.UserAuthSession{
+		{ID: "auth-a", UserID: 31, Status: "active", TokenVersion: 1},
+		{ID: "auth-b", UserID: 31, Status: "active", TokenVersion: 2},
+		{ID: "auth-c", UserID: 31, Status: "revoked", TokenVersion: 3},
+	}).Error; err != nil {
+		t.Fatalf("seed auth sessions: %v", err)
+	}
+
+	svc := NewService(db, nil)
+	result, err := svc.RevokeAllSessions(context.Background(), 31, "auth-b")
+	if err != nil {
+		t.Fatalf("RevokeAllSessions() error = %v", err)
+	}
+	if result.Count != 1 || len(result.Sessions) != 1 || result.Sessions[0].ID != "auth-a" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+
+	var sessions []models.UserAuthSession
+	if err := db.Order("id asc").Find(&sessions, "user_id = ?", 31).Error; err != nil {
+		t.Fatalf("reload sessions: %v", err)
+	}
+	if sessions[0].Status != "revoked" || sessions[0].TokenVersion != 2 {
+		t.Fatalf("unexpected auth-a state: %+v", sessions[0])
+	}
+	if sessions[1].Status != "active" || sessions[1].TokenVersion != 2 {
+		t.Fatalf("unexpected auth-b state: %+v", sessions[1])
+	}
+}
+
+func TestServiceRevokeJWT(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:usersecurity_revoke_jwt?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.AutoMigrate(&models.RevokedToken{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	now := time.Now().UTC()
+	secret := "test-secret"
+	token := createTestJWTForUserSecurity(t, map[string]interface{}{
+		"jti":        "jti-usersecurity-1",
+		"user_id":    9,
+		"session_id": "auth-9",
+		"token_use":  "access",
+		"iat":        now.Unix(),
+		"exp":        now.Add(30 * time.Minute).Unix(),
+	}, secret)
+
+	svc := NewService(db, nil)
+	result, err := svc.RevokeJWT(context.Background(), token, secret, "security-event")
+	if err != nil {
+		t.Fatalf("RevokeJWT() error = %v", err)
+	}
+	if result.JTI != "jti-usersecurity-1" || result.UserID != 9 || result.TokenUse != "access" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+
+	var revoked models.RevokedToken
+	if err := db.First(&revoked, "jti = ?", "jti-usersecurity-1").Error; err != nil {
+		t.Fatalf("load revoked token: %v", err)
+	}
+	if revoked.Reason != "security-event" {
+		t.Fatalf("reason = %q want security-event", revoked.Reason)
+	}
+}
+
+func TestServiceListRevokedTokensAndCleanup(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:usersecurity_query_cleanup?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.AutoMigrate(&models.RevokedToken{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	now := time.Now().UTC()
+	expiredAt := now.Add(-1 * time.Hour)
+	activeAt := now.Add(2 * time.Hour)
+	if err := db.Create([]models.RevokedToken{
+		{JTI: "jti-query-1", UserID: 21, SessionID: "sess-1", TokenUse: "access", ExpiresAt: &activeAt, RevokedAt: now.Add(-2 * time.Minute)},
+		{JTI: "jti-query-2", UserID: 22, SessionID: "sess-2", TokenUse: "refresh", ExpiresAt: &expiredAt, RevokedAt: now.Add(-3 * time.Minute)},
+	}).Error; err != nil {
+		t.Fatalf("seed revoked tokens: %v", err)
+	}
+
+	svc := NewService(db, nil)
+	items, total, err := svc.ListRevokedTokens(context.Background(), RevokedTokenListQuery{
+		ActiveOnly: true,
+		Page:       1,
+		PageSize:   20,
+	})
+	if err != nil {
+		t.Fatalf("ListRevokedTokens() error = %v", err)
+	}
+	if total != 1 || len(items) != 1 || items[0].JTI != "jti-query-1" {
+		t.Fatalf("unexpected active revoked tokens: total=%d items=%+v", total, items)
+	}
+
+	retention := NewGormRevokedTokenRetentionService(db, 10)
+	deleted, err := retention.Cleanup(context.Background(), now)
+	if err != nil {
+		t.Fatalf("Cleanup() error = %v", err)
+	}
+	if deleted != 1 {
+		t.Fatalf("deleted = %d want 1", deleted)
+	}
+}
+
+func createTestJWTForUserSecurity(t *testing.T, payload map[string]interface{}, secret string) string {
+	t.Helper()
+	header := map[string]string{"alg": "HS256", "typ": "JWT"}
+	headerJSON, err := json.Marshal(header)
+	if err != nil {
+		t.Fatalf("marshal header: %v", err)
+	}
+	payloadJSON, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal payload: %v", err)
+	}
+
+	enc := func(b []byte) string { return base64.RawURLEncoding.EncodeToString(b) }
+	unsigned := enc(headerJSON) + "." + enc(payloadJSON)
+
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(unsigned))
+	return unsigned + "." + enc(mac.Sum(nil))
 }

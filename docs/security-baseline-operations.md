@@ -118,7 +118,8 @@
 
 ## 仍待补齐的缺口
 
-- 已具备单用户查询、批量安全态预览、单用户 / 批量用户 token 吊销，以及 auth session 列表查询与单 session 吊销入口；独立 refresh token、revoke list 与更完整的 session 家族治理仍未实现
+- 当前已具备单用户查询、批量安全态预览、单用户 / 批量用户 token 吊销、独立 refresh token、单 token revoke list、revoke list 查询，以及 auth session 列表查询、单 session 吊销与按用户批量 session 吊销入口；session 列表现已返回基础 client metadata（`device_fingerprint` / `user_agent` / `client_ip` / `last_seen_at`）以及衍生字段（`network_label` / `location_label` / `risk_score` / `risk_level` / `risk_reasons`），并补充 `family_public_ip_count` / `family_device_count` / `active_session_count` / `family_hot_refresh_count` / `reference_session_id` / `ip_drift` / `device_drift` / `rapid_ip_change` / `rapid_device_change` / `refresh_recency` / `rapid_refresh_activity` 这类同账号并发、漂移、短窗口切换与 refresh 活跃度上下文；denylist 过期记录会由后台 worker 自动清理，`security.session_risk` 也已成为正式配置面
+- 当前剩余缺口应视为后续增强，而不是本轮 T5 阻塞：真实 Geo/IP 情报富化、更强异常模型、按环境/租户差异化策略
 - 外部开放接口仍缺少代码层强制检查，当前 checklist 主要依赖评审与文档约束
 - 关键配置变更尚未形成“执行前审批 / 执行后验证 / 回滚记录”操作手册
 

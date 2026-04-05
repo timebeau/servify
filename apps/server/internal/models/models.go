@@ -31,17 +31,36 @@ type User struct {
 
 // UserAuthSession tracks login/refresh session state for JWT issuance and targeted revocation.
 type UserAuthSession struct {
-	ID              string         `gorm:"primaryKey;size:64" json:"id"`
-	UserID          uint           `gorm:"index;not null" json:"user_id"`
-	Status          string         `gorm:"default:'active';index" json:"status"` // active, revoked
-	TokenVersion    int            `gorm:"default:0" json:"token_version"`
-	LastRefreshedAt *time.Time     `json:"last_refreshed_at,omitempty"`
-	RevokedAt       *time.Time     `json:"revoked_at,omitempty"`
-	CreatedAt       time.Time      `json:"created_at"`
-	UpdatedAt       time.Time      `json:"updated_at"`
-	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
+	ID                string         `gorm:"primaryKey;size:64" json:"id"`
+	UserID            uint           `gorm:"index;not null" json:"user_id"`
+	Status            string         `gorm:"default:'active';index" json:"status"` // active, revoked
+	TokenVersion      int            `gorm:"default:0" json:"token_version"`
+	DeviceFingerprint string         `gorm:"size:128;index" json:"device_fingerprint"`
+	UserAgent         string         `gorm:"size:512" json:"user_agent"`
+	ClientIP          string         `gorm:"size:128" json:"client_ip"`
+	LastSeenAt        *time.Time     `json:"last_seen_at,omitempty"`
+	LastRefreshedAt   *time.Time     `json:"last_refreshed_at,omitempty"`
+	RevokedAt         *time.Time     `json:"revoked_at,omitempty"`
+	CreatedAt         time.Time      `json:"created_at"`
+	UpdatedAt         time.Time      `json:"updated_at"`
+	DeletedAt         gorm.DeletedAt `gorm:"index" json:"-"`
 
 	User User `gorm:"foreignKey:UserID" json:"user,omitempty"`
+}
+
+// RevokedToken tracks explicitly denylisted JWTs by their unique token id (jti).
+type RevokedToken struct {
+	ID        uint           `gorm:"primaryKey" json:"id"`
+	JTI       string         `gorm:"size:128;uniqueIndex;not null" json:"jti"`
+	UserID    uint           `gorm:"index" json:"user_id"`
+	SessionID string         `gorm:"index" json:"session_id"`
+	TokenUse  string         `gorm:"index" json:"token_use"` // access, refresh
+	Reason    string         `gorm:"type:text" json:"reason"`
+	ExpiresAt *time.Time     `gorm:"index" json:"expires_at,omitempty"`
+	RevokedAt time.Time      `gorm:"index;not null" json:"revoked_at"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // 客户信息扩展

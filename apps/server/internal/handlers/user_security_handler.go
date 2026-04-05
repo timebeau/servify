@@ -3,7 +3,9 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
+	"servify/apps/server/internal/config"
 	auditplatform "servify/apps/server/internal/platform/audit"
 	"servify/apps/server/internal/platform/usersecurity"
 
@@ -12,8 +14,10 @@ import (
 )
 
 type UserSecurityHandler struct {
-	service *usersecurity.Service
-	logger  *logrus.Logger
+	service   *usersecurity.Service
+	jwtSecret string
+	logger    *logrus.Logger
+	policy    sessionRiskPolicy
 }
 
 type batchRevokeTokensRequest struct {
@@ -36,11 +40,45 @@ type revokeSessionRequest struct {
 	SessionID string `json:"session_id" binding:"required"`
 }
 
+type revokeTokenRequest struct {
+	Token  string `json:"token" binding:"required"`
+	Reason string `json:"reason"`
+}
+
+type revokeAllSessionsRequest struct {
+	ExceptSessionID string `json:"except_session_id"`
+	Reason          string `json:"reason"`
+}
+
+type revokedTokenListItem struct {
+	JTI       string `json:"jti"`
+	UserID    uint   `json:"user_id"`
+	SessionID string `json:"session_id"`
+	TokenUse  string `json:"token_use"`
+	Reason    string `json:"reason"`
+	ExpiresAt any    `json:"expires_at"`
+	RevokedAt any    `json:"revoked_at"`
+}
+
 func NewUserSecurityHandler(service *usersecurity.Service, logger *logrus.Logger) *UserSecurityHandler {
 	if logger == nil {
 		logger = logrus.StandardLogger()
 	}
-	return &UserSecurityHandler{service: service, logger: logger}
+	return &UserSecurityHandler{service: service, logger: logger, policy: defaultSessionRiskPolicy()}
+}
+
+func (h *UserSecurityHandler) WithJWTSecret(secret string) *UserSecurityHandler {
+	if h != nil {
+		h.jwtSecret = strings.TrimSpace(secret)
+	}
+	return h
+}
+
+func (h *UserSecurityHandler) WithSessionRiskPolicyConfig(cfg config.SessionRiskPolicyConfig) *UserSecurityHandler {
+	if h != nil {
+		h.policy = sessionRiskPolicyFromConfig(cfg)
+	}
+	return h
 }
 
 // RevokeTokens 强制失效用户已有 token
@@ -318,17 +356,10 @@ func (h *UserSecurityHandler) ListUserSessions(c *gin.Context) {
 		return
 	}
 
+	riskContext := buildSessionRiskContext(sessions, h.policy)
 	items := make([]gin.H, 0, len(sessions))
 	for _, session := range sessions {
-		items = append(items, gin.H{
-			"session_id":        session.ID,
-			"status":            session.Status,
-			"token_version":     session.TokenVersion,
-			"last_refreshed_at": session.LastRefreshedAt,
-			"revoked_at":        session.RevokedAt,
-			"created_at":        session.CreatedAt,
-			"updated_at":        session.UpdatedAt,
-		})
+		items = append(items, mapSessionResponse(session, false, riskContext, h.policy))
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -427,6 +458,119 @@ func (h *UserSecurityHandler) RevokeSession(c *gin.Context) {
 	})
 }
 
+// RevokeAllSessions 失效用户的全部 auth session
+// @Summary 失效用户全部 auth session
+// @Description 吊销指定用户的全部活跃 session，可选保留一个 session
+// @Tags 安全管理
+// @Accept json
+// @Produce json
+// @Param id path int true "用户ID"
+// @Param payload body object false "except_session_id"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/security/users/{id}/sessions/revoke-all [post]
+func (h *UserSecurityHandler) RevokeAllSessions(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "Invalid user ID",
+			Message: "ID must be a valid number",
+		})
+		return
+	}
+	if h.service == nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "User security service unavailable",
+			Message: "user security service not configured",
+		})
+		return
+	}
+
+	if _, err := h.service.GetUser(c.Request.Context(), uint(id)); err != nil {
+		c.JSON(http.StatusNotFound, ErrorResponse{
+			Error:   "User not found",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	var req revokeAllSessionsRequest
+	if c.Request.ContentLength > 0 {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error:   "Invalid request body",
+				Message: err.Error(),
+			})
+			return
+		}
+	}
+	req.ExceptSessionID = strings.TrimSpace(req.ExceptSessionID)
+
+	beforeSessions, err := h.service.ListUserSessions(c.Request.Context(), uint(id))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "Failed to list user sessions",
+			Message: err.Error(),
+		})
+		return
+	}
+	before := make([]gin.H, 0, len(beforeSessions))
+	for _, session := range beforeSessions {
+		if strings.EqualFold(session.Status, "active") && session.RevokedAt == nil && session.ID != req.ExceptSessionID {
+			before = append(before, gin.H{
+				"user_id":           id,
+				"session_id":        session.ID,
+				"status":            session.Status,
+				"token_version":     session.TokenVersion,
+				"last_refreshed_at": session.LastRefreshedAt,
+				"revoked_at":        session.RevokedAt,
+			})
+		}
+	}
+	auditplatform.SetBefore(c, before)
+
+	result, err := h.service.RevokeAllSessions(c.Request.Context(), uint(id), req.ExceptSessionID)
+	if err != nil {
+		h.logger.Errorf("Failed to revoke all sessions for user %d: %v", id, err)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "Failed to revoke user sessions",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	after := make([]gin.H, 0, len(result.Sessions))
+	items := make([]gin.H, 0, len(result.Sessions))
+	for _, session := range result.Sessions {
+		after = append(after, gin.H{
+			"user_id":           id,
+			"session_id":        session.ID,
+			"status":            session.Status,
+			"token_version":     session.TokenVersion,
+			"last_refreshed_at": session.LastRefreshedAt,
+			"revoked_at":        session.RevokedAt,
+		})
+		items = append(items, gin.H{
+			"session_id":    session.ID,
+			"status":        session.Status,
+			"token_version": session.TokenVersion,
+			"revoked_at":    session.RevokedAt,
+		})
+	}
+	auditplatform.SetAfter(c, after)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":           "User sessions revoked successfully",
+		"user_id":           uint(id),
+		"count":             result.Count,
+		"except_session_id": req.ExceptSessionID,
+		"items":             items,
+	})
+}
+
 // GetUserSecurity 获取用户安全状态
 // @Summary 获取用户安全状态
 // @Description 返回用户当前状态、token_version、token_valid_after 和最近登录时间
@@ -477,6 +621,141 @@ func (h *UserSecurityHandler) GetUserSecurity(c *gin.Context) {
 	})
 }
 
+// RevokeToken 显式吊销单个 JWT
+// @Summary 显式吊销单个 JWT
+// @Description 将指定 JWT 的 jti 加入 revoke list，使其在过期前立即失效
+// @Tags 安全管理
+// @Accept json
+// @Produce json
+// @Param payload body object true "token"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/security/tokens/revoke [post]
+func (h *UserSecurityHandler) RevokeToken(c *gin.Context) {
+	if h.service == nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "User security service unavailable",
+			Message: "user security service not configured",
+		})
+		return
+	}
+	if strings.TrimSpace(h.jwtSecret) == "" {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "JWT secret unavailable",
+			Message: "jwt secret not configured",
+		})
+		return
+	}
+
+	var req revokeTokenRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "Invalid request body",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	result, err := h.service.RevokeJWT(c.Request.Context(), req.Token, h.jwtSecret, req.Reason)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "Failed to revoke token",
+			Message: err.Error(),
+		})
+		return
+	}
+	auditplatform.SetAfter(c, gin.H{
+		"jti":        result.JTI,
+		"user_id":    result.UserID,
+		"session_id": result.SessionID,
+		"token_use":  result.TokenUse,
+		"reason":     result.Reason,
+		"expires_at": result.ExpiresAt,
+		"revoked_at": result.RevokedAt,
+	})
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":    "Token revoked successfully",
+		"jti":        result.JTI,
+		"user_id":    result.UserID,
+		"session_id": result.SessionID,
+		"token_use":  result.TokenUse,
+		"expires_at": result.ExpiresAt,
+		"revoked_at": result.RevokedAt,
+	})
+}
+
+// ListRevokedTokens 查询 revoke list
+// @Summary 查询 revoke list
+// @Description 返回显式加入 denylist 的 JWT 记录，支持按 jti/user/session/token_use 过滤
+// @Tags 安全管理
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} ErrorResponse
+// @Router /api/security/tokens/revoked [get]
+func (h *UserSecurityHandler) ListRevokedTokens(c *gin.Context) {
+	if h.service == nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "User security service unavailable",
+			Message: "user security service not configured",
+		})
+		return
+	}
+
+	var userID *uint
+	if raw := strings.TrimSpace(c.Query("user_id")); raw != "" {
+		parsed, err := strconv.ParseUint(raw, 10, 32)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error:   "Invalid user ID",
+				Message: "user_id must be a valid number",
+			})
+			return
+		}
+		value := uint(parsed)
+		userID = &value
+	}
+	page, _ := strconv.Atoi(strings.TrimSpace(c.DefaultQuery("page", "1")))
+	pageSize, _ := strconv.Atoi(strings.TrimSpace(c.DefaultQuery("page_size", "20")))
+	activeOnly := strings.EqualFold(strings.TrimSpace(c.DefaultQuery("active_only", "false")), "true")
+
+	items, total, err := h.service.ListRevokedTokens(c.Request.Context(), usersecurity.RevokedTokenListQuery{
+		JTI:        strings.TrimSpace(c.Query("jti")),
+		UserID:     userID,
+		SessionID:  strings.TrimSpace(c.Query("session_id")),
+		TokenUse:   strings.TrimSpace(c.Query("token_use")),
+		ActiveOnly: activeOnly,
+		Page:       page,
+		PageSize:   pageSize,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "Failed to list revoked tokens",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	resp := make([]revokedTokenListItem, 0, len(items))
+	for _, item := range items {
+		resp = append(resp, revokedTokenListItem{
+			JTI:       item.JTI,
+			UserID:    item.UserID,
+			SessionID: item.SessionID,
+			TokenUse:  item.TokenUse,
+			Reason:    item.Reason,
+			ExpiresAt: item.ExpiresAt,
+			RevokedAt: item.RevokedAt,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"count": total,
+		"items": resp,
+	})
+}
+
 func RegisterUserSecurityRoutes(r *gin.RouterGroup, handler *UserSecurityHandler) {
 	if handler == nil {
 		return
@@ -485,7 +764,10 @@ func RegisterUserSecurityRoutes(r *gin.RouterGroup, handler *UserSecurityHandler
 	{
 		security.GET("/users/:id", handler.GetUserSecurity)
 		security.GET("/users/:id/sessions", handler.ListUserSessions)
+		security.POST("/users/:id/sessions/revoke-all", handler.RevokeAllSessions)
+		security.GET("/tokens/revoked", handler.ListRevokedTokens)
 		security.POST("/users/:id/sessions/revoke", handler.RevokeSession)
+		security.POST("/tokens/revoke", handler.RevokeToken)
 		security.POST("/users/query", handler.QueryUsersSecurity)
 		security.POST("/users/revoke-tokens", handler.BatchRevokeTokens)
 		security.POST("/users/:id/revoke-tokens", handler.RevokeTokens)

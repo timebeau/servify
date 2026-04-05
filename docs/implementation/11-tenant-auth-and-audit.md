@@ -115,10 +115,10 @@
 
 ## T5 security-baseline-for-operations
 
-- [-] 盘点高风险接口和高风险操作
-- [-] 增加关键操作的速率限制、权限兜底和日志
-- [-] 为 token 生命周期、密钥轮换、敏感字段脱敏补最小规范
-- [-] 为对外开放接口补基础安全清单
+- [x] 盘点高风险接口和高风险操作
+- [x] 增加关键操作的速率限制、权限兜底和日志
+- [x] 为 token 生命周期、密钥轮换、敏感字段脱敏补最小规范
+- [x] 为对外开放接口补基础安全清单
 
 验收：
 
@@ -138,9 +138,57 @@
 - 默认开发配置 `config.yml` 现已保持通过 `security` / `observability` strict baseline 检查，但文档已明确其用途仍是本地开发，不应替代生产部署配置模板
 - `internal/platform/auth` 现已新增可组合 token policy 钩子，支持按 `iat` 做 issued-before 失效、按 `token_version` 做最小会话版本淘汰，为后续账号级吊销策略预留接入点
 - `internal/platform/auth` 现已新增基于 `users` 表状态与 `user_auth_sessions` 的 token policy，并接入 router auth middleware：非 active 用户会被拒绝，设置 `token_valid_after` / `token_version` 后可使旧 token 失效；登录与 refresh 现在也会携带 `session_id + session_token_version`，支持同一 auth session 的旧 token 在 refresh 或 targeted revoke 后失效
+- `/api/v1/auth/login`、`/api/v1/auth/register`、`/api/v1/auth/refresh` 现已返回独立 `refresh_token`，refresh 路径不再依赖仍然有效的 access token；refresh token 会携带 `token_use=refresh` 与当前 `session_token_version`，刷新后旧 refresh token 会立即失效，并继续受 user/session revoke、`token_valid_after`、`token_version` 约束
+- 认证签发链路现已为 access / refresh token 注入唯一 `jti`；`internal/platform/auth` 已新增 revoke list policy，管理面可通过 `POST /api/security/tokens/revoke` 将单个 JWT 显式加入 denylist，使其在到期前立即失效
+- 管理面现已补 `GET /api/security/tokens/revoked` revoke list 查询接口，可按 `jti` / `user_id` / `session_id` / `token_use` 过滤，并支持只看当前仍未过期的 denylist 记录
+- revoked token denylist 已接入后台 cleanup worker，会按 token `expires_at` 自动清理过期 revoke 记录，避免 denylist 长期膨胀
 - agent 管理面现已新增 `POST /api/agents/:id/revoke-tokens`，可主动提升用户 `token_version` 并刷新 `token_valid_after`，将旧 token 作废
 - customer 管理面现已新增 `POST /api/customers/:id/revoke-tokens`，可对受作用域约束的客户账号主动触发旧 token 失效
 - token 主动失效底层逻辑现已收敛到 `internal/platform/usersecurity`，agent/customer 两条管理面路径复用同一套 `token_valid_after + token_version` 更新实现
 - 管理面现已新增统一 `security` surface：`GET /api/security/users/:id` 可查询单用户安全状态，`POST /api/security/users/query` 可批量预览用户当前安全态与下一次 revoke 后的 `token_version`，`GET /api/security/users/:id/sessions` 与 `POST /api/security/users/:id/sessions/revoke` 可查看并失效单个 auth session，`POST /api/security/users/:id/revoke-tokens` 与 `POST /api/security/users/revoke-tokens` 可分别执行单用户 / 批量 user revoke，统一由 `security.read` / `security.write` 权限保护
+- 管理面现已补 `POST /api/security/users/:id/sessions/revoke-all`，可批量失效同一用户的全部活跃 auth session，并支持通过 `except_session_id` 保留一个 session，用于“退出所有设备”或“仅踢其它设备”场景
+- `UserAuthSession` 现已补最小 client metadata：登录与 refresh 会记录并更新 `user_agent`、`client_ip`、`last_seen_at`，管理面 `GET /api/security/users/:id/sessions` 可直接看到基础设备视图
+- 认证自助表面现已补 `GET /api/v1/auth/sessions`、`POST /api/v1/auth/sessions/logout-current`、`POST /api/v1/auth/sessions/logout-others`，已登录用户可查看自己的 auth sessions，并执行“退出当前会话”或“踢掉其它设备”
+- `UserAuthSession` 现已进一步补 `device_fingerprint`：优先使用 `X-Device-ID`，否则基于 `User-Agent + ClientIP` 生成稳定哈希，便于同一设备多次 refresh / 多会话归并查看
+- auth / management 两侧 session 列表现已返回衍生安全视图字段 `network_label`、`location_label`、`risk_score`、`risk_level`、`risk_reasons`，以及 `family_public_ip_count` / `family_device_count` / `active_session_count` / `family_hot_refresh_count` / `reference_session_id` / `ip_drift` / `device_drift` / `rapid_ip_change` / `rapid_device_change` / `refresh_recency` / `rapid_refresh_activity` 等 session-family 指标；当前已能区分 loopback/private/public、文档保留网段 / shared address space 等最小 location hint，并将同账号多公网 IP、过多活跃会话、相对最近活跃 session 的设备/IP 漂移、24 小时窗口内的快速切换，以及短时间 refresh 活跃度纳入可解释风险提示
+- 上述 session 风险启发式阈值现已集中到统一 `session risk policy`，并接入 `security.session_risk` 配置面，后续可按环境或部署模板覆盖窗口与阈值
 - 已新增 `servify check-security-baseline --strict` 与 `scripts/check-security-baseline.sh`，可在部署前将现有 security warning 规则升级为显式失败检查，不再只依赖启动日志提醒
-- 当前仍缺 refresh token / revoke list 等更细粒度失效实现，以及审批回滚等更完整的 user security 操作能力
+- T5 当前已达到“最小安全治理骨架”验收目标；后续增强项应单独立项，不再视为本轮收尾阻塞
+
+session 列表示例响应（auth / management 侧字段集合一致，`is_current` 仅 auth 自助侧返回）：
+
+```json
+{
+  "session_id": "sess-current",
+  "status": "active",
+  "token_version": 3,
+  "device_fingerprint": "fp-2d9c6c",
+  "network_label": "public",
+  "location_label": "public_unknown",
+  "risk_score": 5,
+  "risk_level": "high",
+  "risk_reasons": [
+    "public_network",
+    "multi_public_ip_family",
+    "ip_drift"
+  ],
+  "family_public_ip_count": 2,
+  "family_device_count": 2,
+  "active_session_count": 2,
+  "family_hot_refresh_count": 2,
+  "reference_session_id": "sess-latest",
+  "ip_drift": true,
+  "device_drift": false,
+  "rapid_ip_change": true,
+  "rapid_device_change": false,
+  "refresh_recency": "hot",
+  "rapid_refresh_activity": true
+}
+```
+
+当前明确留待后续单独立项的内容：
+
+- 真实 Geo/IP 情报接入
+- 更强时间序列 / 跨会话异常检测
+- 按环境、租户或角色分层的 session risk policy
+- 审批回滚等更完整的 user security 操作能力

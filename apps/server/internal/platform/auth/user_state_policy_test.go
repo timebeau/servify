@@ -19,8 +19,8 @@ func testAuthDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&models.User{}); err != nil {
-		t.Fatalf("migrate user: %v", err)
+	if err := db.AutoMigrate(&models.User{}, &models.RevokedToken{}); err != nil {
+		t.Fatalf("migrate user/revoked token: %v", err)
 	}
 	return db
 }
@@ -220,6 +220,46 @@ func TestUserStateTokenPolicyRejectsRevokedSession(t *testing.T) {
 		Secret: secret,
 		Now:    func() time.Time { return now },
 		Policy: NewUserStateTokenPolicy(db),
+	}))
+	r.GET("/claims", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/claims", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestRevokedTokenPolicyRejectsExplicitlyRevokedToken(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	db := testAuthDB(t)
+	exp := now.Add(10 * time.Minute)
+	if err := db.Create(&models.RevokedToken{
+		JTI:       "jti-123",
+		UserID:    12,
+		TokenUse:  "access",
+		ExpiresAt: &exp,
+		RevokedAt: now.Add(-1 * time.Minute),
+	}).Error; err != nil {
+		t.Fatalf("seed revoked token: %v", err)
+	}
+
+	secret := "test-secret"
+	token := createTestHS256JWT(t, map[string]interface{}{
+		"jti":     "jti-123",
+		"user_id": 12,
+		"iat":     now.Unix(),
+		"exp":     exp.Unix(),
+	}, secret)
+
+	r := gin.New()
+	r.Use(AuthMiddleware(MiddlewareConfig{
+		Secret: secret,
+		Now:    func() time.Time { return now },
+		Policy: NewRevokedTokenPolicy(db),
 	}))
 	r.GET("/claims", func(c *gin.Context) { c.Status(http.StatusOK) })
 

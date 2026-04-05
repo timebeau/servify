@@ -278,3 +278,109 @@ func (w *AuditCleanupWorker) Stop(ctx context.Context) error {
 		return ctx.Err()
 	}
 }
+
+type revokedTokenRetentionService interface {
+	Cleanup(context.Context, time.Time) (int64, error)
+}
+
+// RevokedTokenCleanupWorker periodically deletes expired revoked-token entries.
+type RevokedTokenCleanupWorker struct {
+	service  revokedTokenRetentionService
+	interval time.Duration
+	logger   *logrus.Logger
+	now      func() time.Time
+
+	mu     sync.Mutex
+	cancel context.CancelFunc
+	done   chan struct{}
+}
+
+func NewRevokedTokenCleanupWorker(service revokedTokenRetentionService, interval time.Duration) bootstrap.Worker {
+	if interval <= 0 {
+		interval = 24 * time.Hour
+	}
+	return &RevokedTokenCleanupWorker{
+		service:  service,
+		interval: interval,
+		logger:   logrus.StandardLogger(),
+		now:      time.Now,
+	}
+}
+
+func (w *RevokedTokenCleanupWorker) Name() string { return "revoked-token-cleanup" }
+
+func (w *RevokedTokenCleanupWorker) Start() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.cancel != nil || w.service == nil {
+		return nil
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	w.cancel = cancel
+	w.done = done
+	go func() {
+		defer close(done)
+		initialDelay := jitter(w.interval, 0.1)
+		if initialDelay > 0 {
+			if w.logger != nil {
+				w.logger.Debugf("revoked-token-cleanup worker: initial jitter delay %v", initialDelay)
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(initialDelay):
+			}
+		}
+
+		run := func() bool {
+			deleted, err := w.service.Cleanup(ctx, w.now().UTC())
+			if err != nil {
+				if w.logger != nil {
+					w.logger.WithError(err).Warn("revoked-token cleanup worker: cleanup failed")
+				}
+				return false
+			}
+			if deleted > 0 && w.logger != nil {
+				w.logger.Infof("revoked-token cleanup worker: deleted %d expired revoked tokens", deleted)
+			}
+			return true
+		}
+
+		if !run() && ctx.Err() != nil {
+			return
+		}
+
+		ticker := time.NewTicker(w.interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				run()
+			}
+		}
+	}()
+	return nil
+}
+
+func (w *RevokedTokenCleanupWorker) Stop(ctx context.Context) error {
+	w.mu.Lock()
+	cancel := w.cancel
+	done := w.done
+	w.cancel = nil
+	w.done = nil
+	w.mu.Unlock()
+
+	if cancel == nil {
+		return nil
+	}
+	cancel()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}

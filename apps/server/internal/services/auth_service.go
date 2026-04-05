@@ -15,6 +15,7 @@ import (
 
 	"servify/apps/server/internal/config"
 	"servify/apps/server/internal/models"
+	platformauth "servify/apps/server/internal/platform/auth"
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -39,18 +40,26 @@ type LoginInput struct {
 	Password string
 }
 
+type AuthSessionMetadata struct {
+	DeviceFingerprint string
+	UserAgent         string
+	ClientIP          string
+}
+
 type AuthResult struct {
-	Token     string
-	ExpiresIn int
-	User      *models.User
-	SessionID string
+	Token            string
+	ExpiresIn        int
+	RefreshToken     string
+	RefreshExpiresIn int
+	User             *models.User
+	SessionID        string
 }
 
 func NewAuthService(db *gorm.DB, cfg *config.Config) *AuthService {
 	return &AuthService{db: db, config: cfg}
 }
 
-func (s *AuthService) Register(ctx context.Context, req RegisterInput) (*AuthResult, error) {
+func (s *AuthService) Register(ctx context.Context, req RegisterInput, meta AuthSessionMetadata) (*AuthResult, error) {
 	req.Username = strings.TrimSpace(req.Username)
 	req.Email = strings.TrimSpace(req.Email)
 	if req.Username == "" || req.Email == "" || req.Password == "" {
@@ -96,14 +105,14 @@ func (s *AuthService) Register(ctx context.Context, req RegisterInput) (*AuthRes
 		return nil, err
 	}
 
-	session, err := s.createAuthSession(ctx, user.ID)
+	session, err := s.createAuthSession(ctx, user.ID, meta)
 	if err != nil {
 		return nil, err
 	}
 	return s.buildAuthResult(ctx, user, session)
 }
 
-func (s *AuthService) Login(ctx context.Context, req LoginInput) (*AuthResult, error) {
+func (s *AuthService) Login(ctx context.Context, req LoginInput, meta AuthSessionMetadata) (*AuthResult, error) {
 	var user models.User
 	if err := s.db.WithContext(ctx).Where("username = ? OR email = ?", req.Username, req.Username).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -117,7 +126,7 @@ func (s *AuthService) Login(ctx context.Context, req LoginInput) (*AuthResult, e
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
 		return nil, ErrAuthInvalidCredentials
 	}
-	session, err := s.createAuthSession(ctx, user.ID)
+	session, err := s.createAuthSession(ctx, user.ID, meta)
 	if err != nil {
 		return nil, err
 	}
@@ -132,14 +141,128 @@ func (s *AuthService) GetCurrentUser(ctx context.Context, userID uint) (*models.
 	return &user, nil
 }
 
-func (s *AuthService) RefreshToken(ctx context.Context, userID uint, sessionID string) (*AuthResult, error) {
-	user, err := s.GetCurrentUser(ctx, userID)
-	if err != nil {
+func (s *AuthService) ListAuthSessions(ctx context.Context, userID uint) ([]models.UserAuthSession, error) {
+	if s == nil || s.db == nil {
+		return nil, gorm.ErrInvalidDB
+	}
+	if userID == 0 {
+		return nil, fmt.Errorf("user_id required")
+	}
+
+	var sessions []models.UserAuthSession
+	if err := s.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Order("updated_at desc, created_at desc").
+		Find(&sessions).Error; err != nil {
 		return nil, err
 	}
-	session, err := s.rotateOrCreateAuthSession(ctx, userID, sessionID)
-	if err != nil {
+	return sessions, nil
+}
+
+func (s *AuthService) RevokeCurrentSession(ctx context.Context, userID uint, sessionID string) (*models.UserAuthSession, error) {
+	if s == nil || s.db == nil {
+		return nil, gorm.ErrInvalidDB
+	}
+	if userID == 0 {
+		return nil, fmt.Errorf("user_id required")
+	}
+	if strings.TrimSpace(sessionID) == "" {
+		return nil, fmt.Errorf("session_id required")
+	}
+
+	now := time.Now().UTC()
+	result := s.db.WithContext(ctx).Model(&models.UserAuthSession{}).
+		Where("id = ? AND user_id = ?", sessionID, userID).
+		Updates(map[string]any{
+			"status":        "revoked",
+			"revoked_at":    now,
+			"token_version": gorm.Expr("COALESCE(token_version, 0) + 1"),
+		})
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil, fmt.Errorf("session not found")
+	}
+
+	var session models.UserAuthSession
+	if err := s.db.WithContext(ctx).First(&session, "id = ? AND user_id = ?", sessionID, userID).Error; err != nil {
 		return nil, err
+	}
+	return &session, nil
+}
+
+func (s *AuthService) RevokeOtherSessions(ctx context.Context, userID uint, currentSessionID string) (int, error) {
+	if s == nil || s.db == nil {
+		return 0, gorm.ErrInvalidDB
+	}
+	if userID == 0 {
+		return 0, fmt.Errorf("user_id required")
+	}
+	if strings.TrimSpace(currentSessionID) == "" {
+		return 0, fmt.Errorf("current session_id required")
+	}
+
+	now := time.Now().UTC()
+	result := s.db.WithContext(ctx).Model(&models.UserAuthSession{}).
+		Where("user_id = ? AND id <> ? AND status = ? AND revoked_at IS NULL", userID, currentSessionID, "active").
+		Updates(map[string]any{
+			"status":        "revoked",
+			"revoked_at":    now,
+			"token_version": gorm.Expr("COALESCE(token_version, 0) + 1"),
+		})
+	if result.Error != nil {
+		return 0, result.Error
+	}
+	return int(result.RowsAffected), nil
+}
+
+func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string, meta AuthSessionMetadata) (*AuthResult, error) {
+	refreshToken = strings.TrimSpace(refreshToken)
+	if refreshToken == "" {
+		return nil, ErrAuthInvalidRefreshToken
+	}
+
+	payload, err := (platformauth.Validator{Secret: s.config.JWT.Secret}).ValidateToken(refreshToken)
+	if err != nil {
+		return nil, ErrAuthInvalidRefreshToken
+	}
+	if tokenUse, _ := payload["token_use"].(string); strings.TrimSpace(tokenUse) != "refresh" {
+		return nil, ErrAuthInvalidRefreshToken
+	}
+
+	userID, ok := authNumericClaim(payload, "user_id", "sub")
+	if !ok || userID == 0 {
+		return nil, ErrAuthInvalidRefreshToken
+	}
+	sessionID, _ := authStringClaim(payload, "session_id", "sid")
+	if sessionID == "" {
+		return nil, ErrAuthInvalidRefreshToken
+	}
+	sessionVersion, ok := authNumericClaim(payload, "session_token_version", "stv")
+	if !ok {
+		return nil, ErrAuthInvalidRefreshToken
+	}
+	tokenVersion, _ := authNumericClaim(payload, "token_version")
+	issuedAt, _ := authNumericClaim(payload, "iat")
+
+	user, err := s.GetCurrentUser(ctx, uint(userID))
+	if err != nil {
+		return nil, ErrAuthInvalidRefreshToken
+	}
+	if user.Status != "active" {
+		return nil, ErrAuthUserDisabled
+	}
+	if user.TokenVersion > int(tokenVersion) {
+		return nil, ErrAuthInvalidRefreshToken
+	}
+	if user.TokenValidAfter != nil && !user.TokenValidAfter.IsZero() && issuedAt < user.TokenValidAfter.Unix() {
+		return nil, ErrAuthInvalidRefreshToken
+	}
+
+	session, err := s.rotateRefreshSession(ctx, uint(userID), sessionID, int(sessionVersion), meta)
+	if err != nil {
+		return nil, ErrAuthInvalidRefreshToken
 	}
 	return s.buildAuthResult(ctx, user, session)
 }
@@ -156,9 +279,27 @@ func (s *AuthService) buildAuthResult(ctx context.Context, user *models.User, se
 	token, err := createHS256JWT(map[string]interface{}{
 		"iat":                   now.Unix(),
 		"sub":                   user.ID,
+		"jti":                   newAuthTokenID(),
 		"user_id":               user.ID,
 		"roles":                 []string{user.Role},
 		"exp":                   now.Add(s.config.JWT.ExpiresIn).Unix(),
+		"token_use":             "access",
+		"token_version":         user.TokenVersion,
+		"session_id":            session.ID,
+		"session_token_version": session.TokenVersion,
+	}, s.config.JWT.Secret)
+	if err != nil {
+		return nil, err
+	}
+	refreshExpiresIn := s.refreshExpiresIn()
+	refreshToken, err := createHS256JWT(map[string]interface{}{
+		"iat":                   now.Unix(),
+		"sub":                   user.ID,
+		"jti":                   newAuthTokenID(),
+		"user_id":               user.ID,
+		"roles":                 []string{user.Role},
+		"exp":                   now.Add(refreshExpiresIn).Unix(),
+		"token_use":             "refresh",
 		"token_version":         user.TokenVersion,
 		"session_id":            session.ID,
 		"session_token_version": session.TokenVersion,
@@ -168,22 +309,29 @@ func (s *AuthService) buildAuthResult(ctx context.Context, user *models.User, se
 	}
 	_ = s.db.WithContext(ctx).Model(user).Update("last_login", now).Error
 	return &AuthResult{
-		Token:     token,
-		ExpiresIn: int(s.config.JWT.ExpiresIn.Seconds()),
-		User:      user,
-		SessionID: session.ID,
+		Token:            token,
+		ExpiresIn:        int(s.config.JWT.ExpiresIn.Seconds()),
+		RefreshToken:     refreshToken,
+		RefreshExpiresIn: int(refreshExpiresIn.Seconds()),
+		User:             user,
+		SessionID:        session.ID,
 	}, nil
 }
 
-func (s *AuthService) createAuthSession(ctx context.Context, userID uint) (*models.UserAuthSession, error) {
+func (s *AuthService) createAuthSession(ctx context.Context, userID uint, meta AuthSessionMetadata) (*models.UserAuthSession, error) {
 	if s.db == nil {
 		return nil, gorm.ErrInvalidDB
 	}
+	now := time.Now().UTC()
 	session := &models.UserAuthSession{
-		ID:           newAuthSessionID(),
-		UserID:       userID,
-		Status:       "active",
-		TokenVersion: 0,
+		ID:                newAuthSessionID(),
+		UserID:            userID,
+		Status:            "active",
+		TokenVersion:      0,
+		DeviceFingerprint: normalizeAuthSessionField(meta.DeviceFingerprint, 128),
+		UserAgent:         normalizeAuthSessionField(meta.UserAgent, 512),
+		ClientIP:          normalizeAuthSessionField(meta.ClientIP, 128),
+		LastSeenAt:        &now,
 	}
 	if err := s.db.WithContext(ctx).Create(session).Error; err != nil {
 		return nil, err
@@ -191,25 +339,28 @@ func (s *AuthService) createAuthSession(ctx context.Context, userID uint) (*mode
 	return session, nil
 }
 
-func (s *AuthService) rotateOrCreateAuthSession(ctx context.Context, userID uint, sessionID string) (*models.UserAuthSession, error) {
-	if strings.TrimSpace(sessionID) == "" {
-		return s.createAuthSession(ctx, userID)
-	}
-
+func (s *AuthService) rotateRefreshSession(ctx context.Context, userID uint, sessionID string, expectedVersion int, meta AuthSessionMetadata) (*models.UserAuthSession, error) {
 	var session models.UserAuthSession
 	if err := s.db.WithContext(ctx).First(&session, "id = ? AND user_id = ?", sessionID, userID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return s.createAuthSession(ctx, userID)
-		}
 		return nil, err
+	}
+	if strings.TrimSpace(session.Status) != "active" || session.RevokedAt != nil {
+		return nil, ErrAuthInvalidRefreshToken
+	}
+	if session.TokenVersion != expectedVersion {
+		return nil, ErrAuthInvalidRefreshToken
 	}
 
 	now := time.Now().UTC()
 	updates := map[string]interface{}{
-		"status":            "active",
-		"token_version":     gorm.Expr("COALESCE(token_version, 0) + 1"),
-		"last_refreshed_at": now,
-		"revoked_at":        nil,
+		"status":             "active",
+		"token_version":      gorm.Expr("COALESCE(token_version, 0) + 1"),
+		"device_fingerprint": normalizeAuthSessionField(meta.DeviceFingerprint, 128),
+		"user_agent":         normalizeAuthSessionField(meta.UserAgent, 512),
+		"client_ip":          normalizeAuthSessionField(meta.ClientIP, 128),
+		"last_seen_at":       now,
+		"last_refreshed_at":  now,
+		"revoked_at":         nil,
 	}
 	if err := s.db.WithContext(ctx).Model(&models.UserAuthSession{}).
 		Where("id = ? AND user_id = ?", sessionID, userID).
@@ -222,12 +373,70 @@ func (s *AuthService) rotateOrCreateAuthSession(ctx context.Context, userID uint
 	return &session, nil
 }
 
+func (s *AuthService) refreshExpiresIn() time.Duration {
+	if s != nil && s.config != nil && s.config.JWT.RefreshExpiresIn > 0 {
+		return s.config.JWT.RefreshExpiresIn
+	}
+	return 7 * 24 * time.Hour
+}
+
+func authNumericClaim(payload map[string]interface{}, keys ...string) (int64, bool) {
+	for _, key := range keys {
+		value, ok := payload[key]
+		if !ok || value == nil {
+			continue
+		}
+		switch typed := value.(type) {
+		case float64:
+			return int64(typed), true
+		case json.Number:
+			v, err := typed.Int64()
+			if err == nil {
+				return v, true
+			}
+		}
+	}
+	return 0, false
+}
+
+func authStringClaim(payload map[string]interface{}, keys ...string) (string, bool) {
+	for _, key := range keys {
+		value, ok := payload[key]
+		if !ok || value == nil {
+			continue
+		}
+		if typed, ok := value.(string); ok {
+			typed = strings.TrimSpace(typed)
+			if typed != "" {
+				return typed, true
+			}
+		}
+	}
+	return "", false
+}
+
+func normalizeAuthSessionField(value string, max int) string {
+	value = strings.TrimSpace(value)
+	if max > 0 && len(value) > max {
+		return value[:max]
+	}
+	return value
+}
+
 func newAuthSessionID() string {
 	var buf [16]byte
 	if _, err := rand.Read(buf[:]); err != nil {
 		return fmt.Sprintf("auth_%d", time.Now().UnixNano())
 	}
 	return "auth_" + hex.EncodeToString(buf[:])
+}
+
+func newAuthTokenID() string {
+	var buf [16]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		return fmt.Sprintf("jti_%d", time.Now().UnixNano())
+	}
+	return "jti_" + hex.EncodeToString(buf[:])
 }
 
 func createHS256JWT(payload map[string]interface{}, secret string) (string, error) {

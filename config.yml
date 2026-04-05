@@ -122,6 +122,20 @@ security:
     retention: 4320h
     cleanup_interval: 24h
     cleanup_batch_size: 500
+  session_risk:
+    # Local/dev baseline. Production should usually tighten these windows.
+    hot_refresh_window_minutes: 15
+    recent_refresh_window_minutes: 60
+    today_refresh_window_hours: 24
+    rapid_change_window_hours: 24
+    stale_activity_window_days: 30
+    # Shared egress or NAT-heavy environments may need slightly higher thresholds.
+    multi_public_ip_threshold: 2
+    many_sessions_threshold: 3
+    hot_refresh_family_threshold: 2
+    # Risk score cutoffs for low / medium / high classification.
+    medium_risk_score: 2
+    high_risk_score: 4
 
 upload:
   enabled: true

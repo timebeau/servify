@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"servify/apps/server/internal/models"
+	platformauth "servify/apps/server/internal/platform/auth"
 
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
@@ -167,4 +169,183 @@ func (s *Service) RevokeSession(ctx context.Context, userID uint, sessionID stri
 		return nil, err
 	}
 	return &session, nil
+}
+
+type RevokedTokenResult struct {
+	JTI       string
+	UserID    uint
+	SessionID string
+	TokenUse  string
+	Reason    string
+	ExpiresAt *time.Time
+	RevokedAt time.Time
+}
+
+type RevokeSessionsResult struct {
+	Count    int
+	Sessions []models.UserAuthSession
+}
+
+func (s *Service) RevokeJWT(ctx context.Context, rawToken, secret, reason string) (*RevokedTokenResult, error) {
+	if s == nil || s.db == nil {
+		return nil, gorm.ErrInvalidDB
+	}
+	rawToken = strings.TrimSpace(rawToken)
+	secret = strings.TrimSpace(secret)
+	if rawToken == "" {
+		return nil, fmt.Errorf("token required")
+	}
+	if secret == "" {
+		return nil, fmt.Errorf("jwt secret required")
+	}
+
+	payload, err := (platformauth.Validator{Secret: secret}).ValidateToken(rawToken)
+	if err != nil {
+		return nil, fmt.Errorf("invalid token: %w", err)
+	}
+
+	jti, ok := stringClaim(payload, "jti", "token_id")
+	if !ok || jti == "" {
+		return nil, fmt.Errorf("token missing jti")
+	}
+	userID, _ := uintClaim(payload, "user_id", "sub")
+	sessionID, _ := stringClaim(payload, "session_id", "sid")
+	tokenUse, _ := stringClaim(payload, "token_use")
+	exp, hasExp := unixTimeClaim(payload, "exp")
+	now := time.Now().UTC()
+	var expiresAt *time.Time
+	if hasExp {
+		expUTC := exp.UTC()
+		expiresAt = &expUTC
+	}
+
+	record := &models.RevokedToken{
+		JTI:       jti,
+		UserID:    userID,
+		SessionID: sessionID,
+		TokenUse:  tokenUse,
+		Reason:    strings.TrimSpace(reason),
+		ExpiresAt: expiresAt,
+		RevokedAt: now,
+	}
+	if err := s.db.WithContext(ctx).Where("jti = ?", jti).FirstOrCreate(record).Error; err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(reason) != "" {
+		if err := s.db.WithContext(ctx).Model(record).Updates(map[string]any{
+			"reason":     strings.TrimSpace(reason),
+			"revoked_at": now,
+		}).Error; err != nil {
+			return nil, err
+		}
+		record.Reason = strings.TrimSpace(reason)
+		record.RevokedAt = now
+	}
+	return &RevokedTokenResult{
+		JTI:       record.JTI,
+		UserID:    record.UserID,
+		SessionID: record.SessionID,
+		TokenUse:  record.TokenUse,
+		Reason:    record.Reason,
+		ExpiresAt: record.ExpiresAt,
+		RevokedAt: record.RevokedAt,
+	}, nil
+}
+
+func (s *Service) RevokeAllSessions(ctx context.Context, userID uint, exceptSessionID string) (*RevokeSessionsResult, error) {
+	if s == nil || s.db == nil {
+		return nil, gorm.ErrInvalidDB
+	}
+	if userID == 0 {
+		return nil, fmt.Errorf("user_id required")
+	}
+
+	query := s.db.WithContext(ctx).Model(&models.UserAuthSession{}).
+		Where("user_id = ?", userID).
+		Where("status = ?", "active").
+		Where("revoked_at IS NULL")
+	if exceptSessionID = strings.TrimSpace(exceptSessionID); exceptSessionID != "" {
+		query = query.Where("id <> ?", exceptSessionID)
+	}
+
+	var before []models.UserAuthSession
+	if err := query.Order("updated_at desc, created_at desc").Find(&before).Error; err != nil {
+		return nil, err
+	}
+	if len(before) == 0 {
+		return &RevokeSessionsResult{Count: 0, Sessions: []models.UserAuthSession{}}, nil
+	}
+
+	ids := make([]string, 0, len(before))
+	for _, session := range before {
+		ids = append(ids, session.ID)
+	}
+
+	now := time.Now().UTC()
+	if err := s.db.WithContext(ctx).Model(&models.UserAuthSession{}).
+		Where("id IN ?", ids).
+		Updates(map[string]any{
+			"status":        "revoked",
+			"revoked_at":    now,
+			"token_version": gorm.Expr("COALESCE(token_version, 0) + 1"),
+		}).Error; err != nil {
+		return nil, err
+	}
+
+	var after []models.UserAuthSession
+	if err := s.db.WithContext(ctx).
+		Where("id IN ?", ids).
+		Order("updated_at desc, created_at desc").
+		Find(&after).Error; err != nil {
+		return nil, err
+	}
+
+	return &RevokeSessionsResult{
+		Count:    len(after),
+		Sessions: after,
+	}, nil
+}
+
+func stringClaim(payload map[string]interface{}, keys ...string) (string, bool) {
+	for _, key := range keys {
+		value, ok := payload[key]
+		if !ok || value == nil {
+			continue
+		}
+		if typed, ok := value.(string); ok {
+			typed = strings.TrimSpace(typed)
+			if typed != "" {
+				return typed, true
+			}
+		}
+	}
+	return "", false
+}
+
+func uintClaim(payload map[string]interface{}, keys ...string) (uint, bool) {
+	for _, key := range keys {
+		value, ok := payload[key]
+		if !ok || value == nil {
+			continue
+		}
+		switch typed := value.(type) {
+		case float64:
+			return uint(typed), true
+		}
+	}
+	return 0, false
+}
+
+func unixTimeClaim(payload map[string]interface{}, keys ...string) (time.Time, bool) {
+	for _, key := range keys {
+		value, ok := payload[key]
+		if !ok || value == nil {
+			continue
+		}
+		switch typed := value.(type) {
+		case float64:
+			return time.Unix(int64(typed), 0), true
+		}
+	}
+	return time.Time{}, false
 }

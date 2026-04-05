@@ -60,6 +60,19 @@ security:
     retention: 4320h
     cleanup_interval: 24h
     cleanup_batch_size: 500
+  session_risk:
+    # Production-oriented defaults: tighter windows, same score cutoffs.
+    hot_refresh_window_minutes: 10
+    recent_refresh_window_minutes: 30
+    today_refresh_window_hours: 24
+    rapid_change_window_hours: 12
+    stale_activity_window_days: 14
+    # Increase cautiously if users commonly share public egress.
+    multi_public_ip_threshold: 2
+    many_sessions_threshold: 3
+    hot_refresh_family_threshold: 2
+    medium_risk_score: 2
+    high_risk_score: 4
 
 ai:
   openai:

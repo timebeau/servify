@@ -4,6 +4,9 @@
 package handlers
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -36,8 +39,8 @@ func newTestDBForUserSecurity(t *testing.T) *gorm.DB {
 	}
 	sqlDB.SetMaxOpenConns(1)
 
-	if err := db.AutoMigrate(&models.User{}, &models.UserAuthSession{}); err != nil {
-		t.Fatalf("automigrate user/auth session: %v", err)
+	if err := db.AutoMigrate(&models.User{}, &models.UserAuthSession{}, &models.RevokedToken{}); err != nil {
+		t.Fatalf("automigrate user/auth session/revoked token: %v", err)
 	}
 
 	return db
@@ -354,10 +357,28 @@ func TestUserSecurityHandler_ListAndRevokeSession(t *testing.T) {
 		t.Fatalf("seed user: %v", err)
 	}
 	if err := db.Create(&models.UserAuthSession{
-		ID:           "auth-session-61",
-		UserID:       61,
-		Status:       "active",
-		TokenVersion: 1,
+		ID:                "auth-session-61",
+		UserID:            61,
+		Status:            "active",
+		TokenVersion:      1,
+		DeviceFingerprint: "fp-61",
+		UserAgent:         "servify-browser/1.0",
+		ClientIP:          "203.0.113.61",
+		LastSeenAt:        ptrTime(time.Now().UTC().Add(-2 * time.Hour)),
+		LastRefreshedAt:   ptrTime(time.Now().UTC().Add(-10 * time.Minute)),
+	}).Error; err != nil {
+		t.Fatalf("seed auth session: %v", err)
+	}
+	if err := db.Create(&models.UserAuthSession{
+		ID:                "auth-session-61-b",
+		UserID:            61,
+		Status:            "active",
+		TokenVersion:      2,
+		DeviceFingerprint: "fp-61-b",
+		UserAgent:         "servify-browser/2.0",
+		ClientIP:          "203.0.113.62",
+		LastSeenAt:        ptrTime(time.Now().UTC().Add(-1 * time.Hour)),
+		LastRefreshedAt:   ptrTime(time.Now().UTC().Add(-5 * time.Minute)),
 	}).Error; err != nil {
 		t.Fatalf("seed auth session: %v", err)
 	}
@@ -384,6 +405,9 @@ func TestUserSecurityHandler_ListAndRevokeSession(t *testing.T) {
 		}
 		if !strings.Contains(w.Body.String(), `"session_id":"auth-session-61"`) {
 			t.Fatalf("unexpected body: %s", w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), `"device_fingerprint":"fp-61"`) || !strings.Contains(w.Body.String(), `"network_label":"public"`) || !strings.Contains(w.Body.String(), `"location_label":"documentation"`) || !strings.Contains(w.Body.String(), `"family_public_ip_count":2`) || !strings.Contains(w.Body.String(), `"active_session_count":2`) || !strings.Contains(w.Body.String(), `"family_hot_refresh_count":2`) || !strings.Contains(w.Body.String(), `"reference_session_id":"auth-session-61-b"`) || !strings.Contains(w.Body.String(), `"ip_drift":true`) || !strings.Contains(w.Body.String(), `"device_drift":true`) || !strings.Contains(w.Body.String(), `"rapid_ip_change":true`) || !strings.Contains(w.Body.String(), `"rapid_device_change":true`) || !strings.Contains(w.Body.String(), `"refresh_recency":"hot"`) || !strings.Contains(w.Body.String(), `"rapid_refresh_activity":true`) || !strings.Contains(w.Body.String(), `"risk_score":8`) || !strings.Contains(w.Body.String(), `"risk_level":"high"`) || !strings.Contains(w.Body.String(), `"user_agent":"servify-browser/1.0"`) || !strings.Contains(w.Body.String(), `"client_ip":"203.0.113.61"`) {
+			t.Fatalf("expected session metadata in body: %s", w.Body.String())
 		}
 	})
 
@@ -420,4 +444,194 @@ func TestUserSecurityHandler_ListAndRevokeSession(t *testing.T) {
 			t.Fatalf("unexpected after snapshot: %s", entry.AfterJSON)
 		}
 	})
+}
+
+func TestUserSecurityHandler_RevokeAllSessions(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestDBForUserSecurity(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.WarnLevel)
+
+	if err := db.Create(&models.User{
+		ID:       62,
+		Username: "session-family-user",
+		Email:    "session-family-user@example.com",
+		Name:     "Session Family User",
+		Role:     "admin",
+		Status:   "active",
+	}).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	if err := db.Create([]models.UserAuthSession{
+		{ID: "auth-session-62-a", UserID: 62, Status: "active", TokenVersion: 1},
+		{ID: "auth-session-62-b", UserID: 62, Status: "active", TokenVersion: 4},
+	}).Error; err != nil {
+		t.Fatalf("seed auth sessions: %v", err)
+	}
+
+	recorder := &ticketAuditRecorder{}
+	h := NewUserSecurityHandler(usersecurity.NewService(db, logger), logger)
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", uint(99))
+		c.Set("principal_kind", "admin")
+		c.Next()
+	})
+	r.Use(auditplatform.Middleware(recorder))
+	r.POST("/api/security/users/:id/sessions/revoke-all", h.RevokeAllSessions)
+
+	body := strings.NewReader(`{"except_session_id":"auth-session-62-b","reason":"logout-other-devices"}`)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/security/users/62/sessions/revoke-all", body)
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"count":1`) {
+		t.Fatalf("unexpected body: %s", w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"except_session_id":"auth-session-62-b"`) {
+		t.Fatalf("unexpected body: %s", w.Body.String())
+	}
+
+	var sessions []models.UserAuthSession
+	if err := db.Order("id asc").Find(&sessions, "user_id = ?", 62).Error; err != nil {
+		t.Fatalf("reload sessions: %v", err)
+	}
+	if sessions[0].Status != "revoked" || sessions[0].TokenVersion != 2 {
+		t.Fatalf("unexpected first session state: %+v", sessions[0])
+	}
+	if sessions[1].Status != "active" || sessions[1].TokenVersion != 4 {
+		t.Fatalf("unexpected second session state: %+v", sessions[1])
+	}
+
+	if len(recorder.entries) == 0 {
+		t.Fatalf("expected audit entries")
+	}
+	entry := recorder.entries[len(recorder.entries)-1]
+	if !strings.Contains(entry.BeforeJSON, `"session_id":"auth-session-62-a"`) {
+		t.Fatalf("unexpected before snapshot: %s", entry.BeforeJSON)
+	}
+	if strings.Contains(entry.BeforeJSON, `"session_id":"auth-session-62-b"`) {
+		t.Fatalf("excepted session should not be in before snapshot: %s", entry.BeforeJSON)
+	}
+	if !strings.Contains(entry.AfterJSON, `"status":"revoked"`) {
+		t.Fatalf("unexpected after snapshot: %s", entry.AfterJSON)
+	}
+}
+
+func TestUserSecurityHandler_RevokeToken(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestDBForUserSecurity(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.WarnLevel)
+
+	recorder := &ticketAuditRecorder{}
+	h := NewUserSecurityHandler(usersecurity.NewService(db, logger), logger).WithJWTSecret("test-secret")
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", uint(99))
+		c.Set("principal_kind", "admin")
+		c.Next()
+	})
+	r.Use(auditplatform.Middleware(recorder))
+	r.POST("/api/security/tokens/revoke", h.RevokeToken)
+
+	now := time.Now().UTC()
+	token := createTestHS256JWT(t, map[string]interface{}{
+		"jti":        "jti-handler-1",
+		"user_id":    88,
+		"session_id": "auth-session-88",
+		"token_use":  "refresh",
+		"iat":        now.Unix(),
+		"exp":        now.Add(15 * time.Minute).Unix(),
+	}, "test-secret")
+
+	body := strings.NewReader(`{"token":"` + token + `","reason":"incident-response"}`)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/security/tokens/revoke", body)
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"jti":"jti-handler-1"`) {
+		t.Fatalf("unexpected body: %s", w.Body.String())
+	}
+
+	var revoked models.RevokedToken
+	if err := db.First(&revoked, "jti = ?", "jti-handler-1").Error; err != nil {
+		t.Fatalf("load revoked token: %v", err)
+	}
+	if revoked.TokenUse != "refresh" || revoked.UserID != 88 {
+		t.Fatalf("unexpected revoked token: %+v", revoked)
+	}
+	if len(recorder.entries) == 0 {
+		t.Fatalf("expected audit entries")
+	}
+	entry := recorder.entries[len(recorder.entries)-1]
+	if !strings.Contains(entry.AfterJSON, `"jti":"jti-handler-1"`) {
+		t.Fatalf("unexpected audit snapshot: %s", entry.AfterJSON)
+	}
+}
+
+func TestUserSecurityHandler_ListRevokedTokens(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestDBForUserSecurity(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.WarnLevel)
+
+	now := time.Now().UTC()
+	expiredAt := now.Add(-1 * time.Hour)
+	activeAt := now.Add(2 * time.Hour)
+	records := []models.RevokedToken{
+		{JTI: "jti-list-1", UserID: 71, SessionID: "sess-71", TokenUse: "access", Reason: "manual", ExpiresAt: &activeAt, RevokedAt: now.Add(-2 * time.Minute)},
+		{JTI: "jti-list-2", UserID: 72, SessionID: "sess-72", TokenUse: "refresh", Reason: "expired", ExpiresAt: &expiredAt, RevokedAt: now.Add(-3 * time.Minute)},
+	}
+	if err := db.Create(&records).Error; err != nil {
+		t.Fatalf("seed revoked tokens: %v", err)
+	}
+
+	h := NewUserSecurityHandler(usersecurity.NewService(db, logger), logger)
+	r := gin.New()
+	r.GET("/api/security/tokens/revoked", h.ListRevokedTokens)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/security/tokens/revoked?active_only=true", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"jti":"jti-list-1"`) {
+		t.Fatalf("expected active token in body: %s", w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), `"jti":"jti-list-2"`) {
+		t.Fatalf("did not expect expired token in body: %s", w.Body.String())
+	}
+}
+
+func createTestHS256JWT(t *testing.T, payload map[string]interface{}, secret string) string {
+	t.Helper()
+
+	headerJSON, err := json.Marshal(map[string]string{"alg": "HS256", "typ": "JWT"})
+	if err != nil {
+		t.Fatalf("marshal header: %v", err)
+	}
+	payloadJSON, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal payload: %v", err)
+	}
+
+	enc := func(b []byte) string { return base64.RawURLEncoding.EncodeToString(b) }
+	unsigned := enc(headerJSON) + "." + enc(payloadJSON)
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(unsigned))
+	return unsigned + "." + enc(mac.Sum(nil))
 }
