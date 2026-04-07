@@ -16,6 +16,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/pion/webrtc/v3"
 	"github.com/stretchr/testify/assert"
 
 	"servify/apps/server/internal/models"
@@ -53,6 +54,34 @@ func (s *stubConversationWriter) ListRecentMessages(ctx context.Context, session
 		return nil, s.err
 	}
 	return nil, nil
+}
+
+type stubRTCService struct {
+	offerSessionID     string
+	offer              webrtc.SessionDescription
+	answerSessionID    string
+	answer             webrtc.SessionDescription
+	candidateSessionID string
+	candidate          webrtc.ICECandidateInit
+}
+
+func (s *stubRTCService) HandleOffer(sessionID string, offer webrtc.SessionDescription) (*webrtc.SessionDescription, error) {
+	s.offerSessionID = sessionID
+	s.offer = offer
+	answer := &webrtc.SessionDescription{Type: webrtc.SDPTypeAnswer, SDP: "stub-answer"}
+	return answer, nil
+}
+
+func (s *stubRTCService) HandleAnswer(sessionID string, answer webrtc.SessionDescription) error {
+	s.answerSessionID = sessionID
+	s.answer = answer
+	return nil
+}
+
+func (s *stubRTCService) HandleICECandidate(sessionID string, candidate webrtc.ICECandidateInit) error {
+	s.candidateSessionID = sessionID
+	s.candidate = candidate
+	return nil
 }
 
 func TestWebSocketHub_ClientManagement(t *testing.T) {
@@ -476,7 +505,10 @@ func TestWebSocketClient_ProcessMessageWithAISkipsWhenConversationAssigned(t *te
 
 func TestWebSocketHub_handleWebRTCAnswer(t *testing.T) {
 	hub := NewWebSocketHub()
+	go hub.Run()
 	hub.SetAIService(&stubAI{})
+	rtc := &stubRTCService{}
+	hub.SetWebRTCService(rtc)
 
 	// Create a test client
 	client := &WebSocketClient{
@@ -490,9 +522,18 @@ func TestWebSocketHub_handleWebRTCAnswer(t *testing.T) {
 	hub.register <- client
 	time.Sleep(10 * time.Millisecond)
 
-	// Process the message through handleWebRTCAnswer
-	// This would normally be called via the message processing pipeline
-	// For testing, we verify the hub can handle the message type
+	client.handleWebRTCAnswer(WebSocketMessage{
+		Type: "webrtc-answer",
+		Data: map[string]interface{}{
+			"type": "answer",
+			"sdp":  "answer-sdp",
+		},
+		SessionID: "test-session",
+		Timestamp: time.Now(),
+	})
+	assert.Equal(t, "test-session", rtc.answerSessionID)
+	assert.Equal(t, webrtc.SDPTypeAnswer, rtc.answer.Type)
+	assert.Equal(t, "answer-sdp", rtc.answer.SDP)
 
 	// Clean up
 	hub.unregister <- client
@@ -501,6 +542,9 @@ func TestWebSocketHub_handleWebRTCAnswer(t *testing.T) {
 
 func TestWebSocketHub_handleWebRTCCandidate(t *testing.T) {
 	hub := NewWebSocketHub()
+	go hub.Run()
+	rtc := &stubRTCService{}
+	hub.SetWebRTCService(rtc)
 
 	// Create a test client
 	client := &WebSocketClient{
@@ -514,13 +558,59 @@ func TestWebSocketHub_handleWebRTCCandidate(t *testing.T) {
 	hub.register <- client
 	time.Sleep(10 * time.Millisecond)
 
-	// Process the message through handleWebRTCCandidate
-	// This would normally be called via the message processing pipeline
-	// For testing, we verify the hub can handle the message type
+	client.handleWebRTCCandidate(WebSocketMessage{
+		Type: "webrtc-candidate",
+		Data: map[string]interface{}{
+			"candidate": "candidate:1 1 UDP 2122260223 192.0.2.1 3478 typ host",
+		},
+		SessionID: "test-session",
+		Timestamp: time.Now(),
+	})
+	assert.Equal(t, "test-session", rtc.candidateSessionID)
+	assert.Equal(t, "candidate:1 1 UDP 2122260223 192.0.2.1 3478 typ host", rtc.candidate.Candidate)
 
 	// Clean up
 	hub.unregister <- client
 	time.Sleep(10 * time.Millisecond)
+}
+
+func TestWebSocketHub_handleWebRTCOfferUsesRTCService(t *testing.T) {
+	hub := NewWebSocketHub()
+	rtc := &stubRTCService{}
+	hub.SetWebRTCService(rtc)
+	client := &WebSocketClient{
+		ID:        "test-client",
+		SessionID: "test-session",
+		Send:      make(chan WebSocketMessage, 10),
+		Hub:       hub,
+	}
+
+	client.handleWebRTCOffer(WebSocketMessage{
+		Type: "webrtc-offer",
+		Data: map[string]interface{}{
+			"type": "offer",
+			"sdp":  "offer-sdp",
+		},
+		SessionID: "test-session",
+		Timestamp: time.Now(),
+	})
+
+	assert.Equal(t, "test-session", rtc.offerSessionID)
+	assert.Equal(t, webrtc.SDPTypeOffer, rtc.offer.Type)
+	assert.Equal(t, "offer-sdp", rtc.offer.SDP)
+
+	select {
+	case msg := <-client.Send:
+		assert.Equal(t, "webrtc-answer", msg.Type)
+		answer, ok := msg.Data.(*webrtc.SessionDescription)
+		if !ok || answer == nil {
+			t.Fatalf("expected answer session description, got %#v", msg.Data)
+		}
+		assert.Equal(t, webrtc.SDPTypeAnswer, answer.Type)
+		assert.Equal(t, "stub-answer", answer.SDP)
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("expected webrtc answer message")
+	}
 }
 
 // mockSessionTransferService is a mock implementation

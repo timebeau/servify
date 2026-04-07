@@ -72,6 +72,14 @@ func (s *ShiftService) CreateShift(ctx context.Context, req *ShiftCreateRequest)
 		return nil, fmt.Errorf("end_time must be after start_time")
 	}
 
+	var agent models.Agent
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).Where("user_id = ?", req.AgentID).First(&agent).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, fmt.Errorf("agent not found")
+		}
+		return nil, fmt.Errorf("failed to validate agent: %w", err)
+	}
+
 	shift := &models.ShiftSchedule{
 		AgentID:   req.AgentID,
 		ShiftType: req.ShiftType,
@@ -94,7 +102,7 @@ func (s *ShiftService) CreateShift(ctx context.Context, req *ShiftCreateRequest)
 
 // ListShifts 获取班次列表
 func (s *ShiftService) ListShifts(ctx context.Context, req *ShiftListRequest) ([]models.ShiftSchedule, int64, error) {
-	query := applyScopeFilter(s.db.WithContext(ctx).Model(&models.ShiftSchedule{}), ctx).Preload("Agent")
+	query := applyScopeFilter(scopeAwareShiftPreloads(s.db.WithContext(ctx).Model(&models.ShiftSchedule{}), ctx), ctx)
 
 	if req.AgentID != nil {
 		query = query.Where("agent_id = ?", *req.AgentID)
@@ -139,6 +147,23 @@ func (s *ShiftService) ListShifts(ctx context.Context, req *ShiftListRequest) ([
 	}
 
 	return shifts, total, nil
+}
+
+func scopeAwareShiftPreloads(db *gorm.DB, ctx context.Context) *gorm.DB {
+	tenantID, workspaceID := tenantAndWorkspace(ctx)
+	return db.Preload("Agent", func(tx *gorm.DB) *gorm.DB {
+		if tenantID == "" && workspaceID == "" {
+			return tx
+		}
+		tx = tx.Joins("JOIN agents ON agents.user_id = users.id")
+		if tenantID != "" {
+			tx = tx.Where("agents.tenant_id = ?", tenantID)
+		}
+		if workspaceID != "" {
+			tx = tx.Where("agents.workspace_id = ?", workspaceID)
+		}
+		return tx
+	})
 }
 
 // UpdateShift 更新班次

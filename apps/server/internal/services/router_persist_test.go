@@ -143,3 +143,45 @@ func TestMessageRouter_PersistMessage_RejectsCrossWorkspaceReuse(t *testing.T) {
 		t.Fatalf("expected only first message persisted, got %d", count)
 	}
 }
+
+func TestMessageRouter_PersistMessage_InheritsScopeFromExistingSession(t *testing.T) {
+	db := newRouterPersistTestDB(t)
+	r := NewMessageRouter(stubAI2{reply: "ok"}, NewWebSocketHub(), db)
+
+	first := UnifiedMessage{
+		UserID:     "session-inherit",
+		PlatformID: "web",
+		Content:    "a",
+		Type:       MessageTypeText,
+		Timestamp:  time.Now(),
+		Metadata: map[string]interface{}{
+			"tenant_id":    "tenant-a",
+			"workspace_id": "workspace-a",
+		},
+	}
+	if err := r.persistMessage(first); err != nil {
+		t.Fatalf("persist first message: %v", err)
+	}
+
+	second := UnifiedMessage{
+		UserID:     "session-inherit",
+		PlatformID: "web",
+		Content:    "b",
+		Type:       MessageTypeText,
+		Timestamp:  time.Now(),
+	}
+	if err := r.persistMessage(second); err != nil {
+		t.Fatalf("persist second message: %v", err)
+	}
+
+	var messages []models.Message
+	if err := db.Order("id asc").Find(&messages).Error; err != nil {
+		t.Fatalf("load messages: %v", err)
+	}
+	if len(messages) != 2 {
+		t.Fatalf("expected 2 messages, got %d", len(messages))
+	}
+	if messages[1].TenantID != "tenant-a" || messages[1].WorkspaceID != "workspace-a" {
+		t.Fatalf("expected inherited scope on second message, got %+v", messages[1])
+	}
+}

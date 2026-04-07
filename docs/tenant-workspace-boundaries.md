@@ -94,6 +94,9 @@
 - `MessageRouter` 兼容落库路径
   - 现已从 `UnifiedMessage.Metadata` 提取 `tenant_id` / `workspace_id` 写入 `Session` / `Message`
   - 同一 `sessionID` 若尝试跨 workspace 复用会直接拒绝持久化，避免旧兼容链路串会话
+  - 对于已存在且已 scope 化的 `session`，后续消息即使未重复携带 scope metadata，也会继承 session 已知 scope，避免兼容链路把消息写成无 scope 记录
+- `routing -> agent` transfer runtime 同步
+  - `ApplySessionTransfer` 现已显式透传当前请求 `context`，避免兼容层在会话转接后用无 scope 的 `context.Background()` 回写 agent load/runtime 状态
 
 ## 当前运行时上下文
 
@@ -138,6 +141,28 @@ JWT claims 已支持透传：
 - `Customer` 现已补显式 scope 字段；`customer` 仓储通过 `customers` 扩展表 join 收口用户读取、列表、统计与活动查询
 - `Agent` 现已补显式 scope 字段，并在 `agent` 仓储的创建、读取、列表与统计路径按上下文过滤
 - `WorkspaceService`、`analytics` 模块聚合仓储、`gamification` 排行榜聚合、agent transfer load 同步路径已开始按上下文过滤已 scope 化主数据
+  - `WorkspaceService.GetOverview` 的 `recent_sessions` 关联链现已要求 `sessions -> tickets -> customers -> agents` 保持同一 `tenant_id/workspace_id`，避免 legacy join 因脏外键把其他 workspace 的客户或客服姓名带入当前工作台
+- `SLAService.ListSLAViolations`
+  - 现已对 `Ticket` / `SLAConfig` preload 继续施加当前 scope，避免 scoped 违约列表因脏外键把其他 workspace 的工单或 SLA 配置详情带回管理面
+- `SLAService.CheckSLAViolation` / `CreateSLAViolation`
+  - 现已在 service 内重新按当前 scope 校验 `Ticket` 与 `SLAConfig`，不再信任外部传入的 `Ticket` / `SLAViolation` 结构体
+  - 避免调用方拿其他 workspace 的工单或配置对象触发违约检测/落库，导致跨 workspace 违约记录写入
+- `SLAService.GetSLAStats`
+  - 按优先级 / 客户等级统计违约时，现已要求 `sla_violations -> sla_configs` 保持同一 `tenant_id/workspace_id`
+  - 避免 scoped 统计因脏 `sla_config_id` 关联把其他 workspace 的优先级或客户等级维度带入当前报表
+- `SatisfactionService`
+  - `CreateSatisfaction` / `GetSatisfaction` / `ListSatisfactions` / `GetSatisfactionByTicket` / `UpdateSatisfaction` 现已统一使用 scope-aware preload
+  - `Ticket` / `Customer` 继续按当前 scope 过滤，`Agent` 通过 `agents.user_id` 关联后再校验 `tenant_id/workspace_id`，避免满意度列表与详情回显跨 workspace 的工单、客户或客服身份
+  - `ScheduleSurvey` 现已在 service 内重新按当前 scope 校验 `ticket.ID`，避免调用方传入其他 workspace 的 `Ticket` 结构体后越权创建调查
+  - `GetSurveyPreviewByToken` 的工单预览也已对 `Agent` preload 继续施加 scope 校验，避免 survey token 预览回显跨 workspace 客服姓名
+- `ShiftService.ListShifts`
+  - 现已对 `Agent` preload 增加 `agents.user_id` + 当前 scope 校验，避免班次列表把其他 workspace 的客服用户资料回填到当前排班结果
+  - `ShiftService.CreateShift` 现已要求目标 `Agent` 本身属于当前 scope，避免跨 workspace 排班写入
+- `MacroService.ApplyToTicket`
+  - 现已在当前 scope 下确认目标 `Ticket` 存在后才创建评论，避免旧宏服务把宏内容写入其他 workspace 或不存在的工单
+- `analytics` 模块现已进一步避免在 scoped dashboard / time-range 请求中直接读取全局 `DailyStats`
+  - `GetDashboardStats` 的 `AIUsageToday` / `WeKnoraUsageToday` 仅在 system 级请求下消费 `DailyStats`
+  - `GetTimeRangeStats` 在 scoped 请求下不再回填全局 `DailyStats.AvgResponseTime` / `CustomerSatisfaction`，其中满意度改为按 scoped `CustomerSatisfaction` 日维度重算，避免跨 tenant/workspace 泄漏
 - 尚未统一 scope 化的主要剩余面：
   - 仍保留在旧 `services/*` 中、未完全迁移到 modules 的少量 legacy 聚合查询
   - `DailyStats` 这类跨租户全局聚合表，当前仍按系统级统计处理，而非 tenant/workspace 维度拆分

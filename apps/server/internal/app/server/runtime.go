@@ -115,6 +115,7 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	routingService := routingapp.NewService(routingRepo, bus)
 
 	webrtcService := services.NewWebRTCService(cfg.WebRTC.STUNServer, wsHub)
+	wsHub.SetWebRTCService(webrtcService)
 	rt.RTCGateway = realtimeplatform.NewWebRTCAdapter(webrtcService)
 
 	rt.MessageRouter = services.NewMessageRouter(rt.AIService, wsHub, db)

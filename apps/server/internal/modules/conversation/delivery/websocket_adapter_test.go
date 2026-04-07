@@ -131,3 +131,35 @@ func TestWebSocketMessageAdapterListRecentMessages(t *testing.T) {
 		t.Fatalf("unexpected mapped history: %+v", items[0])
 	}
 }
+
+func TestHandlerServiceAdapterGetConversationFallsBackToMessageHistory(t *testing.T) {
+	now := time.Now()
+	repo := &stubConversationRepo{
+		messages: map[string][]conversationdomain.ConversationMessage{
+			"sess-fallback": {
+				{ID: "1", ConversationID: "sess-fallback", Sender: conversationdomain.ParticipantRoleCustomer, Kind: conversationdomain.MessageKindText, Content: "hello", CreatedAt: now},
+			},
+		},
+	}
+
+	handler := NewHandlerService(conversationapp.NewService(repo, nil))
+	dto, err := handler.GetConversation(context.Background(), "sess-fallback")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if dto == nil {
+		t.Fatal("expected synthesized conversation dto")
+	}
+	if dto.ID != "sess-fallback" {
+		t.Fatalf("conversation id = %q want sess-fallback", dto.ID)
+	}
+	if dto.Status != string(conversationdomain.ConversationStatusActive) {
+		t.Fatalf("status = %q want %q", dto.Status, conversationdomain.ConversationStatusActive)
+	}
+	if dto.Channel.Channel != "web" || dto.Channel.SessionID != "sess-fallback" {
+		t.Fatalf("unexpected channel: %+v", dto.Channel)
+	}
+	if dto.LastMessageAt == nil || !dto.LastMessageAt.Equal(now) {
+		t.Fatalf("last_message_at = %+v want %v", dto.LastMessageAt, now)
+	}
+}

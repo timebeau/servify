@@ -24,6 +24,25 @@ func TestWebRTCAdapterMapSessionStarted(t *testing.T) {
 	}
 }
 
+func TestWebRTCAdapterMapSessionStartedFromJSONPayload(t *testing.T) {
+	adapter := NewWebRTCAdapter(nil)
+
+	event, err := adapter.MapSessionStarted(context.Background(), map[string]interface{}{
+		"call_id":         "call-json-1",
+		"conversation_id": "conv-json-1",
+		"connection_id":   "peer-json-1",
+		"metadata": map[string]interface{}{
+			"track": "audio",
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if event.CallID != "call-json-1" || event.ConversationID != "conv-json-1" || event.ConnectionID != "peer-json-1" {
+		t.Fatalf("unexpected mapped event: %+v", event)
+	}
+}
+
 func TestWebRTCAdapterRejectsUnsupportedPayload(t *testing.T) {
 	adapter := NewWebRTCAdapter(nil)
 

@@ -269,8 +269,15 @@ func (r *MessageRouter) persistMessage(message UnifiedMessage) error {
 		sid = uuid.NewString()
 	}
 	tenantID, workspaceID := routerScopeFromMetadata(message.Metadata)
-	if err := r.ensureSession(sid, message.PlatformID, tenantID, workspaceID); err != nil {
+	sessionTenantID, sessionWorkspaceID, err := r.ensureSession(sid, message.PlatformID, tenantID, workspaceID)
+	if err != nil {
 		return fmt.Errorf("ensure session: %w", err)
+	}
+	if tenantID == "" {
+		tenantID = sessionTenantID
+	}
+	if workspaceID == "" {
+		workspaceID = sessionWorkspaceID
 	}
 
 	// 映射到持久化模型
@@ -293,9 +300,9 @@ func (r *MessageRouter) persistMessage(message UnifiedMessage) error {
 }
 
 // ensureSession 确保会话记录存在
-func (r *MessageRouter) ensureSession(sessionID string, platform string, tenantID string, workspaceID string) error {
+func (r *MessageRouter) ensureSession(sessionID string, platform string, tenantID string, workspaceID string) (string, string, error) {
 	if r.db == nil || sessionID == "" {
-		return nil
+		return tenantID, workspaceID, nil
 	}
 	var s models.Session
 	if err := r.db.First(&s, "id = ?", sessionID).Error; err != nil {
@@ -311,17 +318,17 @@ func (r *MessageRouter) ensureSession(sessionID string, platform string, tenantI
 				UpdatedAt:   time.Now(),
 			}
 			if err := r.db.Create(&s).Error; err != nil {
-				return fmt.Errorf("create session: %w", err)
+				return "", "", fmt.Errorf("create session: %w", err)
 			}
-			return nil
+			return s.TenantID, s.WorkspaceID, nil
 		}
-		return err
+		return "", "", err
 	}
 	if tenantID != "" && s.TenantID != "" && s.TenantID != tenantID {
-		return fmt.Errorf("session %s tenant scope mismatch", sessionID)
+		return "", "", fmt.Errorf("session %s tenant scope mismatch", sessionID)
 	}
 	if workspaceID != "" && s.WorkspaceID != "" && s.WorkspaceID != workspaceID {
-		return fmt.Errorf("session %s workspace scope mismatch", sessionID)
+		return "", "", fmt.Errorf("session %s workspace scope mismatch", sessionID)
 	}
 	if (s.TenantID == "" && tenantID != "") || (s.WorkspaceID == "" && workspaceID != "") {
 		updates := map[string]interface{}{"updated_at": time.Now()}
@@ -332,10 +339,16 @@ func (r *MessageRouter) ensureSession(sessionID string, platform string, tenantI
 			updates["workspace_id"] = workspaceID
 		}
 		if err := r.db.Model(&models.Session{}).Where("id = ?", sessionID).Updates(updates).Error; err != nil {
-			return fmt.Errorf("update session scope: %w", err)
+			return "", "", fmt.Errorf("update session scope: %w", err)
+		}
+		if s.TenantID == "" && tenantID != "" {
+			s.TenantID = tenantID
+		}
+		if s.WorkspaceID == "" && workspaceID != "" {
+			s.WorkspaceID = workspaceID
 		}
 	}
-	return nil
+	return s.TenantID, s.WorkspaceID, nil
 }
 
 func routerScopeFromMetadata(metadata map[string]interface{}) (string, string) {

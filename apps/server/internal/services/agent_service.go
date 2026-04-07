@@ -186,8 +186,10 @@ func (s *AgentService) parseSkills(skillsStr string) []string {
 	return skills
 }
 
-func (s *AgentService) ApplySessionTransfer(sessionID string, fromAgentID *uint, toAgentID uint) {
-	ctx := context.Background()
+func (s *AgentService) ApplySessionTransfer(ctx context.Context, sessionID string, fromAgentID *uint, toAgentID uint) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if err := s.module.ApplySessionTransfer(ctx, sessionID, fromAgentID, toAgentID); err != nil {
 		s.logger.Warnf("apply session transfer to agent module failed: %v", err)
 	}

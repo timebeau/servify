@@ -55,12 +55,34 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 | 项目 | 证据 | 状态 |
 | --- | --- | --- |
 | WeKnora CLI 可构建 | `make build-weknora` 通过 | 通过 |
-| WeKnora 相关 handler/pkg 基础测试 | `go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/server/pkg/weknora/...` 通过 | 部分通过 |
+| WeKnora 相关 handler/pkg 基础测试 | `go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/server/pkg/weknora/...` 通过 | 通过 |
+| 本地最小环境检查 | `make local-check` 通过 | 通过 |
+| 发布前最小自检 | `make release-check CONFIG=./config.yml` 通过 | 通过 |
+| 客服主链路聚焦自动化验证 | `go test -tags integration ./apps/server/internal/handlers -run 'Test(WorkspaceHandler_GetOverview_.*|StatisticsHandler_Dashboard_And_TimeRange|TicketHandler_Create_Get_List_Assign)'`、`go test ./apps/server/internal/handlers -run 'Test(ConversationWorkspaceHandler_(ListMessages|SendMessage|AssignAgent|Transfer|CloseSession|GetSession)|AuthHandlerRefreshToken|AuthHandlerSelfServiceSessions)'`、`go test ./apps/server/internal/services -run 'Test(AuthServiceLoginAndRefreshRotateSession|AuthServiceSelfManageSessions|WorkspaceService_GetOverview_WithSessions|StatisticsService_GetDashboardStats_EmptyDB|StatisticsService_GetDashboardStats_WithData)'` 通过 | 部分通过 |
+| 主链路人工运行验证当前阻塞 | `nc -z localhost 5432` 返回非零；`go -C apps/server run ./cmd/server --port 18080` 实际报错 `dial tcp 127.0.0.1:5432: connect: connection refused`；`redis-cli -h localhost -p 6379 ping` 返回 `Connection refused`；当前本机 Docker daemon 也不可用 | 阻塞 |
+| 主链路人工运行验证第二轮 | 本机已拉起 `redis-server` 与 `postgresql@15`；`make migrate` 完成；`go -C apps/server run ./cmd/server --port 18080` 启动成功；`curl http://localhost:18080/health` 返回 healthy；`scripts/seed-data.sh http://localhost:18080` 完成；随后已实际完成 `admin / admin123` 登录、Dashboard 查询、Workspace 查询、Ticket 列表/详情查询、补建 agent 实体后完成 Ticket assign，并通过 WebSocket 向 `g1-session-1` 写入消息再经 `/api/omni/sessions/g1-session-1/messages` 读回 | 部分通过 |
+| 主链路人工运行验证第三轮 | 本机以 `DB_USER=cui DB_NAME=servify` 完成 `make migrate`；启动 `SERVIFY_JWT_SECRET=dev-secret DB_USER=cui DB_NAME=servify go -C apps/server run ./cmd/server --port 18080`；`curl http://localhost:18080/health` 返回 healthy；更新后的 `scripts/seed-data.sh http://localhost:18080` 会创建 agent 实体并自动置为 online；随后已实际完成 `admin / admin123` 登录、`/api/statistics/dashboard`、`/api/omni/workspace`、`/api/omni/sessions/g1-session-2`、`/api/tickets`、`POST /api/tickets/30/assign`，并确认工单详情 `agent_id` 已更新为 `4` | 通过 |
+| AI 主链路人工运行验证第一轮 | 以 `admin / admin123` 登录后，实际完成 `GET /api/v1/ai/status`、`POST /api/v1/ai/query`、`GET /api/v1/ai/metrics`；其中 `status` 返回 `type=orchestrated_enhanced`、`fallback_enabled=true`，`query` 返回 `strategy=fallback`，证明在无 WeKnora 可用时主链路仍可响应 | 通过 |
+| AI 控制面人工运行验证第二轮 | 使用基于 `config.weknora.yml` 的临时配置启动服务，实际完成 `PUT /api/v1/ai/weknora/enable`、`PUT /api/v1/ai/weknora/disable`、`POST /api/v1/ai/circuit-breaker/reset`；同时确认 `GET /api/v1/ai/status` 返回 `weknora_enabled=true` 且 `weknora_healthy=false`，说明控制路由已暴露，且运行时清楚标识 WeKnora 不健康 | 部分通过 |
+| AI 知识链路人工运行验证第三轮 | 本机启动临时 `weknora-mock` 后，以基于 `config.weknora.yml` 的临时配置启动服务；随后实际完成 `POST /api/v1/ai/knowledge/upload`、`POST /api/v1/ai/knowledge/sync`，并确认 `GET /api/v1/ai/status` 返回 `weknora_enabled=true`、`weknora_healthy=true`；说明 Servify 到 WeKnora API 的上传 / 同步协议路径已跑通 | 部分通过 |
+| 配置加载口径修复回归验证 | 新增 `TestLoadConfigFindsRepoRootConfigFromNestedDir`，确认从 `apps/server` 这类嵌套目录启动时，`LoadConfig()` 仍能读到仓库根 `config.yml` | 通过 |
+| 运营高价值链路人工运行验证第一轮 | 以 `admin / admin123` 登录后，实际完成 `POST /api/customers`、`GET /api/customers/:id`、`PUT /api/customers/:id`、`POST /api/customers/:id/notes`、`PUT /api/customers/:id/tags`、`GET /api/customers/stats`、`GET /api/agents`、`POST /api/agents/:id/online`、`PUT /api/agents/:id/status`、`GET /api/agents/online`、`GET /api/agents/stats`、`GET /api/security/users/:id`、`POST /api/security/users/:id/revoke-tokens`、`GET /api/security/users/:id/sessions`、`GET /api/audit/logs?action=customers.create`、`GET /api/audit/logs/:id`、`GET /api/audit/logs/:id/diff`、`GET /api/audit/logs/export?action=customers.create&limit=5`；其中审计查询在默认限流下触发过一次 `429`，随后使用白名单 `X-API-Key: internal-test-key` 验证通过 | 部分通过 |
+| 运营高价值链路人工运行验证第二轮 | 本机以 `DB_USER=cui DB_NAME=servify go run ./apps/server/cmd/server --port 18081` 启动服务，并继续使用 `admin / admin123` 登录；随后实际完成 `POST /api/sla/configs` 创建 urgent 配置、`POST /api/sla/configs` 创建 high 配置、`GET /api/sla/configs/:id`、`GET /api/sla/configs?page=1&page_size=20`、`PUT /api/sla/configs/:id`、`DELETE /api/sla/configs/:id`、`GET /api/sla/configs/priority/urgent`、`POST /api/sla/check/ticket/22`、`GET /api/sla/violations?page=1&page_size=20`、`POST /api/sla/violations/1/resolve`、`GET /api/sla/stats`；其中 ticket `22` 基于新建 urgent 配置命中 `resolution` 违约，`resolve` 后统计中的 `unresolved_violations` 变为 `0`；同时补充回归测试，确保 `CheckTicketSLA` 首次创建和重复返回违约时都会带上真实 `ticket` / `sla_config` 关联数据 | 通过 |
+| 公开入口与实时入口人工运行验证第一轮 | 本机继续以 `DB_USER=cui DB_NAME=servify go run ./apps/server/cmd/server --port 18081` 启动服务；未登录访问 `GET /public/portal/config` 返回 `brand_name=Servify` 等公开配置；以 `admin / admin123` 登录后创建知识文档 `G1-4 Public KB`，随后 `GET /public/kb/docs?search=G1-4&page=1&page_size=10` 与 `GET /public/kb/docs/16` 均可公开读取；使用 Node `ws` 客户端连到 `ws://127.0.0.1:18081/api/v1/ws?session_id=g1-4-ws` 后成功收到同会话回显消息，且在连接存活期间 `GET /api/v1/ws/stats` 返回 `connected_clients=1`；同时通过插入一条缺失的 `customers.user_id=6` 扩展记录，实际完成 `GET /public/csat/g1-4-public-csat-token` 与 `POST /public/csat/g1-4-public-csat-token/respond`，确认公开问卷可读取并可提交，提交后再次读取可见 `status=completed`；Voice 基础路径方面，已实际完成 `GET /api/voice/protocols`、`POST /api/voice/recordings/start`、`GET /api/voice/recordings/:recordingID`、`POST /api/voice/recordings/stop`、`POST /api/voice/transcripts`、`GET /api/voice/transcripts?call_id=g1-4-call`、`POST /api/voice/protocols/sip/call-events/invite|answer|hangup`、`POST /api/voice/protocols/webrtc/media-events/session_started`；WebRTC 连接链路方面，已补齐 `ws` 对 `webrtc-offer/answer/candidate` 的真实 runtime wiring，并修复 `WebSocketClient.readPump()` 的 `512B` 入站限制，否则正常 SDP offer 会直接触发断连；随后使用本地生成的真实 SDP offer 连到 `ws://127.0.0.1:18081/api/v1/ws?session_id=g1-4-webrtc-real`，成功收到 `webrtc-answer` 与多条 `webrtc-candidate`，且 `GET /api/v1/webrtc/stats?session_id=g1-4-webrtc-real` 返回 `connection_state=connecting`、`ice_connection_state=checking`，`GET /api/v1/webrtc/connections` 返回 `connection_count=1` | 通过 |
 
 说明：
 
 - 上述结果只能证明构建链和部分测试是通的。
 - 不能据此推出所有 API、权限、迁移、前端、数据链路都已完成。
+- `G1-1` 曾受本地 Postgres/Redis 环境阻塞，但该阻塞已在后续验证轮次解除。
+- 当前 `G1-1` 已补到一轮完整真实运行证据，原先暴露出的 3 个缺口里：
+  - `scripts/seed-data.sh` 固定 `customer_id` 导致用户关联错位，已修复为基于真实注册返回的用户 ID 建票。
+  - `scripts/seed-data.sh` 未创建 agent 实体，已修复为自动创建 `/api/agents` 记录。
+  - `/api/omni/sessions/:id` 曾在仅有消息落库时返回 `conversation not found`，已补最小会话读模型兜底。
+- 当前 `G1-2` 已拿到 AI 主链路、fallback、控制接口以及基于本地 `weknora-mock` 的知识上传 / 同步协议证据。
+- 当前 `G1-2` 仍未拿到“真实 WeKnora 服务部署”的运行证据；现阶段证明的是 Servify 对 WeKnora API 的调用路径可用，但不等同于真实外部 WeKnora 环境已完成验收。
+- `LoadConfig()` 现已补默认搜索 `.`、`..`、`../..`，避免从 `apps/server` 启动时读不到仓库根配置，导致验收口径和实际部署口径漂移。
+- 当前仍不能据此推出 `G1-2` 到 `G1-4` 已完成，它们需要各自独立验收与证据回填。
 
 ## 一票否决项
 
@@ -91,15 +113,15 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 
 | 功能项 | 入口 | 验收步骤 | 预期结果 | 自动化证据 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| 健康检查 | `GET /health` | 服务启动后直接请求 | `200` 且返回健康信息 | [health_enhanced_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/health_enhanced_test.go) | 未验 |
+| 健康检查 | `GET /health` | 服务启动后直接请求 | `200` 且返回健康信息 | [health_enhanced_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/health_enhanced_test.go) | 通过 |
 | 就绪检查 | `GET /ready` | 在依赖就绪后请求 | `200`；依赖异常时不应误报健康 | [health_enhanced_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/health_enhanced_test.go) | 未验 |
 | Prometheus 指标 | `GET <metricsPath>` | 启动后访问 metrics | 返回文本指标；包含 runtime/AI/DB 指标 | [ai_handler.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler.go) | 未验 |
 | 安全基线严格校验 | `make security-check CONFIG=...` | 使用部署配置执行校验 | 无 warning 时返回 `0`；有高风险配置时非零退出 | [check_security_baseline_test.go](/Users/cui/Workspaces/servify/apps/server/cmd/cli/check_security_baseline_test.go) | 通过 |
 | 可观测性基线严格校验 | `make observability-check CONFIG=...` | 使用部署配置执行校验 | metrics/tracing 配置与 dashboard/alert/runbook/collector 资产齐备时返回 `0` | [check_observability_baseline_test.go](/Users/cui/Workspaces/servify/apps/server/cmd/cli/check_observability_baseline_test.go) | 通过 |
-| 发布前最小自检 | `make release-check CONFIG=...` | 执行统一自检脚本 | local/security/observability/focused Go tests 全部通过 | [check-release-readiness.sh](/Users/cui/Workspaces/servify/scripts/check-release-readiness.sh) | 未验 |
+| 发布前最小自检 | `make release-check CONFIG=./config.yml` | 执行统一自检脚本 | local/security/observability/focused Go tests 全部通过 | [check-release-readiness.sh](/Users/cui/Workspaces/servify/scripts/check-release-readiness.sh) | 通过 |
 | CLI 标准构建 | `make build` | 执行构建 | 生成二进制，无编译错误 | `make build` | 未验 |
 | CLI WeKnora 构建 | `make build-weknora` | 执行构建 | 生成二进制，无编译错误 | `make build-weknora` | 通过 |
-| 本地最小环境检查 | `make local-check` | 执行环境校验脚本 | 所有关键依赖通过 | [Makefile](/Users/cui/Workspaces/servify/Makefile) | 未验 |
+| 本地最小环境检查 | `make local-check` | 执行环境校验脚本 | 所有关键依赖通过 | [Makefile](/Users/cui/Workspaces/servify/Makefile) | 通过 |
 
 ### 2. 实时能力
 
@@ -110,10 +132,10 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 
 | 功能项 | 入口 | 验收步骤 | 预期结果 | 自动化证据 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| WebSocket 建连 | `GET /api/v1/ws` | 带 `session_id` 建立连接 | 成功升级协议，可收发消息 | [websocket_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/websocket_test.go) | 未验 |
-| WebSocket 统计 | `GET /api/v1/ws/stats` | 建连前后各请求一次 | client 数量正确变化 | [websocket_processing_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/websocket_processing_test.go) | 未验 |
-| WebRTC 统计 | `GET /api/v1/webrtc/stats` | 建立会话后请求 | 返回连接统计 | [webrtc_stats_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/webrtc_stats_test.go) | 未验 |
-| WebRTC 连接列表 | `GET /api/v1/webrtc/connections` | 建立多连接后请求 | 返回当前连接列表 | [webrtc_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/webrtc_test.go) | 未验 |
+| WebSocket 建连 | `GET /api/v1/ws` | 带 `session_id` 建立连接 | 成功升级协议，可收发消息 | [websocket_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/websocket_test.go) | 通过 |
+| WebSocket 统计 | `GET /api/v1/ws/stats` | 建连前后各请求一次 | client 数量正确变化 | [websocket_processing_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/websocket_processing_test.go) | 通过 |
+| WebRTC 统计 | `GET /api/v1/webrtc/stats` | 建立会话后请求 | 返回连接统计 | [webrtc_stats_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/webrtc_stats_test.go) | 通过 |
+| WebRTC 连接列表 | `GET /api/v1/webrtc/connections` | 建立多连接后请求 | 返回当前连接列表 | [webrtc_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/webrtc_test.go) | 通过 |
 | 平台消息路由统计 | `GET /api/v1/messages/platforms` | 模拟不同平台消息后请求 | 平台维度统计正确 | [router_stats_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/router_stats_test.go) | 未验 |
 
 ### 3. AI 与 WeKnora
@@ -126,15 +148,28 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 
 | 功能项 | 入口 | 验收步骤 | 预期结果 | 自动化证据 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| AI 查询 | `POST /api/v1/ai/query` | 发起普通问题请求 | 返回回答，结构稳定 | [ai_handler_comprehensive_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_comprehensive_test.go) | 未验 |
-| AI 状态 | `GET /api/v1/ai/status` | 请求状态接口 | 返回 AI 服务当前状态 | [ai_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_test.go) | 未验 |
-| AI 指标 | `GET /api/v1/ai/metrics` | 调用多次查询后请求 | query count、latency 等可见 | [ai_handler_comprehensive_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_comprehensive_test.go) | 未验 |
-| 知识上传 | `POST /api/v1/ai/knowledge/upload` | 上传合法文档 | 上传成功并返回任务或文档信息 | [ai_handler_comprehensive_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_comprehensive_test.go) | 未验 |
-| 知识同步 | `POST /api/v1/ai/knowledge/sync` | 触发同步 | 返回同步结果，无 500 | [ai_handler_comprehensive_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_comprehensive_test.go) | 未验 |
-| 启用 WeKnora | `PUT /api/v1/ai/weknora/enable` | 启用增强能力 | 状态切换成功 | [ai_handler_comprehensive_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_comprehensive_test.go) | 未验 |
-| 禁用 WeKnora | `PUT /api/v1/ai/weknora/disable` | 禁用增强能力 | 状态切换成功 | [ai_handler_comprehensive_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_comprehensive_test.go) | 未验 |
-| 熔断器重置 | `POST /api/v1/ai/circuit-breaker/reset` | 先制造失败再重置 | 熔断状态恢复 | [ai_handler_comprehensive_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_comprehensive_test.go) | 未验 |
-| WeKnora 不可用回退 | AI 查询主链路 | 关闭 WeKnora 或制造超时 | 系统进入 fallback，而不是整体不可用 | [orchestrated_ai_fallback_integration_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/orchestrated_ai_fallback_integration_test.go) | 未验 |
+| AI 查询 | `POST /api/v1/ai/query` | 发起普通问题请求 | 返回回答，结构稳定 | [ai_handler_comprehensive_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_comprehensive_test.go) | 通过 |
+| AI 状态 | `GET /api/v1/ai/status` | 请求状态接口 | 返回 AI 服务当前状态 | [ai_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_test.go) | 通过 |
+| AI 指标 | `GET /api/v1/ai/metrics` | 调用多次查询后请求 | query count、latency 等可见 | [ai_handler_comprehensive_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_comprehensive_test.go) | 通过 |
+| 知识上传 | `POST /api/v1/ai/knowledge/upload` | 上传合法文档 | 上传成功并返回任务或文档信息 | [ai_handler_comprehensive_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_comprehensive_test.go) | 部分通过 |
+| 知识同步 | `POST /api/v1/ai/knowledge/sync` | 触发同步 | 返回同步结果，无 500 | [ai_handler_comprehensive_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_comprehensive_test.go) | 部分通过 |
+| 启用 WeKnora | `PUT /api/v1/ai/weknora/enable` | 启用增强能力 | 状态切换成功 | [ai_handler_comprehensive_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_comprehensive_test.go) | 通过 |
+| 禁用 WeKnora | `PUT /api/v1/ai/weknora/disable` | 禁用增强能力 | 状态切换成功 | [ai_handler_comprehensive_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_comprehensive_test.go) | 通过 |
+| 熔断器重置 | `POST /api/v1/ai/circuit-breaker/reset` | 先制造失败再重置 | 熔断状态恢复 | [ai_handler_comprehensive_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_comprehensive_test.go) | 通过 |
+| WeKnora 不可用回退 | AI 查询主链路 | 关闭 WeKnora 或制造超时 | 系统进入 fallback，而不是整体不可用 | [orchestrated_ai_fallback_integration_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/orchestrated_ai_fallback_integration_test.go) | 通过 |
+
+### 3A. 认证与会话
+
+代码入口：
+
+- [auth_handler.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/auth_handler.go)
+- [auth_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/auth_service_test.go)
+
+| 功能项 | 入口 | 验收步骤 | 预期结果 | 自动化证据 | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| 登录与 refresh token 轮转 | `POST /api/v1/auth/login` `POST /api/v1/auth/refresh` | 登录后刷新 token，再尝试复用旧 refresh token | 返回 access/refresh token，新 token 生效，旧 refresh token 失效 | [auth_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/auth_service_test.go)、[auth_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/auth_handler_test.go) | 部分通过 |
+| 当前会话列表 | `GET /api/v1/auth/sessions` | 登录后查看当前用户会话 | 返回会话列表、当前会话标记和基础风险字段 | [auth_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/auth_handler_test.go) | 部分通过 |
+| 退出当前会话/其它会话 | `POST /api/v1/auth/sessions/logout-current` `POST /api/v1/auth/sessions/logout-others` | 执行自助登出 | 当前或其它会话被正确失效 | [auth_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/auth_handler_test.go)、[auth_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/auth_service_test.go) | 部分通过 |
 
 ### 4. 客户管理
 
@@ -142,14 +177,14 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 
 | 功能项 | 入口 | 验收步骤 | 预期结果 | 自动化证据 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| 创建客户 | `POST /api/customers` | 提交合法客户资料 | 创建成功，返回 ID | [customer_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/customer_handler_test.go) | 未验 |
+| 创建客户 | `POST /api/customers` | 提交合法客户资料 | 创建成功，返回 ID | [customer_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/customer_handler_test.go) | 通过 |
 | 客户列表 | `GET /api/customers` | 创建若干客户后查询 | 支持列表和筛选 | [customer_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/customer_handler_test.go) | 未验 |
-| 客户统计 | `GET /api/customers/stats` | 准备不同客户样本后查询 | 返回统计信息正确 | [customer_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/customer_service_test.go) | 未验 |
-| 客户详情 | `GET /api/customers/:id` | 查询已存在客户 | 返回正确详情 | [customer_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/customer_handler_test.go) | 未验 |
-| 更新客户 | `PUT /api/customers/:id` | 更新字段后重新查询 | 数据被持久化 | [customer_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/customer_handler_test.go) | 未验 |
+| 客户统计 | `GET /api/customers/stats` | 准备不同客户样本后查询 | 返回统计信息正确 | [customer_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/customer_service_test.go) | 通过 |
+| 客户详情 | `GET /api/customers/:id` | 查询已存在客户 | 返回正确详情 | [customer_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/customer_handler_test.go) | 通过 |
+| 更新客户 | `PUT /api/customers/:id` | 更新字段后重新查询 | 数据被持久化 | [customer_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/customer_handler_test.go) | 通过 |
 | 活动轨迹 | `GET /api/customers/:id/activity` | 产生客户相关活动后查询 | 轨迹完整、排序正确 | [customer_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/customer_handler_test.go) | 未验 |
-| 添加备注 | `POST /api/customers/:id/notes` | 添加备注后重查 | 备注被记录 | [customer_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/customer_handler_test.go) | 未验 |
-| 更新标签 | `PUT /api/customers/:id/tags` | 更新标签后重查 | 标签覆盖或合并符合设计 | [customer_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/customer_handler_test.go) | 未验 |
+| 添加备注 | `POST /api/customers/:id/notes` | 添加备注后重查 | 备注被记录 | [customer_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/customer_handler_test.go) | 通过 |
+| 更新标签 | `PUT /api/customers/:id/tags` | 更新标签后重查 | 标签覆盖或合并符合设计 | [customer_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/customer_handler_test.go) | 通过 |
 
 ### 5. 客服管理
 
@@ -158,12 +193,12 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 | 功能项 | 入口 | 验收步骤 | 预期结果 | 自动化证据 | 状态 |
 | --- | --- | --- | --- | --- | --- |
 | 创建客服 | `POST /api/agents` | 提交合法资料 | 创建成功 | [agent_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/agent_handler_test.go) | 未验 |
-| 客服列表 | `GET /api/agents` | 创建后查询 | 返回客服列表 | [agent_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/agent_handler_test.go) | 未验 |
-| 在线客服列表 | `GET /api/agents/online` | 切换在线离线状态后查询 | 仅返回在线客服 | [agent_handler_extended_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/agent_handler_extended_test.go) | 未验 |
-| 客服统计 | `GET /api/agents/stats` | 准备不同负载样本后查询 | 统计值正确 | [agent_service_more_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/agent_service_more_test.go) | 未验 |
+| 客服列表 | `GET /api/agents` | 创建后查询 | 返回客服列表 | [agent_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/agent_handler_test.go) | 通过 |
+| 在线客服列表 | `GET /api/agents/online` | 切换在线离线状态后查询 | 仅返回在线客服 | [agent_handler_extended_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/agent_handler_extended_test.go) | 通过 |
+| 客服统计 | `GET /api/agents/stats` | 准备不同负载样本后查询 | 统计值正确 | [agent_service_more_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/agent_service_more_test.go) | 通过 |
 | 查找可用客服 | `GET /api/agents/find-available` | 准备多个客服状态 | 返回最合适客服 | [agent_service_assignment_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/agent_service_assignment_test.go) | 未验 |
-| 更新状态 | `PUT /api/agents/:id/status` | 更新在线/忙碌状态 | 状态持久化 | [agent_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/agent_handler_test.go) | 未验 |
-| 上下线切换 | `POST /api/agents/:id/online` `POST /api/agents/:id/offline` | 调用接口并重查 | 状态切换正确 | [agent_handler_extended_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/agent_handler_extended_test.go) | 未验 |
+| 更新状态 | `PUT /api/agents/:id/status` | 更新在线/忙碌状态 | 状态持久化 | [agent_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/agent_handler_test.go) | 通过 |
+| 上下线切换 | `POST /api/agents/:id/online` `POST /api/agents/:id/offline` | 调用接口并重查 | 状态切换正确 | [agent_handler_extended_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/agent_handler_extended_test.go) | 部分通过 |
 | 会话分配/释放 | `POST /api/agents/:id/assign-session` `POST /api/agents/:id/release-session` | 分配后查看客服负载 | 负载变化正确 | [agent_service_assignment_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/agent_service_assignment_test.go) | 未验 |
 
 ### 6. 工单
@@ -172,16 +207,32 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 
 | 功能项 | 入口 | 验收步骤 | 预期结果 | 自动化证据 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| 创建工单 | `POST /api/tickets` | 提交合法工单 | 创建成功，返回 ID | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 未验 |
+| 创建工单 | `POST /api/tickets` | 提交合法工单 | 创建成功，返回 ID | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 部分通过 |
 | 批量更新工单 | `POST /api/tickets/bulk` | 批量更新多个工单 | 返回批量结果，数据一致 | [ticket_handler.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler.go) | 未验 |
-| 工单列表 | `GET /api/tickets` | 创建后查询 | 支持筛选和分页 | [query_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/ticket/application/query_service_test.go) | 未验 |
+| 工单列表 | `GET /api/tickets` | 创建后查询 | 支持筛选和分页 | [query_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/ticket/application/query_service_test.go)、[ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 通过 |
 | 导出工单 CSV | `GET /api/tickets/export` | 准备样本后导出 | 下载成功，字段完整 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 未验 |
 | 工单统计 | `GET /api/tickets/stats` | 准备不同状态工单后查询 | 统计值正确 | [query_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/ticket/application/query_service_test.go) | 未验 |
-| 工单详情 | `GET /api/tickets/:id` | 查询已存在工单 | 返回正确详情 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 未验 |
+| 工单详情 | `GET /api/tickets/:id` | 查询已存在工单 | 返回正确详情 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 通过 |
 | 更新工单 | `PUT /api/tickets/:id` | 更新标题、优先级、状态 | 数据被持久化 | [command_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/ticket/application/command_service_test.go) | 未验 |
-| 指派工单 | `POST /api/tickets/:id/assign` | 指派给客服 | 负责人变化正确 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 未验 |
+| 指派工单 | `POST /api/tickets/:id/assign` | 指派给客服 | 负责人变化正确 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 通过 |
 | 添加评论 | `POST /api/tickets/:id/comments` | 添加评论后重查 | 评论可读出 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 未验 |
 | 关闭工单 | `POST /api/tickets/:id/close` | 关闭后重查 | 状态变为关闭，关闭时间正确 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 未验 |
+
+### 6A. 会话工作台
+
+代码入口：
+
+- [conversation_workspace_handler.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/conversation_workspace_handler.go)
+- [conversation_workspace_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/conversation_workspace_handler_test.go)
+
+| 功能项 | 入口 | 验收步骤 | 预期结果 | 自动化证据 | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| 会话详情 | `GET /api/omni/sessions/:id` | 查询已存在会话 | 返回正确会话详情与状态 | [conversation_workspace_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/conversation_workspace_handler_test.go) | 阻塞 |
+| 消息列表 | `GET /api/omni/sessions/:id/messages` | 查询会话消息 | 返回按时间顺序排列的消息列表 | [conversation_workspace_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/conversation_workspace_handler_test.go) | 通过 |
+| 发送消息 | `POST /api/omni/sessions/:id/messages` | 在工作台发送消息 | 消息写入持久层并触发 realtime 推送 | [conversation_workspace_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/conversation_workspace_handler_test.go) | 部分通过 |
+| 指派会话 | `POST /api/omni/sessions/:id/assign` | 指派客服接管 | 返回成功并更新会话归属 | [conversation_workspace_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/conversation_workspace_handler_test.go) | 部分通过 |
+| 转接会话 | `POST /api/omni/sessions/:id/transfer` | 转接到另一位客服 | 返回成功并更新转接结果 | [conversation_workspace_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/conversation_workspace_handler_test.go) | 部分通过 |
+| 关闭会话 | `POST /api/omni/sessions/:id/close` | 关闭当前会话 | 会话状态切为 `closed` | [conversation_workspace_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/conversation_workspace_handler_test.go) | 部分通过 |
 
 ### 7. 会话转接
 
@@ -215,8 +266,8 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 | 更新满意度 | `PUT /api/satisfactions/:id` | 修改评分或备注 | 数据更新成功 | [satisfaction_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/satisfaction_handler_test.go) | 未验 |
 | 删除满意度 | `DELETE /api/satisfactions/:id` | 删除后重查 | 记录不可再读 | [satisfaction_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/satisfaction_handler_test.go) | 未验 |
 | 按工单查询满意度 | `GET /api/tickets/:id/satisfaction` | 工单已有评价时查询 | 返回对应满意度 | [satisfaction_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/satisfaction_handler_test.go) | 未验 |
-| 公开问卷查看 | `GET /public/csat/:token` | 使用有效 token 访问 | 返回问卷内容 | [csat_public_handler.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/csat_public_handler.go) | 未验 |
-| 公开问卷提交 | `POST /public/csat/:token/respond` | 提交问卷响应 | 返回成功并持久化 | [csat_public_handler.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/csat_public_handler.go) | 未验 |
+| 公开问卷查看 | `GET /public/csat/:token` | 使用有效 token 访问 | 返回问卷内容 | [csat_public_handler.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/csat_public_handler.go) | 通过 |
+| 公开问卷提交 | `POST /public/csat/:token/respond` | 提交问卷响应 | 返回成功并持久化 | [csat_public_handler.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/csat_public_handler.go) | 通过 |
 
 ### 9. 工作台、宏、集成、自定义字段
 
@@ -229,7 +280,7 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 
 | 功能项 | 入口 | 验收步骤 | 预期结果 | 自动化证据 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| 工作台概览 | `GET /api/omni/workspace` | 请求工作台概览 | 返回聚合视图 | [workspace_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/workspace_handler_test.go) | 未验 |
+| 工作台概览 | `GET /api/omni/workspace` | 请求工作台概览 | 返回聚合视图 | [workspace_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/workspace_handler_test.go)、[workspace_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/workspace_service_test.go) | 通过 |
 | 宏列表/创建/更新/删除/应用 | `/api/macros` 系列 | 依次执行 CRUD 与 apply | 规则可持久化且可实际应用 | [macro_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/macro_handler_test.go) | 未验 |
 | 应用集成列表/创建/更新/删除 | `/api/apps/integrations` 系列 | 执行 CRUD | 集成配置生效并可回读 | [app_market_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/app_market_handler_test.go) | 未验 |
 | 自定义字段列表/详情/创建/更新/删除 | `/api/custom-fields` 系列 | 执行 CRUD | 字段定义持久化并可用于工单等实体 | [custom_field_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/custom_field_handler_test.go) | 未验 |
@@ -244,20 +295,37 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 
 | 功能项 | 入口 | 验收步骤 | 预期结果 | 自动化证据 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| 仪表盘统计 | `GET /api/statistics/dashboard` | 准备样本数据后查询 | 返回聚合概览 | [statistics_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/statistics_handler_test.go) | 未验 |
-| 时间范围统计 | `GET /api/statistics/time-range` | 指定日期范围查询 | 返回按时间切片聚合 | [statistics_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/statistics_service_test.go) | 未验 |
+| 仪表盘统计 | `GET /api/statistics/dashboard` | 准备样本数据后查询 | 返回聚合概览 | [statistics_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/statistics_handler_test.go)、[statistics_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/statistics_service_test.go) | 通过 |
+| 时间范围统计 | `GET /api/statistics/time-range` | 指定日期范围查询 | 返回按时间切片聚合 | [statistics_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/statistics_service_test.go)、[statistics_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/statistics_handler_test.go) | 部分通过 |
 | 客服绩效统计 | `GET /api/statistics/agent-performance` | 准备客服样本后查询 | 返回绩效排序 | [statistics_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/statistics_service_test.go) | 未验 |
 | 工单分类统计 | `GET /api/statistics/ticket-category` | 准备不同分类工单 | 分类聚合正确 | [statistics_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/statistics_handler_test.go) | 未验 |
 | 工单优先级统计 | `GET /api/statistics/ticket-priority` | 准备不同优先级工单 | 优先级聚合正确 | [statistics_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/statistics_handler_test.go) | 未验 |
 | 客户来源统计 | `GET /api/statistics/customer-source` | 准备不同来源客户 | 来源聚合正确 | [statistics_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/statistics_handler_test.go) | 未验 |
 | 每日统计更新 | `POST /api/statistics/update-daily` | 指定日期触发更新 | 更新成功且可被后续查询读到 | [statistics_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/statistics_service_test.go) | 未验 |
-| SLA 配置 CRUD | `/api/sla/configs` 系列 | 执行配置增删改查 | 配置生效并可回读 | [sla_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/sla_handler_test.go) | 未验 |
-| SLA 优先级配置查询 | `GET /api/sla/configs/priority/:priority` | 查询指定优先级 | 返回正确规则 | [sla_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/sla_handler_test.go) | 未验 |
-| SLA 违约列表 | `GET /api/sla/violations` | 准备违约工单后查询 | 返回违约记录 | [sla_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/sla_handler_test.go) | 未验 |
-| SLA 违约解决 | `POST /api/sla/violations/:id/resolve` | 解决违约后重查 | 状态变化正确 | [sla_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/sla_handler_test.go) | 未验 |
-| SLA 统计 | `GET /api/sla/stats` | 准备样本后查询 | 返回 SLA 统计视图 | [sla_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/sla_handler_test.go) | 未验 |
-| 工单 SLA 检查 | `POST /api/sla/check/ticket/:ticket_id` | 对指定工单执行检查 | 返回 SLA 判定结果 | [sla_handler_check_ticket_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/sla_handler_check_ticket_test.go) | 未验 |
+| SLA 配置 CRUD | `/api/sla/configs` 系列 | 执行配置增删改查 | 配置生效并可回读 | [sla_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/sla_handler_test.go) | 通过 |
+| SLA 优先级配置查询 | `GET /api/sla/configs/priority/:priority` | 查询指定优先级 | 返回正确规则 | [sla_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/sla_handler_test.go) | 通过 |
+| SLA 违约列表 | `GET /api/sla/violations` | 准备违约工单后查询 | 返回违约记录 | [sla_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/sla_handler_test.go) | 通过 |
+| SLA 违约解决 | `POST /api/sla/violations/:id/resolve` | 解决违约后重查 | 状态变化正确 | [sla_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/sla_handler_test.go) | 通过 |
+| SLA 统计 | `GET /api/sla/stats` | 准备样本后查询 | 返回 SLA 统计视图 | [sla_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/sla_handler_test.go) | 通过 |
+| 工单 SLA 检查 | `POST /api/sla/check/ticket/:ticket_id` | 对指定工单执行检查 | 返回 SLA 判定结果 | [sla_handler_check_ticket_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/sla_handler_check_ticket_test.go) | 通过 |
 | 排班 CRUD 与统计 | `/api/shifts` 系列 | 创建、查询、更新、删除、统计 | 排班记录和统计正确 | [shift_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/shift_handler_test.go) | 未验 |
+
+### 10A. 审计与安全
+
+代码入口：
+
+- [audit_handler.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/audit_handler.go)
+- [user_security_handler.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/user_security_handler.go)
+
+| 功能项 | 入口 | 验收步骤 | 预期结果 | 自动化证据 | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| 用户安全态查询 | `GET /api/security/users/:id` | 查询指定用户安全状态 | 返回 `user_id`、`role`、`status`、`token_version` 等字段 | [user_security_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/user_security_handler_test.go) | 通过 |
+| 用户 token 失效 | `POST /api/security/users/:id/revoke-tokens` | 触发旧 token 失效 | `token_version` 增加，后续状态可回读 | [user_security_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/user_security_handler_test.go) | 通过 |
+| 用户会话列表 | `GET /api/security/users/:id/sessions` | 查询指定用户会话 | 返回会话列表或空列表，结构稳定 | [user_security_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/user_security_handler_test.go) | 通过 |
+| 审计日志列表 | `GET /api/audit/logs` | 按 action 等条件查询 | 返回审计记录列表及分页信息 | [audit_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/audit_handler_test.go) | 通过 |
+| 审计日志详情 | `GET /api/audit/logs/:id` | 查询单条审计记录 | 返回指定审计记录 | [audit_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/audit_handler_test.go) | 通过 |
+| 审计日志差异预览 | `GET /api/audit/logs/:id/diff` | 查看变更 diff | 返回变更路径或明确无差异 | [audit_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/audit_handler_test.go) | 通过 |
+| 审计日志导出 | `GET /api/audit/logs/export` | 导出过滤后的日志 | 返回 CSV 内容 | [audit_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/audit_handler_test.go) | 通过 |
 
 ### 11. 自动化、知识库、辅助建议、激励
 
@@ -274,7 +342,7 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 | 自动化运行记录 | `GET /api/automations/runs` | 触发自动化后查询 | 可查看运行结果 | [automation_service_more_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/automation_service_more_test.go) | 未验 |
 | 自动化批量运行 | `POST /api/automations/run` | 触发批量运行 | 返回执行结果，失败项可见 | [automation_service_more_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/automation_service_more_test.go) | 未验 |
 | 知识文档 CRUD | `/api/knowledge-docs` 系列 | 执行 CRUD | 文档可持久化 | [knowledge_doc_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/knowledge_doc_handler_test.go) | 未验 |
-| 公开知识库查询 | `/public/kb/docs` 系列 | 访问公开知识文档 | 可读且权限边界正确 | [knowledge_doc_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/knowledge_doc_handler_test.go) | 未验 |
+| 公开知识库查询 | `/public/kb/docs` 系列 | 访问公开知识文档 | 可读且权限边界正确 | [knowledge_doc_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/knowledge_doc_handler_test.go) | 通过 |
 | 辅助建议 | `GET /api/assist/suggest` `POST /api/assist/suggest` | 传入上下文获取建议 | 返回建议结果 | [suggestion_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/suggestion_handler_test.go) | 未验 |
 | 激励排行 | `GET /api/gamification/leaderboard` | 准备积分样本后查询 | 排名正确 | [gamification_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/gamification_handler_test.go) | 未验 |
 
@@ -284,14 +352,14 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 
 | 功能项 | 入口 | 验收步骤 | 预期结果 | 自动化证据 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| 协议列表 | `GET /api/voice/protocols` | 请求协议列表 | 返回已注册协议 | [voice_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/voice_handler_test.go) | 未验 |
-| 协议信令事件 | `POST /api/voice/protocols/:protocol/call-events/:event` | 发送 invite/answer/hangup 等事件 | 事件被正确映射和处理 | [voice_handler_integration_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/voice_handler_integration_test.go) | 未验 |
-| 协议媒体事件 | `POST /api/voice/protocols/:protocol/media-events/:event` | 发送媒体事件 | 媒体状态正确更新 | [voice_handler_integration_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/voice_handler_integration_test.go) | 未验 |
-| 开始录音 | `POST /api/voice/recordings/start` | 启动录音 | 返回 recording ID | [service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/voice/application/service_test.go) | 未验 |
-| 停止录音 | `POST /api/voice/recordings/stop` | 停止录音后查询 | 录音状态完成 | [recording_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/voice/application/recording_service_test.go) | 未验 |
-| 获取录音 | `GET /api/voice/recordings/:recordingID` | 查询录音详情 | 返回录音元数据 | [recording_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/voice/application/recording_service_test.go) | 未验 |
-| 转写追加 | `POST /api/voice/transcripts` | 追加语音转写片段 | 转写被保存 | [transcript_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/voice/application/transcript_service_test.go) | 未验 |
-| 转写列表 | `GET /api/voice/transcripts` | 追加后查询 | 返回转写内容 | [transcript_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/voice/application/transcript_service_test.go) | 未验 |
+| 协议列表 | `GET /api/voice/protocols` | 请求协议列表 | 返回已注册协议 | [voice_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/voice_handler_test.go) | 通过 |
+| 协议信令事件 | `POST /api/voice/protocols/:protocol/call-events/:event` | 发送 invite/answer/hangup 等事件 | 事件被正确映射和处理 | [voice_handler_integration_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/voice_handler_integration_test.go) | 通过 |
+| 协议媒体事件 | `POST /api/voice/protocols/:protocol/media-events/:event` | 发送媒体事件 | 媒体状态正确更新 | [voice_handler_integration_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/voice_handler_integration_test.go) | 通过 |
+| 开始录音 | `POST /api/voice/recordings/start` | 启动录音 | 返回 recording ID | [service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/voice/application/service_test.go) | 通过 |
+| 停止录音 | `POST /api/voice/recordings/stop` | 停止录音后查询 | 录音状态完成 | [recording_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/voice/application/recording_service_test.go) | 通过 |
+| 获取录音 | `GET /api/voice/recordings/:recordingID` | 查询录音详情 | 返回录音元数据 | [recording_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/voice/application/recording_service_test.go) | 通过 |
+| 转写追加 | `POST /api/voice/transcripts` | 追加语音转写片段 | 转写被保存 | [transcript_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/voice/application/transcript_service_test.go) | 通过 |
+| 转写列表 | `GET /api/voice/transcripts` | 追加后查询 | 返回转写内容 | [transcript_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/voice/application/transcript_service_test.go) | 通过 |
 
 ## 权限与异常路径必须额外验
 

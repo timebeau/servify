@@ -357,7 +357,7 @@ func TestMacroService_ApplyToTicket(t *testing.T) {
 			macroID:  activeMacro.ID,
 			ticketID: 9999,
 			actorID:  1,
-			wantErr:  false, // 会创建评论，即使工单不存在
+			wantErr:  true,
 		},
 	}
 
@@ -377,5 +377,35 @@ func TestMacroService_ApplyToTicket(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestMacroService_ApplyToTicket_RejectsCrossScopeTicket(t *testing.T) {
+	db := newMacroTestDB(t)
+	svc := NewMacroService(db)
+
+	ctxA := scopedContext("tenant-a", "workspace-a")
+	macroA, err := svc.Create(ctxA, &MacroCreateRequest{
+		Name:    "宏-A",
+		Content: "A",
+	})
+	if err != nil {
+		t.Fatalf("create macro A failed: %v", err)
+	}
+
+	ticketB := &models.Ticket{
+		CustomerID:  1,
+		Status:      "open",
+		Priority:    "1",
+		Title:       "工单-B",
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-b",
+	}
+	if err := db.Create(ticketB).Error; err != nil {
+		t.Fatalf("create ticket B: %v", err)
+	}
+
+	if _, err := svc.ApplyToTicket(ctxA, macroA.ID, ticketB.ID, 1); err == nil {
+		t.Fatal("expected cross-scope ticket application to fail")
 	}
 }

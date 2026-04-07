@@ -239,3 +239,162 @@ func TestSatisfactionService_ScopedByWorkspace(t *testing.T) {
 		t.Fatal("expected cross-workspace delete to fail")
 	}
 }
+
+func TestSatisfactionService_ListSatisfactions_DoesNotLeakCrossScopePreloads(t *testing.T) {
+	db := newSatisfactionTestDB(t)
+	svc := NewSatisfactionService(db, logrus.New())
+	now := time.Now()
+
+	customerUserB := &models.User{ID: 301, Username: "customer-b", Email: "customer-b@example.com", Name: "Customer B"}
+	agentUserB := &models.User{ID: 302, Username: "agent-b", Email: "agent-b@example.com", Name: "Agent B"}
+	if err := db.Create(customerUserB).Error; err != nil {
+		t.Fatalf("create customer user B: %v", err)
+	}
+	if err := db.Create(agentUserB).Error; err != nil {
+		t.Fatalf("create agent user B: %v", err)
+	}
+
+	customerB := &models.Customer{ID: 201, TenantID: "tenant-b", WorkspaceID: "workspace-b", UserID: customerUserB.ID}
+	if err := db.Create(customerB).Error; err != nil {
+		t.Fatalf("create customer B: %v", err)
+	}
+	agentB := &models.Agent{TenantID: "tenant-b", WorkspaceID: "workspace-b", UserID: agentUserB.ID, Status: "online"}
+	if err := db.Create(agentB).Error; err != nil {
+		t.Fatalf("create agent B: %v", err)
+	}
+
+	ticketB := &models.Ticket{
+		ID:          101,
+		Title:       "Ticket B",
+		CustomerID:  customerUserB.ID,
+		Status:      "closed",
+		Source:      "web",
+		TenantID:    "tenant-b",
+		WorkspaceID: "workspace-b",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := db.Create(ticketB).Error; err != nil {
+		t.Fatalf("create ticket B: %v", err)
+	}
+
+	satisfactionA := &models.CustomerSatisfaction{
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-a",
+		TicketID:    ticketB.ID,
+		CustomerID:  customerB.ID,
+		AgentID:     &agentUserB.ID,
+		Rating:      5,
+		Category:    "overall",
+		CreatedAt:   now,
+	}
+	if err := db.Create(satisfactionA).Error; err != nil {
+		t.Fatalf("create satisfaction A: %v", err)
+	}
+
+	items, total, err := svc.ListSatisfactions(scopedContext("tenant-a", "workspace-a"), &SatisfactionListRequest{
+		Page:     1,
+		PageSize: 20,
+	})
+	if err != nil {
+		t.Fatalf("ListSatisfactions failed: %v", err)
+	}
+	if total != 1 || len(items) != 1 {
+		t.Fatalf("unexpected scoped satisfactions: total=%d items=%+v", total, items)
+	}
+	if items[0].Ticket.ID != 0 {
+		t.Fatalf("expected ticket preload to stay scoped, got %+v", items[0].Ticket)
+	}
+	if items[0].Customer.ID != 0 {
+		t.Fatalf("expected customer preload to stay scoped, got %+v", items[0].Customer)
+	}
+	if items[0].Agent != nil {
+		t.Fatalf("expected agent preload to stay scoped, got %+v", items[0].Agent)
+	}
+}
+
+func TestSatisfactionService_GetSurveyPreview_DoesNotLeakCrossScopeAgent(t *testing.T) {
+	db := newSatisfactionTestDB(t)
+	logger := logrus.New()
+	svc := NewSatisfactionService(db, logger)
+	now := time.Now()
+
+	customerUser := &models.User{ID: 401, Username: "customer-prev", Email: "customer-prev@example.com"}
+	agentUserB := &models.User{ID: 402, Username: "agent-prev-b", Email: "agent-prev-b@example.com", Name: "Agent Preview B", Role: "agent"}
+	if err := db.Create(customerUser).Error; err != nil {
+		t.Fatalf("create customer user: %v", err)
+	}
+	if err := db.Create(agentUserB).Error; err != nil {
+		t.Fatalf("create agent user B: %v", err)
+	}
+	if err := db.Create(&models.Customer{UserID: customerUser.ID, TenantID: "tenant-a", WorkspaceID: "workspace-a"}).Error; err != nil {
+		t.Fatalf("create customer: %v", err)
+	}
+	if err := db.Create(&models.Agent{UserID: agentUserB.ID, TenantID: "tenant-a", WorkspaceID: "workspace-b", Status: "online"}).Error; err != nil {
+		t.Fatalf("create agent B: %v", err)
+	}
+
+	ticketA := &models.Ticket{
+		ID:          401,
+		Title:       "工单预览 A",
+		CustomerID:  customerUser.ID,
+		AgentID:     &agentUserB.ID,
+		Status:      "closed",
+		Source:      "web",
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-a",
+		ResolvedAt:  &now,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := db.Create(ticketA).Error; err != nil {
+		t.Fatalf("create ticket A: %v", err)
+	}
+
+	surveyA, err := svc.ScheduleSurvey(scopedContext("tenant-a", "workspace-a"), ticketA)
+	if err != nil {
+		t.Fatalf("schedule survey A: %v", err)
+	}
+
+	preview, err := svc.GetSurveyPreviewByToken(context.Background(), surveyA.SurveyToken)
+	if err != nil {
+		t.Fatalf("GetSurveyPreviewByToken failed: %v", err)
+	}
+	if preview.AgentName != "" {
+		t.Fatalf("expected preview agent name to stay scoped, got %+v", preview)
+	}
+}
+
+func TestSatisfactionService_ScheduleSurvey_RejectsCrossScopeTicket(t *testing.T) {
+	db := newSatisfactionTestDB(t)
+	logger := logrus.New()
+	svc := NewSatisfactionService(db, logger)
+	now := time.Now()
+
+	customerB := &models.User{ID: 451, Username: "customer-bx", Email: "customer-bx@example.com"}
+	if err := db.Create(customerB).Error; err != nil {
+		t.Fatalf("create customer B: %v", err)
+	}
+	if err := db.Create(&models.Customer{UserID: customerB.ID, TenantID: "tenant-a", WorkspaceID: "workspace-b"}).Error; err != nil {
+		t.Fatalf("create customer profile B: %v", err)
+	}
+
+	ticketB := &models.Ticket{
+		ID:          451,
+		Title:       "工单 Bx",
+		CustomerID:  customerB.ID,
+		Status:      "closed",
+		Source:      "web",
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-b",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := db.Create(ticketB).Error; err != nil {
+		t.Fatalf("create ticket B: %v", err)
+	}
+
+	if _, err := svc.ScheduleSurvey(scopedContext("tenant-a", "workspace-a"), ticketB); err == nil {
+		t.Fatal("expected cross-scope ticket scheduling to fail")
+	}
+}

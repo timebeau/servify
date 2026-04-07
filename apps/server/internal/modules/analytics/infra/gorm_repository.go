@@ -51,7 +51,7 @@ func (r *GormRepository) GetDashboardStats(ctx context.Context) (*analyticsapp.D
 	stats.CustomerSatisfaction = avgSatisfaction
 
 	var dailyStat models.DailyStats
-	if err := r.db.WithContext(ctx).Where("date = ?", today).First(&dailyStat).Error; err == nil {
+	if shouldUseGlobalDailyStats(ctx) && r.db.WithContext(ctx).Where("date = ?", today).First(&dailyStat).Error == nil {
 		stats.AIUsageToday = int64(dailyStat.AIUsageCount)
 		stats.WeKnoraUsageToday = int64(dailyStat.WeKnoraUsageCount)
 	}
@@ -69,10 +69,18 @@ func (r *GormRepository) GetTimeRangeStats(ctx context.Context, startDate, endDa
 		applyEntityScope(r.db.WithContext(ctx).Model(&models.Session{}), ctx).Where("created_at >= ? AND created_at < ?", current, nextDay).Count(&stat.Sessions)
 		applyEntityScope(r.db.WithContext(ctx).Model(&models.Message{}), ctx).Where("created_at >= ? AND created_at < ?", current, nextDay).Count(&stat.Messages)
 		applyEntityScope(r.db.WithContext(ctx).Model(&models.Ticket{}), ctx).Where("resolved_at >= ? AND resolved_at < ?", current, nextDay).Count(&stat.ResolvedTickets)
-		var daily models.DailyStats
-		if err := r.db.WithContext(ctx).Where("date = ?", current).First(&daily).Error; err == nil {
-			stat.AvgResponseTime = float64(daily.AvgResponseTime)
-			stat.CustomerSatisfaction = daily.CustomerSatisfaction
+		if shouldUseGlobalDailyStats(ctx) {
+			var daily models.DailyStats
+			if err := r.db.WithContext(ctx).Where("date = ?", current).First(&daily).Error; err == nil {
+				stat.AvgResponseTime = float64(daily.AvgResponseTime)
+				stat.CustomerSatisfaction = daily.CustomerSatisfaction
+			}
+		} else {
+			// DailyStats is currently system-scoped; for scoped requests only derive
+			// values that can be safely recomputed from scoped primary data.
+			applyEntityScope(r.db.WithContext(ctx).Model(&models.CustomerSatisfaction{}), ctx).
+				Where("created_at >= ? AND created_at < ?", current, nextDay).
+				Select("COALESCE(AVG(rating), 0)").Row().Scan(&stat.CustomerSatisfaction)
 		}
 		stats = append(stats, stat)
 		current = nextDay
@@ -215,6 +223,11 @@ func customerScope(db *gorm.DB, ctx context.Context) *gorm.DB {
 		db = db.Where("customers.workspace_id = ?", workspaceID)
 	}
 	return db
+}
+
+func shouldUseGlobalDailyStats(ctx context.Context) bool {
+	tenantID, workspaceID := scopeValues(ctx)
+	return tenantID == "" && workspaceID == ""
 }
 
 func (r *GormRepository) IncrementDailyStat(ctx context.Context, event analyticsapp.IncrementEvent) error {

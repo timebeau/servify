@@ -38,6 +38,7 @@ func BuildRealtimeRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB
 	wsHub.SetAIService(ai)
 
 	webrtcService := services.NewWebRTCService(cfg.WebRTC.STUNServer, wsHub)
+	wsHub.SetWebRTCService(webrtcService)
 	return &RealtimeRuntime{
 		Config:           cfg,
 		Logger:           logger,

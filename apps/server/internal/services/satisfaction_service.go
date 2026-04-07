@@ -121,12 +121,19 @@ func (s *SatisfactionService) ScheduleSurvey(ctx context.Context, ticket *models
 		return nil, fmt.Errorf("ticket required for survey scheduling")
 	}
 	scopeCtx := contextWithRecordScope(ctx, ticket.TenantID, ticket.WorkspaceID)
+	var scopedTicket models.Ticket
+	if err := applyScopeFilter(s.db.WithContext(ctx), scopeCtx).First(&scopedTicket, ticket.ID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, fmt.Errorf("ticket not found")
+		}
+		return nil, fmt.Errorf("failed to validate ticket for survey: %w", err)
+	}
 
 	// 如果已有评价则不再发送调查
 	var satisfactionCount int64
 	if err := applyScopeFilter(s.db.WithContext(ctx).
 		Model(&models.CustomerSatisfaction{}), scopeCtx).
-		Where("ticket_id = ?", ticket.ID).
+		Where("ticket_id = ?", scopedTicket.ID).
 		Count(&satisfactionCount).Error; err != nil {
 		return nil, fmt.Errorf("failed to check satisfaction status: %w", err)
 	}
@@ -137,7 +144,7 @@ func (s *SatisfactionService) ScheduleSurvey(ctx context.Context, ticket *models
 	// 如果存在待发送调查则直接复用
 	var existing models.SatisfactionSurvey
 	if err := applyScopeFilter(s.db.WithContext(ctx), scopeCtx).
-		Where("ticket_id = ? AND status IN ?", ticket.ID, []string{"queued", "sent"}).
+		Where("ticket_id = ? AND status IN ?", scopedTicket.ID, []string{"queued", "sent"}).
 		Order("created_at DESC").
 		First(&existing).Error; err == nil {
 		return &existing, nil
@@ -147,14 +154,14 @@ func (s *SatisfactionService) ScheduleSurvey(ctx context.Context, ticket *models
 
 	now := time.Now()
 	expires := now.Add(defaultSurveyTTL)
-	channel := detectSurveyChannel(ticket.Source)
+	channel := detectSurveyChannel(scopedTicket.Source)
 
 	survey := &models.SatisfactionSurvey{
 		TenantID:    platformauth.TenantIDFromContext(scopeCtx),
 		WorkspaceID: platformauth.WorkspaceIDFromContext(scopeCtx),
-		TicketID:    ticket.ID,
-		CustomerID:  ticket.CustomerID,
-		AgentID:     ticket.AgentID,
+		TicketID:    scopedTicket.ID,
+		CustomerID:  scopedTicket.CustomerID,
+		AgentID:     scopedTicket.AgentID,
 		Channel:     channel,
 		Status:      "sent",
 		SurveyToken: uuid.NewString(),
@@ -228,7 +235,7 @@ func (s *SatisfactionService) GetSurveyPreviewByToken(ctx context.Context, token
 	scopeCtx := contextWithRecordScope(ctx, survey.TenantID, survey.WorkspaceID)
 
 	var ticket models.Ticket
-	if err := applyScopeFilter(s.db.WithContext(ctx).Preload("Agent"), scopeCtx).First(&ticket, survey.TicketID).Error; err != nil {
+	if err := applyScopeFilter(scopeAwareTicketAgentPreload(s.db.WithContext(ctx), scopeCtx), scopeCtx).First(&ticket, survey.TicketID).Error; err != nil {
 		return nil, fmt.Errorf("failed to load ticket for survey: %w", err)
 	}
 
@@ -404,7 +411,7 @@ func (s *SatisfactionService) CreateSatisfaction(ctx context.Context, req *Satis
 	}
 
 	// 预加载关联数据
-	if err := applyScopeFilter(s.db.Preload("Ticket").Preload("Customer").Preload("Agent"), ctx).First(satisfaction, satisfaction.ID).Error; err != nil {
+	if err := applyScopeFilter(scopeAwareSatisfactionPreloads(s.db, ctx), ctx).First(satisfaction, satisfaction.ID).Error; err != nil {
 		s.logger.Warnf("Failed to preload satisfaction data: %v", err)
 	}
 
@@ -417,7 +424,7 @@ func (s *SatisfactionService) CreateSatisfaction(ctx context.Context, req *Satis
 // GetSatisfaction 获取满意度评价
 func (s *SatisfactionService) GetSatisfaction(ctx context.Context, id uint) (*models.CustomerSatisfaction, error) {
 	var satisfaction models.CustomerSatisfaction
-	if err := applyScopeFilter(s.db.Preload("Ticket").Preload("Customer").Preload("Agent"), ctx).First(&satisfaction, id).Error; err != nil {
+	if err := applyScopeFilter(scopeAwareSatisfactionPreloads(s.db, ctx), ctx).First(&satisfaction, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, fmt.Errorf("satisfaction not found")
 		}
@@ -478,7 +485,7 @@ func (s *SatisfactionService) ListSatisfactions(ctx context.Context, req *Satisf
 	}
 
 	var satisfactions []models.CustomerSatisfaction
-	if err := query.Preload("Ticket").Preload("Customer").Preload("Agent").Find(&satisfactions).Error; err != nil {
+	if err := scopeAwareSatisfactionPreloads(query, ctx).Find(&satisfactions).Error; err != nil {
 		return nil, 0, fmt.Errorf("failed to list satisfactions: %w", err)
 	}
 
@@ -488,7 +495,7 @@ func (s *SatisfactionService) ListSatisfactions(ctx context.Context, req *Satisf
 // GetSatisfactionByTicket 根据工单获取满意度评价
 func (s *SatisfactionService) GetSatisfactionByTicket(ctx context.Context, ticketID uint) (*models.CustomerSatisfaction, error) {
 	var satisfaction models.CustomerSatisfaction
-	if err := applyScopeFilter(s.db.WithContext(ctx).Where("ticket_id = ?", ticketID).Preload("Ticket").Preload("Customer").Preload("Agent"), ctx).First(&satisfaction).Error; err != nil {
+	if err := applyScopeFilter(scopeAwareSatisfactionPreloads(s.db.WithContext(ctx).Where("ticket_id = ?", ticketID), ctx), ctx).First(&satisfaction).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil // 返回 nil 表示未找到，这是正常情况
 		}
@@ -637,7 +644,7 @@ func (s *SatisfactionService) UpdateSatisfaction(ctx context.Context, id uint, c
 	}
 
 	// 重新加载关联数据
-	if err := applyScopeFilter(s.db.Preload("Ticket").Preload("Customer").Preload("Agent"), ctx).First(&satisfaction, id).Error; err != nil {
+	if err := applyScopeFilter(scopeAwareSatisfactionPreloads(s.db, ctx), ctx).First(&satisfaction, id).Error; err != nil {
 		s.logger.Warnf("Failed to preload satisfaction data: %v", err)
 	}
 
@@ -667,4 +674,33 @@ func contextWithRecordScope(ctx context.Context, tenantID, workspaceID string) c
 		currentWorkspace = workspaceID
 	}
 	return platformauth.ContextWithScope(ctx, currentTenant, currentWorkspace)
+}
+
+func scopeAwareSatisfactionPreloads(db *gorm.DB, ctx context.Context) *gorm.DB {
+	query := db.WithContext(ctx).
+		Preload("Ticket", func(tx *gorm.DB) *gorm.DB {
+			return applyScopeFilter(tx, ctx)
+		}).
+		Preload("Customer", func(tx *gorm.DB) *gorm.DB {
+			return applyScopeFilter(tx, ctx)
+		})
+
+	return scopeAwareTicketAgentPreload(query, ctx)
+}
+
+func scopeAwareTicketAgentPreload(db *gorm.DB, ctx context.Context) *gorm.DB {
+	tenantID, workspaceID := tenantAndWorkspace(ctx)
+	return db.Preload("Agent", func(tx *gorm.DB) *gorm.DB {
+		if tenantID == "" && workspaceID == "" {
+			return tx
+		}
+		tx = tx.Joins("JOIN agents ON agents.user_id = users.id")
+		if tenantID != "" {
+			tx = tx.Where("agents.tenant_id = ?", tenantID)
+		}
+		if workspaceID != "" {
+			tx = tx.Where("agents.workspace_id = ?", workspaceID)
+		}
+		return tx
+	})
 }

@@ -88,6 +88,69 @@
   - `11-tenant-auth-and-audit` 的后续增强项（主要是真实 Geo/IP 情报接入、按环境/租户细化 session risk policy），以及少量 legacy 聚合尾项
   - 生产配置与发布前检查的最终对齐（Phase 5）
 
+与最终产品的差距待办：
+
+- [-] Gap A: 全量验收与运行证据补齐
+  - 目标：把“代码已完成/测试已通过”推进到“真实链路已验收、可对外交付”
+  - 范围：
+    - 以 `docs/acceptance-checklist.md` 为基线补运行证据与数据证据
+    - 优先验收客服主链路、AI 主链路、后台管理高频链路
+    - 为已验收条目回填状态，避免“文档完成度”和“实际可交付度”漂移
+  - 任务包：
+    - [x] G1-1 验收核心客服链路：登录 -> Dashboard -> Conversation -> Ticket
+    - [-] G1-2 验收 AI / Knowledge / WeKnora fallback 主链路
+    - [x] G1-3 验收 Agent / Customer / SLA / Audit / Security 高价值运营链路
+    - [x] G1-4 验收公开入口与实时入口：`/public/*`、`/api/v1/ws`、WebRTC / Voice 基础路径
+
+- [ ] Gap B: 租户、安全与审计从“骨架完成”推进到“生产闭环”
+  - 目标：补齐 `11-tenant-auth-and-audit` 剩余缺口，降低真实部署风险
+  - 范围：
+    - 收口少量 legacy 聚合尾项与系统级汇总表维度设计
+    - 为 session risk policy 增加环境级/租户级细化能力
+    - 接入真实 Geo/IP 情报或明确 provider adapter 边界
+    - 补齐审计保留、导出、配置回滚等真实运营约束
+  - 任务包：
+    - [-] G2-1 收尾 tenant/workspace 边界与遗留聚合查询
+    - [ ] G2-2 接入真实 Geo/IP 情报与 session risk provider
+    - [ ] G2-3 按环境/租户细化 session risk policy 与 security config
+    - [ ] G2-4 收口 audit/config rollback 的运营约束与验收清单
+
+- [ ] Gap C: 远程协助从“技术能力”推进到“明确产品能力”
+  - 目标：让 README、官网、文档站、管理端表达与实际能力一致，形成产品差异点
+  - 范围：
+    - 把远程协助从底层实时能力表述提升为用户可理解的产品能力
+    - 明确客服何时发起协助、协助后如何继续接管/转接/工单闭环
+    - 补齐远程协助的最小演示路径、文档路径和验收口径
+  - 任务包：
+    - [ ] G3-1 收口官网/README/文档站的远程协助产品叙事
+    - [ ] G3-2 盘点管理端与服务端当前远程协助入口、状态与缺口
+    - [ ] G3-3 定义远程协助最小可交付链路及验收清单
+
+- [ ] Gap D: 上线前最终对齐
+  - 目标：把当前“可本地运行、可通过 baseline check”推进到“可稳定上线”
+  - 范围：
+    - 统一开发、测试、生产配置说明与部署模板
+    - 补最后一轮 release readiness、回滚、监控、告警、runbook 对齐
+    - 明确默认 demo/dev 资产与正式部署资产的边界
+  - 任务包：
+    - [ ] G4-1 做一轮 staging 口径的 release readiness 演练
+    - [ ] G4-2 对齐生产配置模板、告警阈值与 operator runbook
+    - [ ] G4-3 清点并标注 demo/mock/in-memory 能力的保留原因与退出条件
+
+差距收口执行规则：
+
+- 一次只推进一个 Gap 下的一个任务包
+- 中断恢复时，优先从最近一个 `[-]` 的 `G*` 任务包继续
+- 每完成一个 `G*` 任务包，必须同步更新 `docs/acceptance-checklist.md` 或对应专题文档
+- 若发现某项差距不应继续放在索引页，应拆到对应 `docs/implementation/*` backlog 维护
+
+建议执行顺序：
+
+- 第一优先级：`Gap A` 全量验收与运行证据补齐
+- 第二优先级：`Gap B` 租户、安全与审计收尾
+- 第三优先级：`Gap D` 上线前最终对齐
+- 第四优先级：`Gap C` 远程协助产品能力收口
+
 产品化详细计划：
 
 - [x] Phase 1: 核心客服链路闭环

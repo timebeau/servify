@@ -311,3 +311,84 @@ func TestWorkspaceService_GetOverview_AppliesScope(t *testing.T) {
 		t.Fatalf("unexpected scoped channels: %+v", overview.Channels)
 	}
 }
+
+func TestWorkspaceService_GetOverview_RecentSessionsDoesNotLeakCrossScopeJoins(t *testing.T) {
+	db := newWorkspaceServiceTestDB(t)
+	svc := NewWorkspaceService(db, nil)
+	now := time.Now()
+
+	customerAUser := &models.User{Username: "customer-a", Email: "customer-a@test.com", Name: "Customer A", Role: "customer"}
+	customerBUser := &models.User{Username: "customer-b", Email: "customer-b@test.com", Name: "Customer B", Role: "customer"}
+	agentAUser := &models.User{Username: "agent-a", Email: "agent-a@test.com", Name: "Agent A", Role: "agent"}
+	agentBUser := &models.User{Username: "agent-b", Email: "agent-b@test.com", Name: "Agent B", Role: "agent"}
+	if err := db.Create(customerAUser).Error; err != nil {
+		t.Fatalf("create customer A user: %v", err)
+	}
+	if err := db.Create(customerBUser).Error; err != nil {
+		t.Fatalf("create customer B user: %v", err)
+	}
+	if err := db.Create(agentAUser).Error; err != nil {
+		t.Fatalf("create agent A user: %v", err)
+	}
+	if err := db.Create(agentBUser).Error; err != nil {
+		t.Fatalf("create agent B user: %v", err)
+	}
+
+	customerA := &models.Customer{TenantID: "tenant-a", WorkspaceID: "workspace-a", UserID: customerAUser.ID}
+	customerB := &models.Customer{TenantID: "tenant-b", WorkspaceID: "workspace-b", UserID: customerBUser.ID}
+	if err := db.Create(customerA).Error; err != nil {
+		t.Fatalf("create customer A: %v", err)
+	}
+	if err := db.Create(customerB).Error; err != nil {
+		t.Fatalf("create customer B: %v", err)
+	}
+
+	agentA := &models.Agent{TenantID: "tenant-a", WorkspaceID: "workspace-a", UserID: agentAUser.ID, Status: "online"}
+	agentB := &models.Agent{TenantID: "tenant-b", WorkspaceID: "workspace-b", UserID: agentBUser.ID, Status: "online"}
+	if err := db.Create(agentA).Error; err != nil {
+		t.Fatalf("create agent A: %v", err)
+	}
+	if err := db.Create(agentB).Error; err != nil {
+		t.Fatalf("create agent B: %v", err)
+	}
+
+	ticketB := &models.Ticket{
+		TenantID:    "tenant-b",
+		WorkspaceID: "workspace-b",
+		Title:       "cross-scope ticket",
+		CustomerID:  customerBUser.ID,
+	}
+	if err := db.Create(ticketB).Error; err != nil {
+		t.Fatalf("create ticket B: %v", err)
+	}
+
+	sessionA := &models.Session{
+		ID:          "sess-cross-scope",
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-a",
+		TicketID:    &ticketB.ID,
+		AgentID:     &agentBUser.ID,
+		Platform:    "web",
+		Status:      "active",
+		StartedAt:   now,
+	}
+	if err := db.Create(sessionA).Error; err != nil {
+		t.Fatalf("create session A: %v", err)
+	}
+
+	overview, err := svc.GetOverview(scopedContext("tenant-a", "workspace-a"), 10)
+	if err != nil {
+		t.Fatalf("GetOverview() error = %v", err)
+	}
+	if len(overview.RecentSessions) != 1 {
+		t.Fatalf("expected 1 recent session, got %d", len(overview.RecentSessions))
+	}
+
+	recent := overview.RecentSessions[0]
+	if recent.CustomerName != "" || recent.CustomerID != nil {
+		t.Fatalf("expected customer join to be scope-protected, got %+v", recent)
+	}
+	if recent.AgentName != "" {
+		t.Fatalf("expected agent join to be scope-protected, got %+v", recent)
+	}
+}

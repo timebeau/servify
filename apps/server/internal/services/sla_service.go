@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"servify/apps/server/internal/models"
+	platformauth "servify/apps/server/internal/platform/auth"
 
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
@@ -438,6 +439,9 @@ func (s *SLAService) GetSLAConfigByPriority(ctx context.Context, priority string
 func (s *SLAService) CheckSLAViolation(ctx context.Context, ticket *models.Ticket) (*models.SLAViolation, error) {
 	ctx, span := s.tracer.Start(ctx, "sla.check_violation")
 	defer span.End()
+	if ticket == nil {
+		return nil, fmt.Errorf("ticket required")
+	}
 
 	span.SetAttributes(
 		attribute.Int64("sla.ticket.id", int64(ticket.ID)),
@@ -445,30 +449,39 @@ func (s *SLAService) CheckSLAViolation(ctx context.Context, ticket *models.Ticke
 		attribute.String("sla.ticket.status", ticket.Status),
 	)
 
-	customerTier := s.resolveCustomerTier(ctx, ticket.CustomerID)
+	scopeCtx := slaRecordScopeContext(ctx, ticket.TenantID, ticket.WorkspaceID)
+	var scopedTicket models.Ticket
+	if err := applyScopeFilter(s.db.WithContext(ctx), scopeCtx).First(&scopedTicket, ticket.ID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, fmt.Errorf("ticket not found")
+		}
+		return nil, fmt.Errorf("failed to validate ticket scope: %w", err)
+	}
+
+	customerTier := s.resolveCustomerTier(scopeCtx, scopedTicket.CustomerID)
 
 	// 获取对应的SLA配置（优先匹配客户级别）
-	slaConfig, err := s.GetSLAConfigByPriority(ctx, ticket.Priority, customerTier)
+	slaConfig, err := s.GetSLAConfigByPriority(scopeCtx, scopedTicket.Priority, customerTier)
 	if err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("failed to get SLA config: %w", err)
 	}
 	if slaConfig == nil {
-		s.logger.Debugf("No SLA config for priority: %s", ticket.Priority)
+		s.logger.Debugf("No SLA config for priority: %s", scopedTicket.Priority)
 		return nil, nil // 没有SLA配置，不检查违约
 	}
 
 	now := time.Now()
-	violation := s.detectViolation(ticket, slaConfig, now)
+	violation := s.detectViolation(&scopedTicket, slaConfig, now)
 	if violation == nil {
 		return nil, nil // 没有违约
 	}
 
 	// 检查同类型的违约是否已经存在
 	var existingViolation models.SLAViolation
-	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).Where(
+	if err := applyScopeFilter(scopeAwareSLAViolationPreloads(s.db.WithContext(ctx), scopeCtx), scopeCtx).Where(
 		"ticket_id = ? AND sla_config_id = ? AND violation_type = ?",
-		ticket.ID, slaConfig.ID, violation.ViolationType,
+		scopedTicket.ID, slaConfig.ID, violation.ViolationType,
 	).First(&existingViolation).Error; err == nil {
 		return &existingViolation, nil // 已存在相同类型的违约记录
 	} else if err != gorm.ErrRecordNotFound {
@@ -483,19 +496,26 @@ func (s *SLAService) CheckSLAViolation(ctx context.Context, ticket *models.Ticke
 		return nil, fmt.Errorf("failed to create SLA violation: %w", err)
 	}
 
+	var createdViolation models.SLAViolation
+	if err := applyScopeFilter(scopeAwareSLAViolationPreloads(s.db.WithContext(ctx), scopeCtx), scopeCtx).
+		First(&createdViolation, violation.ID).Error; err != nil {
+		span.RecordError(err)
+		return nil, fmt.Errorf("failed to load created SLA violation: %w", err)
+	}
+
 	s.logger.Warnf("SLA violation detected: ticket=%d, type=%s, deadline=%s",
-		ticket.ID, violation.ViolationType, violation.Deadline.Format(time.RFC3339))
+		scopedTicket.ID, violation.ViolationType, violation.Deadline.Format(time.RFC3339))
 
 	// 触发自动化
 	if s.automation != nil {
 		go s.automation.HandleEvent(context.Background(), AutomationEvent{
 			Type:     "sla_violation",
-			TicketID: ticket.ID,
+			TicketID: scopedTicket.ID,
 			Payload:  violation,
 		})
 	}
 
-	return violation, nil
+	return &createdViolation, nil
 }
 
 // detectViolation 检测具体的违约类型
@@ -548,6 +568,9 @@ func (s *SLAService) detectViolation(ticket *models.Ticket, slaConfig *models.SL
 func (s *SLAService) CreateSLAViolation(ctx context.Context, violation *models.SLAViolation) error {
 	ctx, span := s.tracer.Start(ctx, "sla.create_violation")
 	defer span.End()
+	if violation == nil {
+		return fmt.Errorf("violation required")
+	}
 
 	span.SetAttributes(
 		attribute.Int64("sla.violation.ticket_id", int64(violation.TicketID)),
@@ -555,11 +578,27 @@ func (s *SLAService) CreateSLAViolation(ctx context.Context, violation *models.S
 		attribute.String("sla.violation.type", violation.ViolationType),
 	)
 
-	violation.CreatedAt = time.Now()
-	violation.UpdatedAt = time.Now()
-	if violation.TenantID == "" && violation.WorkspaceID == "" {
-		violation.TenantID, violation.WorkspaceID = tenantAndWorkspace(ctx)
+	scopeCtx := slaRecordScopeContext(ctx, violation.TenantID, violation.WorkspaceID)
+	var ticket models.Ticket
+	if err := applyScopeFilter(s.db.WithContext(ctx), scopeCtx).First(&ticket, violation.TicketID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return fmt.Errorf("ticket not found")
+		}
+		return fmt.Errorf("failed to validate violation ticket: %w", err)
 	}
+	var config models.SLAConfig
+	if err := applyScopeFilter(s.db.WithContext(ctx), scopeCtx).First(&config, violation.SLAConfigID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return fmt.Errorf("sla config not found")
+		}
+		return fmt.Errorf("failed to validate violation config: %w", err)
+	}
+
+	now := time.Now()
+	violation.CreatedAt = now
+	violation.UpdatedAt = now
+	violation.TenantID = ticket.TenantID
+	violation.WorkspaceID = ticket.WorkspaceID
 
 	if err := s.db.WithContext(ctx).Create(violation).Error; err != nil {
 		span.RecordError(err)
@@ -576,7 +615,7 @@ func (s *SLAService) ListSLAViolations(ctx context.Context, req *SLAViolationLis
 	ctx, span := s.tracer.Start(ctx, "sla.list_violations")
 	defer span.End()
 
-	query := applyScopeFilter(s.db.WithContext(ctx).Model(&models.SLAViolation{}), ctx).Preload("Ticket").Preload("SLAConfig")
+	query := applyScopeFilter(scopeAwareSLAViolationPreloads(s.db.WithContext(ctx).Model(&models.SLAViolation{}), ctx), ctx)
 
 	// 应用筛选
 	if req.TicketID != nil {
@@ -753,7 +792,7 @@ func (s *SLAService) GetSLAStats(ctx context.Context) (*SLAStatsResponse, error)
 	}
 	violationStatsQuery := s.db.WithContext(ctx).Table("sla_violations").
 		Select("sla_configs.priority, COUNT(*) as count").
-		Joins("JOIN sla_configs ON sla_violations.sla_config_id = sla_configs.id")
+		Joins("JOIN sla_configs ON sla_violations.sla_config_id = sla_configs.id AND sla_configs.tenant_id = sla_violations.tenant_id AND sla_configs.workspace_id = sla_violations.workspace_id")
 	if tenantID, workspaceID := tenantAndWorkspace(ctx); tenantID != "" || workspaceID != "" {
 		if tenantID != "" {
 			violationStatsQuery = violationStatsQuery.Where("sla_violations.tenant_id = ?", tenantID)
@@ -778,7 +817,7 @@ func (s *SLAService) GetSLAStats(ctx context.Context) (*SLAStatsResponse, error)
 	}
 	violationTierQuery := s.db.WithContext(ctx).Table("sla_violations").
 		Select("COALESCE(sla_configs.customer_tier, '') as customer_tier, COUNT(*) as count").
-		Joins("JOIN sla_configs ON sla_violations.sla_config_id = sla_configs.id")
+		Joins("JOIN sla_configs ON sla_violations.sla_config_id = sla_configs.id AND sla_configs.tenant_id = sla_violations.tenant_id AND sla_configs.workspace_id = sla_violations.workspace_id")
 	if tenantID, workspaceID := tenantAndWorkspace(ctx); tenantID != "" || workspaceID != "" {
 		if tenantID != "" {
 			violationTierQuery = violationTierQuery.Where("sla_violations.tenant_id = ?", tenantID)
@@ -897,6 +936,27 @@ func joinTags(tags []string) string {
 		}
 	}
 	return strings.Join(clean, ",")
+}
+
+func slaRecordScopeContext(ctx context.Context, tenantID, workspaceID string) context.Context {
+	currentTenant, currentWorkspace := tenantAndWorkspace(ctx)
+	if currentTenant == "" {
+		currentTenant = tenantID
+	}
+	if currentWorkspace == "" {
+		currentWorkspace = workspaceID
+	}
+	return platformauth.ContextWithScope(ctx, currentTenant, currentWorkspace)
+}
+
+func scopeAwareSLAViolationPreloads(db *gorm.DB, ctx context.Context) *gorm.DB {
+	return db.
+		Preload("Ticket", func(tx *gorm.DB) *gorm.DB {
+			return applyScopeFilter(tx, ctx)
+		}).
+		Preload("SLAConfig", func(tx *gorm.DB) *gorm.DB {
+			return applyScopeFilter(tx, ctx)
+		})
 }
 
 // resolveCustomerTier 根据工单的客户ID提取客户等级（复用客户优先级字段）

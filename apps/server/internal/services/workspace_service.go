@@ -138,10 +138,11 @@ func (s *WorkspaceService) GetOverview(ctx context.Context, limit int) (*Workspa
 	if err := query.
 		Select(`sessions.id, COALESCE(sessions.platform, 'unknown') AS platform, sessions.status, sessions.agent_id, sessions.started_at,
 				customers.user_id AS customer_id, cu.name AS customer_name, au.name AS agent_name`).
-		Joins("LEFT JOIN tickets t ON t.id = sessions.ticket_id").
-		Joins("LEFT JOIN customers ON customers.user_id = t.customer_id").
+		Joins("LEFT JOIN tickets t ON t.id = sessions.ticket_id AND t.tenant_id = sessions.tenant_id AND t.workspace_id = sessions.workspace_id").
+		Joins("LEFT JOIN customers ON customers.user_id = t.customer_id AND customers.tenant_id = sessions.tenant_id AND customers.workspace_id = sessions.workspace_id").
 		Joins("LEFT JOIN users cu ON cu.id = customers.user_id").
-		Joins("LEFT JOIN users au ON au.id = sessions.agent_id").
+		Joins("LEFT JOIN agents ag ON ag.user_id = sessions.agent_id AND ag.tenant_id = sessions.tenant_id AND ag.workspace_id = sessions.workspace_id").
+		Joins("LEFT JOIN users au ON au.id = ag.user_id").
 		Order("sessions.created_at DESC").
 		Limit(limit).
 		Scan(&sessions).Error; err != nil {

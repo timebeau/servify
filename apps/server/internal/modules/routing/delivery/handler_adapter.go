@@ -24,7 +24,7 @@ type AISessionService interface {
 type agentRuntime interface {
 	FindAvailableAgent(ctx context.Context, skills []string, priority string) (*agentdelivery.AgentInfo, error)
 	GetOnlineAgent(userID uint) (*agentdelivery.AgentInfo, bool)
-	ApplySessionTransfer(sessionID string, fromAgentID *uint, toAgentID uint)
+	ApplySessionTransfer(ctx context.Context, sessionID string, fromAgentID *uint, toAgentID uint)
 }
 
 type notifier interface {
@@ -189,7 +189,7 @@ func (s *HandlerServiceAdapter) executeTransfer(ctx context.Context, session *co
 	}
 
 	if s.agentService != nil {
-		s.agentService.ApplySessionTransfer(session.ID, fromAgentID, targetAgentID)
+		s.agentService.ApplySessionTransfer(ctx, session.ID, fromAgentID, targetAgentID)
 	}
 	s.notifyTransfer(session.ID, targetAgentID, transferMessageContent)
 	s.logger.Infof("Successfully transferred session %s to agent %d", session.ID, targetAgentID)

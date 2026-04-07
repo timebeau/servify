@@ -21,8 +21,9 @@ func newTestDB(t *testing.T, tables ...interface{}) *gorm.DB {
 		t.Fatalf("failed to open sqlite: %v", err)
 	}
 	if len(tables) == 0 {
-		tables = []interface{}{&models.ShiftSchedule{}}
+		tables = []interface{}{&models.ShiftSchedule{}, &models.User{}, &models.Agent{}}
 	}
+	tables = append(tables, &models.User{}, &models.Agent{})
 	if err := db.AutoMigrate(tables...); err != nil {
 		t.Fatalf("failed to migrate: %v", err)
 	}
@@ -30,8 +31,14 @@ func newTestDB(t *testing.T, tables ...interface{}) *gorm.DB {
 }
 
 func TestShiftService_Create_and_GetStats(t *testing.T) {
-	db := newTestDB(t, &models.ShiftSchedule{})
+	db := newTestDB(t, &models.ShiftSchedule{}, &models.User{}, &models.Agent{})
 	svc := NewShiftService(db, logrus.New())
+	if err := db.Create(&models.User{ID: 1, Username: "agent1", Email: "agent1@example.com", Role: "agent"}).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	if err := db.Create(&models.Agent{UserID: 1, Status: "online"}).Error; err != nil {
+		t.Fatalf("create agent: %v", err)
+	}
 
 	now := time.Now()
 	req := &ShiftCreateRequest{
@@ -62,8 +69,14 @@ func TestShiftService_Create_and_GetStats(t *testing.T) {
 }
 
 func TestShiftService_Create_Validation(t *testing.T) {
-	db := newTestDB(t, &models.ShiftSchedule{})
+	db := newTestDB(t, &models.ShiftSchedule{}, &models.User{}, &models.Agent{})
 	svc := NewShiftService(db, logrus.New())
+	if err := db.Create(&models.User{ID: 1, Username: "agentv", Email: "agentv@example.com", Role: "agent"}).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	if err := db.Create(&models.Agent{UserID: 1, Status: "online"}).Error; err != nil {
+		t.Fatalf("create agent: %v", err)
+	}
 
 	now := time.Now()
 	req := &ShiftCreateRequest{
@@ -79,8 +92,14 @@ func TestShiftService_Create_Validation(t *testing.T) {
 }
 
 func TestShiftService_Update_and_Delete(t *testing.T) {
-	db := newTestDB(t, &models.ShiftSchedule{})
+	db := newTestDB(t, &models.ShiftSchedule{}, &models.User{}, &models.Agent{})
 	svc := NewShiftService(db, logrus.New())
+	if err := db.Create(&models.User{ID: 2, Username: "agent2", Email: "agent2@example.com", Role: "agent"}).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	if err := db.Create(&models.Agent{UserID: 2, Status: "online"}).Error; err != nil {
+		t.Fatalf("create agent: %v", err)
+	}
 
 	now := time.Now()
 	shift, err := svc.CreateShift(context.Background(), &ShiftCreateRequest{
@@ -114,12 +133,24 @@ func TestShiftService_Update_and_Delete(t *testing.T) {
 }
 
 func TestShiftService_ScopedByWorkspace(t *testing.T) {
-	db := newTestDB(t, &models.ShiftSchedule{})
+	db := newTestDB(t, &models.ShiftSchedule{}, &models.User{}, &models.Agent{})
 	svc := NewShiftService(db, logrus.New())
 
 	now := time.Now()
 	ctxA := scopedContext("tenant-a", "workspace-a")
 	ctxB := scopedContext("tenant-a", "workspace-b")
+	if err := db.Create(&models.User{ID: 1, Username: "agenta", Email: "agenta@example.com", Role: "agent"}).Error; err != nil {
+		t.Fatalf("create user A: %v", err)
+	}
+	if err := db.Create(&models.User{ID: 2, Username: "agentb", Email: "agentb@example.com", Role: "agent"}).Error; err != nil {
+		t.Fatalf("create user B: %v", err)
+	}
+	if err := db.Create(&models.Agent{TenantID: "tenant-a", WorkspaceID: "workspace-a", UserID: 1, Status: "online"}).Error; err != nil {
+		t.Fatalf("create agent A: %v", err)
+	}
+	if err := db.Create(&models.Agent{TenantID: "tenant-a", WorkspaceID: "workspace-b", UserID: 2, Status: "online"}).Error; err != nil {
+		t.Fatalf("create agent B: %v", err)
+	}
 
 	shiftA, err := svc.CreateShift(ctxA, &ShiftCreateRequest{
 		AgentID:   1,
@@ -167,5 +198,76 @@ func TestShiftService_ScopedByWorkspace(t *testing.T) {
 	}
 	if err := svc.DeleteShift(ctxB, shiftA.ID); err == nil {
 		t.Fatal("expected scoped delete to reject cross-workspace shift")
+	}
+}
+
+func TestShiftService_ListShifts_DoesNotLeakCrossScopeAgentPreload(t *testing.T) {
+	db := newTestDB(t, &models.ShiftSchedule{}, &models.User{}, &models.Agent{})
+	svc := NewShiftService(db, logrus.New())
+	now := time.Now()
+
+	agentUserB := &models.User{ID: 401, Username: "agent-b", Email: "agent-b@example.com", Name: "Agent B", Role: "agent"}
+	if err := db.Create(agentUserB).Error; err != nil {
+		t.Fatalf("create agent user B: %v", err)
+	}
+	if err := db.Create(&models.Agent{
+		TenantID:    "tenant-b",
+		WorkspaceID: "workspace-b",
+		UserID:      agentUserB.ID,
+		Status:      "online",
+	}).Error; err != nil {
+		t.Fatalf("create agent B: %v", err)
+	}
+	if err := db.Create(&models.ShiftSchedule{
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-a",
+		AgentID:     agentUserB.ID,
+		ShiftType:   "morning",
+		StartTime:   now.Add(time.Hour),
+		EndTime:     now.Add(2 * time.Hour),
+		Date:        now.Truncate(24 * time.Hour),
+		Status:      "scheduled",
+	}).Error; err != nil {
+		t.Fatalf("create shift A: %v", err)
+	}
+
+	items, total, err := svc.ListShifts(scopedContext("tenant-a", "workspace-a"), &ShiftListRequest{Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatalf("ListShifts failed: %v", err)
+	}
+	if total != 1 || len(items) != 1 {
+		t.Fatalf("unexpected scoped shifts: total=%d items=%+v", total, items)
+	}
+	if items[0].Agent.ID != 0 {
+		t.Fatalf("expected agent preload to stay scoped, got %+v", items[0].Agent)
+	}
+}
+
+func TestShiftService_CreateShift_RejectsCrossScopeAgent(t *testing.T) {
+	db := newTestDB(t, &models.ShiftSchedule{}, &models.User{}, &models.Agent{})
+	svc := NewShiftService(db, logrus.New())
+	now := time.Now()
+
+	agentUserB := &models.User{ID: 501, Username: "agent-b2", Email: "agent-b2@example.com", Name: "Agent B2", Role: "agent"}
+	if err := db.Create(agentUserB).Error; err != nil {
+		t.Fatalf("create agent user B2: %v", err)
+	}
+	if err := db.Create(&models.Agent{
+		TenantID:    "tenant-b",
+		WorkspaceID: "workspace-b",
+		UserID:      agentUserB.ID,
+		Status:      "online",
+	}).Error; err != nil {
+		t.Fatalf("create agent B2: %v", err)
+	}
+
+	if _, err := svc.CreateShift(scopedContext("tenant-a", "workspace-a"), &ShiftCreateRequest{
+		AgentID:   agentUserB.ID,
+		ShiftType: "morning",
+		StartTime: now.Add(time.Hour),
+		EndTime:   now.Add(2 * time.Hour),
+		Status:    "scheduled",
+	}); err == nil {
+		t.Fatal("expected cross-scope agent assignment to fail")
 	}
 }

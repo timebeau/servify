@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/pion/webrtc/v3"
 	"github.com/sirupsen/logrus"
 	"servify/apps/server/internal/models"
 	conversationdelivery "servify/apps/server/internal/modules/conversation/delivery"
@@ -25,6 +26,12 @@ type websocketAIService interface {
 	ProcessQuery(ctx context.Context, query string, sessionID string) (*AIResponse, error)
 	ShouldTransferToHuman(query string, sessionHistory []models.Message) bool
 	GetSessionSummary(messages []models.Message) (string, error)
+}
+
+type websocketRTCService interface {
+	HandleOffer(sessionID string, offer webrtc.SessionDescription) (*webrtc.SessionDescription, error)
+	HandleAnswer(sessionID string, answer webrtc.SessionDescription) error
+	HandleICECandidate(sessionID string, candidate webrtc.ICECandidateInit) error
 }
 
 type WebSocketMessage struct {
@@ -54,6 +61,8 @@ type WebSocketHub struct {
 	transferService sessionTransferRuntime
 	// 优先使用 conversation 模块适配器持久化消息
 	conversationWriter conversationdelivery.WebSocketMessageWriter
+	// 可选：用于处理 WebRTC 信令
+	rtcService websocketRTCService
 }
 
 var upgrader = websocket.Upgrader{
@@ -90,6 +99,13 @@ func (h *WebSocketHub) SetConversationMessageWriter(writer conversationdelivery.
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 	h.conversationWriter = writer
+}
+
+// SetWebRTCService injects the WebRTC signaling runtime used by websocket events.
+func (h *WebSocketHub) SetWebRTCService(rtc websocketRTCService) {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	h.rtcService = rtc
 }
 
 func (h *WebSocketHub) Run() {
@@ -159,7 +175,9 @@ func (c *WebSocketClient) readPump() {
 		c.Conn.Close()
 	}()
 
-	c.Conn.SetReadLimit(512)
+	// WebRTC SDP payloads are routinely several KB, so the generic websocket
+	// ingress limit must be large enough to carry signaling messages.
+	c.Conn.SetReadLimit(64 * 1024)
 	c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 	c.Conn.SetPongHandler(func(string) error {
 		c.Conn.SetReadDeadline(time.Now().Add(60 * time.Second))
@@ -245,43 +263,68 @@ func (c *WebSocketClient) handleTextMessage(message WebSocketMessage) {
 }
 
 func (c *WebSocketClient) handleWebRTCOffer(message WebSocketMessage) {
-	// 处理 WebRTC offer
-	// 集成 WebRTC 服务处理
 	logrus.Infof("Received WebRTC offer from session %s", c.SessionID)
 
-	// 这里应该调用 WebRTC 服务来处理 offer
-	// 并将 answer 返回给客户端
-	/*
-		if webrtcService != nil {
-			answer, err := webrtcService.HandleOffer(c.SessionID, message.Data)
-			if err != nil {
-				logrus.Errorf("Failed to handle WebRTC offer: %v", err)
-				return
-			}
-
-			// 发送 answer 回客户端
-			response := WebSocketMessage{
-				Type:      "webrtc-answer",
-				Data:      answer,
-				SessionID: c.SessionID,
-				Timestamp: time.Now(),
-			}
-			c.Send <- response
+	c.Hub.mutex.RLock()
+	rtc := c.Hub.rtcService
+	c.Hub.mutex.RUnlock()
+	if rtc != nil {
+		offer, err := asSessionDescription(message.Data)
+		if err != nil {
+			logrus.Errorf("Failed to decode WebRTC offer: %v", err)
+			return
 		}
-	*/
+		answer, err := rtc.HandleOffer(c.SessionID, offer)
+		if err != nil {
+			logrus.Errorf("Failed to handle WebRTC offer: %v", err)
+			return
+		}
+		c.Send <- WebSocketMessage{
+			Type:      "webrtc-answer",
+			Data:      answer,
+			SessionID: c.SessionID,
+			Timestamp: time.Now(),
+		}
+		return
+	}
 
-	// 当前实现：简单转发给同一会话的其他客户端
 	c.Hub.broadcast <- message
 }
 
 func (c *WebSocketClient) handleWebRTCAnswer(message WebSocketMessage) {
-	// 处理 WebRTC answer
 	logrus.Infof("Received WebRTC answer from session %s", c.SessionID)
+	c.Hub.mutex.RLock()
+	rtc := c.Hub.rtcService
+	c.Hub.mutex.RUnlock()
+	if rtc == nil {
+		return
+	}
+	answer, err := asSessionDescription(message.Data)
+	if err != nil {
+		logrus.Errorf("Failed to decode WebRTC answer: %v", err)
+		return
+	}
+	if err := rtc.HandleAnswer(c.SessionID, answer); err != nil {
+		logrus.Errorf("Failed to handle WebRTC answer: %v", err)
+	}
 }
 
 func (c *WebSocketClient) handleWebRTCCandidate(message WebSocketMessage) {
-	// 处理 ICE candidate
 	logrus.Infof("Received ICE candidate from session %s", c.SessionID)
+	c.Hub.mutex.RLock()
+	rtc := c.Hub.rtcService
+	c.Hub.mutex.RUnlock()
+	if rtc == nil {
+		return
+	}
+	candidate, err := asICECandidate(message.Data)
+	if err != nil {
+		logrus.Errorf("Failed to decode ICE candidate: %v", err)
+		return
+	}
+	if err := rtc.HandleICECandidate(c.SessionID, candidate); err != nil {
+		logrus.Errorf("Failed to handle ICE candidate: %v", err)
+	}
 }
 
 func (h *WebSocketHub) SendToSession(sessionID string, message WebSocketMessage) {
@@ -297,6 +340,54 @@ func (h *WebSocketHub) GetClientCount() int {
 	h.mutex.RLock()
 	defer h.mutex.RUnlock()
 	return len(h.clients)
+}
+
+func asSessionDescription(data interface{}) (webrtc.SessionDescription, error) {
+	switch v := data.(type) {
+	case webrtc.SessionDescription:
+		return v, nil
+	case *webrtc.SessionDescription:
+		if v == nil {
+			return webrtc.SessionDescription{}, fmt.Errorf("nil session description")
+		}
+		return *v, nil
+	case map[string]interface{}:
+		raw, err := json.Marshal(v)
+		if err != nil {
+			return webrtc.SessionDescription{}, fmt.Errorf("marshal session description: %w", err)
+		}
+		var desc webrtc.SessionDescription
+		if err := json.Unmarshal(raw, &desc); err != nil {
+			return webrtc.SessionDescription{}, fmt.Errorf("decode session description: %w", err)
+		}
+		return desc, nil
+	default:
+		return webrtc.SessionDescription{}, fmt.Errorf("unsupported session description payload %T", data)
+	}
+}
+
+func asICECandidate(data interface{}) (webrtc.ICECandidateInit, error) {
+	switch v := data.(type) {
+	case webrtc.ICECandidateInit:
+		return v, nil
+	case *webrtc.ICECandidateInit:
+		if v == nil {
+			return webrtc.ICECandidateInit{}, fmt.Errorf("nil ICE candidate")
+		}
+		return *v, nil
+	case map[string]interface{}:
+		raw, err := json.Marshal(v)
+		if err != nil {
+			return webrtc.ICECandidateInit{}, fmt.Errorf("marshal ICE candidate: %w", err)
+		}
+		var candidate webrtc.ICECandidateInit
+		if err := json.Unmarshal(raw, &candidate); err != nil {
+			return webrtc.ICECandidateInit{}, fmt.Errorf("decode ICE candidate: %w", err)
+		}
+		return candidate, nil
+	default:
+		return webrtc.ICECandidateInit{}, fmt.Errorf("unsupported ICE candidate payload %T", data)
+	}
 }
 
 // persistTextMessage 持久化文本消息

@@ -64,6 +64,12 @@ func TestSLAService_CheckViolation_FirstResponse(t *testing.T) {
 	if violation == nil || violation.ViolationType != "first_response" {
 		t.Fatalf("expected first_response violation, got %+v", violation)
 	}
+	if violation.Ticket.ID != ticket.ID {
+		t.Fatalf("expected preloaded ticket in violation, got %+v", violation.Ticket)
+	}
+	if violation.SLAConfig.ID != cfg.ID {
+		t.Fatalf("expected preloaded sla config in violation, got %+v", violation.SLAConfig)
+	}
 
 	// running again should reuse existing violation
 	violation2, err := svc.CheckSLAViolation(context.Background(), ticket)
@@ -72,6 +78,9 @@ func TestSLAService_CheckViolation_FirstResponse(t *testing.T) {
 	}
 	if violation2 == nil || violation2.ID != violation.ID {
 		t.Fatalf("expected duplicate detection; got %#v", violation2)
+	}
+	if violation2.Ticket.ID != ticket.ID || violation2.SLAConfig.ID != cfg.ID {
+		t.Fatalf("expected preloaded associations on duplicate violation, got %+v", violation2)
 	}
 }
 
@@ -255,5 +264,212 @@ func TestSLAService_ViolationsScopedByWorkspace(t *testing.T) {
 	}
 	if resolvedTotal != 1 || len(resolvedItems) != 1 || !resolvedItems[0].Resolved {
 		t.Fatalf("unexpected resolved items: total=%d items=%+v", resolvedTotal, resolvedItems)
+	}
+}
+
+func TestSLAService_ListViolations_DoesNotLeakCrossScopePreloads(t *testing.T) {
+	db := newSLATestDB(t)
+	svc := NewSLAService(db, logrus.New())
+	now := time.Now()
+
+	ticketB := &models.Ticket{
+		ID:          101,
+		Title:       "Ticket B",
+		Priority:    "urgent",
+		Status:      "open",
+		TenantID:    "tenant-b",
+		WorkspaceID: "workspace-b",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := db.Create(ticketB).Error; err != nil {
+		t.Fatalf("create ticket B failed: %v", err)
+	}
+
+	configB := &models.SLAConfig{
+		ID:                202,
+		Name:              "Config B",
+		Priority:          "urgent",
+		TenantID:          "tenant-b",
+		WorkspaceID:       "workspace-b",
+		FirstResponseTime: 5,
+		ResolutionTime:    60,
+		EscalationTime:    30,
+		Active:            true,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}
+	if err := db.Create(configB).Error; err != nil {
+		t.Fatalf("create config B failed: %v", err)
+	}
+
+	violationA := &models.SLAViolation{
+		TenantID:      "tenant-a",
+		WorkspaceID:   "workspace-a",
+		TicketID:      ticketB.ID,
+		SLAConfigID:   configB.ID,
+		ViolationType: "first_response",
+		Deadline:      now.Add(-10 * time.Minute),
+		ViolatedAt:    now,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	if err := db.Create(violationA).Error; err != nil {
+		t.Fatalf("create violation A failed: %v", err)
+	}
+
+	items, total, err := svc.ListSLAViolations(scopedContext("tenant-a", "workspace-a"), &SLAViolationListRequest{
+		Page:     1,
+		PageSize: 20,
+	})
+	if err != nil {
+		t.Fatalf("ListSLAViolations failed: %v", err)
+	}
+	if total != 1 || len(items) != 1 {
+		t.Fatalf("unexpected scoped violations: total=%d items=%+v", total, items)
+	}
+	if items[0].Ticket.ID != 0 {
+		t.Fatalf("expected scoped ticket preload to stay empty, got %+v", items[0].Ticket)
+	}
+	if items[0].SLAConfig.ID != 0 {
+		t.Fatalf("expected scoped config preload to stay empty, got %+v", items[0].SLAConfig)
+	}
+}
+
+func TestSLAService_CheckViolation_RejectsCrossScopeTicket(t *testing.T) {
+	db := newSLATestDB(t)
+	svc := NewSLAService(db, logrus.New())
+	now := time.Now()
+
+	cfgB := &models.SLAConfig{
+		Name:              "Urgent B",
+		Priority:          "urgent",
+		TenantID:          "tenant-a",
+		WorkspaceID:       "workspace-b",
+		FirstResponseTime: 5,
+		ResolutionTime:    60,
+		EscalationTime:    30,
+		Active:            true,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}
+	if err := db.Create(cfgB).Error; err != nil {
+		t.Fatalf("create config B failed: %v", err)
+	}
+
+	ticketB := &models.Ticket{
+		ID:          303,
+		Title:       "Ticket B",
+		Priority:    "urgent",
+		Status:      "open",
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-b",
+		CreatedAt:   now.Add(-2 * time.Hour),
+		UpdatedAt:   now.Add(-2 * time.Hour),
+	}
+	if err := db.Create(ticketB).Error; err != nil {
+		t.Fatalf("create ticket B failed: %v", err)
+	}
+
+	if _, err := svc.CheckSLAViolation(scopedContext("tenant-a", "workspace-a"), ticketB); err == nil {
+		t.Fatal("expected cross-scope ticket violation check to fail")
+	}
+}
+
+func TestSLAService_CreateSLAViolation_RejectsCrossScopeReferences(t *testing.T) {
+	db := newSLATestDB(t)
+	svc := NewSLAService(db, logrus.New())
+	now := time.Now()
+
+	ticketB := &models.Ticket{
+		ID:          401,
+		Title:       "Ticket B",
+		Priority:    "urgent",
+		Status:      "open",
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-b",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := db.Create(ticketB).Error; err != nil {
+		t.Fatalf("create ticket B failed: %v", err)
+	}
+
+	configB := &models.SLAConfig{
+		ID:                402,
+		Name:              "Config B",
+		Priority:          "urgent",
+		TenantID:          "tenant-a",
+		WorkspaceID:       "workspace-b",
+		FirstResponseTime: 5,
+		ResolutionTime:    60,
+		EscalationTime:    30,
+		Active:            true,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}
+	if err := db.Create(configB).Error; err != nil {
+		t.Fatalf("create config B failed: %v", err)
+	}
+
+	err := svc.CreateSLAViolation(scopedContext("tenant-a", "workspace-a"), &models.SLAViolation{
+		TicketID:      ticketB.ID,
+		SLAConfigID:   configB.ID,
+		ViolationType: "first_response",
+		Deadline:      now.Add(-10 * time.Minute),
+		ViolatedAt:    now,
+	})
+	if err == nil {
+		t.Fatal("expected cross-scope violation creation to fail")
+	}
+}
+
+func TestSLAService_GetStats_DoesNotLeakCrossScopeConfigJoins(t *testing.T) {
+	db := newSLATestDB(t)
+	svc := NewSLAService(db, logrus.New())
+	now := time.Now()
+
+	violationA := &models.SLAViolation{
+		TenantID:      "tenant-a",
+		WorkspaceID:   "workspace-a",
+		TicketID:      501,
+		SLAConfigID:   601,
+		ViolationType: "first_response",
+		Deadline:      now.Add(-10 * time.Minute),
+		ViolatedAt:    now,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	if err := db.Create(violationA).Error; err != nil {
+		t.Fatalf("create violation A failed: %v", err)
+	}
+
+	configB := &models.SLAConfig{
+		ID:                601,
+		Name:              "Config B",
+		Priority:          "urgent",
+		CustomerTier:      "vip",
+		TenantID:          "tenant-a",
+		WorkspaceID:       "workspace-b",
+		FirstResponseTime: 5,
+		ResolutionTime:    60,
+		EscalationTime:    30,
+		Active:            true,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}
+	if err := db.Create(configB).Error; err != nil {
+		t.Fatalf("create config B failed: %v", err)
+	}
+
+	stats, err := svc.GetSLAStats(scopedContext("tenant-a", "workspace-a"))
+	if err != nil {
+		t.Fatalf("GetSLAStats failed: %v", err)
+	}
+	if stats.ViolationsByPriority["urgent"] != 0 {
+		t.Fatalf("expected cross-scope priority join to be excluded, got %+v", stats.ViolationsByPriority)
+	}
+	if stats.ViolationsByTier["vip"] != 0 {
+		t.Fatalf("expected cross-scope tier join to be excluded, got %+v", stats.ViolationsByTier)
 	}
 }

@@ -111,6 +111,13 @@ func (s *MacroService) ApplyToTicket(ctx context.Context, macroID, ticketID, act
 	if !macro.Active {
 		return nil, fmt.Errorf("macro inactive")
 	}
+	var ticket models.Ticket
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).First(&ticket, ticketID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, fmt.Errorf("ticket not found")
+		}
+		return nil, err
+	}
 	comment := &models.TicketComment{
 		TicketID:  ticketID,
 		UserID:    actorID,

@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"errors"
+	"path/filepath"
 
 	"servify/apps/server/internal/config"
 
@@ -10,7 +11,10 @@ import (
 
 // LoadConfig loads configuration from the default path or a specific config file.
 func LoadConfig(configPath string) (*config.Config, error) {
+	viper.Reset()
 	viper.AddConfigPath(".")
+	viper.AddConfigPath("..")
+	viper.AddConfigPath(filepath.Join("..", ".."))
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AutomaticEnv()

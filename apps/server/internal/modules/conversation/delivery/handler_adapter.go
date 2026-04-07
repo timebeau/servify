@@ -3,6 +3,7 @@ package delivery
 import (
 	"context"
 	"errors"
+	"time"
 
 	conversationapp "servify/apps/server/internal/modules/conversation/application"
 	conversationdomain "servify/apps/server/internal/modules/conversation/domain"
@@ -22,6 +23,10 @@ func (a *HandlerServiceAdapter) GetConversation(ctx context.Context, sessionID s
 	dto, err := a.service.GetConversation(ctx, sessionID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			items, listErr := a.service.ListRecentMessages(ctx, sessionID, 1)
+			if listErr == nil && len(items) > 0 {
+				return synthesizeConversationDTO(sessionID, items[0].CreatedAt), nil
+			}
 			return nil, ErrConversationNotFound
 		}
 		return nil, err
@@ -107,3 +112,16 @@ func (a *HandlerServiceAdapter) Close(ctx context.Context, sessionID string) (*c
 }
 
 var _ HandlerService = (*HandlerServiceAdapter)(nil)
+
+func synthesizeConversationDTO(sessionID string, lastMessageAt time.Time) *conversationapp.ConversationDTO {
+	return &conversationapp.ConversationDTO{
+		ID:     sessionID,
+		Status: string(conversationdomain.ConversationStatusActive),
+		Channel: conversationdomain.ChannelBinding{
+			Channel:   "web",
+			SessionID: sessionID,
+		},
+		StartedAt:     lastMessageAt,
+		LastMessageAt: &lastMessageAt,
+	}
+}
