@@ -156,6 +156,7 @@
 - `security.cors`：`system`
 - `security.rbac.roles`：`system`
 - `security.rate_limiting` 默认值：`system`
+- `security.session_risk` 基线：`system`，允许 `tenant` / `workspace` 在已授权 scope 内细化风险阈值
 - 某 tenant / workspace 是否允许公开知识库、Portal、特定集成：`tenant` 或 `workspace`
 
 ### AI Provider
@@ -240,8 +241,9 @@
 当前代码骨架：
 
 - `internal/platform/configscope.Resolver` 已支持 `portal`、`OpenAI`、`WeKnora` 的 `tenant -> workspace -> runtime` provider 覆盖顺序
+- `internal/platform/configscope.Resolver` 现已支持 `session_risk` 的 `system -> tenant -> workspace -> runtime` 风险阈值解析链路
 - 已新增数据库持久化的 `TenantConfig` / `WorkspaceConfig` GORM provider；当前 public portal 已接入这套读取链路
-- 管理面已具备 tenant/workspace scoped config 的最小读写入口，当前覆盖 `portal` / `OpenAI` / `WeKnora`
+- 管理面已具备 tenant/workspace scoped config 的最小读写入口，当前覆盖 `portal` / `OpenAI` / `WeKnora` / `session_risk`
 - scoped config 写接口现已记录 before/after 快照，并提供 tenant/workspace 级变更历史列表元数据、单条历史详情的字段路径级差异预览与带 `added/removed/updated` 类型的 current/snapshot 值对，以及要求显式确认的按审计记录回滚入口
 
 ### 当前数据库配置对象的建议定位

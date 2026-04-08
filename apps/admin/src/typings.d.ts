@@ -293,4 +293,67 @@ declare namespace API {
     started_at: string;
     duration?: number;
   }
+
+  // ---- 安全管理 ----
+  interface UserSecurityPreview {
+    user_id: number;
+    username: string;
+    name: string;
+    role: string;
+    status: string;
+    token_version: number;
+    next_token_version: number;
+    last_login?: string;
+    token_valid_after?: string;
+  }
+
+  interface UserSecurityDetail {
+    user_id: number;
+    role: string;
+    status: string;
+    token_version: number;
+    token_valid_after?: string;
+    last_login?: string;
+  }
+
+  interface UserSecuritySession {
+    session_id: string;
+    status: string;
+    token_version: number;
+    device_fingerprint?: string;
+    network_label?: string;
+    location_label?: string;
+    risk_score?: number;
+    risk_level?: string;
+    risk_reasons?: string[];
+    family_public_ip_count?: number;
+    family_device_count?: number;
+    active_session_count?: number;
+    family_hot_refresh_count?: number;
+    reference_session_id?: string;
+    ip_drift?: boolean;
+    device_drift?: boolean;
+    rapid_ip_change?: boolean;
+    rapid_device_change?: boolean;
+    refresh_recency?: string;
+    rapid_refresh_activity?: boolean;
+    user_agent?: string;
+    client_ip?: string;
+    last_seen_at?: string;
+    last_refreshed_at?: string;
+    revoked_at?: string;
+    created_at?: string;
+    updated_at?: string;
+    is_current?: boolean;
+  }
+
+  interface RevokedToken {
+    jti: string;
+    user_id: number;
+    session_id?: string;
+    token_use?: string;
+    reason?: string;
+    expires_at?: string;
+    revoked_at?: string;
+  }
 }

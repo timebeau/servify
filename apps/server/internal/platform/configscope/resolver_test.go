@@ -37,6 +37,16 @@ func (s stubWeKnoraProvider) LoadWeKnoraConfig(ctx context.Context) (config.WeKn
 	return s.value, s.ok, s.err
 }
 
+type stubSessionRiskProvider struct {
+	value config.SessionRiskPolicyConfig
+	ok    bool
+	err   error
+}
+
+func (s stubSessionRiskProvider) LoadSessionRiskConfig(ctx context.Context) (config.SessionRiskPolicyConfig, bool, error) {
+	return s.value, s.ok, s.err
+}
+
 func TestResolverResolvePortalPrecedence(t *testing.T) {
 	resolver := NewResolver(
 		&config.Config{
@@ -243,5 +253,49 @@ func TestResolverResolveWeKnoraPrecedence(t *testing.T) {
 	}
 	if got.MaxRetries != 6 {
 		t.Fatalf("max retries = %d want 6", got.MaxRetries)
+	}
+}
+
+func TestResolverResolveSessionRiskPrecedence(t *testing.T) {
+	resolver := NewResolver(
+		&config.Config{
+			Security: config.SecurityConfig{
+				SessionRisk: config.SessionRiskPolicyConfig{
+					HotRefreshWindowMinutes: 15,
+					ManySessionsThreshold:   3,
+					MediumRiskScore:         2,
+					HighRiskScore:           4,
+				},
+			},
+		},
+		WithTenantSessionRiskProvider(stubSessionRiskProvider{
+			ok: true,
+			value: config.SessionRiskPolicyConfig{
+				ManySessionsThreshold: 5,
+			},
+		}),
+		WithWorkspaceSessionRiskProvider(stubSessionRiskProvider{
+			ok: true,
+			value: config.SessionRiskPolicyConfig{
+				HighRiskScore: 8,
+			},
+		}),
+	)
+
+	got := resolver.ResolveSessionRisk(context.Background(), &config.SessionRiskPolicyConfig{
+		HotRefreshWindowMinutes: 30,
+	})
+
+	if got.HotRefreshWindowMinutes != 30 {
+		t.Fatalf("hot refresh window = %d want runtime override", got.HotRefreshWindowMinutes)
+	}
+	if got.ManySessionsThreshold != 5 {
+		t.Fatalf("many sessions threshold = %d want tenant override", got.ManySessionsThreshold)
+	}
+	if got.HighRiskScore != 8 {
+		t.Fatalf("high risk score = %d want workspace override", got.HighRiskScore)
+	}
+	if got.MediumRiskScore != 2 {
+		t.Fatalf("medium risk score = %d want system default", got.MediumRiskScore)
 	}
 }

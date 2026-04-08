@@ -56,7 +56,7 @@ func TestScopedConfigHandlerTenantRoundTrip(t *testing.T) {
 	db := newScopedConfigTestDB(t)
 	r := newScopedConfigTestRouter(db, "tenant-a", "", false)
 
-	putBody := `{"portal":{"brand_name":"Tenant Brand"},"openai":{"base_url":"https://tenant.example/v1"}}`
+	putBody := `{"portal":{"brand_name":"Tenant Brand"},"openai":{"base_url":"https://tenant.example/v1"},"session_risk":{"high_risk_score":9}}`
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPut, "/security/config/tenant", strings.NewReader(putBody))
 	req.Header.Set("Content-Type", "application/json")
@@ -83,6 +83,10 @@ func TestScopedConfigHandlerTenantRoundTrip(t *testing.T) {
 	openai := configObj["openai"].(map[string]any)
 	if openai["base_url"].(string) != "https://tenant.example/v1" {
 		t.Fatalf("unexpected openai payload: %+v", openai)
+	}
+	sessionRisk := configObj["session_risk"].(map[string]any)
+	if int(sessionRisk["high_risk_score"].(float64)) != 9 {
+		t.Fatalf("unexpected session_risk payload: %+v", sessionRisk)
 	}
 }
 
@@ -114,6 +118,40 @@ func TestScopedConfigHandlerWorkspaceRoundTrip(t *testing.T) {
 	weknora := configObj["weknora"].(map[string]any)
 	if weknora["knowledge_base_id"].(string) != "kb-workspace" {
 		t.Fatalf("unexpected weknora payload: %+v", weknora)
+	}
+}
+
+func TestBuildScopedConfigDiffIncludesSessionRisk(t *testing.T) {
+	diff := buildScopedConfigDiff(
+		&configscope.ScopedConfigDocument{
+			TenantID:    "tenant-a",
+			WorkspaceID: "workspace-1",
+			SessionRisk: &config.SessionRiskPolicyConfig{
+				HighRiskScore: 4,
+			},
+		},
+		&configscope.ScopedConfigDocument{
+			TenantID:    "tenant-a",
+			WorkspaceID: "workspace-1",
+			SessionRisk: &config.SessionRiskPolicyConfig{
+				HighRiskScore: 8,
+			},
+		},
+	)
+
+	if diff["session_risk_changed"] != true {
+		t.Fatalf("expected session_risk_changed=true diff=%+v", diff)
+	}
+	paths := diff["session_risk_paths"].([]string)
+	if len(paths) != 1 || paths[0] != "session_risk.high_risk_score" {
+		t.Fatalf("unexpected session_risk_paths=%v", paths)
+	}
+	changes := diff["session_risk_changes"].([]gin.H)
+	if len(changes) != 1 {
+		t.Fatalf("expected one session_risk change diff=%+v", diff)
+	}
+	if changes[0]["path"].(string) != "session_risk.high_risk_score" {
+		t.Fatalf("unexpected session_risk change=%+v", changes[0])
 	}
 }
 

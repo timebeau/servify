@@ -19,14 +19,20 @@ type WeKnoraConfigProvider interface {
 	LoadWeKnoraConfig(ctx context.Context) (config.WeKnoraConfig, bool, error)
 }
 
+type SessionRiskConfigProvider interface {
+	LoadSessionRiskConfig(ctx context.Context) (config.SessionRiskPolicyConfig, bool, error)
+}
+
 type Resolver struct {
-	system           *config.Config
-	tenantPortal     PortalConfigProvider
-	workspacePortal  PortalConfigProvider
-	tenantOpenAI     OpenAIConfigProvider
-	workspaceOpenAI  OpenAIConfigProvider
-	tenantWeKnora    WeKnoraConfigProvider
-	workspaceWeKnora WeKnoraConfigProvider
+	system               *config.Config
+	tenantPortal         PortalConfigProvider
+	workspacePortal      PortalConfigProvider
+	tenantOpenAI         OpenAIConfigProvider
+	workspaceOpenAI      OpenAIConfigProvider
+	tenantWeKnora        WeKnoraConfigProvider
+	workspaceWeKnora     WeKnoraConfigProvider
+	tenantSessionRisk    SessionRiskConfigProvider
+	workspaceSessionRisk SessionRiskConfigProvider
 }
 
 func NewResolver(cfg *config.Config, opts ...Option) *Resolver {
@@ -74,6 +80,18 @@ func WithTenantWeKnoraProvider(provider WeKnoraConfigProvider) Option {
 func WithWorkspaceWeKnoraProvider(provider WeKnoraConfigProvider) Option {
 	return func(r *Resolver) {
 		r.workspaceWeKnora = provider
+	}
+}
+
+func WithTenantSessionRiskProvider(provider SessionRiskConfigProvider) Option {
+	return func(r *Resolver) {
+		r.tenantSessionRisk = provider
+	}
+}
+
+func WithWorkspaceSessionRiskProvider(provider SessionRiskConfigProvider) Option {
+	return func(r *Resolver) {
+		r.workspaceSessionRisk = provider
 	}
 }
 
@@ -186,6 +204,27 @@ func (r *Resolver) ResolveWeKnora(ctx context.Context, runtime *config.WeKnoraCo
 	return resolved
 }
 
+func (r *Resolver) ResolveSessionRisk(ctx context.Context, runtime *config.SessionRiskPolicyConfig) config.SessionRiskPolicyConfig {
+	var resolved config.SessionRiskPolicyConfig
+	if r != nil && r.system != nil {
+		resolved = r.system.Security.SessionRisk
+	}
+	if r != nil && r.tenantSessionRisk != nil {
+		if next, ok, err := r.tenantSessionRisk.LoadSessionRiskConfig(ctx); err == nil && ok {
+			resolved = mergeSessionRiskConfig(resolved, next)
+		}
+	}
+	if r != nil && r.workspaceSessionRisk != nil {
+		if next, ok, err := r.workspaceSessionRisk.LoadSessionRiskConfig(ctx); err == nil && ok {
+			resolved = mergeSessionRiskConfig(resolved, next)
+		}
+	}
+	if runtime != nil {
+		resolved = mergeSessionRiskConfig(resolved, *runtime)
+	}
+	return resolved
+}
+
 func mergeOpenAIConfig(base config.OpenAIConfig, overlay config.OpenAIConfig) config.OpenAIConfig {
 	if strings.TrimSpace(overlay.APIKey) != "" {
 		base.APIKey = overlay.APIKey
@@ -244,6 +283,40 @@ func mergeWeKnoraConfig(base config.WeKnoraConfig, overlay config.WeKnoraConfig)
 	}
 	if overlay.HealthCheck.Timeout != 0 {
 		base.HealthCheck.Timeout = overlay.HealthCheck.Timeout
+	}
+	return base
+}
+
+func mergeSessionRiskConfig(base config.SessionRiskPolicyConfig, overlay config.SessionRiskPolicyConfig) config.SessionRiskPolicyConfig {
+	if overlay.HotRefreshWindowMinutes > 0 {
+		base.HotRefreshWindowMinutes = overlay.HotRefreshWindowMinutes
+	}
+	if overlay.RecentRefreshWindowMinutes > 0 {
+		base.RecentRefreshWindowMinutes = overlay.RecentRefreshWindowMinutes
+	}
+	if overlay.TodayRefreshWindowHours > 0 {
+		base.TodayRefreshWindowHours = overlay.TodayRefreshWindowHours
+	}
+	if overlay.RapidChangeWindowHours > 0 {
+		base.RapidChangeWindowHours = overlay.RapidChangeWindowHours
+	}
+	if overlay.StaleActivityWindowDays > 0 {
+		base.StaleActivityWindowDays = overlay.StaleActivityWindowDays
+	}
+	if overlay.MultiPublicIPThreshold > 0 {
+		base.MultiPublicIPThreshold = overlay.MultiPublicIPThreshold
+	}
+	if overlay.ManySessionsThreshold > 0 {
+		base.ManySessionsThreshold = overlay.ManySessionsThreshold
+	}
+	if overlay.HotRefreshFamilyThreshold > 0 {
+		base.HotRefreshFamilyThreshold = overlay.HotRefreshFamilyThreshold
+	}
+	if overlay.MediumRiskScore > 0 {
+		base.MediumRiskScore = overlay.MediumRiskScore
+	}
+	if overlay.HighRiskScore > 0 {
+		base.HighRiskScore = overlay.HighRiskScore
 	}
 	return base
 }

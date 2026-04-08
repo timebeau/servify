@@ -50,6 +50,15 @@ func (p *GormTenantConfigProvider) LoadWeKnoraConfig(ctx context.Context) (confi
 	return decodeConfig[config.WeKnoraConfig](cfg.WeKnoraJSON)
 }
 
+func (p *GormTenantConfigProvider) LoadSessionRiskConfig(ctx context.Context) (config.SessionRiskPolicyConfig, bool, error) {
+	var cfg models.TenantConfig
+	ok, err := p.load(ctx, &cfg)
+	if !ok || err != nil {
+		return config.SessionRiskPolicyConfig{}, ok, err
+	}
+	return decodeConfig[config.SessionRiskPolicyConfig](cfg.SessionRiskJSON)
+}
+
 func (p *GormTenantConfigProvider) load(ctx context.Context, out *models.TenantConfig) (bool, error) {
 	if p == nil || p.db == nil {
 		return false, nil
@@ -104,6 +113,15 @@ func (p *GormWorkspaceConfigProvider) LoadWeKnoraConfig(ctx context.Context) (co
 		return config.WeKnoraConfig{}, ok, err
 	}
 	return decodeConfig[config.WeKnoraConfig](cfg.WeKnoraJSON)
+}
+
+func (p *GormWorkspaceConfigProvider) LoadSessionRiskConfig(ctx context.Context) (config.SessionRiskPolicyConfig, bool, error) {
+	var cfg models.WorkspaceConfig
+	ok, err := p.load(ctx, &cfg)
+	if !ok || err != nil {
+		return config.SessionRiskPolicyConfig{}, ok, err
+	}
+	return decodeConfig[config.SessionRiskPolicyConfig](cfg.SessionRiskJSON)
 }
 
 func (p *GormWorkspaceConfigProvider) load(ctx context.Context, out *models.WorkspaceConfig) (bool, error) {
