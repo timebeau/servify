@@ -439,24 +439,29 @@ func buildScopedConfigDiff(current, snapshot *configscope.ScopedConfigDocument) 
 	portalChanges := diffJSONChanges(current.Portal, snapshot.Portal, "portal")
 	openAIChanges := diffJSONChanges(current.OpenAI, snapshot.OpenAI, "openai")
 	weKnoraChanges := diffJSONChanges(current.WeKnora, snapshot.WeKnora, "weknora")
+	sessionRiskChanges := diffJSONChanges(current.SessionRisk, snapshot.SessionRisk, "session_risk")
 	changes := append(append([]gin.H{}, portalChanges...), openAIChanges...)
 	changes = append(changes, weKnoraChanges...)
+	changes = append(changes, sessionRiskChanges...)
 	changedPaths := changePaths(changes)
 	return gin.H{
-		"portal_changed":    len(portalChanges) > 0,
-		"openai_changed":    len(openAIChanges) > 0,
-		"weknora_changed":   len(weKnoraChanges) > 0,
-		"scope_changed":     current.TenantID != snapshot.TenantID || current.WorkspaceID != snapshot.WorkspaceID,
-		"current_sections":  presentSections(current),
-		"snapshot_sections": presentSections(snapshot),
-		"changed_paths":     changedPaths,
-		"portal_paths":      changePaths(portalChanges),
-		"openai_paths":      changePaths(openAIChanges),
-		"weknora_paths":     changePaths(weKnoraChanges),
-		"changes":           changes,
-		"portal_changes":    portalChanges,
-		"openai_changes":    openAIChanges,
-		"weknora_changes":   weKnoraChanges,
+		"portal_changed":       len(portalChanges) > 0,
+		"openai_changed":       len(openAIChanges) > 0,
+		"weknora_changed":      len(weKnoraChanges) > 0,
+		"session_risk_changed": len(sessionRiskChanges) > 0,
+		"scope_changed":        current.TenantID != snapshot.TenantID || current.WorkspaceID != snapshot.WorkspaceID,
+		"current_sections":     presentSections(current),
+		"snapshot_sections":    presentSections(snapshot),
+		"changed_paths":        changedPaths,
+		"portal_paths":         changePaths(portalChanges),
+		"openai_paths":         changePaths(openAIChanges),
+		"weknora_paths":        changePaths(weKnoraChanges),
+		"session_risk_paths":   changePaths(sessionRiskChanges),
+		"changes":              changes,
+		"portal_changes":       portalChanges,
+		"openai_changes":       openAIChanges,
+		"weknora_changes":      weKnoraChanges,
+		"session_risk_changes": sessionRiskChanges,
 	}
 }
 
@@ -464,7 +469,7 @@ func presentSections(doc *configscope.ScopedConfigDocument) []string {
 	if doc == nil {
 		return nil
 	}
-	sections := make([]string, 0, 3)
+	sections := make([]string, 0, 4)
 	if doc.Portal != nil {
 		sections = append(sections, "portal")
 	}
@@ -473,6 +478,9 @@ func presentSections(doc *configscope.ScopedConfigDocument) []string {
 	}
 	if doc.WeKnora != nil {
 		sections = append(sections, "weknora")
+	}
+	if doc.SessionRisk != nil {
+		sections = append(sections, "session_risk")
 	}
 	return sections
 }

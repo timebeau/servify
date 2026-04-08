@@ -27,10 +27,11 @@ func openProviderTestDB(t *testing.T) *gorm.DB {
 func TestGormTenantConfigProviderLoadsScopedConfigs(t *testing.T) {
 	db := openProviderTestDB(t)
 	seed := models.TenantConfig{
-		TenantID:    "tenant-a",
-		PortalJSON:  `{"brand_name":"Tenant Brand"}`,
-		OpenAIJSON:  `{"model":"gpt-tenant"}`,
-		WeKnoraJSON: `{"knowledge_base_id":"kb-tenant"}`,
+		TenantID:        "tenant-a",
+		PortalJSON:      `{"brand_name":"Tenant Brand"}`,
+		OpenAIJSON:      `{"model":"gpt-tenant"}`,
+		WeKnoraJSON:     `{"knowledge_base_id":"kb-tenant"}`,
+		SessionRiskJSON: `{"high_risk_score":9}`,
 	}
 	if err := db.Create(&seed).Error; err != nil {
 		t.Fatalf("seed: %v", err)
@@ -50,16 +51,21 @@ func TestGormTenantConfigProviderLoadsScopedConfigs(t *testing.T) {
 	if err != nil || !ok || weknora.KnowledgeBaseID != "kb-tenant" {
 		t.Fatalf("weknora = %+v ok=%v err=%v", weknora, ok, err)
 	}
+	sessionRisk, ok, err := provider.LoadSessionRiskConfig(ctx)
+	if err != nil || !ok || sessionRisk.HighRiskScore != 9 {
+		t.Fatalf("session risk = %+v ok=%v err=%v", sessionRisk, ok, err)
+	}
 }
 
 func TestGormWorkspaceConfigProviderLoadsScopedConfigs(t *testing.T) {
 	db := openProviderTestDB(t)
 	seed := models.WorkspaceConfig{
-		TenantID:    "tenant-a",
-		WorkspaceID: "workspace-1",
-		PortalJSON:  `{"brand_name":"Workspace Brand"}`,
-		OpenAIJSON:  `{"model":"gpt-workspace"}`,
-		WeKnoraJSON: `{"knowledge_base_id":"kb-workspace"}`,
+		TenantID:        "tenant-a",
+		WorkspaceID:     "workspace-1",
+		PortalJSON:      `{"brand_name":"Workspace Brand"}`,
+		OpenAIJSON:      `{"model":"gpt-workspace"}`,
+		WeKnoraJSON:     `{"knowledge_base_id":"kb-workspace"}`,
+		SessionRiskJSON: `{"high_risk_score":11}`,
 	}
 	if err := db.Create(&seed).Error; err != nil {
 		t.Fatalf("seed: %v", err)
@@ -78,6 +84,10 @@ func TestGormWorkspaceConfigProviderLoadsScopedConfigs(t *testing.T) {
 	weknora, ok, err := provider.LoadWeKnoraConfig(ctx)
 	if err != nil || !ok || weknora.KnowledgeBaseID != "kb-workspace" {
 		t.Fatalf("weknora = %+v ok=%v err=%v", weknora, ok, err)
+	}
+	sessionRisk, ok, err := provider.LoadSessionRiskConfig(ctx)
+	if err != nil || !ok || sessionRisk.HighRiskScore != 11 {
+		t.Fatalf("session risk = %+v ok=%v err=%v", sessionRisk, ok, err)
 	}
 }
 

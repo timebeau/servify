@@ -12,11 +12,12 @@ import (
 )
 
 type ScopedConfigDocument struct {
-	TenantID    string                `json:"tenant_id,omitempty"`
-	WorkspaceID string                `json:"workspace_id,omitempty"`
-	Portal      *config.PortalConfig  `json:"portal,omitempty"`
-	OpenAI      *config.OpenAIConfig  `json:"openai,omitempty"`
-	WeKnora     *config.WeKnoraConfig `json:"weknora,omitempty"`
+	TenantID    string                          `json:"tenant_id,omitempty"`
+	WorkspaceID string                          `json:"workspace_id,omitempty"`
+	Portal      *config.PortalConfig            `json:"portal,omitempty"`
+	OpenAI      *config.OpenAIConfig            `json:"openai,omitempty"`
+	WeKnora     *config.WeKnoraConfig           `json:"weknora,omitempty"`
+	SessionRisk *config.SessionRiskPolicyConfig `json:"session_risk,omitempty"`
 }
 
 type GormConfigStore struct {
@@ -78,6 +79,13 @@ func (s *GormConfigStore) UpsertTenantConfig(ctx context.Context, tenantID strin
 		}
 		row.WeKnoraJSON = encoded
 	}
+	if payload.SessionRisk != nil {
+		encoded, err := encodeConfig(*payload.SessionRisk)
+		if err != nil {
+			return nil, err
+		}
+		row.SessionRiskJSON = encoded
+	}
 	if err := s.db.WithContext(ctx).Save(&row).Error; err != nil {
 		return nil, err
 	}
@@ -137,6 +145,13 @@ func (s *GormConfigStore) UpsertWorkspaceConfig(ctx context.Context, tenantID, w
 		}
 		row.WeKnoraJSON = encoded
 	}
+	if payload.SessionRisk != nil {
+		encoded, err := encodeConfig(*payload.SessionRisk)
+		if err != nil {
+			return nil, err
+		}
+		row.SessionRiskJSON = encoded
+	}
 	if err := s.db.WithContext(ctx).Save(&row).Error; err != nil {
 		return nil, err
 	}
@@ -164,6 +179,11 @@ func tenantRowToDocument(row models.TenantConfig) (*ScopedConfigDocument, error)
 	} else if ok {
 		doc.WeKnora = &cfg
 	}
+	if cfg, ok, err := decodeConfig[config.SessionRiskPolicyConfig](row.SessionRiskJSON); err != nil {
+		return nil, err
+	} else if ok {
+		doc.SessionRisk = &cfg
+	}
 	return doc, nil
 }
 
@@ -183,6 +203,11 @@ func workspaceRowToDocument(row models.WorkspaceConfig) (*ScopedConfigDocument, 
 		return nil, err
 	} else if ok {
 		doc.WeKnora = &cfg
+	}
+	if cfg, ok, err := decodeConfig[config.SessionRiskPolicyConfig](row.SessionRiskJSON); err != nil {
+		return nil, err
+	} else if ok {
+		doc.SessionRisk = &cfg
 	}
 	return doc, nil
 }

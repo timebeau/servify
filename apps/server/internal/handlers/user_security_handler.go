@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"servify/apps/server/internal/config"
 	auditplatform "servify/apps/server/internal/platform/audit"
+	"servify/apps/server/internal/platform/configscope"
 	"servify/apps/server/internal/platform/usersecurity"
 
 	"github.com/gin-gonic/gin"
@@ -18,6 +20,7 @@ type UserSecurityHandler struct {
 	jwtSecret string
 	logger    *logrus.Logger
 	policy    sessionRiskPolicy
+	resolver  *configscope.Resolver
 }
 
 type batchRevokeTokensRequest struct {
@@ -77,6 +80,13 @@ func (h *UserSecurityHandler) WithJWTSecret(secret string) *UserSecurityHandler 
 func (h *UserSecurityHandler) WithSessionRiskPolicyConfig(cfg config.SessionRiskPolicyConfig) *UserSecurityHandler {
 	if h != nil {
 		h.policy = sessionRiskPolicyFromConfig(cfg)
+	}
+	return h
+}
+
+func (h *UserSecurityHandler) WithSessionRiskResolver(resolver *configscope.Resolver) *UserSecurityHandler {
+	if h != nil {
+		h.resolver = resolver
 	}
 	return h
 }
@@ -356,10 +366,11 @@ func (h *UserSecurityHandler) ListUserSessions(c *gin.Context) {
 		return
 	}
 
-	riskContext := buildSessionRiskContext(sessions, h.policy)
+	policy := h.sessionRiskPolicy(c.Request.Context())
+	riskContext := buildSessionRiskContext(sessions, policy)
 	items := make([]gin.H, 0, len(sessions))
 	for _, session := range sessions {
-		items = append(items, mapSessionResponse(session, false, riskContext, h.policy))
+		items = append(items, mapSessionResponse(session, false, riskContext, policy))
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -367,6 +378,16 @@ func (h *UserSecurityHandler) ListUserSessions(c *gin.Context) {
 		"count":   len(items),
 		"items":   items,
 	})
+}
+
+func (h *UserSecurityHandler) sessionRiskPolicy(ctx context.Context) sessionRiskPolicy {
+	if h != nil && h.resolver != nil {
+		return sessionRiskPolicyFromConfig(h.resolver.ResolveSessionRisk(ctx, nil))
+	}
+	if h == nil {
+		return defaultSessionRiskPolicy()
+	}
+	return h.policy
 }
 
 // RevokeSession 失效单个 auth session

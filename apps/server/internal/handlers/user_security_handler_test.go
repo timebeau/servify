@@ -14,8 +14,11 @@ import (
 	"testing"
 	"time"
 
+	"servify/apps/server/internal/config"
 	"servify/apps/server/internal/models"
 	auditplatform "servify/apps/server/internal/platform/audit"
+	platformauth "servify/apps/server/internal/platform/auth"
+	"servify/apps/server/internal/platform/configscope"
 	"servify/apps/server/internal/platform/usersecurity"
 
 	"github.com/gin-gonic/gin"
@@ -444,6 +447,96 @@ func TestUserSecurityHandler_ListAndRevokeSession(t *testing.T) {
 			t.Fatalf("unexpected after snapshot: %s", entry.AfterJSON)
 		}
 	})
+}
+
+func TestUserSecurityHandler_ListUserSessionsUsesScopedRiskPolicy(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestDBForUserSecurity(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.WarnLevel)
+
+	if err := db.AutoMigrate(&models.TenantConfig{}); err != nil {
+		t.Fatalf("automigrate tenant config: %v", err)
+	}
+	if err := db.Create(&models.TenantConfig{
+		TenantID:        "tenant-a",
+		SessionRiskJSON: "high_risk_score: 10\n",
+	}).Error; err != nil {
+		t.Fatalf("seed tenant config: %v", err)
+	}
+	if err := db.Create(&models.User{
+		ID:       71,
+		Username: "scoped-session-user",
+		Email:    "scoped-session-user@example.com",
+		Name:     "Scoped Session User",
+		Role:     "admin",
+		Status:   "active",
+	}).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	if err := db.Create(&models.UserAuthSession{
+		ID:                "auth-session-71",
+		UserID:            71,
+		Status:            "active",
+		TokenVersion:      1,
+		DeviceFingerprint: "fp-71",
+		UserAgent:         "servify-browser/1.0",
+		ClientIP:          "203.0.113.71",
+		LastSeenAt:        ptrTime(time.Now().UTC().Add(-2 * time.Hour)),
+		LastRefreshedAt:   ptrTime(time.Now().UTC().Add(-10 * time.Minute)),
+	}).Error; err != nil {
+		t.Fatalf("seed auth session: %v", err)
+	}
+	if err := db.Create(&models.UserAuthSession{
+		ID:                "auth-session-71-b",
+		UserID:            71,
+		Status:            "active",
+		TokenVersion:      2,
+		DeviceFingerprint: "fp-71-b",
+		UserAgent:         "servify-browser/2.0",
+		ClientIP:          "203.0.113.72",
+		LastSeenAt:        ptrTime(time.Now().UTC().Add(-1 * time.Hour)),
+		LastRefreshedAt:   ptrTime(time.Now().UTC().Add(-5 * time.Minute)),
+	}).Error; err != nil {
+		t.Fatalf("seed auth session: %v", err)
+	}
+
+	resolver := configscope.NewResolver(
+		&config.Config{
+			Security: config.SecurityConfig{
+				SessionRisk: config.SessionRiskPolicyConfig{
+					MediumRiskScore: 2,
+					HighRiskScore:   4,
+				},
+			},
+		},
+		configscope.WithTenantSessionRiskProvider(configscope.NewGormTenantConfigProvider(db)),
+	)
+	h := NewUserSecurityHandler(usersecurity.NewService(db, logger), logger).WithSessionRiskResolver(resolver)
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Request = c.Request.WithContext(platformauth.ContextWithScope(c.Request.Context(), "tenant-a", ""))
+		c.Next()
+	})
+	r.GET("/api/security/users/:id/sessions", h.ListUserSessions)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/security/users/71/sessions", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"risk_score":8`) {
+		t.Fatalf("expected unchanged risk score in body: %s", w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"risk_level":"medium"`) {
+		t.Fatalf("expected scoped risk policy to downgrade high threshold: %s", w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), `"risk_level":"high"`) {
+		t.Fatalf("expected no high risk level after scoped override: %s", w.Body.String())
+	}
 }
 
 func TestUserSecurityHandler_RevokeAllSessions(t *testing.T) {

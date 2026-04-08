@@ -10,7 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"servify/apps/server/internal/config"
 	"servify/apps/server/internal/models"
+	platformauth "servify/apps/server/internal/platform/auth"
+	"servify/apps/server/internal/platform/configscope"
 	"servify/apps/server/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -24,6 +27,16 @@ type stubAuthService struct {
 	revokeCount  int
 	refreshResp  *services.AuthResult
 	refreshErr   error
+}
+
+type stubAuthSessionRiskProvider struct {
+	value config.SessionRiskPolicyConfig
+	ok    bool
+	err   error
+}
+
+func (s stubAuthSessionRiskProvider) LoadSessionRiskConfig(ctx context.Context) (config.SessionRiskPolicyConfig, bool, error) {
+	return s.value, s.ok, s.err
 }
 
 func (s *stubAuthService) Register(ctx context.Context, req services.RegisterInput, meta services.AuthSessionMetadata) (*services.AuthResult, error) {
@@ -215,6 +228,59 @@ func TestAuthHandlerSelfServiceSessions(t *testing.T) {
 			t.Fatalf("expected count=1: %s", w.Body.String())
 		}
 	})
+}
+
+func TestAuthHandlerSelfServiceSessionsUsesScopedRiskPolicy(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	svc := &stubAuthService{
+		sessions: []models.UserAuthSession{
+			{ID: "sess-a", Status: "active", TokenVersion: 1, DeviceFingerprint: "fp-a", UserAgent: "browser-a", ClientIP: "203.0.113.10", LastSeenAt: ptrTime(time.Now().UTC().Add(-2 * time.Hour)), LastRefreshedAt: ptrTime(time.Now().UTC().Add(-10 * time.Minute))},
+			{ID: "sess-b", Status: "active", TokenVersion: 2, DeviceFingerprint: "fp-b", UserAgent: "browser-b", ClientIP: "203.0.113.11", LastSeenAt: ptrTime(time.Now().UTC().Add(-1 * time.Hour)), LastRefreshedAt: ptrTime(time.Now().UTC().Add(-5 * time.Minute))},
+		},
+	}
+	resolver := configscope.NewResolver(
+		&config.Config{
+			Security: config.SecurityConfig{
+				SessionRisk: config.SessionRiskPolicyConfig{
+					MediumRiskScore: 2,
+					HighRiskScore:   4,
+				},
+			},
+		},
+		configscope.WithTenantSessionRiskProvider(stubAuthSessionRiskProvider{
+			ok: true,
+			value: config.SessionRiskPolicyConfig{
+				HighRiskScore: 10,
+			},
+		}),
+	)
+	handler := NewAuthHandler(svc).WithSessionRiskResolver(resolver)
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", uint(7))
+		c.Set("session_id", "sess-a")
+		c.Request = c.Request.WithContext(platformauth.ContextWithScope(c.Request.Context(), "tenant-a", "workspace-1"))
+		c.Next()
+	})
+	r.GET("/api/v1/auth/sessions", handler.ListSessions)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/sessions", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if !bytes.Contains(w.Body.Bytes(), []byte(`"risk_score":8`)) {
+		t.Fatalf("expected unchanged risk score in response: %s", w.Body.String())
+	}
+	if !bytes.Contains(w.Body.Bytes(), []byte(`"risk_level":"medium"`)) {
+		t.Fatalf("expected scoped risk policy to downgrade high threshold: %s", w.Body.String())
+	}
+	if bytes.Contains(w.Body.Bytes(), []byte(`"risk_level":"high"`)) {
+		t.Fatalf("expected no high risk level after scoped override: %s", w.Body.String())
+	}
 }
 
 func ptrTime(v time.Time) *time.Time {

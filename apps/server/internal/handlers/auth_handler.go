@@ -12,6 +12,7 @@ import (
 
 	"servify/apps/server/internal/config"
 	"servify/apps/server/internal/models"
+	"servify/apps/server/internal/platform/configscope"
 	"servify/apps/server/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -19,8 +20,9 @@ import (
 
 // AuthHandler handles authentication endpoints.
 type AuthHandler struct {
-	service authService
-	policy  sessionRiskPolicy
+	service  authService
+	policy   sessionRiskPolicy
+	resolver *configscope.Resolver
 }
 
 type authService interface {
@@ -41,6 +43,13 @@ func NewAuthHandler(service authService) *AuthHandler {
 func (h *AuthHandler) WithSessionRiskPolicyConfig(cfg config.SessionRiskPolicyConfig) *AuthHandler {
 	if h != nil {
 		h.policy = sessionRiskPolicyFromConfig(cfg)
+	}
+	return h
+}
+
+func (h *AuthHandler) WithSessionRiskResolver(resolver *configscope.Resolver) *AuthHandler {
+	if h != nil {
+		h.resolver = resolver
 	}
 	return h
 }
@@ -217,16 +226,27 @@ func (h *AuthHandler) ListSessions(c *gin.Context) {
 		return
 	}
 	currentSessionID := authSessionID(c)
-	riskContext := buildSessionRiskContext(sessions, h.policy)
+	policy := h.sessionRiskPolicy(c.Request.Context())
+	riskContext := buildSessionRiskContext(sessions, policy)
 	items := make([]gin.H, 0, len(sessions))
 	for _, session := range sessions {
-		items = append(items, mapSessionResponse(session, currentSessionID != "" && session.ID == currentSessionID, riskContext, h.policy))
+		items = append(items, mapSessionResponse(session, currentSessionID != "" && session.ID == currentSessionID, riskContext, policy))
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"count": len(items),
 		"items": items,
 	})
+}
+
+func (h *AuthHandler) sessionRiskPolicy(ctx context.Context) sessionRiskPolicy {
+	if h != nil && h.resolver != nil {
+		return sessionRiskPolicyFromConfig(h.resolver.ResolveSessionRisk(ctx, nil))
+	}
+	if h == nil {
+		return defaultSessionRiskPolicy()
+	}
+	return h.policy
 }
 
 // LogoutCurrentSession godoc

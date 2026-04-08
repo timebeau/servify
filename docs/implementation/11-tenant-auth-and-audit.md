@@ -107,8 +107,9 @@
 - 已为 `portal` / `OpenAI` / `WeKnora` resolver 补齐 tenant/workspace provider 接口与覆盖顺序骨架，后续可接数据库持久化 provider
 - 已新增 `TenantConfig` / `WorkspaceConfig` 持久化模型与 GORM provider，当前已接入 `portal` 的 tenant/workspace 覆盖读取
 - `OpenAI` / `WeKnora` 的 resolver 已可消费同一批持久化 provider；管理面 `AI` handler 主路径与 `RuntimeService` 主路径都已按 request scope 解析 scoped provider
+- `security.session_risk` 已纳入同一套 scoped config 文档与 resolver；auth 自助 session 列表、管理面 user security session 列表都会按请求 scope 动态解析 tenant/workspace 覆盖阈值
 - 对于 `context.Background()` 或匿名 websocket 等未携带 scope 的调用，仍会自然回退到 system config
-- 管理面已新增 tenant/workspace scoped config 的最小 `GET/PUT` 接口，可读写 `portal` / `OpenAI` / `WeKnora` override
+- 管理面已新增 tenant/workspace scoped config 的最小 `GET/PUT` 接口，可读写 `portal` / `OpenAI` / `WeKnora` / `session_risk` override
 - scoped config 现已新增 `history` / `rollback` 管理接口，配置写入与恢复都会写入 `AuditLog`，并保留 before/after 快照；rollback 需显式提交确认参数才会执行
 - 管理面现已支持在 scoped config history 列表中直接返回 `operation` / preview / rollback 元数据，并可按单条审计记录查看字段路径级差异预览，直接获得带 `added/removed/updated` 类型的 current/snapshot 值对，便于回滚前确认变更影响
 - 当前仍缺更通用的跨配置域写接口，以及更完整的审批流/双人复核约束

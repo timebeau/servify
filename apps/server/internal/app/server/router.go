@@ -84,7 +84,12 @@ func authPolicies(db *gorm.DB) []platformauth.TokenPolicy {
 
 func registerAuthRoutes(r *gin.Engine, deps Dependencies) {
 	auth := r.Group("/api/v1/auth")
-	authHandler := handlers.NewAuthHandler(services.NewAuthService(deps.DB, deps.Config)).WithSessionRiskPolicyConfig(deps.Config.Security.SessionRisk)
+	sessionRiskResolver := configscope.NewResolver(
+		deps.Config,
+		configscope.WithTenantSessionRiskProvider(configscope.NewGormTenantConfigProvider(deps.DB)),
+		configscope.WithWorkspaceSessionRiskProvider(configscope.NewGormWorkspaceConfigProvider(deps.DB)),
+	)
+	authHandler := handlers.NewAuthHandler(services.NewAuthService(deps.DB, deps.Config)).WithSessionRiskResolver(sessionRiskResolver)
 
 	auth.POST("/register", authHandler.Register)
 	auth.POST("/login", authHandler.Login)
@@ -187,7 +192,12 @@ func registerManagementRoutes(r *gin.Engine, deps Dependencies) {
 
 	securityAPI := api.Group("/")
 	securityAPI.Use(middleware.RequireResourcePermission("security"))
-	handlers.RegisterUserSecurityRoutes(securityAPI, handlers.NewUserSecurityHandler(usersecurity.NewService(deps.DB, deps.Logger), deps.Logger).WithJWTSecret(deps.Config.JWT.Secret).WithSessionRiskPolicyConfig(deps.Config.Security.SessionRisk))
+	securitySessionRiskResolver := configscope.NewResolver(
+		deps.Config,
+		configscope.WithTenantSessionRiskProvider(configscope.NewGormTenantConfigProvider(deps.DB)),
+		configscope.WithWorkspaceSessionRiskProvider(configscope.NewGormWorkspaceConfigProvider(deps.DB)),
+	)
+	handlers.RegisterUserSecurityRoutes(securityAPI, handlers.NewUserSecurityHandler(usersecurity.NewService(deps.DB, deps.Logger), deps.Logger).WithJWTSecret(deps.Config.JWT.Secret).WithSessionRiskResolver(securitySessionRiskResolver))
 	handlers.RegisterScopedConfigRoutes(securityAPI, handlers.NewScopedConfigHandler(configscope.NewGormConfigStore(deps.DB), auditplatform.NewGormQueryService(deps.DB)))
 }
 
