@@ -1,8 +1,8 @@
-# Example production-oriented security baseline.
-# Do not commit real secrets into this file.
+# Example staging-oriented baseline.
+# Keep secrets injected from environment, but allow staging-specific origins and labels.
 
 server:
-  environment: "production"
+  environment: "staging"
 
 jwt:
   secret: "${SERVIFY_JWT_SECRET}"
@@ -12,90 +12,86 @@ security:
   cors:
     enabled: true
     allowed_origins:
-      - "https://app.example.com"
-      - "https://ops.example.com"
+      - "https://staging-app.example.com"
+      - "https://staging-ops.example.com"
     allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     allowed_headers: ["Authorization", "Content-Type", "X-Request-ID"]
   rbac:
     enabled: true
   rate_limiting:
     enabled: true
-    requests_per_minute: 120
-    burst: 30
+    requests_per_minute: 180
+    burst: 45
     key_header: ""
     whitelist_ips: []
     whitelist_keys: []
     paths:
       - enabled: true
         prefix: "/public/"
-        requests_per_minute: 120
-        burst: 30
+        requests_per_minute: 180
+        burst: 45
       - enabled: true
         prefix: "/public/kb/"
-        requests_per_minute: 60
-        burst: 15
+        requests_per_minute: 90
+        burst: 20
       - enabled: true
         prefix: "/public/csat/"
-        requests_per_minute: 30
+        requests_per_minute: 45
         burst: 10
       - enabled: true
         prefix: "/api/v1/auth/"
-        requests_per_minute: 20
-        burst: 10
-      - enabled: true
-        prefix: "/api/v1/ws"
-        requests_per_minute: 40
-        burst: 20
-      - enabled: true
-        prefix: "/uploads/"
-        requests_per_minute: 90
-        burst: 20
-      - enabled: true
-        prefix: "/api/v1/ai/query"
-        requests_per_minute: 45
+        requests_per_minute: 30
         burst: 15
       - enabled: true
+        prefix: "/api/v1/ws"
+        requests_per_minute: 60
+        burst: 30
+      - enabled: true
+        prefix: "/uploads/"
+        requests_per_minute: 120
+        burst: 30
+      - enabled: true
+        prefix: "/api/v1/ai/query"
+        requests_per_minute: 60
+        burst: 20
+      - enabled: true
         prefix: "/api/v1/ai/knowledge/"
-        requests_per_minute: 10
+        requests_per_minute: 15
         burst: 5
       - enabled: true
         prefix: "/api/v1/metrics/ingest"
-        requests_per_minute: 180
-        burst: 60
+        requests_per_minute: 240
+        burst: 80
       - enabled: true
         prefix: "/api/"
-        requests_per_minute: 90
-        burst: 20
+        requests_per_minute: 120
+        burst: 30
   audit:
     enabled: true
-    retention: 4320h
+    retention: 2160h
     cleanup_interval: 24h
     cleanup_batch_size: 500
   session_risk:
-    # Production-oriented defaults: tighter windows, same score cutoffs.
     hot_refresh_window_minutes: 10
     recent_refresh_window_minutes: 30
     today_refresh_window_hours: 24
     rapid_change_window_hours: 12
     stale_activity_window_days: 14
-    # Increase cautiously if users commonly share public egress.
-    multi_public_ip_threshold: 2
-    many_sessions_threshold: 3
+    multi_public_ip_threshold: 3
+    many_sessions_threshold: 4
     hot_refresh_family_threshold: 2
     medium_risk_score: 2
-    high_risk_score: 4
+    high_risk_score: 5
   session_risk_profiles:
-    production:
+    staging:
       hot_refresh_window_minutes: 10
       recent_refresh_window_minutes: 30
       rapid_change_window_hours: 12
       stale_activity_window_days: 14
-      high_risk_score: 4
+      high_risk_score: 5
   session_ip_intelligence:
-    # Optional external Geo/IP enrichment provider.
-    # Keep disabled until endpoint, auth and privacy review are ready.
     enabled: false
-    base_url: "https://geo.example.com/lookup/{ip}"
+    base_url: "https://geo-staging.example.com/lookup/{ip}"
     api_key: "${SESSION_IP_API_KEY}"
     auth_header: "Authorization"
     timeout_ms: 1500
@@ -106,7 +102,7 @@ ai:
 
 dify:
   enabled: true
-  base_url: "https://dify.example.com/v1"
+  base_url: "https://dify-staging.example.com/v1"
   api_key: "${DIFY_API_KEY}"
   dataset_id: "${DIFY_DATASET_ID}"
 
@@ -121,10 +117,3 @@ log:
 
 monitoring:
   enabled: true
-  metrics_path: "/metrics"
-  tracing:
-    enabled: true
-    endpoint: "http://otel-collector:4317"
-    insecure: true
-    sample_ratio: 0.1
-    service_name: "servify"

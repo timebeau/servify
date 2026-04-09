@@ -19,6 +19,9 @@ func TestGetDefaultConfig(t *testing.T) {
 	if cfg.Database.Name == "" {
 		t.Error("expected Database.Name to be set")
 	}
+	if cfg.Server.Environment != "development" {
+		t.Fatalf("expected default server environment development, got %q", cfg.Server.Environment)
+	}
 	if cfg.JWT.Secret == "" {
 		t.Error("expected JWT.Secret to be set")
 	}
@@ -50,6 +53,9 @@ func TestConfig_Timeouts(t *testing.T) {
 	if cfg.AI.OpenAI.Timeout == 0 {
 		t.Error("expected AI timeout to be set")
 	}
+	if cfg.Dify.Timeout == 0 {
+		t.Error("expected Dify timeout to be set")
+	}
 	if cfg.WeKnora.Timeout == 0 {
 		t.Error("expected WeKnora timeout to be set")
 	}
@@ -76,6 +82,15 @@ func TestConfig_SecurityDefaults(t *testing.T) {
 	}
 	if cfg.Security.SessionRisk.HighRiskScore != 4 {
 		t.Fatalf("expected default high risk score to be 4, got %d", cfg.Security.SessionRisk.HighRiskScore)
+	}
+	if cfg.Security.SessionIPIntelligence.Enabled {
+		t.Fatal("expected session IP intelligence to be disabled by default")
+	}
+	if cfg.Security.SessionIPIntelligence.AuthHeader != "Authorization" {
+		t.Fatalf("expected default session IP auth header Authorization, got %q", cfg.Security.SessionIPIntelligence.AuthHeader)
+	}
+	if cfg.Security.SessionIPIntelligence.TimeoutMs != 1500 {
+		t.Fatalf("expected default session IP timeout 1500ms, got %d", cfg.Security.SessionIPIntelligence.TimeoutMs)
 	}
 }
 
@@ -109,6 +124,12 @@ func TestConfig_SessionRiskDefaults(t *testing.T) {
 	if cfg.Security.SessionRisk.HighRiskScore != 4 {
 		t.Fatalf("expected high risk score = 4, got %d", cfg.Security.SessionRisk.HighRiskScore)
 	}
+	if cfg.Security.SessionRiskProfiles["development"].HighRiskScore != 6 {
+		t.Fatalf("expected development session risk profile high risk score 6, got %d", cfg.Security.SessionRiskProfiles["development"].HighRiskScore)
+	}
+	if cfg.Security.SessionRiskProfiles["production"].RapidChangeWindowHours != 12 {
+		t.Fatalf("expected production session risk profile rapid change window 12h, got %d", cfg.Security.SessionRiskProfiles["production"].RapidChangeWindowHours)
+	}
 }
 
 func TestLoad_SessionRiskOverrides(t *testing.T) {
@@ -139,6 +160,56 @@ func TestLoad_SessionRiskOverrides(t *testing.T) {
 	}
 }
 
+func TestLoad_SessionIPIntelligenceOverrides(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+
+	viper.Set("security.session_ip_intelligence.enabled", true)
+	viper.Set("security.session_ip_intelligence.base_url", "https://geo.example.com/lookup/{ip}")
+	viper.Set("security.session_ip_intelligence.api_key", "geo-token")
+	viper.Set("security.session_ip_intelligence.auth_header", "X-Geo-Key")
+	viper.Set("security.session_ip_intelligence.timeout_ms", 2200)
+
+	cfg := Load()
+
+	if !cfg.Security.SessionIPIntelligence.Enabled {
+		t.Fatal("expected session IP intelligence to be enabled")
+	}
+	if cfg.Security.SessionIPIntelligence.BaseURL != "https://geo.example.com/lookup/{ip}" {
+		t.Fatalf("unexpected session IP base url %q", cfg.Security.SessionIPIntelligence.BaseURL)
+	}
+	if cfg.Security.SessionIPIntelligence.APIKey != "geo-token" {
+		t.Fatalf("unexpected session IP api key %q", cfg.Security.SessionIPIntelligence.APIKey)
+	}
+	if cfg.Security.SessionIPIntelligence.AuthHeader != "X-Geo-Key" {
+		t.Fatalf("unexpected session IP auth header %q", cfg.Security.SessionIPIntelligence.AuthHeader)
+	}
+	if cfg.Security.SessionIPIntelligence.TimeoutMs != 2200 {
+		t.Fatalf("unexpected session IP timeout %d", cfg.Security.SessionIPIntelligence.TimeoutMs)
+	}
+}
+
+func TestLoad_SessionRiskEnvironmentProfileOverrides(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+
+	viper.Set("server.environment", "production")
+	viper.Set("security.session_risk_profiles.production.high_risk_score", 7)
+	viper.Set("security.session_risk_profiles.production.rapid_change_window_hours", 8)
+
+	cfg := Load()
+
+	if cfg.Server.Environment != "production" {
+		t.Fatalf("expected server environment production, got %q", cfg.Server.Environment)
+	}
+	if cfg.Security.SessionRiskProfiles["production"].HighRiskScore != 7 {
+		t.Fatalf("expected production profile high risk score 7, got %d", cfg.Security.SessionRiskProfiles["production"].HighRiskScore)
+	}
+	if cfg.Security.SessionRiskProfiles["production"].RapidChangeWindowHours != 8 {
+		t.Fatalf("expected production profile rapid change window 8h, got %d", cfg.Security.SessionRiskProfiles["production"].RapidChangeWindowHours)
+	}
+}
+
 func TestConfig_FallbackSettings(t *testing.T) {
 	cfg := GetDefaultConfig()
 
@@ -161,6 +232,12 @@ func TestConfig_AIConfiguration(t *testing.T) {
 	}
 	if cfg.AI.OpenAI.MaxTokens == 0 {
 		t.Error("expected OpenAI max tokens to be set")
+	}
+	if cfg.Dify.Search.TopK == 0 {
+		t.Error("expected Dify top_k to be set")
+	}
+	if cfg.Dify.Search.SearchMethod == "" {
+		t.Error("expected Dify search method to be set")
 	}
 }
 

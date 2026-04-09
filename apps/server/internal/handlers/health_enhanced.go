@@ -87,9 +87,9 @@ func (h *EnhancedHealthHandler) Health(c *gin.Context) {
 		h.checkRedis(ctx, &response, &allHealthy)
 	}
 
-	// 检查 WeKnora（如果启用）
+	// 检查知识 provider（Dify / WeKnora）
 	weKnoraConfig := configscope.NewResolver(h.config).ResolveWeKnora(context.Background(), nil)
-	if h.config.Monitoring.HealthChecks.WeKnora && weKnoraConfig.Enabled {
+	if h.config.Monitoring.HealthChecks.WeKnora && (weKnoraConfig.Enabled || (h.config != nil && h.config.Dify.Enabled)) {
 		h.checkWeKnora(ctx, &response, &allHealthy)
 	}
 
@@ -259,7 +259,7 @@ func (h *EnhancedHealthHandler) checkRedis(ctx context.Context, response *Health
 	response.Services["redis"] = serviceInfo
 }
 
-// checkWeKnora 检查 WeKnora 状态
+// checkWeKnora 检查当前知识 provider 状态。
 func (h *EnhancedHealthHandler) checkWeKnora(ctx context.Context, response *HealthResponse, allHealthy *bool) {
 	start := time.Now()
 	weKnoraConfig := configscope.NewResolver(h.config).ResolveWeKnora(context.Background(), nil)
@@ -267,24 +267,41 @@ func (h *EnhancedHealthHandler) checkWeKnora(ctx context.Context, response *Heal
 	// 如果是增强 AI 服务，获取 WeKnora 状态
 	if _, ok := h.aiService.GetMetrics(); ok {
 		status := h.aiService.GetStatus(ctx)
+		providerID, _ := status["knowledge_provider"].(string)
+		if providerID == "" {
+			if h.config != nil && h.config.Dify.Enabled {
+				providerID = "dify"
+			} else {
+				providerID = "weknora"
+			}
+		}
 
-		weKnoraHealthy, exists := status["weknora_healthy"].(bool)
-		if !exists || !weKnoraHealthy {
-			response.Services["weknora"] = ServiceInfo{
+		healthyKey := providerID + "_healthy"
+		providerHealthy, exists := status[healthyKey].(bool)
+		if !exists {
+			providerHealthy, _ = status["knowledge_provider_healthy"].(bool)
+		}
+		if !providerHealthy {
+			response.Services[providerID] = ServiceInfo{
 				Status:  "unhealthy",
 				Latency: time.Since(start).String(),
-				Error:   "WeKnora service unavailable",
+				Error:   providerID + " service unavailable",
 			}
-			// WeKnora 不可用时不影响整体健康状态（有降级机制）
-			h.logger.Warn("WeKnora service is unhealthy, but fallback is available")
+			h.logger.Warnf("%s service is unhealthy, but fallback is available", providerID)
 		} else {
-			response.Services["weknora"] = ServiceInfo{
+			details := map[string]interface{}{}
+			switch providerID {
+			case "dify":
+				details["base_url"] = h.config.Dify.BaseURL
+				details["dataset_id"] = h.config.Dify.DatasetID
+			default:
+				details["base_url"] = weKnoraConfig.BaseURL
+				details["kb_id"] = weKnoraConfig.KnowledgeBaseID
+			}
+			response.Services[providerID] = ServiceInfo{
 				Status:  "healthy",
 				Latency: time.Since(start).String(),
-				Details: map[string]interface{}{
-					"base_url": weKnoraConfig.BaseURL,
-					"kb_id":    weKnoraConfig.KnowledgeBaseID,
-				},
+				Details: details,
 			}
 		}
 	} else {

@@ -9,9 +9,11 @@ import (
 	aidelivery "servify/apps/server/internal/modules/ai/delivery"
 	"servify/apps/server/internal/platform/configscope"
 	"servify/apps/server/internal/platform/knowledgeprovider"
+	difykp "servify/apps/server/internal/platform/knowledgeprovider/dify"
 	weknorakp "servify/apps/server/internal/platform/knowledgeprovider/weknora"
 	"servify/apps/server/internal/platform/llm/openai"
 	"servify/apps/server/internal/services"
+	"servify/apps/server/pkg/dify"
 	"servify/apps/server/pkg/weknora"
 
 	"github.com/sirupsen/logrus"
@@ -26,16 +28,20 @@ type AIAssemblyOptions struct {
 type AIAssembly struct {
 	Service         aidelivery.HandlerService
 	RuntimeService  aidelivery.RuntimeService
+	KnowledgeDriver knowledgeprovider.KnowledgeProvider
+	KnowledgeProviderID string
+	DifyHealthy     bool
+	DifyDatasetID   string
 	WeKnoraClient   weknora.WeKnoraInterface
 	WeKnoraHealthy  bool
 	KnowledgeBaseID string
 }
 
 func (a *AIAssembly) KnowledgeProvider(cfg *config.Config) knowledgeprovider.KnowledgeProvider {
-	if a == nil || !a.WeKnoraHealthy || a.WeKnoraClient == nil {
+	if a == nil {
 		return nil
 	}
-	return weknorakp.NewProvider(a.WeKnoraClient, a.KnowledgeBaseID)
+	return a.KnowledgeDriver
 }
 
 func BuildAIAssembly(cfg *config.Config, logger *logrus.Logger, opts AIAssemblyOptions) (*AIAssembly, error) {
@@ -52,6 +58,7 @@ func BuildAIAssembly(cfg *config.Config, logger *logrus.Logger, opts AIAssemblyO
 		baseAI,
 		openai.NewProvider(openAIConfig.APIKey, openAIConfig.BaseURL),
 		nil,
+		"",
 		nil,
 		"",
 		logger,
@@ -62,6 +69,45 @@ func BuildAIAssembly(cfg *config.Config, logger *logrus.Logger, opts AIAssemblyO
 		RuntimeService:  defaultService,
 		KnowledgeBaseID: weKnoraConfig.KnowledgeBaseID,
 	}
+
+	if cfg.Dify.Enabled {
+		difyClient := dify.NewClient(&dify.Config{
+			BaseURL: cfg.Dify.BaseURL,
+			APIKey:  cfg.Dify.APIKey,
+			Timeout: cfg.Dify.Timeout,
+		})
+		ctx, cancel := context.WithTimeout(context.Background(), timeoutForHealthCheck(opts))
+		defer cancel()
+		if err := difyClient.HealthCheck(ctx, cfg.Dify.DatasetID); err != nil {
+			logger.Warnf("Dify health check failed: %v", err)
+			if !weKnoraConfig.Enabled && opts.RequireWeKnoraHealthy {
+				return nil, fmt.Errorf("dify health check failed: %w", err)
+			}
+		} else {
+			assembly.DifyHealthy = true
+			assembly.DifyDatasetID = cfg.Dify.DatasetID
+			assembly.KnowledgeProviderID = "dify"
+			assembly.KnowledgeDriver = difykp.NewProvider(difyClient, cfg.Dify.DatasetID, difykp.SearchConfig{
+				TopK:            cfg.Dify.Search.TopK,
+				ScoreThreshold:  cfg.Dify.Search.ScoreThreshold,
+				SearchMethod:    cfg.Dify.Search.SearchMethod,
+				RerankingEnable: cfg.Dify.Search.RerankingEnable,
+			})
+			enhanced := services.NewOrchestratedEnhancedAIService(
+				baseAI,
+				openai.NewProvider(openAIConfig.APIKey, openAIConfig.BaseURL),
+				assembly.KnowledgeDriver,
+				"dify",
+				nil,
+				cfg.Dify.DatasetID,
+				logger,
+			)
+			assembly.Service = aidelivery.NewHandlerServiceAdapter(enhanced)
+			assembly.RuntimeService = enhanced
+			return assembly, nil
+		}
+	}
+
 	if !weKnoraConfig.Enabled {
 		return assembly, nil
 	}
@@ -75,10 +121,7 @@ func BuildAIAssembly(cfg *config.Config, logger *logrus.Logger, opts AIAssemblyO
 	}, logger)
 	assembly.WeKnoraClient = client
 
-	timeout := opts.HealthCheckTimeout
-	if timeout <= 0 {
-		timeout = 10 * time.Second
-	}
+	timeout := timeoutForHealthCheck(opts)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	if err := client.HealthCheck(ctx); err != nil {
@@ -92,11 +135,14 @@ func BuildAIAssembly(cfg *config.Config, logger *logrus.Logger, opts AIAssemblyO
 		return assembly, nil
 	}
 	assembly.WeKnoraHealthy = true
+	assembly.KnowledgeProviderID = "weknora"
+	assembly.KnowledgeDriver = weknorakp.NewProvider(client, weKnoraConfig.KnowledgeBaseID)
 
 	enhanced := services.NewOrchestratedEnhancedAIService(
 		baseAI,
 		openai.NewProvider(openAIConfig.APIKey, openAIConfig.BaseURL),
-		weknorakp.NewProvider(client, weKnoraConfig.KnowledgeBaseID),
+		assembly.KnowledgeDriver,
+		"weknora",
 		client,
 		weKnoraConfig.KnowledgeBaseID,
 		logger,
@@ -111,4 +157,11 @@ func BuildAIAssembly(cfg *config.Config, logger *logrus.Logger, opts AIAssemblyO
 	assembly.Service = aidelivery.NewHandlerServiceAdapter(enhanced)
 	assembly.RuntimeService = enhanced
 	return assembly, nil
+}
+
+func timeoutForHealthCheck(opts AIAssemblyOptions) time.Duration {
+	if opts.HealthCheckTimeout > 0 {
+		return opts.HealthCheckTimeout
+	}
+	return 10 * time.Second
 }

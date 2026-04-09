@@ -21,6 +21,7 @@ type OrchestratedEnhancedAIService struct {
 	orchestrator      *aimodule.QueryOrchestrator
 	llmProvider       llm.LLMProvider
 	knowledgeProvider knowledgeprovider.KnowledgeProvider
+	knowledgeProviderID string
 	weKnoraClient     baseweknora.WeKnoraInterface
 	knowledgeBaseID   string
 	weKnoraEnabled    bool
@@ -34,6 +35,7 @@ func NewOrchestratedEnhancedAIService(
 	base *AIService,
 	llmProvider llm.LLMProvider,
 	knowledgeProvider knowledgeprovider.KnowledgeProvider,
+	knowledgeProviderID string,
 	weKnoraClient baseweknora.WeKnoraInterface,
 	knowledgeBaseID string,
 	logger *logrus.Logger,
@@ -41,18 +43,22 @@ func NewOrchestratedEnhancedAIService(
 	if logger == nil {
 		logger = logrus.New()
 	}
+	if knowledgeProvider != nil && strings.TrimSpace(knowledgeProviderID) == "" {
+		knowledgeProviderID = "weknora"
+	}
 	orchestrator := aimodule.NewQueryOrchestrator(llmProvider, knowledgeProvider)
 	return &OrchestratedEnhancedAIService{
 		base:              base,
 		orchestrator:      orchestrator,
 		llmProvider:       llmProvider,
 		knowledgeProvider: knowledgeProvider,
+		knowledgeProviderID: strings.TrimSpace(knowledgeProviderID),
 		weKnoraClient:     weKnoraClient,
 		knowledgeBaseID:   knowledgeBaseID,
 		weKnoraEnabled:    knowledgeProvider != nil,
 		fallbackEnabled:   true,
 		circuitBreaker:    NewCircuitBreaker(),
-		metrics:           &AIMetrics{},
+		metrics:           &AIMetrics{ActiveKnowledgeProvider: strings.TrimSpace(knowledgeProviderID)},
 		logger:            logger,
 	}
 }
@@ -128,10 +134,17 @@ func (s *OrchestratedEnhancedAIService) ProcessQueryEnhanced(ctx context.Context
 		Duration: result.Latency,
 	}
 	if len(result.Sources) > 0 {
-		enhanced.Strategy = "weknora"
+		enhanced.Strategy = s.activeKnowledgeProviderID()
 		enhanced.Sources = toWeKnoraSources(result.Sources)
-		s.metrics.WeKnoraUsageCount++
-		s.metrics.WeKnoraLatency = result.Latency
+		s.metrics.KnowledgeProviderUsageCount++
+		s.metrics.KnowledgeProviderLatency = result.Latency
+		switch s.activeKnowledgeProviderID() {
+		case "dify":
+			s.metrics.DifyUsageCount++
+		case "weknora":
+			s.metrics.WeKnoraUsageCount++
+			s.metrics.WeKnoraLatency = result.Latency
+		}
 	} else {
 		s.metrics.FallbackUsageCount++
 	}
@@ -155,23 +168,38 @@ func (s *OrchestratedEnhancedAIService) InitializeKnowledgeBase() {
 
 func (s *OrchestratedEnhancedAIService) GetStatus(ctx context.Context) map[string]interface{} {
 	status := map[string]interface{}{
-		"type":             "orchestrated_enhanced",
-		"weknora_enabled":  s.weKnoraEnabled,
-		"fallback_enabled": s.fallbackEnabled,
-		"llm_provider":     s.llmProvider != nil,
-		"knowledge_base":   "orchestrated",
-		"document_count":   len(s.base.knowledgeBase.documents),
-		"metrics":          s.GetMetrics(),
+		"type":                      "orchestrated_enhanced",
+		"knowledge_provider":        s.activeKnowledgeProviderID(),
+		"knowledge_provider_enabled": s.weKnoraEnabled,
+		"weknora_enabled":           s.weKnoraEnabled && s.activeKnowledgeProviderID() == "weknora",
+		"dify_enabled":              s.weKnoraEnabled && s.activeKnowledgeProviderID() == "dify",
+		"fallback_enabled":          s.fallbackEnabled,
+		"llm_provider":              s.llmProvider != nil,
+		"knowledge_base":            "orchestrated",
+		"document_count":            len(s.base.knowledgeBase.documents),
+		"metrics":                   s.GetMetrics(),
 		"circuit_breaker": map[string]interface{}{
 			"state":         s.circuitBreaker.State(),
 			"failure_count": s.circuitBreaker.FailureCount(),
 		},
 	}
-	if s.weKnoraClient != nil {
-		err := s.weKnoraClient.HealthCheck(ctx)
-		status["weknora_healthy"] = err == nil
+	if s.knowledgeProvider != nil {
+		err := s.knowledgeProvider.HealthCheck(ctx)
+		status["knowledge_provider_healthy"] = err == nil
 		if err != nil {
-			status["weknora_error"] = err.Error()
+			status["knowledge_provider_error"] = err.Error()
+		}
+		switch s.activeKnowledgeProviderID() {
+		case "dify":
+			status["dify_healthy"] = err == nil
+			if err != nil {
+				status["dify_error"] = err.Error()
+			}
+		case "weknora":
+			status["weknora_healthy"] = err == nil
+			if err != nil {
+				status["weknora_error"] = err.Error()
+			}
 		}
 	}
 	return status
@@ -230,6 +258,13 @@ func (s *OrchestratedEnhancedAIService) activeKnowledgeProvider() knowledgeprovi
 		return s.knowledgeProvider
 	}
 	return nil
+}
+
+func (s *OrchestratedEnhancedAIService) activeKnowledgeProviderID() string {
+	if strings.TrimSpace(s.knowledgeProviderID) == "" {
+		return "weknora"
+	}
+	return s.knowledgeProviderID
 }
 
 func (s *OrchestratedEnhancedAIService) activeOrchestrator() *aimodule.QueryOrchestrator {

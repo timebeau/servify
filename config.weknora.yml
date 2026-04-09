@@ -34,6 +34,18 @@ ai:
     max_tokens: 1000
     timeout: 30s
 
+dify:
+  enabled: false
+  base_url: "https://api.dify.example/v1"
+  api_key: ""
+  dataset_id: ""
+  timeout: 30s
+  search:
+    top_k: 5
+    score_threshold: 0.7
+    search_method: "semantic_search"
+    reranking_enable: false
+
 # 新增：WeKnora 配置
 weknora:
   enabled: true  # 是否启用 WeKnora

@@ -31,13 +31,17 @@ type EnhancedAIService struct {
 
 // AIMetrics AI 服务指标
 type AIMetrics struct {
-	QueryCount         int64         `json:"query_count"`
-	SuccessCount       int64         `json:"success_count"`
-	WeKnoraUsageCount  int64         `json:"weknora_usage_count"`
-	FallbackUsageCount int64         `json:"fallback_usage_count"`
-	AverageLatency     time.Duration `json:"average_latency"`
-	WeKnoraLatency     time.Duration `json:"weknora_latency"`
-	OpenAILatency      time.Duration `json:"openai_latency"`
+	QueryCount                  int64         `json:"query_count"`
+	SuccessCount                int64         `json:"success_count"`
+	KnowledgeProviderUsageCount int64         `json:"knowledge_provider_usage_count"`
+	DifyUsageCount              int64         `json:"dify_usage_count"`
+	WeKnoraUsageCount           int64         `json:"weknora_usage_count"`
+	FallbackUsageCount          int64         `json:"fallback_usage_count"`
+	AverageLatency              time.Duration `json:"average_latency"`
+	KnowledgeProviderLatency    time.Duration `json:"knowledge_provider_latency"`
+	WeKnoraLatency              time.Duration `json:"weknora_latency"`
+	OpenAILatency               time.Duration `json:"openai_latency"`
+	ActiveKnowledgeProvider     string        `json:"active_knowledge_provider,omitempty"`
 }
 
 // EnhancedAIResponse 增强的 AI 响应

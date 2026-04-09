@@ -32,6 +32,18 @@ ai:
     max_tokens: 1000
     timeout: 30s
 
+dify:
+  enabled: false
+  base_url: "https://api.dify.example/v1"
+  api_key: "${DIFY_API_KEY}"
+  dataset_id: "${DIFY_DATASET_ID}"
+  timeout: 30s
+  search:
+    top_k: 5
+    score_threshold: 0.7
+    search_method: "semantic_search"
+    reranking_enable: false
+
 jwt:
   secret: "${SERVIFY_JWT_SECRET}"
   expires_in: "24h"

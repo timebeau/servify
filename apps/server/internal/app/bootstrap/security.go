@@ -52,6 +52,12 @@ func SecurityWarnings(cfg *config.Config) []string {
 	if strings.TrimSpace(cfg.AI.OpenAI.APIKey) == "" {
 		warnings = append(warnings, "ai.openai.api_key is empty")
 	}
+	if cfg.Dify.Enabled && strings.TrimSpace(cfg.Dify.APIKey) == "" {
+		warnings = append(warnings, "dify is enabled but dify.api_key is empty")
+	}
+	if cfg.Dify.Enabled && strings.TrimSpace(cfg.Dify.DatasetID) == "" {
+		warnings = append(warnings, "dify is enabled but dify.dataset_id is empty")
+	}
 	if cfg.WeKnora.Enabled && strings.TrimSpace(cfg.WeKnora.APIKey) == "" {
 		warnings = append(warnings, "weknora is enabled but weknora.api_key is empty")
 	}

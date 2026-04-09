@@ -6,9 +6,11 @@ import (
 	"servify/apps/server/internal/config"
 	aidelivery "servify/apps/server/internal/modules/ai/delivery"
 	"servify/apps/server/internal/platform/configscope"
+	difykp "servify/apps/server/internal/platform/knowledgeprovider/dify"
 	weknorakp "servify/apps/server/internal/platform/knowledgeprovider/weknora"
 	"servify/apps/server/internal/platform/llm/openai"
 	"servify/apps/server/internal/services"
+	"servify/apps/server/pkg/dify"
 	"servify/apps/server/pkg/weknora"
 
 	"github.com/sirupsen/logrus"
@@ -82,14 +84,18 @@ func (s *scopedAIHandlerService) buildService(ctx context.Context) aidelivery.Ru
 		return nil
 	}
 	if s.resolver == nil {
-		return runtimeServiceFromResolvedConfig(config.OpenAIConfig{}, config.WeKnoraConfig{}, s.logger)
+		return runtimeServiceFromResolvedConfig(config.OpenAIConfig{}, config.DifyConfig{}, config.WeKnoraConfig{}, s.logger)
 	}
 	openAIConfig := s.resolver.ResolveOpenAI(ctx, nil)
 	weKnoraConfig := s.resolver.ResolveWeKnora(ctx, nil)
-	return runtimeServiceFromResolvedConfig(openAIConfig, weKnoraConfig, s.logger)
+	difyConfig := config.DifyConfig{}
+	if s.cfg != nil {
+		difyConfig = s.cfg.Dify
+	}
+	return runtimeServiceFromResolvedConfig(openAIConfig, difyConfig, weKnoraConfig, s.logger)
 }
 
-func runtimeServiceFromResolvedConfig(openAIConfig config.OpenAIConfig, weKnoraConfig config.WeKnoraConfig, logger *logrus.Logger) aidelivery.RuntimeService {
+func runtimeServiceFromResolvedConfig(openAIConfig config.OpenAIConfig, difyConfig config.DifyConfig, weKnoraConfig config.WeKnoraConfig, logger *logrus.Logger) aidelivery.RuntimeService {
 	if logger == nil {
 		logger = logrus.StandardLogger()
 	}
@@ -99,10 +105,32 @@ func runtimeServiceFromResolvedConfig(openAIConfig config.OpenAIConfig, weKnoraC
 		baseAI,
 		openai.NewProvider(openAIConfig.APIKey, openAIConfig.BaseURL),
 		nil,
+		"",
 		nil,
 		"",
 		logger,
 	)
+	if difyConfig.Enabled {
+		client := dify.NewClient(&dify.Config{
+			BaseURL: difyConfig.BaseURL,
+			APIKey:  difyConfig.APIKey,
+			Timeout: difyConfig.Timeout,
+		})
+		return services.NewOrchestratedEnhancedAIService(
+			baseAI,
+			openai.NewProvider(openAIConfig.APIKey, openAIConfig.BaseURL),
+			difykp.NewProvider(client, difyConfig.DatasetID, difykp.SearchConfig{
+				TopK:            difyConfig.Search.TopK,
+				ScoreThreshold:  difyConfig.Search.ScoreThreshold,
+				SearchMethod:    difyConfig.Search.SearchMethod,
+				RerankingEnable: difyConfig.Search.RerankingEnable,
+			}),
+			"dify",
+			nil,
+			difyConfig.DatasetID,
+			logger,
+		)
+	}
 	if !weKnoraConfig.Enabled {
 		return defaultService
 	}
@@ -117,6 +145,7 @@ func runtimeServiceFromResolvedConfig(openAIConfig config.OpenAIConfig, weKnoraC
 		baseAI,
 		openai.NewProvider(openAIConfig.APIKey, openAIConfig.BaseURL),
 		weknorakp.NewProvider(client, weKnoraConfig.KnowledgeBaseID),
+		"weknora",
 		client,
 		weKnoraConfig.KnowledgeBaseID,
 		logger,

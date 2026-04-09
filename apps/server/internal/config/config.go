@@ -13,6 +13,7 @@ type Config struct {
 	Redis      RedisConfig      `yaml:"redis"`
 	WebRTC     WebRTCConfig     `yaml:"webrtc"`
 	AI         AIConfig         `yaml:"ai"`
+	Dify       DifyConfig       `yaml:"dify"`
 	WeKnora    WeKnoraConfig    `yaml:"weknora"`
 	Fallback   FallbackConfig   `yaml:"fallback"`
 	JWT        JWTConfig        `yaml:"jwt"`
@@ -24,8 +25,9 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Host string `yaml:"host"`
-	Port int    `yaml:"port"`
+	Host        string `yaml:"host"`
+	Port        int    `yaml:"port"`
+	Environment string `yaml:"environment"`
 }
 
 type DatabaseConfig struct {
@@ -63,6 +65,22 @@ type OpenAIConfig struct {
 	Temperature float64       `yaml:"temperature" json:"temperature,omitempty"`
 	MaxTokens   int           `yaml:"max_tokens" json:"max_tokens,omitempty"`
 	Timeout     time.Duration `yaml:"timeout" json:"timeout,omitempty"`
+}
+
+type DifyConfig struct {
+	Enabled   bool             `yaml:"enabled" json:"enabled,omitempty"`
+	BaseURL   string           `yaml:"base_url" json:"base_url,omitempty"`
+	APIKey    string           `yaml:"api_key" json:"api_key,omitempty"`
+	DatasetID string           `yaml:"dataset_id" json:"dataset_id,omitempty"`
+	Timeout   time.Duration    `yaml:"timeout" json:"timeout,omitempty"`
+	Search    DifySearchConfig `yaml:"search" json:"search,omitempty"`
+}
+
+type DifySearchConfig struct {
+	TopK            int     `yaml:"top_k" json:"top_k,omitempty"`
+	ScoreThreshold  float64 `yaml:"score_threshold" json:"score_threshold,omitempty"`
+	SearchMethod    string  `yaml:"search_method" json:"search_method,omitempty"`
+	RerankingEnable bool    `yaml:"reranking_enable" json:"reranking_enable,omitempty"`
 }
 
 type WeKnoraConfig struct {
@@ -148,12 +166,14 @@ type TracingConfig struct {
 }
 
 type SecurityConfig struct {
-	CORS            CORSConfig              `yaml:"cors"`
-	RateLimiting    RateLimitingConfig      `yaml:"rate_limiting"`
-	RBAC            RBACConfig              `yaml:"rbac"`
-	Audit           AuditConfig             `yaml:"audit"`
-	TokenRevocation TokenRevocationConfig   `yaml:"token_revocation"`
-	SessionRisk     SessionRiskPolicyConfig `yaml:"session_risk"`
+	CORS                  CORSConfig                         `yaml:"cors"`
+	RateLimiting          RateLimitingConfig                 `yaml:"rate_limiting"`
+	RBAC                  RBACConfig                         `yaml:"rbac"`
+	Audit                 AuditConfig                        `yaml:"audit"`
+	TokenRevocation       TokenRevocationConfig              `yaml:"token_revocation"`
+	SessionRisk           SessionRiskPolicyConfig            `yaml:"session_risk"`
+	SessionRiskProfiles   map[string]SessionRiskPolicyConfig `yaml:"session_risk_profiles"`
+	SessionIPIntelligence SessionIPIntelligenceConfig        `yaml:"session_ip_intelligence"`
 }
 
 type CORSConfig struct {
@@ -192,6 +212,14 @@ type SessionRiskPolicyConfig struct {
 	HotRefreshFamilyThreshold  int `yaml:"hot_refresh_family_threshold" json:"hot_refresh_family_threshold,omitempty"`
 	MediumRiskScore            int `yaml:"medium_risk_score" json:"medium_risk_score,omitempty"`
 	HighRiskScore              int `yaml:"high_risk_score" json:"high_risk_score,omitempty"`
+}
+
+type SessionIPIntelligenceConfig struct {
+	Enabled    bool   `yaml:"enabled"`
+	BaseURL    string `yaml:"base_url"`
+	APIKey     string `yaml:"api_key"`
+	AuthHeader string `yaml:"auth_header"`
+	TimeoutMs  int    `yaml:"timeout_ms"`
 }
 
 type RateLimitingConfig struct {
@@ -252,8 +280,9 @@ func Load() *Config {
 func GetDefaultConfig() *Config {
 	return &Config{
 		Server: ServerConfig{
-			Host: "0.0.0.0",
-			Port: 8080,
+			Host:        "0.0.0.0",
+			Port:        8080,
+			Environment: "development",
 		},
 		Database: DatabaseConfig{
 			Host:            "localhost",
@@ -283,6 +312,18 @@ func GetDefaultConfig() *Config {
 				Temperature: 0.7,
 				MaxTokens:   1000,
 				Timeout:     30 * time.Second,
+			},
+		},
+		Dify: DifyConfig{
+			Enabled:   false,
+			BaseURL:   "http://localhost:5001/v1",
+			DatasetID: "",
+			Timeout:   30 * time.Second,
+			Search: DifySearchConfig{
+				TopK:            5,
+				ScoreThreshold:  0.7,
+				SearchMethod:    "semantic_search",
+				RerankingEnable: false,
 			},
 		},
 		WeKnora: WeKnoraConfig{
@@ -383,6 +424,27 @@ func GetDefaultConfig() *Config {
 				HotRefreshFamilyThreshold:  2,
 				MediumRiskScore:            2,
 				HighRiskScore:              4,
+			},
+			SessionRiskProfiles: map[string]SessionRiskPolicyConfig{
+				"development": {
+					HighRiskScore: 6,
+				},
+				"staging": {
+					HighRiskScore:          5,
+					RapidChangeWindowHours: 12,
+				},
+				"production": {
+					HotRefreshWindowMinutes:    10,
+					RecentRefreshWindowMinutes: 30,
+					RapidChangeWindowHours:     12,
+					StaleActivityWindowDays:    14,
+					HighRiskScore:              4,
+				},
+			},
+			SessionIPIntelligence: SessionIPIntelligenceConfig{
+				Enabled:    false,
+				AuthHeader: "Authorization",
+				TimeoutMs:  1500,
 			},
 		},
 		Portal: PortalConfig{

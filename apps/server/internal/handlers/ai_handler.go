@@ -260,11 +260,13 @@ func (h *MetricsHandler) GetMetrics(c *gin.Context) {
 		webrtcConns = h.webrtcService.ConnectionCount()
 	}
 
-	var aiQueries, aiWeKnora, aiFallback int64
+	var aiQueries, aiDify, aiWeKnora, aiProvider, aiFallback int64
 	var aiAvgLatency float64
 	if m, ok := h.aiService.GetMetrics(); ok && m != nil {
 		aiQueries = m.QueryCount
+		aiDify = m.DifyUsageCount
 		aiWeKnora = m.WeKnoraUsageCount
+		aiProvider = m.KnowledgeProviderUsageCount
 		aiFallback = m.FallbackUsageCount
 		aiAvgLatency = m.AverageLatency.Seconds()
 	}
@@ -294,6 +296,14 @@ func (h *MetricsHandler) GetMetrics(c *gin.Context) {
 	fmt.Fprintf(b, "# HELP servify_ai_requests_total Total AI queries processed\n")
 	fmt.Fprintf(b, "# TYPE servify_ai_requests_total counter\n")
 	fmt.Fprintf(b, "servify_ai_requests_total %d\n\n", aiQueries)
+
+	fmt.Fprintf(b, "# HELP servify_ai_knowledge_provider_usage_total Total AI queries served via an external knowledge provider\n")
+	fmt.Fprintf(b, "# TYPE servify_ai_knowledge_provider_usage_total counter\n")
+	fmt.Fprintf(b, "servify_ai_knowledge_provider_usage_total %d\n\n", aiProvider)
+
+	fmt.Fprintf(b, "# HELP servify_ai_dify_usage_total Total AI queries served via Dify\n")
+	fmt.Fprintf(b, "# TYPE servify_ai_dify_usage_total counter\n")
+	fmt.Fprintf(b, "servify_ai_dify_usage_total %d\n\n", aiDify)
 
 	fmt.Fprintf(b, "# HELP servify_ai_weknora_usage_total Total AI queries served via WeKnora\n")
 	fmt.Fprintf(b, "# TYPE servify_ai_weknora_usage_total counter\n")

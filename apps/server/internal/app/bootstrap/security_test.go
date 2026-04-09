@@ -15,6 +15,9 @@ func TestSecurityWarnings(t *testing.T) {
 	cfg.Security.RateLimiting.Enabled = false
 	cfg.Security.CORS.AllowedOrigins = []string{"*"}
 	cfg.AI.OpenAI.APIKey = ""
+	cfg.Dify.Enabled = true
+	cfg.Dify.APIKey = ""
+	cfg.Dify.DatasetID = ""
 	cfg.WeKnora.Enabled = true
 	cfg.WeKnora.APIKey = ""
 
@@ -26,6 +29,8 @@ func TestSecurityWarnings(t *testing.T) {
 		"security.cors.allowed_origins allows all origins",
 		"security.rate_limiting is disabled",
 		"ai.openai.api_key is empty",
+		"dify is enabled but dify.api_key is empty",
+		"dify is enabled but dify.dataset_id is empty",
 		"weknora is enabled but weknora.api_key is empty",
 	} {
 		if !strings.Contains(joined, want) {

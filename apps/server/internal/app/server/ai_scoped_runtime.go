@@ -14,6 +14,7 @@ import (
 )
 
 type scopedAIRuntimeService struct {
+	cfg      *config.Config
 	logger   *logrus.Logger
 	resolver *configscope.Resolver
 	fallback aidelivery.RuntimeService
@@ -30,7 +31,7 @@ func NewScopedAIRuntimeService(cfg *config.Config, logger *logrus.Logger, db *go
 		configscope.WithTenantWeKnoraProvider(configscope.NewGormTenantConfigProvider(db)),
 		configscope.WithWorkspaceWeKnoraProvider(configscope.NewGormWorkspaceConfigProvider(db)),
 	)
-	return &scopedAIRuntimeService{logger: logger, resolver: resolver, fallback: fallback}
+	return &scopedAIRuntimeService{cfg: cfg, logger: logger, resolver: resolver, fallback: fallback}
 }
 
 func (s *scopedAIRuntimeService) ProcessQuery(ctx context.Context, query string, sessionID string) (*services.AIResponse, error) {
@@ -69,5 +70,9 @@ func (s *scopedAIRuntimeService) buildService(ctx context.Context) aidelivery.Ru
 	}
 	openAIConfig := s.resolver.ResolveOpenAI(ctx, nil)
 	weKnoraConfig := s.resolver.ResolveWeKnora(ctx, nil)
-	return runtimeServiceFromResolvedConfig(openAIConfig, weKnoraConfig, s.logger)
+	difyConfig := config.DifyConfig{}
+	if s.cfg != nil {
+		difyConfig = s.cfg.Dify
+	}
+	return runtimeServiceFromResolvedConfig(openAIConfig, difyConfig, weKnoraConfig, s.logger)
 }

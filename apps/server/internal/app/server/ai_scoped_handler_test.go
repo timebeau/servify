@@ -116,7 +116,7 @@ func TestScopedAIHandlerServiceGetMetricsFallsBackToBaseHandler(t *testing.T) {
 }
 
 func TestRuntimeServiceFromResolvedConfigWithoutWeKnora(t *testing.T) {
-	service := runtimeServiceFromResolvedConfig(config.OpenAIConfig{APIKey: "", BaseURL: ""}, config.WeKnoraConfig{}, logrus.New())
+	service := runtimeServiceFromResolvedConfig(config.OpenAIConfig{APIKey: "", BaseURL: ""}, config.DifyConfig{}, config.WeKnoraConfig{}, logrus.New())
 	status := service.GetStatus(context.Background())
 	if typ, _ := status["type"].(string); typ == "" {
 		t.Fatalf("expected service status type, got %+v", status)
@@ -124,7 +124,7 @@ func TestRuntimeServiceFromResolvedConfigWithoutWeKnora(t *testing.T) {
 }
 
 func TestRuntimeServiceFromResolvedConfigWithWeKnoraScopedKnowledgeBase(t *testing.T) {
-	service := runtimeServiceFromResolvedConfig(config.OpenAIConfig{}, config.WeKnoraConfig{
+	service := runtimeServiceFromResolvedConfig(config.OpenAIConfig{}, config.DifyConfig{}, config.WeKnoraConfig{
 		Enabled:         true,
 		BaseURL:         "http://127.0.0.1:1",
 		APIKey:          "key",
