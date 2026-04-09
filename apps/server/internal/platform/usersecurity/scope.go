@@ -2,6 +2,7 @@ package usersecurity
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -78,6 +79,10 @@ func hasRequestScope(ctx context.Context) bool {
 	tenantID := strings.TrimSpace(platformauth.TenantIDFromContext(ctx))
 	workspaceID := strings.TrimSpace(platformauth.WorkspaceIDFromContext(ctx))
 	return tenantID != "" || workspaceID != ""
+}
+
+func IsNotFound(err error) bool {
+	return errors.Is(err, gorm.ErrRecordNotFound)
 }
 
 func scopedUserIDQuery(ctx context.Context, db *gorm.DB, model any) *gorm.DB {

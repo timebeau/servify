@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"gorm.io/gorm"
 )
 
 type UserSecurityHandler struct {
@@ -682,7 +680,7 @@ func (h *UserSecurityHandler) RevokeToken(c *gin.Context) {
 
 	result, err := h.service.RevokeJWT(c.Request.Context(), req.Token, h.jwtSecret, req.Reason)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if usersecurity.IsNotFound(err) {
 			c.JSON(http.StatusNotFound, ErrorResponse{
 				Error:   "Token target not found",
 				Message: "token target is outside request scope or no longer exists",

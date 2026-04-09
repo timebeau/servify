@@ -182,16 +182,16 @@ type TokenRevocationConfig struct {
 }
 
 type SessionRiskPolicyConfig struct {
-	HotRefreshWindowMinutes    int `yaml:"hot_refresh_window_minutes"`
-	RecentRefreshWindowMinutes int `yaml:"recent_refresh_window_minutes"`
-	TodayRefreshWindowHours    int `yaml:"today_refresh_window_hours"`
-	RapidChangeWindowHours     int `yaml:"rapid_change_window_hours"`
-	StaleActivityWindowDays    int `yaml:"stale_activity_window_days"`
-	MultiPublicIPThreshold     int `yaml:"multi_public_ip_threshold"`
-	ManySessionsThreshold      int `yaml:"many_sessions_threshold"`
-	HotRefreshFamilyThreshold  int `yaml:"hot_refresh_family_threshold"`
-	MediumRiskScore            int `yaml:"medium_risk_score"`
-	HighRiskScore              int `yaml:"high_risk_score"`
+	HotRefreshWindowMinutes    int `yaml:"hot_refresh_window_minutes" json:"hot_refresh_window_minutes,omitempty"`
+	RecentRefreshWindowMinutes int `yaml:"recent_refresh_window_minutes" json:"recent_refresh_window_minutes,omitempty"`
+	TodayRefreshWindowHours    int `yaml:"today_refresh_window_hours" json:"today_refresh_window_hours,omitempty"`
+	RapidChangeWindowHours     int `yaml:"rapid_change_window_hours" json:"rapid_change_window_hours,omitempty"`
+	StaleActivityWindowDays    int `yaml:"stale_activity_window_days" json:"stale_activity_window_days,omitempty"`
+	MultiPublicIPThreshold     int `yaml:"multi_public_ip_threshold" json:"multi_public_ip_threshold,omitempty"`
+	ManySessionsThreshold      int `yaml:"many_sessions_threshold" json:"many_sessions_threshold,omitempty"`
+	HotRefreshFamilyThreshold  int `yaml:"hot_refresh_family_threshold" json:"hot_refresh_family_threshold,omitempty"`
+	MediumRiskScore            int `yaml:"medium_risk_score" json:"medium_risk_score,omitempty"`
+	HighRiskScore              int `yaml:"high_risk_score" json:"high_risk_score,omitempty"`
 }
 
 type RateLimitingConfig struct {
