@@ -1444,6 +1444,10 @@ func scopedConfigVerificationTemplateFromAudit(entry *models.AuditLog) scopedCon
 	after := scopedConfigDocumentFromAuditJSON(entry.AfterJSON)
 	changedSections := scopedConfigChangedSections(before, after)
 	changedPaths := scopedConfigChangedPaths(before, after)
+	return scopedConfigVerificationTemplateForChangeSet(operation, changedSections, changedPaths)
+}
+
+func scopedConfigVerificationTemplateForChangeSet(operation string, changedSections, changedPaths []string) scopedConfigVerificationTemplate {
 	checks := []scopedConfigVerificationCheckDefinition{
 		{
 			ID:           "change_scope_reviewed",
@@ -1627,8 +1631,16 @@ func scopedConfigVerificationTemplateForHistoryEntry(entry *models.AuditLog, cur
 	if entry == nil {
 		return scopedConfigVerificationTemplate{}
 	}
+	auditTemplate := scopedConfigVerificationTemplateFromAudit(entry)
 	if strings.TrimSpace(entry.BeforeJSON) != "" || current == nil || snapshot == nil {
-		return scopedConfigVerificationTemplateFromAudit(entry)
+		return auditTemplate
+	}
+	if changedPaths := extractScopedConfigChangedPaths(entry.RequestJSON); len(changedPaths) > 0 {
+		return scopedConfigVerificationTemplateForChangeSet(
+			scopedConfigOperation(entry.Action),
+			scopedConfigChangedSectionsFromPaths(changedPaths),
+			changedPaths,
+		)
 	}
 	return scopedConfigVerificationTemplateForDocuments(scopedConfigOperation(entry.Action), current, snapshot)
 }
@@ -1710,6 +1722,37 @@ func normalizeScopedConfigChangedPaths(paths []string) []string {
 	return result
 }
 
+func scopedConfigChangedSectionsFromPaths(paths []string) []string {
+	if len(paths) == 0 {
+		return nil
+	}
+	sections := make([]string, 0, 4)
+	seen := map[string]struct{}{}
+	for _, path := range paths {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			continue
+		}
+		section := path
+		if idx := strings.Index(section, "."); idx >= 0 {
+			section = section[:idx]
+		}
+		switch section {
+		case "portal", "openai", "weknora", "session_risk":
+			if _, ok := seen[section]; ok {
+				continue
+			}
+			seen[section] = struct{}{}
+			sections = append(sections, section)
+		}
+	}
+	if len(sections) == 0 {
+		return nil
+	}
+	sort.Strings(sections)
+	return sections
+}
+
 func changedPathsForPrefixes(paths []string, prefixes ...string) []string {
 	if len(paths) == 0 || len(prefixes) == 0 {
 		return nil
@@ -1784,6 +1827,20 @@ func validateScopedConfigVerificationSubmission(req scopedConfigVerificationRequ
 		Error:   "Failed verification check required",
 		Message: "at least one verification check must be marked failed when verification status is failed",
 	}
+}
+
+func extractScopedConfigChangedPaths(requestJSON string) []string {
+	requestJSON = strings.TrimSpace(requestJSON)
+	if requestJSON == "" {
+		return nil
+	}
+	var payload struct {
+		ChangedPaths []string `json:"changed_paths"`
+	}
+	if err := json.Unmarshal([]byte(requestJSON), &payload); err != nil {
+		return nil
+	}
+	return normalizeScopedConfigChangedPaths(payload.ChangedPaths)
 }
 
 func scopedConfigVerificationTemplateForDocuments(operation string, before, after *configscope.ScopedConfigDocument) scopedConfigVerificationTemplate {
