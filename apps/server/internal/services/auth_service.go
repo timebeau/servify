@@ -60,6 +60,9 @@ func NewAuthService(db *gorm.DB, cfg *config.Config) *AuthService {
 }
 
 func (s *AuthService) Register(ctx context.Context, req RegisterInput, meta AuthSessionMetadata) (*AuthResult, error) {
+	if s == nil || s.db == nil {
+		return nil, gorm.ErrInvalidDB
+	}
 	req.Username = strings.TrimSpace(req.Username)
 	req.Email = strings.TrimSpace(req.Email)
 	if req.Username == "" || req.Email == "" || req.Password == "" {
@@ -113,6 +116,9 @@ func (s *AuthService) Register(ctx context.Context, req RegisterInput, meta Auth
 }
 
 func (s *AuthService) Login(ctx context.Context, req LoginInput, meta AuthSessionMetadata) (*AuthResult, error) {
+	if s == nil || s.db == nil {
+		return nil, gorm.ErrInvalidDB
+	}
 	var user models.User
 	if err := s.db.WithContext(ctx).Where("username = ? OR email = ?", req.Username, req.Username).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -134,6 +140,9 @@ func (s *AuthService) Login(ctx context.Context, req LoginInput, meta AuthSessio
 }
 
 func (s *AuthService) GetCurrentUser(ctx context.Context, userID uint) (*models.User, error) {
+	if s == nil || s.db == nil {
+		return nil, gorm.ErrInvalidDB
+	}
 	var user models.User
 	if err := s.db.WithContext(ctx).First(&user, userID).Error; err != nil {
 		return nil, err
@@ -218,6 +227,9 @@ func (s *AuthService) RevokeOtherSessions(ctx context.Context, userID uint, curr
 }
 
 func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string, meta AuthSessionMetadata) (*AuthResult, error) {
+	if s == nil || s.db == nil {
+		return nil, gorm.ErrInvalidDB
+	}
 	refreshToken = strings.TrimSpace(refreshToken)
 	if refreshToken == "" {
 		return nil, ErrAuthInvalidRefreshToken

@@ -49,7 +49,6 @@ func TestBuildRouter_AuthPublicRoutesRemainAnonymous(t *testing.T) {
 	for _, path := range []string{
 		"/api/v1/auth/login",
 		"/api/v1/auth/register",
-		"/api/v1/auth/refresh",
 	} {
 		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{}`))
 		req.Header.Set("Content-Type", "application/json")
@@ -59,5 +58,14 @@ func TestBuildRouter_AuthPublicRoutesRemainAnonymous(t *testing.T) {
 		if w.Code == http.StatusUnauthorized || w.Code == http.StatusForbidden {
 			t.Fatalf("expected %s to remain anonymous, got %d body=%s", path, w.Code, w.Body.String())
 		}
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/refresh", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code == http.StatusForbidden {
+		t.Fatalf("expected /api/v1/auth/refresh to remain anonymous, got %d body=%s", w.Code, w.Body.String())
 	}
 }
