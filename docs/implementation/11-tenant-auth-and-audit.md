@@ -37,6 +37,7 @@
 - `Ticket` 已补显式 `tenant_id/workspace_id` 字段与基础索引，并在 `ticket` 仓储主查询、统计与创建路径按上下文过滤
 - `Customer` 已补显式 `tenant_id/workspace_id` 字段，并在 `customer` 仓储读取、列表、统计与活动查询通过扩展表 scope 收口
 - `Agent` 已补显式 `tenant_id/workspace_id` 字段，并在 `agent` 仓储创建、读取、列表与统计路径按上下文过滤
+- 管理面 `security/users/*` 与 `security/tokens/*` 现已在资源权限之外，继续按目标 user 关联的 `Agent` / `Customer` scope 校验 tenant/workspace 归属；跨 scope 目标统一按 not found 处理，避免枚举或误操作其它租户用户/令牌
 - `WorkspaceService`、`analytics` 模块聚合仓储与 agent transfer runtime load 同步路径已开始按上下文过滤 `Session/Agent/Ticket/Message/Customer` 等已 scope 化主数据
 - 当前剩余缺口已从“核心主数据未建模”进一步收敛到“少量 legacy 聚合尾项与 `DailyStats` 这类系统级全局汇总表的维度设计”，详见 `docs/tenant-workspace-boundaries.md`
 
@@ -111,8 +112,19 @@
 - 对于 `context.Background()` 或匿名 websocket 等未携带 scope 的调用，仍会自然回退到 system config
 - 管理面已新增 tenant/workspace scoped config 的最小 `GET/PUT` 接口，可读写 `portal` / `OpenAI` / `WeKnora` / `session_risk` override
 - scoped config 现已新增 `history` / `rollback` 管理接口，配置写入与恢复都会写入 `AuditLog`，并保留 before/after 快照；rollback 需显式提交确认参数才会执行
-- 管理面现已支持在 scoped config history 列表中直接返回 `operation` / preview / rollback 元数据，并可按单条审计记录查看字段路径级差异预览，直接获得带 `added/removed/updated` 类型的 current/snapshot 值对，便于回滚前确认变更影响
-- 当前仍缺更通用的跨配置域写接口，以及更完整的审批流/双人复核约束
+- tenant/workspace scoped config 的 `PUT` / `rollback` / `verify` 现已强制要求提交 `change_ref` 与 `reason`，支持 JSON body 或 `X-Change-Ref` / `X-Change-Reason` header，并会一并进入审计 request metadata
+- 高风险 scoped config 变更现已从“审批单号存在”推进到“真实审批记录存在”：当字段风险评估命中高风险 provider endpoint、KB mapping、session risk threshold 或 rollback 操作时，`PUT` / `rollback` 不仅必须提交 `approval_ref`，还必须能按 `approval_ref + change_ref` 查到已记录的 `scoped_config.{scope}.approve` 审计事件，且审批人与执行人必须分离；接口继续支持 JSON body 或 `X-Approval-Ref` header
+- 管理面现已支持 `POST /security/config/{scope}/verify/:audit_id`，用于给 update / rollback 结果写入执行后验证结论；verification body 除 `status` / `notes` / `evidence` 外，还需提交与 `verification_template.checks` 对齐的 `checks`
+- scoped config verification 现已从自由文本收口为模板化检查项：`passed` 必须补 evidence，且模板中所有必填检查项都必须显式标记为 `passed`；`failed` 必须补 notes，且至少要有一个模板检查项标记为 `failed`
+- `verification_template` 现已进一步按真实 `changed_paths` 细分检查项，并在模板根节点返回 `changed_paths`；单个 check 还会返回 `risk_level` 与自身覆盖的 `changed_paths`，可直接驱动前端或自动化脚本按字段风险执行验证
+- 当前细分模板已覆盖 portal public surface / locale、OpenAI endpoint / model contract、WeKnora endpoint / knowledge mapping / health check、session risk score / window / concurrency 这几类高风险配置簇
+- 变更治理现已补统一状态机：响应会额外返回 `governance_status` / `governance_policy`，当前状态值至少覆盖 `awaiting_approval`、`awaiting_verification`、`verified`、`verification_failed`、`approved`、`not_required`
+- scoped config verification 现已具备最小双人复核约束：verification reviewer 必须是带 `user_id` 的已认证操作者，且不能与原始 update / rollback 执行人相同
+- 管理面现已支持在 scoped config 写入响应、history 列表、单条详情和 verify 响应中直接返回 `change_control` / `change_risk` / `approval_policy` 元数据；其中 `change_control` 会包含 `approval_ref`，`change_risk` 会给出 `risk_level` / `risk_reasons` / `changed_paths`，`approval_policy` 会声明是否必须补审批、审批记录是否已落库、最新审批审计 ID / 时间 / 审批人等真实执行前审批信息
+- verify 响应还会返回 `source_governance_status` / `source_governance_policy`，用于直接判断被验证的那条 source change 当前是否已经闭环
+- 管理面现已支持在 scoped config history 列表、单条详情和 verify 响应中直接返回 `operation` / preview / rollback / verify / `verification_status` / `latest_verification` / `verification_template` / `verification_policy` 元数据；其中 `verification_policy` 会额外声明 `checks_required`、`required_check_ids`、`template_check_count` 与失败态检查约束，便于前端或自动化脚本按模板渲染执行后验证流程
+- `GET /security/config/{scope}/history` 现已可直接作为治理工作台数据源，支持 `governance_status` / `risk_level` / `approval_status` / `verification_status` / `needs_action` 筛选，并返回 `governance_summary` 聚合计数与 `applied_filters`，用于渲染待处理变更队列
+- 当前仍缺更通用的跨配置域写接口，以及更完整的双人复核编排、自动化验收模板与发布后验证规则编排
 
 ## T5 security-baseline-for-operations
 
@@ -135,7 +147,7 @@
 - 已新增 `config.production.secure.example.yml`，提供启用限流、收紧 CORS、使用环境变量注入 secrets 的生产示例模板
 - 已新增 `docs/public-surface-security-checklist.md`，收口匿名 / 对外开放接口的最小评审项与逐类入口检查清单
 - 已新增 bootstrap 启动安全告警，对默认 `jwt.secret`、开放式 CORS、关闭限流、空 provider key 等高风险配置输出 warning
-- 启动安全告警与 `check-security-baseline --strict` 现已进一步覆盖公开 / 高风险入口限流基线，若 `/public/`、`/public/kb/`、`/public/csat/`、`/api/v1/ws`、`/api/v1/metrics/ingest` 或 `/api/` 未配置独立路径级 rate limit，会在启动与部署前校验阶段明确告警
+- 启动安全告警与 `check-security-baseline --strict` 现已进一步覆盖公开 / 高风险入口限流基线，若 `/public/`、`/public/kb/`、`/public/csat/`、`/api/v1/auth/`、`/api/v1/ws`、`/uploads/`、`/api/v1/metrics/ingest` 或 `/api/` 未配置独立路径级 rate limit，会在启动与部署前校验阶段明确告警
 - 默认开发配置 `config.yml` 现已保持通过 `security` / `observability` strict baseline 检查，但文档已明确其用途仍是本地开发，不应替代生产部署配置模板
 - `internal/platform/auth` 现已新增可组合 token policy 钩子，支持按 `iat` 做 issued-before 失效、按 `token_version` 做最小会话版本淘汰，为后续账号级吊销策略预留接入点
 - `internal/platform/auth` 现已新增基于 `users` 表状态与 `user_auth_sessions` 的 token policy，并接入 router auth middleware：非 active 用户会被拒绝，设置 `token_valid_after` / `token_version` 后可使旧 token 失效；登录与 refresh 现在也会携带 `session_id + session_token_version`，支持同一 auth session 的旧 token 在 refresh 或 targeted revoke 后失效
@@ -147,7 +159,10 @@
 - customer 管理面现已新增 `POST /api/customers/:id/revoke-tokens`，可对受作用域约束的客户账号主动触发旧 token 失效
 - token 主动失效底层逻辑现已收敛到 `internal/platform/usersecurity`，agent/customer 两条管理面路径复用同一套 `token_valid_after + token_version` 更新实现
 - 管理面现已新增统一 `security` surface：`GET /api/security/users/:id` 可查询单用户安全状态，`POST /api/security/users/query` 可批量预览用户当前安全态与下一次 revoke 后的 `token_version`，`GET /api/security/users/:id/sessions` 与 `POST /api/security/users/:id/sessions/revoke` 可查看并失效单个 auth session，`POST /api/security/users/:id/revoke-tokens` 与 `POST /api/security/users/revoke-tokens` 可分别执行单用户 / 批量 user revoke，统一由 `security.read` / `security.write` 权限保护
+- 上述 `security/users/*` 入口现已补目标用户 scope 校验：若请求上下文携带 `tenant_id/workspace_id`，则只允许操作该 scope 下的 `Agent` / `Customer` 关联用户，跨 scope 目标统一返回 not found
+- `security/tokens/revoke` 与 `security/tokens/revoked` 也已沿用同一套 scoped user 约束：scoped 请求只能吊销或查看本 scope 下 `Agent` / `Customer` 关联用户的 token 记录，不能跨租户操作 denylist
 - 管理面现已补 `POST /api/security/users/:id/sessions/revoke-all`，可批量失效同一用户的全部活跃 auth session，并支持通过 `except_session_id` 保留一个 session，用于“退出所有设备”或“仅踢其它设备”场景
+- 路由治理层现已新增代码级 `security surface catalog`，会用真实 `BuildRouter()` 路由表校验匿名 / 开放表面是否被显式登记；`/api/v1/auth/*` 与 `/uploads/*` 也已纳入同一套公开表面治理与专属限流基线
 - `UserAuthSession` 现已补最小 client metadata：登录与 refresh 会记录并更新 `user_agent`、`client_ip`、`last_seen_at`，管理面 `GET /api/security/users/:id/sessions` 可直接看到基础设备视图
 - 认证自助表面现已补 `GET /api/v1/auth/sessions`、`POST /api/v1/auth/sessions/logout-current`、`POST /api/v1/auth/sessions/logout-others`，已登录用户可查看自己的 auth sessions，并执行“退出当前会话”或“踢掉其它设备”
 - `UserAuthSession` 现已进一步补 `device_fingerprint`：优先使用 `X-Device-ID`，否则基于 `User-Agent + ClientIP` 生成稳定哈希，便于同一设备多次 refresh / 多会话归并查看
@@ -192,4 +207,5 @@ session 列表示例响应（auth / management 侧字段集合一致，`is_curre
 - 真实 Geo/IP 情报接入
 - 更强时间序列 / 跨会话异常检测
 - 按环境、租户或角色分层的 session risk policy
+- 更细粒度的公开接口审批/自动审查规则
 - 审批回滚等更完整的 user security 操作能力

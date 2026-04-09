@@ -3,7 +3,6 @@ package usersecurity
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -27,6 +26,12 @@ func NewService(db *gorm.DB, logger *logrus.Logger) *Service {
 }
 
 func (s *Service) RevokeTokens(ctx context.Context, userID uint) (int, error) {
+	if s == nil || s.db == nil {
+		return 0, gorm.ErrInvalidDB
+	}
+	if err := ensureScopedUserAccess(ctx, s.db, userID); err != nil {
+		return 0, err
+	}
 	return RevokeUserTokens(ctx, s.db, userID, time.Now().UTC())
 }
 
@@ -38,12 +43,22 @@ func (s *Service) BatchRevokeTokens(ctx context.Context, userIDs []uint) (map[ui
 		return map[uint]int{}, nil
 	}
 
+	orderedIDs, err := orderedUniqueUserIDs(userIDs)
+	if err != nil {
+		return nil, err
+	}
+	allowed, err := scopedUserIDs(ctx, s.db, orderedIDs)
+	if err != nil {
+		return nil, err
+	}
+	if len(allowed) != len(orderedIDs) {
+		missing := missingScopedUserIDs(orderedIDs, allowed, allowed)
+		return nil, fmt.Errorf("user not found: %v", missing)
+	}
+
 	results := make(map[uint]int, len(userIDs))
 	revokeAt := time.Now().UTC()
 	for _, userID := range userIDs {
-		if userID == 0 {
-			return nil, fmt.Errorf("user_id required")
-		}
 		version, err := RevokeUserTokens(ctx, s.db, userID, revokeAt)
 		if err != nil {
 			return nil, err
@@ -56,6 +71,9 @@ func (s *Service) BatchRevokeTokens(ctx context.Context, userIDs []uint) (map[ui
 func (s *Service) GetUser(ctx context.Context, userID uint) (*models.User, error) {
 	if s == nil || s.db == nil {
 		return nil, gorm.ErrInvalidDB
+	}
+	if err := ensureScopedUserAccess(ctx, s.db, userID); err != nil {
+		return nil, err
 	}
 	var user models.User
 	if err := s.db.WithContext(ctx).First(&user, userID).Error; err != nil {
@@ -72,35 +90,25 @@ func (s *Service) GetUsers(ctx context.Context, userIDs []uint) ([]models.User, 
 		return []models.User{}, nil
 	}
 
-	orderedIDs := make([]uint, 0, len(userIDs))
-	seen := make(map[uint]struct{}, len(userIDs))
-	for _, userID := range userIDs {
-		if userID == 0 {
-			return nil, fmt.Errorf("user_id required")
-		}
-		if _, ok := seen[userID]; ok {
-			continue
-		}
-		seen[userID] = struct{}{}
-		orderedIDs = append(orderedIDs, userID)
+	orderedIDs, err := orderedUniqueUserIDs(userIDs)
+	if err != nil {
+		return nil, err
+	}
+	allowed, err := scopedUserIDs(ctx, s.db, orderedIDs)
+	if err != nil {
+		return nil, err
 	}
 
 	var users []models.User
 	if err := s.db.WithContext(ctx).Where("id IN ?", orderedIDs).Find(&users).Error; err != nil {
 		return nil, err
 	}
-	if len(users) != len(orderedIDs) {
-		found := make(map[uint]struct{}, len(users))
-		for _, user := range users {
-			found[user.ID] = struct{}{}
-		}
-		missing := make([]uint, 0, len(orderedIDs))
-		for _, userID := range orderedIDs {
-			if _, ok := found[userID]; !ok {
-				missing = append(missing, userID)
-			}
-		}
-		sort.Slice(missing, func(i, j int) bool { return missing[i] < missing[j] })
+	found := make(map[uint]struct{}, len(users))
+	for _, user := range users {
+		found[user.ID] = struct{}{}
+	}
+	if len(users) != len(orderedIDs) || len(allowed) != len(orderedIDs) {
+		missing := missingScopedUserIDs(orderedIDs, allowed, found)
 		return nil, fmt.Errorf("user not found: %v", missing)
 	}
 
@@ -124,8 +132,8 @@ func (s *Service) ListUserSessions(ctx context.Context, userID uint) ([]models.U
 	if s == nil || s.db == nil {
 		return nil, gorm.ErrInvalidDB
 	}
-	if userID == 0 {
-		return nil, fmt.Errorf("user_id required")
+	if err := ensureScopedUserAccess(ctx, s.db, userID); err != nil {
+		return nil, err
 	}
 
 	var sessions []models.UserAuthSession
@@ -142,8 +150,8 @@ func (s *Service) RevokeSession(ctx context.Context, userID uint, sessionID stri
 	if s == nil || s.db == nil {
 		return nil, gorm.ErrInvalidDB
 	}
-	if userID == 0 {
-		return nil, fmt.Errorf("user_id required")
+	if err := ensureScopedUserAccess(ctx, s.db, userID); err != nil {
+		return nil, err
 	}
 	if sessionID == "" {
 		return nil, fmt.Errorf("session_id required")
@@ -209,6 +217,14 @@ func (s *Service) RevokeJWT(ctx context.Context, rawToken, secret, reason string
 		return nil, fmt.Errorf("token missing jti")
 	}
 	userID, _ := uintClaim(payload, "user_id", "sub")
+	if hasRequestScope(ctx) {
+		if userID == 0 {
+			return nil, gorm.ErrRecordNotFound
+		}
+		if err := ensureScopedUserAccess(ctx, s.db, userID); err != nil {
+			return nil, err
+		}
+	}
 	sessionID, _ := stringClaim(payload, "session_id", "sid")
 	tokenUse, _ := stringClaim(payload, "token_use")
 	exp, hasExp := unixTimeClaim(payload, "exp")
@@ -256,8 +272,8 @@ func (s *Service) RevokeAllSessions(ctx context.Context, userID uint, exceptSess
 	if s == nil || s.db == nil {
 		return nil, gorm.ErrInvalidDB
 	}
-	if userID == 0 {
-		return nil, fmt.Errorf("user_id required")
+	if err := ensureScopedUserAccess(ctx, s.db, userID); err != nil {
+		return nil, err
 	}
 
 	query := s.db.WithContext(ctx).Model(&models.UserAuthSession{}).

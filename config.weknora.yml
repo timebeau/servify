@@ -152,9 +152,17 @@ security:
     # 可选：按路径覆盖（前缀匹配，优先匹配）
     paths:
       - enabled: true
+        prefix: "/api/v1/auth/"
+        requests_per_minute: 25
+        burst: 10
+      - enabled: true
         prefix: "/api/v1/ai/query"
         requests_per_minute: 30
         burst: 10
+      - enabled: true
+        prefix: "/uploads/"
+        requests_per_minute: 90
+        burst: 20
       - enabled: true
         prefix: "/api/v1/metrics/ingest"
         requests_per_minute: 120

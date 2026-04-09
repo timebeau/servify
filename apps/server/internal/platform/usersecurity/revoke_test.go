@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"servify/apps/server/internal/models"
+	platformauth "servify/apps/server/internal/platform/auth"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -182,6 +183,80 @@ func TestServiceRevokeAllSessions(t *testing.T) {
 	}
 }
 
+func TestServiceScopedUserAccess(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:usersecurity_scope_access?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.AutoMigrate(&models.User{}, &models.UserAuthSession{}, &models.Agent{}, &models.Customer{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	if err := db.Create([]models.User{
+		{ID: 41, Username: "u41", Email: "u41@example.com", Status: "active", Role: "agent"},
+		{ID: 42, Username: "u42", Email: "u42@example.com", Status: "active", Role: "customer"},
+	}).Error; err != nil {
+		t.Fatalf("seed users: %v", err)
+	}
+	if err := db.Create(&models.Agent{UserID: 41, TenantID: "tenant-a", WorkspaceID: "workspace-a"}).Error; err != nil {
+		t.Fatalf("seed scoped agent: %v", err)
+	}
+	if err := db.Create(&models.Customer{UserID: 42, TenantID: "tenant-b", WorkspaceID: "workspace-b"}).Error; err != nil {
+		t.Fatalf("seed out-of-scope customer: %v", err)
+	}
+	if err := db.Create([]models.UserAuthSession{
+		{ID: "auth-41", UserID: 41, Status: "active", TokenVersion: 1},
+		{ID: "auth-42", UserID: 42, Status: "active", TokenVersion: 1},
+	}).Error; err != nil {
+		t.Fatalf("seed auth sessions: %v", err)
+	}
+
+	svc := NewService(db, nil)
+	ctx := platformauth.ContextWithScope(context.Background(), "tenant-a", "workspace-a")
+
+	if _, err := svc.GetUser(ctx, 41); err != nil {
+		t.Fatalf("GetUser(scoped allowed) error = %v", err)
+	}
+	if _, err := svc.GetUser(ctx, 42); err == nil {
+		t.Fatalf("expected scoped GetUser to reject cross-scope user")
+	}
+
+	users, err := svc.GetUsers(ctx, []uint{41, 41})
+	if err != nil {
+		t.Fatalf("GetUsers(scoped duplicates) error = %v", err)
+	}
+	if len(users) != 2 || users[0].ID != 41 || users[1].ID != 41 {
+		t.Fatalf("unexpected scoped users: %+v", users)
+	}
+	if _, err := svc.GetUsers(ctx, []uint{41, 42}); err == nil {
+		t.Fatalf("expected scoped GetUsers to reject mixed-scope batch")
+	}
+
+	if _, err := svc.ListUserSessions(ctx, 41); err != nil {
+		t.Fatalf("ListUserSessions(scoped allowed) error = %v", err)
+	}
+	if _, err := svc.ListUserSessions(ctx, 42); err == nil {
+		t.Fatalf("expected scoped ListUserSessions to reject cross-scope user")
+	}
+
+	if _, err := svc.RevokeTokens(ctx, 41); err != nil {
+		t.Fatalf("RevokeTokens(scoped allowed) error = %v", err)
+	}
+	if _, err := svc.RevokeTokens(ctx, 42); err == nil {
+		t.Fatalf("expected scoped RevokeTokens to reject cross-scope user")
+	}
+
+	if _, err := svc.RevokeSession(ctx, 41, "auth-41"); err != nil {
+		t.Fatalf("RevokeSession(scoped allowed) error = %v", err)
+	}
+	if _, err := svc.RevokeSession(ctx, 42, "auth-42"); err == nil {
+		t.Fatalf("expected scoped RevokeSession to reject cross-scope user")
+	}
+
+	if _, err := svc.RevokeAllSessions(ctx, 42, ""); err == nil {
+		t.Fatalf("expected scoped RevokeAllSessions to reject cross-scope user")
+	}
+}
+
 func TestServiceRevokeJWT(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open("file:usersecurity_revoke_jwt?mode=memory&cache=shared"), &gorm.Config{})
 	if err != nil {
@@ -217,6 +292,61 @@ func TestServiceRevokeJWT(t *testing.T) {
 	}
 	if revoked.Reason != "security-event" {
 		t.Fatalf("reason = %q want security-event", revoked.Reason)
+	}
+}
+
+func TestServiceScopedTokenSurface(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:usersecurity_scoped_tokens?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.AutoMigrate(&models.User{}, &models.Agent{}, &models.Customer{}, &models.RevokedToken{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	if err := db.Create([]models.User{
+		{ID: 61, Username: "u61", Email: "u61@example.com", Status: "active", Role: "agent"},
+		{ID: 62, Username: "u62", Email: "u62@example.com", Status: "active", Role: "customer"},
+	}).Error; err != nil {
+		t.Fatalf("seed users: %v", err)
+	}
+	if err := db.Create(&models.Agent{UserID: 61, TenantID: "tenant-a", WorkspaceID: "workspace-a"}).Error; err != nil {
+		t.Fatalf("seed scoped agent: %v", err)
+	}
+	if err := db.Create(&models.Customer{UserID: 62, TenantID: "tenant-b", WorkspaceID: "workspace-b"}).Error; err != nil {
+		t.Fatalf("seed cross-scope customer: %v", err)
+	}
+
+	now := time.Now().UTC()
+	expiry := now.Add(30 * time.Minute)
+	if err := db.Create([]models.RevokedToken{
+		{JTI: "jti-scope-61", UserID: 61, SessionID: "sess-61", TokenUse: "access", ExpiresAt: &expiry, RevokedAt: now},
+		{JTI: "jti-scope-62", UserID: 62, SessionID: "sess-62", TokenUse: "access", ExpiresAt: &expiry, RevokedAt: now},
+	}).Error; err != nil {
+		t.Fatalf("seed revoked tokens: %v", err)
+	}
+
+	svc := NewService(db, nil)
+	ctx := platformauth.ContextWithScope(context.Background(), "tenant-a", "workspace-a")
+
+	items, total, err := svc.ListRevokedTokens(ctx, RevokedTokenListQuery{Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatalf("ListRevokedTokens(scoped) error = %v", err)
+	}
+	if total != 1 || len(items) != 1 || items[0].UserID != 61 {
+		t.Fatalf("unexpected scoped revoked tokens: total=%d items=%+v", total, items)
+	}
+
+	secret := "test-secret"
+	token := createTestJWTForUserSecurity(t, map[string]interface{}{
+		"jti":        "jti-cross-scope",
+		"user_id":    62,
+		"session_id": "auth-62",
+		"token_use":  "access",
+		"iat":        now.Unix(),
+		"exp":        expiry.Unix(),
+	}, secret)
+	if _, err := svc.RevokeJWT(ctx, token, secret, "cross-scope"); err == nil {
+		t.Fatalf("expected scoped RevokeJWT to reject cross-scope token")
 	}
 }
 

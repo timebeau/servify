@@ -175,3 +175,37 @@ func TestMiddlewareAllowsAuditOverrides(t *testing.T) {
 		t.Fatalf("resource_id = %q want tenant-a", entry.ResourceID)
 	}
 }
+
+func TestMiddlewareMergesRequestMetadata(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := &stubRecorder{}
+
+	r := gin.New()
+	r.Use(Middleware(recorder))
+	r.PUT("/security/config/tenant", func(c *gin.Context) {
+		MergeRequestMetadata(c, map[string]interface{}{
+			"change_ref": "CHG-1001",
+			"reason":     "approve portal branding rollout",
+		})
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/security/config/tenant", strings.NewReader(`{"portal":{"brand_name":"Tenant"}}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d body=%s", w.Code, w.Body.String())
+	}
+	if len(recorder.entries) != 1 {
+		t.Fatalf("expected 1 audit entry got %d", len(recorder.entries))
+	}
+	entry := recorder.entries[0]
+	if !strings.Contains(entry.RequestJSON, `"change_ref":"CHG-1001"`) {
+		t.Fatalf("request_json missing change_ref: %q", entry.RequestJSON)
+	}
+	if !strings.Contains(entry.RequestJSON, `"reason":"approve portal branding rollout"`) {
+		t.Fatalf("request_json missing reason: %q", entry.RequestJSON)
+	}
+}

@@ -616,6 +616,61 @@ func TestUserSecurityHandler_RevokeAllSessions(t *testing.T) {
 	}
 }
 
+func TestUserSecurityHandler_RejectsCrossScopeUsers(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestDBForUserSecurity(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.WarnLevel)
+
+	if err := db.AutoMigrate(&models.Agent{}, &models.Customer{}); err != nil {
+		t.Fatalf("automigrate scoped user tables: %v", err)
+	}
+	if err := db.Create([]models.User{
+		{ID: 81, Username: "scope-agent", Email: "scope-agent@example.com", Name: "Scope Agent", Role: "agent", Status: "active"},
+		{ID: 82, Username: "scope-customer", Email: "scope-customer@example.com", Name: "Scope Customer", Role: "customer", Status: "active"},
+	}).Error; err != nil {
+		t.Fatalf("seed users: %v", err)
+	}
+	if err := db.Create(&models.Agent{UserID: 81, TenantID: "tenant-a", WorkspaceID: "workspace-a"}).Error; err != nil {
+		t.Fatalf("seed scoped agent: %v", err)
+	}
+	if err := db.Create(&models.Customer{UserID: 82, TenantID: "tenant-b", WorkspaceID: "workspace-b"}).Error; err != nil {
+		t.Fatalf("seed cross-scope customer: %v", err)
+	}
+
+	h := NewUserSecurityHandler(usersecurity.NewService(db, logger), logger)
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Request = c.Request.WithContext(platformauth.ContextWithScope(c.Request.Context(), "tenant-a", "workspace-a"))
+		c.Next()
+	})
+	r.GET("/api/security/users/:id", h.GetUserSecurity)
+	r.POST("/api/security/users/revoke-tokens", h.BatchRevokeTokens)
+
+	t.Run("single user lookup returns 404 for cross scope target", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/api/security/users/82", nil)
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusNotFound {
+			t.Fatalf("expected 404 got %d body=%s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("batch revoke rejects mixed scope targets", func(t *testing.T) {
+		body := strings.NewReader(`{"user_ids":[81,82]}`)
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/api/security/users/revoke-tokens", body)
+		req.Header.Set("Content-Type", "application/json")
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusNotFound {
+			t.Fatalf("expected 404 got %d body=%s", w.Code, w.Body.String())
+		}
+	})
+}
+
 func TestUserSecurityHandler_RevokeToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -708,6 +763,84 @@ func TestUserSecurityHandler_ListRevokedTokens(t *testing.T) {
 	if strings.Contains(w.Body.String(), `"jti":"jti-list-2"`) {
 		t.Fatalf("did not expect expired token in body: %s", w.Body.String())
 	}
+}
+
+func TestUserSecurityHandler_TokenSurfaceHonorsScope(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestDBForUserSecurity(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.WarnLevel)
+
+	if err := db.AutoMigrate(&models.Agent{}, &models.Customer{}); err != nil {
+		t.Fatalf("automigrate scoped user tables: %v", err)
+	}
+	if err := db.Create([]models.User{
+		{ID: 91, Username: "token-scope-agent", Email: "token-scope-agent@example.com", Name: "Token Scope Agent", Role: "agent", Status: "active"},
+		{ID: 92, Username: "token-scope-customer", Email: "token-scope-customer@example.com", Name: "Token Scope Customer", Role: "customer", Status: "active"},
+	}).Error; err != nil {
+		t.Fatalf("seed users: %v", err)
+	}
+	if err := db.Create(&models.Agent{UserID: 91, TenantID: "tenant-a", WorkspaceID: "workspace-a"}).Error; err != nil {
+		t.Fatalf("seed scoped agent: %v", err)
+	}
+	if err := db.Create(&models.Customer{UserID: 92, TenantID: "tenant-b", WorkspaceID: "workspace-b"}).Error; err != nil {
+		t.Fatalf("seed cross-scope customer: %v", err)
+	}
+
+	now := time.Now().UTC()
+	expiry := now.Add(30 * time.Minute)
+	if err := db.Create([]models.RevokedToken{
+		{JTI: "jti-scope-list-91", UserID: 91, SessionID: "sess-91", TokenUse: "access", ExpiresAt: &expiry, RevokedAt: now},
+		{JTI: "jti-scope-list-92", UserID: 92, SessionID: "sess-92", TokenUse: "access", ExpiresAt: &expiry, RevokedAt: now},
+	}).Error; err != nil {
+		t.Fatalf("seed revoked tokens: %v", err)
+	}
+
+	h := NewUserSecurityHandler(usersecurity.NewService(db, logger), logger).WithJWTSecret("test-secret")
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Request = c.Request.WithContext(platformauth.ContextWithScope(c.Request.Context(), "tenant-a", "workspace-a"))
+		c.Next()
+	})
+	r.GET("/api/security/tokens/revoked", h.ListRevokedTokens)
+	r.POST("/api/security/tokens/revoke", h.RevokeToken)
+
+	t.Run("revoked token list is scope filtered", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/api/security/tokens/revoked", nil)
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200 got %d body=%s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), `"jti":"jti-scope-list-91"`) {
+			t.Fatalf("expected scoped token in body: %s", w.Body.String())
+		}
+		if strings.Contains(w.Body.String(), `"jti":"jti-scope-list-92"`) {
+			t.Fatalf("did not expect cross-scope token in body: %s", w.Body.String())
+		}
+	})
+
+	t.Run("token revoke returns 404 for cross scope target", func(t *testing.T) {
+		token := createTestHS256JWT(t, map[string]interface{}{
+			"jti":        "jti-token-scope-92",
+			"user_id":    92,
+			"session_id": "auth-92",
+			"token_use":  "refresh",
+			"iat":        now.Unix(),
+			"exp":        expiry.Unix(),
+		}, "test-secret")
+		body := strings.NewReader(`{"token":"` + token + `"}`)
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/api/security/tokens/revoke", body)
+		req.Header.Set("Content-Type", "application/json")
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusNotFound {
+			t.Fatalf("expected 404 got %d body=%s", w.Code, w.Body.String())
+		}
+	})
 }
 
 func createTestHS256JWT(t *testing.T, payload map[string]interface{}, secret string) string {

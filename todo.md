@@ -85,7 +85,7 @@
 - Phase 5 上线 readiness 基础能力已完成，T4/T5 基础安全治理已完成，剩余主要是文档与发布前对齐
 - 当前完成度大致在 `85% ~ 90%`
 - 当前最短板是：
-  - `11-tenant-auth-and-audit` 的后续增强项（主要是真实 Geo/IP 情报接入、按环境/租户细化 session risk policy），以及少量 legacy 聚合尾项
+  - `11-tenant-auth-and-audit` 已收口 management `security/users/*` / `security/tokens/*` 的 scope 隔离，补开放路由 `security surface catalog` 与 `/api/v1/auth/`、`/uploads/` 基线限流，并为 scoped config 敏感变更补 `change_ref` / `reason` 强制审计追踪、执行后 verification、模板化 `checks`、按字段风险细分的 `verification_template`、高风险 `approval_ref` 对应真实审批事件与审批执行分离约束，以及统一 `governance_status` / `governance_policy` 状态机和最小双人复核与证据约束；后续增强项主要收敛到真实 Geo/IP 情报接入、按环境/租户细化 session risk policy，以及少量 legacy 聚合尾项
   - 生产配置与发布前检查的最终对齐（Phase 5）
 
 与最终产品的差距待办：

@@ -41,6 +41,13 @@ func (s *Service) ListRevokedTokens(ctx context.Context, query RevokedTokenListQ
 	}
 
 	tx := s.db.WithContext(ctx).Model(&models.RevokedToken{})
+	if hasRequestScope(ctx) {
+		tx = tx.Where(
+			"user_id IN (?) OR user_id IN (?)",
+			scopedUserIDQuery(ctx, s.db, &models.Agent{}),
+			scopedUserIDQuery(ctx, s.db, &models.Customer{}),
+		)
+	}
 	if query.JTI != "" {
 		tx = tx.Where("jti = ?", query.JTI)
 	}

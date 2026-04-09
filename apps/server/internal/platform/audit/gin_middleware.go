@@ -17,6 +17,7 @@ const (
 	actionKey       = "audit.action"
 	resourceTypeKey = "audit.resource_type"
 	resourceIDKey   = "audit.resource_id"
+	requestMetaKey  = "audit.request_metadata"
 )
 
 func Middleware(recorder Recorder) gin.HandlerFunc {
@@ -48,7 +49,7 @@ func Middleware(recorder Recorder) gin.HandlerFunc {
 			UserAgent:     c.Request.UserAgent(),
 			TenantID:      stringValue(c, "tenant_id"),
 			WorkspaceID:   stringValue(c, "workspace_id"),
-			RequestJSON:   requestJSON,
+			RequestJSON:   mergeRequestJSON(requestJSON, requestMetadata(c)),
 			BeforeJSON:    contextJSON(c, beforeKey),
 			AfterJSON:     contextJSON(c, afterKey),
 		}
@@ -87,6 +88,38 @@ func SetResourceID(c *gin.Context, value string) {
 	if c != nil {
 		c.Set(resourceIDKey, strings.TrimSpace(value))
 	}
+}
+
+func MergeRequestMetadata(c *gin.Context, values map[string]interface{}) {
+	if c == nil || len(values) == 0 {
+		return
+	}
+	merged := map[string]interface{}{}
+	if existing, ok := c.Get(requestMetaKey); ok {
+		if typed, ok := existing.(map[string]interface{}); ok {
+			for key, value := range typed {
+				merged[key] = value
+			}
+		}
+	}
+	for key, value := range values {
+		key = strings.TrimSpace(key)
+		if key == "" || value == nil {
+			continue
+		}
+		if text, ok := value.(string); ok {
+			if strings.TrimSpace(text) == "" {
+				continue
+			}
+			merged[key] = strings.TrimSpace(text)
+			continue
+		}
+		merged[key] = value
+	}
+	if len(merged) == 0 {
+		return
+	}
+	c.Set(requestMetaKey, merged)
 }
 
 func shouldAuditMethod(method string) bool {
@@ -157,6 +190,110 @@ func contextJSON(c *gin.Context, key string) string {
 		return ""
 	}
 	return redactJSONText(string(data))
+}
+
+func requestMetadata(c *gin.Context) map[string]interface{} {
+	if c == nil {
+		return nil
+	}
+	value, ok := c.Get(requestMetaKey)
+	if !ok || value == nil {
+		return nil
+	}
+	typed, ok := value.(map[string]interface{})
+	if !ok || len(typed) == 0 {
+		return nil
+	}
+	metadata := make(map[string]interface{}, len(typed))
+	for key, item := range typed {
+		metadata[key] = item
+	}
+	return metadata
+}
+
+func mergeRequestJSON(raw string, metadata map[string]interface{}) string {
+	raw = strings.TrimSpace(raw)
+	if len(metadata) == 0 {
+		return raw
+	}
+	if raw == "" {
+		data, err := json.Marshal(metadata)
+		if err != nil {
+			return ""
+		}
+		return redactJSONText(string(data))
+	}
+
+	var payload interface{}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		data, marshalErr := json.Marshal(map[string]interface{}{
+			"request":  raw,
+			"metadata": metadata,
+		})
+		if marshalErr != nil {
+			return raw
+		}
+		return redactJSONText(string(data))
+	}
+
+	object, ok := payload.(map[string]interface{})
+	if !ok {
+		data, err := json.Marshal(map[string]interface{}{
+			"request":  payload,
+			"metadata": metadata,
+		})
+		if err != nil {
+			return raw
+		}
+		return redactJSONText(string(data))
+	}
+
+	var conflictMetadata map[string]interface{}
+	for key, value := range metadata {
+		existing, exists := object[key]
+		if !exists {
+			object[key] = value
+			continue
+		}
+		if jsonValueEquals(existing, value) {
+			continue
+		}
+		if conflictMetadata == nil {
+			conflictMetadata = map[string]interface{}{}
+		}
+		conflictMetadata[key] = value
+	}
+	if len(conflictMetadata) > 0 {
+		object["_audit"] = mergeObjectField(object["_audit"], conflictMetadata)
+	}
+
+	data, err := json.Marshal(object)
+	if err != nil {
+		return raw
+	}
+	return redactJSONText(string(data))
+}
+
+func mergeObjectField(existing interface{}, values map[string]interface{}) map[string]interface{} {
+	result := map[string]interface{}{}
+	if typed, ok := existing.(map[string]interface{}); ok {
+		for key, value := range typed {
+			result[key] = value
+		}
+	}
+	for key, value := range values {
+		result[key] = value
+	}
+	return result
+}
+
+func jsonValueEquals(left, right interface{}) bool {
+	leftJSON, leftErr := json.Marshal(left)
+	rightJSON, rightErr := json.Marshal(right)
+	if leftErr != nil || rightErr != nil {
+		return false
+	}
+	return string(leftJSON) == string(rightJSON)
 }
 
 func redactJSONText(raw string) string {

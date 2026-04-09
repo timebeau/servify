@@ -56,7 +56,9 @@ func TestSecurityWarnings_PublicSurfaceRateLimitCoverage(t *testing.T) {
 		"security.rate_limiting.paths has no dedicated limit for /public/ (anonymous public surface baseline)",
 		"security.rate_limiting.paths has no dedicated limit for /public/kb/ (public knowledge base enumeration and crawl risk)",
 		"security.rate_limiting.paths has no dedicated limit for /public/csat/ (public survey token access and submission risk)",
+		"security.rate_limiting.paths has no dedicated limit for /api/v1/auth/ (anonymous auth entrypoints)",
 		"security.rate_limiting.paths has no dedicated limit for /api/v1/ws (anonymous realtime connection surface)",
+		"security.rate_limiting.paths has no dedicated limit for /uploads/ (public uploaded asset surface)",
 		"security.rate_limiting.paths has no dedicated limit for /api/v1/metrics/ingest (service ingestion surface)",
 	} {
 		if !strings.Contains(joined, want) {
@@ -91,9 +93,21 @@ func TestSecurityWarnings_PublicSurfaceRateLimitCoverageSatisfied(t *testing.T) 
 		},
 		{
 			Enabled:           true,
+			Prefix:            "/api/v1/auth/",
+			RequestsPerMinute: 25,
+			Burst:             10,
+		},
+		{
+			Enabled:           true,
 			Prefix:            "/api/v1/ws",
 			RequestsPerMinute: 30,
 			Burst:             10,
+		},
+		{
+			Enabled:           true,
+			Prefix:            "/uploads/",
+			RequestsPerMinute: 90,
+			Burst:             20,
 		},
 		{
 			Enabled:           true,
@@ -111,7 +125,7 @@ func TestSecurityWarnings_PublicSurfaceRateLimitCoverageSatisfied(t *testing.T) 
 	cfg.AI.OpenAI.APIKey = "openai-key"
 
 	warnings := strings.Join(SecurityWarnings(cfg), "\n")
-	for _, denied := range []string{"/public/", "/public/kb/", "/public/csat/", "/api/v1/ws", "/api/v1/metrics/ingest", "/api/"} {
+	for _, denied := range []string{"/public/", "/public/kb/", "/public/csat/", "/api/v1/auth/", "/api/v1/ws", "/uploads/", "/api/v1/metrics/ingest", "/api/"} {
 		if strings.Contains(warnings, denied) {
 			t.Fatalf("unexpected public/service/management surface warning for %s in %q", denied, warnings)
 		}
@@ -138,6 +152,12 @@ func TestSecurityWarnings_PublicSurfaceInheritedLimitDoesNotCountAsDedicated(t *
 		},
 		{
 			Enabled:           true,
+			Prefix:            "/uploads/",
+			RequestsPerMinute: 90,
+			Burst:             20,
+		},
+		{
+			Enabled:           true,
 			Prefix:            "/api/v1/metrics/ingest",
 			RequestsPerMinute: 120,
 			Burst:             30,
@@ -152,7 +172,7 @@ func TestSecurityWarnings_PublicSurfaceInheritedLimitDoesNotCountAsDedicated(t *
 	cfg.AI.OpenAI.APIKey = "openai-key"
 
 	warnings := strings.Join(SecurityWarnings(cfg), "\n")
-	for _, want := range []string{"/public/kb/", "/public/csat/"} {
+	for _, want := range []string{"/public/kb/", "/public/csat/", "/api/v1/auth/"} {
 		if !strings.Contains(warnings, want) {
 			t.Fatalf("expected dedicated-path warning for %s in %q", want, warnings)
 		}

@@ -20,7 +20,9 @@ var requiredSecurityRateLimitPaths = []requiredRateLimitPath{
 	{prefix: "/public/", reason: "anonymous public surface baseline"},
 	{prefix: "/public/kb/", reason: "public knowledge base enumeration and crawl risk"},
 	{prefix: "/public/csat/", reason: "public survey token access and submission risk"},
+	{prefix: "/api/v1/auth/", reason: "anonymous auth entrypoints"},
 	{prefix: "/api/v1/ws", reason: "anonymous realtime connection surface"},
+	{prefix: "/uploads/", reason: "public uploaded asset surface"},
 	{prefix: "/api/v1/metrics/ingest", reason: "service ingestion surface"},
 	{prefix: "/api/", reason: "management surface"},
 }

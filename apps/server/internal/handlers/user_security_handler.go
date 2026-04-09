@@ -680,6 +680,13 @@ func (h *UserSecurityHandler) RevokeToken(c *gin.Context) {
 
 	result, err := h.service.RevokeJWT(c.Request.Context(), req.Token, h.jwtSecret, req.Reason)
 	if err != nil {
+		if usersecurity.IsNotFound(err) {
+			c.JSON(http.StatusNotFound, ErrorResponse{
+				Error:   "Token target not found",
+				Message: "token target is outside request scope or no longer exists",
+			})
+			return
+		}
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "Failed to revoke token",
 			Message: err.Error(),
