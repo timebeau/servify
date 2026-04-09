@@ -244,7 +244,16 @@
 - `internal/platform/configscope.Resolver` 现已支持 `session_risk` 的 `system -> tenant -> workspace -> runtime` 风险阈值解析链路
 - 已新增数据库持久化的 `TenantConfig` / `WorkspaceConfig` GORM provider；当前 public portal 已接入这套读取链路
 - 管理面已具备 tenant/workspace scoped config 的最小读写入口，当前覆盖 `portal` / `OpenAI` / `WeKnora` / `session_risk`
-- scoped config 写接口现已记录 before/after 快照，并提供 tenant/workspace 级变更历史列表元数据、单条历史详情的字段路径级差异预览与带 `added/removed/updated` 类型的 current/snapshot 值对，以及要求显式确认的按审计记录回滚入口
+- scoped config 写接口现已记录 before/after 快照；tenant/workspace 级 `PUT` / `rollback` / `verify` 还会强制要求 `change_ref` 与 `reason`，并把这些变更控制字段写入审计 request metadata
+- 对命中高风险配置簇的 `PUT` / `rollback`，当前不仅要求提供 `approval_ref`，还要求 `approval_ref + change_ref` 能匹配到已记录的 `scoped_config.{scope}.approve` 审计事件，且审批人与实际执行人必须分离；接口仍支持 JSON body 或 `X-Approval-Ref` header，当前高风险主要覆盖 provider endpoint、WeKnora KB mapping、session risk 核心阈值以及 rollback 操作本身
+- scoped config 同时提供 tenant/workspace 级变更历史列表元数据、单条历史详情的字段路径级差异预览与带 `added/removed/updated` 类型的 current/snapshot 值对，以及要求显式确认的按审计记录回滚入口
+- 管理面现已补执行后验证入口，可为单条 update / rollback 审计记录写入 `passed` / `failed` verification 结果；verification 提交除 `status` / `notes` / `evidence` 外，还需携带与 `verification_template.checks` 对齐的 `checks`
+- 当前 verification 已按模板化检查项收口：`passed` 必须带 evidence，且模板内所有必填检查项都要显式 `passed`；`failed` 必须带 notes，且至少要有一个模板检查项标记为 `failed`
+- `verification_template` 现已同时返回根级 `changed_paths`，并把单个检查项按字段风险细分到 portal public surface / locale、OpenAI endpoint / model、WeKnora endpoint / KB mapping / health check、session risk score / window / concurrency；每个 check 还会带 `risk_level` 和自身命中的 `changed_paths`
+- 写入响应、history 列表、详情与 verify 响应还会同步返回 `change_control`、`change_risk` 和 `approval_policy`；其中 `change_control` 会带 `approval_ref`，`change_risk` 会给出 `risk_level` / `risk_reasons` / `changed_paths`，`approval_policy` 现在会进一步区分仅提供单号、已落库审批事件和最新审批人等真实审批状态
+- 当前还会同步返回统一的 `governance_status` / `governance_policy`，把审批前置和执行后验证组合成单一状态机；verify 响应会额外返回 `source_governance_status` / `source_governance_policy`
+- 当前 verification 还会执行最小双人复核约束：reviewer 必须带 `user_id`，且不能与原始变更执行人相同；history 列表、详情与 verify 响应会同步给出 `verification_status`、最新 verification 记录、verification history、`verification_template` 和带 `checks_required` / `required_check_ids` / `template_check_count` 的 `verification_policy`
+- `history` 列表还支持直接按 `governance_status` / `risk_level` / `approval_status` / `verification_status` / `needs_action` 查询治理队列，并额外返回 `governance_summary` 与 `applied_filters`，便于管理后台直接渲染待审批/待验证工作台
 
 ### 当前数据库配置对象的建议定位
 

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	appbootstrap "servify/apps/server/internal/app/bootstrap"
+	appserver "servify/apps/server/internal/app/server"
 
 	"github.com/spf13/cobra"
 )
@@ -33,6 +34,8 @@ func runCheckSecurityBaseline(configPath string, strict bool, out io.Writer) err
 	}
 
 	warnings := appbootstrap.SecurityWarnings(cfg)
+	router := appserver.BuildRouter(appserver.Dependencies{Config: cfg})
+	warnings = append(warnings, appserver.RouteSecurityWarnings(router.Routes(), cfg)...)
 	if len(warnings) == 0 {
 		_, _ = fmt.Fprintln(out, "Security baseline check passed.")
 		return nil
