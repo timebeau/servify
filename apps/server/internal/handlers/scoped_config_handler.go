@@ -269,7 +269,7 @@ func (h *ScopedConfigHandler) historyEntry(c *gin.Context, scope string) {
 		return
 	}
 	operation := scopedConfigOperation(entry.Action)
-	verificationTemplate := scopedConfigVerificationTemplateFromAudit(entry)
+	verificationTemplate := scopedConfigVerificationTemplateForHistoryEntry(entry, current, snapshot)
 	changeControl := extractScopedConfigChangeControl(entry.RequestJSON)
 	changeRisk := scopedConfigChangeRiskForTemplate(operation, verificationTemplate)
 	approval, err := h.latestScopedConfigApproval(c.Request.Context(), scope, tenantID, workspaceID, changeControl)
@@ -1623,6 +1623,16 @@ func scopedConfigVerificationTemplateFromAudit(entry *models.AuditLog) scopedCon
 	}
 }
 
+func scopedConfigVerificationTemplateForHistoryEntry(entry *models.AuditLog, current, snapshot *configscope.ScopedConfigDocument) scopedConfigVerificationTemplate {
+	if entry == nil {
+		return scopedConfigVerificationTemplate{}
+	}
+	if strings.TrimSpace(entry.BeforeJSON) != "" || current == nil || snapshot == nil {
+		return scopedConfigVerificationTemplateFromAudit(entry)
+	}
+	return scopedConfigVerificationTemplateForDocuments(scopedConfigOperation(entry.Action), current, snapshot)
+}
+
 func scopedConfigDocumentFromAuditJSON(raw string) *configscope.ScopedConfigDocument {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -2506,11 +2516,45 @@ func diffJSONChanges(current, snapshot interface{}, prefix string) []gin.H {
 	if body, err := json.Marshal(snapshot); err == nil && len(body) > 0 && string(body) != "null" {
 		_ = json.Unmarshal(body, &snapshotValue)
 	}
+	currentValue = normalizeDiffJSONValue(currentValue)
+	snapshotValue = normalizeDiffJSONValue(snapshotValue)
 	changes := collectDiffChanges(currentValue, snapshotValue, prefix)
 	sort.Slice(changes, func(i, j int) bool {
 		return changes[i]["path"].(string) < changes[j]["path"].(string)
 	})
 	return changes
+}
+
+func normalizeDiffJSONValue(value interface{}) interface{} {
+	switch typed := value.(type) {
+	case map[string]interface{}:
+		if len(typed) == 0 {
+			return nil
+		}
+		normalized := make(map[string]interface{}, len(typed))
+		for key, child := range typed {
+			normalizedChild := normalizeDiffJSONValue(child)
+			if normalizedChild == nil {
+				continue
+			}
+			normalized[key] = normalizedChild
+		}
+		if len(normalized) == 0 {
+			return nil
+		}
+		return normalized
+	case []interface{}:
+		if len(typed) == 0 {
+			return typed
+		}
+		normalized := make([]interface{}, 0, len(typed))
+		for _, child := range typed {
+			normalized = append(normalized, normalizeDiffJSONValue(child))
+		}
+		return normalized
+	default:
+		return value
+	}
 }
 
 func collectDiffChanges(current, snapshot interface{}, prefix string) []gin.H {
