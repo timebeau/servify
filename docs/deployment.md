@@ -86,7 +86,7 @@
 ### 3.1 克隆仓库
 
 ```bash
-git clone https://github.com/Toconvo/servify.git
+git clone https://github.com/timebeau/servify.git
 cd servify
 ```
 
@@ -158,15 +158,21 @@ docker compose -f infra/compose/docker-compose.yml logs -f servify
 docker compose -f infra/compose/docker-compose.yml down
 ```
 
-### 4.2 带 WeKnora 知识库
+### 4.2 带 WeKnora mock 验收环境
 
 ```bash
-# 启动全套（含知识库服务）
+# 启动全套（含 mock WeKnora 服务）
 docker compose \
   -f infra/compose/docker-compose.yml \
   -f infra/compose/docker-compose.weknora.yml \
   up -d
 ```
+
+注意：
+
+- 该 compose 文件当前构建的是 `infra/compose/weknora-mock/`。
+- 它适用于本地协议回归和验收证据采集，不应被当作真实 WeKnora 生产部署模板。
+- 若要执行 `WEKNORA_ACCEPTANCE_MODE=real`，请改连真实 WeKnora 地址。
 
 需要额外环境变量：
 
@@ -199,10 +205,10 @@ monitoring:
 
 访问 Jaeger UI：http://localhost:16686
 
-### 4.4 全套部署（一键启动）
+### 4.4 全套本地验收部署（一键启动）
 
 ```bash
-# API + DB + Redis + WeKnora + OTel + Jaeger
+# API + DB + Redis + mock WeKnora + OTel + Jaeger
 docker compose \
   -f infra/compose/docker-compose.yml \
   -f infra/compose/docker-compose.weknora.yml \
@@ -491,7 +497,7 @@ monitoring:
 
 ### 7.3 生产配置安全清单
 
-使用 `config.production.secure.example.yml` 作为基线：
+使用 `config.production.secure.example.yml` 作为生产基线；使用 `config.staging.example.yml` 作为 staging 演练基线。
 
 - [ ] `jwt.secret` 使用环境变量引用 `"${SERVIFY_JWT_SECRET}"`
 - [ ] `security.cors.allowed_origins` 限制为实际域名，不用 `*`
@@ -587,10 +593,23 @@ healthcheck:
 |------|------|---------|
 | HighHTTP5xxRate | Critical | 5xx 比例 > 5% 持续 5 分钟 |
 | HighP99Latency | Warning | P99 延迟 > 5s 持续 10 分钟 |
+| HighRateLimitDrops | Info | 限流丢弃速率 > 10/s 持续 5 分钟 |
+| HighGoroutineCount | Warning | goroutines > 10000 持续 10 分钟 |
 | HighSystemErrorRate | Critical | 系统错误 > 0.01/s 持续 5 分钟 |
+| HighDependencyErrorRate | Warning | 依赖错误 > 0.1/s 持续 5 分钟 |
 | EventBusHandlerFailures | Warning | 事件处理失败持续 5 分钟 |
+| EventBusDeadLetters | Info | dead letter 持续 10 分钟 |
 | AIProviderDegraded | Critical | AI 失败率 > 20% 持续 5 分钟 |
+| AIHighLatency | Warning | AI P95 延迟 > 10s 持续 10 分钟 |
 | WorkerJobFailures | Warning | Worker 失败持续 10 分钟 |
+
+生产建议直接从 `config.production.secure.example.yml` 启动，并显式保留：
+
+- `monitoring.metrics_path: "/metrics"`
+- `monitoring.tracing.enabled: true`
+- `monitoring.tracing.endpoint: "http://otel-collector:4317"`
+- `monitoring.tracing.sample_ratio: 0.1`
+- `monitoring.tracing.service_name: "servify"`
 
 ---
 

@@ -10,8 +10,8 @@
 
 [![Go Version](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![CI](https://img.shields.io/github/actions/workflow/status/Toconvo/servify/ci.yml?branch=main&label=CI)](https://github.com/Toconvo/servify/actions)
-[![GitHub Stars](https://img.shields.io/github/stars/Toconvo/servify?style=social)](https://github.com/Toconvo/servify)
+[![CI](https://img.shields.io/github/actions/workflow/status/timebeau/servify/ci.yml?branch=main&label=CI)](https://github.com/timebeau/servify/actions)
+[![GitHub Stars](https://img.shields.io/github/stars/timebeau/servify?style=social)](https://github.com/timebeau/servify)
 [![Website](https://img.shields.io/badge/website-servify.cloud-6366f1?logo=cloudflare)](https://www.servify.cloud/)
 
 </div>
@@ -22,6 +22,8 @@ Servify 是一个面向企业独立部署的开源智能客服系统。
 
 它当前的产品重心不是“平台化多租户”，而是先把客服主链路做完整：`Web 接入 -> AI 首答 -> 远程协助 -> 人工接管 -> 转接协作 -> 工单闭环`。
 
+这里的“远程协助”不是单指某个协议或 SDK，而是指客服在同一条服务链路里，从聊天升级到实时指引、联合排查和持续接管的能力。
+
 当前仓库已经收敛到 `模块化单体` 架构，重点围绕会话、路由、工单、AI、知识库和后台运营持续演化；多端 SDK、更多渠道和语音能力属于后续扩展边界，而不是当前产品中心。
 
 ---
@@ -30,7 +32,7 @@ Servify 是一个面向企业独立部署的开源智能客服系统。
 
 - ✅ 已形成智能客服产品骨架：`conversation`、`routing`、`ticket`
 - ✅ 已具备 AI 与知识库基础能力：`ai`、`knowledge`
-- ✅ 已具备远程协助所需的实时能力基础：WebSocket / WebRTC 相关链路已纳入产品演化
+- ✅ 已具备远程协助所需的实时能力基础：WebSocket / WebRTC 相关链路、会话承接与统计入口已纳入产品演化
 - ✅ 已完成客服后台关键模块迁移：`agent`、`customer`
 - ✅ 已补齐管理面安全基线首轮能力：认证、审计、token state revoke、session security surface
 - ✅ 已明确 Web 优先、多端预留的演化方向
@@ -51,6 +53,16 @@ Servify 当前更适合这样理解：
 - 管理员在后台管理坐席、知识库、权限和基础配置
 
 这意味着 `tenant/workspace` 更接近治理和隔离能力，而不是产品主叙事。
+
+## 🛟 远程协助当前指什么
+
+在 Servify 当前阶段，远程协助应该被理解为：
+
+- 客户在 Web 会话中遇到需要一步步引导的问题时，客服可以从“解释”升级到“带着完成”
+- AI、人工接管、实时交互和工单不是割裂的工具，而是一条连续服务链路
+- 远程协助结束后，客服仍可以继续转接、协作或沉淀工单，而不是把上下文丢到外部系统
+
+当前仓库已经具备这条能力链路的实时基础，包括会话、消息、WebSocket、WebRTC stats / connections、人工接管和后续工单衔接能力；但它现在还不是一个“已经交付完整 co-browsing 产品”的承诺。
 
 ---
 
@@ -118,6 +130,11 @@ Servify 当前更适合这样理解：
 - 把远程协助做成真实产品差异点，而不是隐藏在底层实时能力里
 - 把转接、协作和工单闭环收完整
 - 把后台运营和安全基线稳定下来
+
+推荐先读：
+
+- [远程协助产品说明](./docs/remote-assistance.md)
+- [文档站首页](./docs/README.md)
 
 当前不会把“平台化租户能力”作为产品中心持续扩张，而是先把独立部署客服产品做扎实。
 
@@ -392,7 +409,7 @@ Jaeger 默认地址：`http://localhost:16686`
 1. **创建 Cloudflare Pages 项目**
    - 登录 [Cloudflare Dashboard](https://dash.cloudflare.com)
    - 进入 **Workers & Pages** → **Create application** → **Pages** → **Connect to Git**
-   - 选择 GitHub 仓库 `Toconvo/servify`
+   - 选择 GitHub 仓库 `timebeau/servify`
    - 项目名称设为：`servify-website`
    - 构建设置（静态站点无需构建）：
      - 生产分支：`main`
@@ -432,9 +449,9 @@ Jaeger 默认地址：`http://localhost:16686`
 
 **[⬆ 返回顶部](#-servify)**
 
-Made with ❤️ by [Toconvo](https://github.com/Toconvo)
+Made with ❤️ by [timebeau](https://github.com/timebeau)
 
 [![Apache License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![GitHub](https://img.shields.io/badge/GitHub-Toconvo%2Fservify-181717?logo=github)](https://github.com/Toconvo/servify)
+[![GitHub](https://img.shields.io/badge/GitHub-timebeau%2Fservify-181717?logo=github)](https://github.com/timebeau/servify)
 
 </div>
