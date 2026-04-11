@@ -2,10 +2,10 @@
   "name": "@servify/docs",
   "private": true,
   "version": "0.1.0",
-  "description": "Servify documentation site powered by VuePress",
+  "description": "Servify product documentation site powered by VuePress",
   "scripts": {
-    "dev": "npx vuepress dev . --host 0.0.0.0 --port 8082",
-    "build": "npx vuepress build ."
+    "dev": "vuepress dev . --host 0.0.0.0 --port 8082",
+    "build": "vuepress build ."
   },
   "devDependencies": {
     "@vuepress/bundler-vite": "^2.0.0-rc.18",

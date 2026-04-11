@@ -41,6 +41,15 @@ func (p *GormTenantConfigProvider) LoadOpenAIConfig(ctx context.Context) (config
 	return decodeConfig[config.OpenAIConfig](cfg.OpenAIJSON)
 }
 
+func (p *GormTenantConfigProvider) LoadDifyConfig(ctx context.Context) (config.DifyConfig, bool, error) {
+	var cfg models.TenantConfig
+	ok, err := p.load(ctx, &cfg)
+	if !ok || err != nil {
+		return config.DifyConfig{}, ok, err
+	}
+	return decodeConfig[config.DifyConfig](cfg.DifyJSON)
+}
+
 func (p *GormTenantConfigProvider) LoadWeKnoraConfig(ctx context.Context) (config.WeKnoraConfig, bool, error) {
 	var cfg models.TenantConfig
 	ok, err := p.load(ctx, &cfg)
@@ -104,6 +113,15 @@ func (p *GormWorkspaceConfigProvider) LoadOpenAIConfig(ctx context.Context) (con
 		return config.OpenAIConfig{}, ok, err
 	}
 	return decodeConfig[config.OpenAIConfig](cfg.OpenAIJSON)
+}
+
+func (p *GormWorkspaceConfigProvider) LoadDifyConfig(ctx context.Context) (config.DifyConfig, bool, error) {
+	var cfg models.WorkspaceConfig
+	ok, err := p.load(ctx, &cfg)
+	if !ok || err != nil {
+		return config.DifyConfig{}, ok, err
+	}
+	return decodeConfig[config.DifyConfig](cfg.DifyJSON)
 }
 
 func (p *GormWorkspaceConfigProvider) LoadWeKnoraConfig(ctx context.Context) (config.WeKnoraConfig, bool, error) {

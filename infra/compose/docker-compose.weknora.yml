@@ -1,8 +1,10 @@
-# WeKnora 集成开发环境
-# 使用方法: docker-compose -f docker-compose.yml -f docker-compose.weknora.yml up -d
+# WeKnora mock-backed 集成环境
+# 注意：当前 compose 文件构建的是 ./weknora-mock，用于本地协议回归与验收证据留档，
+# 不是“真实 WeKnora staging/production”部署模板。
+# 使用方法: docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.weknora.yml up -d
 
 services:
-  # WeKnora 主服务
+  # WeKnora mock 服务
   weknora:
     build:
       context: ./weknora-mock

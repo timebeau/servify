@@ -6,6 +6,7 @@ package services
 import (
 	"context"
 	"testing"
+	"time"
 
 	"servify/apps/server/internal/models"
 
@@ -275,6 +276,41 @@ func TestCustomerService_UpdateCustomer(t *testing.T) {
 				t.Error("expected updated customer, got nil")
 			}
 		})
+	}
+}
+
+func TestCustomerService_GetCustomerStats_AppliesScope(t *testing.T) {
+	db := newCustomerServiceTestDB(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.ErrorLevel)
+	svc := NewCustomerService(db, logger)
+	now := time.Now()
+
+	if err := db.Create(&[]models.User{
+		{ID: 11, Username: "customer-a", Email: "customer-a@test.com", Role: "customer", Status: "active", CreatedAt: now, UpdatedAt: now},
+		{ID: 12, Username: "customer-b", Email: "customer-b@test.com", Role: "customer", Status: "active", CreatedAt: now, UpdatedAt: now},
+	}).Error; err != nil {
+		t.Fatalf("create users: %v", err)
+	}
+	if err := db.Create(&[]models.Customer{
+		{UserID: 11, TenantID: "tenant-a", WorkspaceID: "workspace-a", Source: "web", Priority: "normal", CreatedAt: now, UpdatedAt: now},
+		{UserID: 12, TenantID: "tenant-a", WorkspaceID: "workspace-b", Source: "referral", Priority: "high", CreatedAt: now, UpdatedAt: now},
+	}).Error; err != nil {
+		t.Fatalf("create customers: %v", err)
+	}
+
+	stats, err := svc.GetCustomerStats(scopedContext("tenant-a", "workspace-a"))
+	if err != nil {
+		t.Fatalf("GetCustomerStats() error = %v", err)
+	}
+	if stats.Total != 1 {
+		t.Fatalf("unexpected scoped customer stats: %+v", stats)
+	}
+	if len(stats.BySource) != 1 || stats.BySource[0].Source != "web" || stats.BySource[0].Count != 1 {
+		t.Fatalf("unexpected scoped source stats: %+v", stats.BySource)
+	}
+	if len(stats.ByPriority) != 1 || stats.ByPriority[0].Priority != "normal" || stats.ByPriority[0].Count != 1 {
+		t.Fatalf("unexpected scoped priority stats: %+v", stats.ByPriority)
 	}
 }
 

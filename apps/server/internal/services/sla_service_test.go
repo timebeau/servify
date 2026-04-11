@@ -473,3 +473,81 @@ func TestSLAService_GetStats_DoesNotLeakCrossScopeConfigJoins(t *testing.T) {
 		t.Fatalf("expected cross-scope tier join to be excluded, got %+v", stats.ViolationsByTier)
 	}
 }
+
+func TestSLAService_GetStats_DoesNotLeakCrossScopeTrendData(t *testing.T) {
+	db := newSLATestDB(t)
+	svc := NewSLAService(db, logrus.New())
+	now := time.Now()
+
+	if err := db.Create(&[]models.Ticket{
+		{
+			ID:          701,
+			Title:       "ticket-a",
+			Status:      "open",
+			TenantID:    "tenant-a",
+			WorkspaceID: "workspace-a",
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		},
+		{
+			ID:          702,
+			Title:       "ticket-b",
+			Status:      "open",
+			TenantID:    "tenant-a",
+			WorkspaceID: "workspace-b",
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		},
+	}).Error; err != nil {
+		t.Fatalf("create tickets failed: %v", err)
+	}
+
+	if err := db.Create(&[]models.SLAViolation{
+		{
+			ID:            801,
+			TenantID:      "tenant-a",
+			WorkspaceID:   "workspace-a",
+			TicketID:      701,
+			SLAConfigID:   1,
+			ViolationType: "first_response",
+			Deadline:      now.Add(-time.Hour),
+			ViolatedAt:    now,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		},
+		{
+			ID:            802,
+			TenantID:      "tenant-a",
+			WorkspaceID:   "workspace-b",
+			TicketID:      702,
+			SLAConfigID:   2,
+			ViolationType: "resolution",
+			Deadline:      now.Add(-time.Hour),
+			ViolatedAt:    now,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		},
+	}).Error; err != nil {
+		t.Fatalf("create violations failed: %v", err)
+	}
+
+	stats, err := svc.GetSLAStats(scopedContext("tenant-a", "workspace-a"))
+	if err != nil {
+		t.Fatalf("GetSLAStats failed: %v", err)
+	}
+	if len(stats.TrendData) == 0 {
+		t.Fatalf("expected trend data, got %+v", stats)
+	}
+	foundScopedDay := false
+	for _, item := range stats.TrendData {
+		if item.TotalTickets > 1 || item.Violations > 1 {
+			t.Fatalf("expected scoped trend to exclude workspace-b data, got %+v", stats.TrendData)
+		}
+		if item.TotalTickets == 1 && item.Violations == 1 && item.ComplianceRate == 0 {
+			foundScopedDay = true
+		}
+	}
+	if !foundScopedDay {
+		t.Fatalf("expected one scoped trend row with 1 ticket and 1 violation, got %+v", stats.TrendData)
+	}
+}

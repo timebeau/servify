@@ -23,6 +23,7 @@ type AuthHandler struct {
 	service  authService
 	policy   sessionRiskPolicy
 	resolver *configscope.Resolver
+	ipIntel  sessionIPIntelligence
 }
 
 type authService interface {
@@ -37,7 +38,7 @@ type authService interface {
 
 // NewAuthHandler creates a new AuthHandler.
 func NewAuthHandler(service authService) *AuthHandler {
-	return &AuthHandler{service: service, policy: defaultSessionRiskPolicy()}
+	return &AuthHandler{service: service, policy: defaultSessionRiskPolicy(), ipIntel: heuristicSessionIPIntelligence{}}
 }
 
 func (h *AuthHandler) WithSessionRiskPolicyConfig(cfg config.SessionRiskPolicyConfig) *AuthHandler {
@@ -50,6 +51,13 @@ func (h *AuthHandler) WithSessionRiskPolicyConfig(cfg config.SessionRiskPolicyCo
 func (h *AuthHandler) WithSessionRiskResolver(resolver *configscope.Resolver) *AuthHandler {
 	if h != nil {
 		h.resolver = resolver
+	}
+	return h
+}
+
+func (h *AuthHandler) WithSessionIPIntelligence(provider sessionIPIntelligence) *AuthHandler {
+	if h != nil && provider != nil {
+		h.ipIntel = provider
 	}
 	return h
 }
@@ -227,10 +235,10 @@ func (h *AuthHandler) ListSessions(c *gin.Context) {
 	}
 	currentSessionID := authSessionID(c)
 	policy := h.sessionRiskPolicy(c.Request.Context())
-	riskContext := buildSessionRiskContext(sessions, policy)
+	riskContext := buildSessionRiskContext(sessions, policy, h.ipIntel)
 	items := make([]gin.H, 0, len(sessions))
 	for _, session := range sessions {
-		items = append(items, mapSessionResponse(session, currentSessionID != "" && session.ID == currentSessionID, riskContext, policy))
+		items = append(items, mapSessionResponse(session, currentSessionID != "" && session.ID == currentSessionID, riskContext, policy, h.ipIntel))
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -460,7 +468,7 @@ func sessionRiskPolicyFromConfig(cfg config.SessionRiskPolicyConfig) sessionRisk
 	return policy
 }
 
-func buildSessionRiskContext(sessions []models.UserAuthSession, policy sessionRiskPolicy) sessionRiskContext {
+func buildSessionRiskContext(sessions []models.UserAuthSession, policy sessionRiskPolicy, provider sessionIPIntelligence) sessionRiskContext {
 	publicIPs := make(map[string]struct{})
 	devices := make(map[string]struct{})
 	activeCount := 0
@@ -477,7 +485,7 @@ func buildSessionRiskContext(sessions []models.UserAuthSession, policy sessionRi
 			latestActive = &copy
 		}
 
-		if strings.EqualFold(classifyNetworkLabel(session.ClientIP), "public") {
+		if strings.EqualFold(describeSessionIP(provider, session.ClientIP).NetworkLabel, "public") {
 			if ip := strings.TrimSpace(session.ClientIP); ip != "" {
 				publicIPs[ip] = struct{}{}
 			}
@@ -499,8 +507,8 @@ func buildSessionRiskContext(sessions []models.UserAuthSession, policy sessionRi
 	}
 }
 
-func mapSessionResponse(session models.UserAuthSession, isCurrent bool, riskContext sessionRiskContext, policy sessionRiskPolicy) gin.H {
-	riskScore, riskLevel, riskReasons, networkLabel, locationLabel, drift := describeSessionRisk(session, isCurrent, riskContext, policy)
+func mapSessionResponse(session models.UserAuthSession, isCurrent bool, riskContext sessionRiskContext, policy sessionRiskPolicy, provider sessionIPIntelligence) gin.H {
+	riskScore, riskLevel, riskReasons, networkLabel, locationLabel, drift := describeSessionRisk(session, isCurrent, riskContext, policy, provider)
 	refreshRecency, rapidRefresh := classifyRefreshActivity(session, riskContext, policy)
 	return gin.H{
 		"session_id":               session.ID,
@@ -542,10 +550,11 @@ type sessionDriftSignals struct {
 	RapidDeviceChange  bool
 }
 
-func describeSessionRisk(session models.UserAuthSession, isCurrent bool, riskContext sessionRiskContext, policy sessionRiskPolicy) (int, string, []string, string, string, sessionDriftSignals) {
+func describeSessionRisk(session models.UserAuthSession, isCurrent bool, riskContext sessionRiskContext, policy sessionRiskPolicy, provider sessionIPIntelligence) (int, string, []string, string, string, sessionDriftSignals) {
 	reasons := make([]string, 0, 8)
-	networkLabel := classifyNetworkLabel(session.ClientIP)
-	locationLabel := classifyLocationLabel(session.ClientIP)
+	ipDesc := describeSessionIP(provider, session.ClientIP)
+	networkLabel := ipDesc.NetworkLabel
+	locationLabel := ipDesc.LocationLabel
 	drift := detectSessionDrift(session, riskContext, policy)
 	score := 0
 

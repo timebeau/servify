@@ -6,7 +6,7 @@ import { docsNavbar, docsSidebar } from './site-structure';
 export default defineUserConfig({
   lang: 'zh-CN',
   title: 'Servify Docs',
-  description: 'Servify architecture, implementation backlogs, and integration guides',
+  description: 'Servify product docs for intelligent customer service, remote assistance, deployment, and operations',
   base: '/servify/',
   bundler: viteBundler(),
   head: [

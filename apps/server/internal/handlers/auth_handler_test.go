@@ -35,6 +35,14 @@ type stubAuthSessionRiskProvider struct {
 	err   error
 }
 
+type stubSessionIPIntelligence struct {
+	desc sessionIPDescription
+}
+
+func (s stubSessionIPIntelligence) DescribeIP(ip string) sessionIPDescription {
+	return s.desc
+}
+
 func (s stubAuthSessionRiskProvider) LoadSessionRiskConfig(ctx context.Context) (config.SessionRiskPolicyConfig, bool, error) {
 	return s.value, s.ok, s.err
 }
@@ -280,6 +288,97 @@ func TestAuthHandlerSelfServiceSessionsUsesScopedRiskPolicy(t *testing.T) {
 	}
 	if bytes.Contains(w.Body.Bytes(), []byte(`"risk_level":"high"`)) {
 		t.Fatalf("expected no high risk level after scoped override: %s", w.Body.String())
+	}
+}
+
+func TestAuthHandlerSelfServiceSessionsUsesEnvironmentRiskProfile(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	svc := &stubAuthService{
+		sessions: []models.UserAuthSession{
+			{ID: "sess-a", Status: "active", TokenVersion: 1, DeviceFingerprint: "fp-a", UserAgent: "browser-a", ClientIP: "203.0.113.10", LastSeenAt: ptrTime(time.Now().UTC().Add(-2 * time.Hour)), LastRefreshedAt: ptrTime(time.Now().UTC().Add(-10 * time.Minute))},
+			{ID: "sess-b", Status: "active", TokenVersion: 2, DeviceFingerprint: "fp-b", UserAgent: "browser-b", ClientIP: "203.0.113.11", LastSeenAt: ptrTime(time.Now().UTC().Add(-1 * time.Hour)), LastRefreshedAt: ptrTime(time.Now().UTC().Add(-5 * time.Minute))},
+		},
+	}
+	resolver := configscope.NewResolver(
+		&config.Config{
+			Server: config.ServerConfig{
+				Environment: "staging",
+			},
+			Security: config.SecurityConfig{
+				SessionRisk: config.SessionRiskPolicyConfig{
+					MediumRiskScore: 2,
+					HighRiskScore:   4,
+				},
+				SessionRiskProfiles: map[string]config.SessionRiskPolicyConfig{
+					"staging": {
+						HighRiskScore: 10,
+					},
+				},
+			},
+		},
+	)
+	handler := NewAuthHandler(svc).WithSessionRiskResolver(resolver)
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", uint(7))
+		c.Set("session_id", "sess-a")
+		c.Next()
+	})
+	r.GET("/api/v1/auth/sessions", handler.ListSessions)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/sessions", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if !bytes.Contains(w.Body.Bytes(), []byte(`"risk_score":8`)) {
+		t.Fatalf("expected unchanged risk score in response: %s", w.Body.String())
+	}
+	if !bytes.Contains(w.Body.Bytes(), []byte(`"risk_level":"medium"`)) {
+		t.Fatalf("expected environment risk profile to downgrade high threshold: %s", w.Body.String())
+	}
+	if bytes.Contains(w.Body.Bytes(), []byte(`"risk_level":"high"`)) {
+		t.Fatalf("expected no high risk level after environment profile: %s", w.Body.String())
+	}
+}
+
+func TestAuthHandlerSelfServiceSessionsUsesInjectedIPIntelligence(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	svc := &stubAuthService{
+		sessions: []models.UserAuthSession{
+			{ID: "sess-a", Status: "active", TokenVersion: 1, DeviceFingerprint: "fp-a", UserAgent: "browser-a", ClientIP: "8.8.8.8", LastSeenAt: ptrTime(time.Now().UTC().Add(-10 * time.Minute))},
+		},
+	}
+	handler := NewAuthHandler(svc).WithSessionIPIntelligence(stubSessionIPIntelligence{
+		desc: sessionIPDescription{
+			NetworkLabel:  "public",
+			LocationLabel: "geo:cn-zj",
+		},
+	})
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", uint(7))
+		c.Set("session_id", "sess-a")
+		c.Next()
+	})
+	r.GET("/api/v1/auth/sessions", handler.ListSessions)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/sessions", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if !bytes.Contains(w.Body.Bytes(), []byte(`"location_label":"geo:cn-zj"`)) {
+		t.Fatalf("expected injected location label in response: %s", w.Body.String())
+	}
+	if !bytes.Contains(w.Body.Bytes(), []byte(`"network_label":"public"`)) {
+		t.Fatalf("expected injected network label in response: %s", w.Body.String())
 	}
 }
 

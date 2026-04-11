@@ -19,6 +19,7 @@ type DashboardReadModel struct {
 	AvgResolutionTime    float64
 	CustomerSatisfaction float64
 	AIUsageToday         int64
+	KnowledgeProviderUsageToday int64
 	WeKnoraUsageToday    int64
 }
 

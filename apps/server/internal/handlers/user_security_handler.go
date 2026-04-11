@@ -21,6 +21,7 @@ type UserSecurityHandler struct {
 	logger    *logrus.Logger
 	policy    sessionRiskPolicy
 	resolver  *configscope.Resolver
+	ipIntel   sessionIPIntelligence
 }
 
 type batchRevokeTokensRequest struct {
@@ -67,7 +68,7 @@ func NewUserSecurityHandler(service *usersecurity.Service, logger *logrus.Logger
 	if logger == nil {
 		logger = logrus.StandardLogger()
 	}
-	return &UserSecurityHandler{service: service, logger: logger, policy: defaultSessionRiskPolicy()}
+	return &UserSecurityHandler{service: service, logger: logger, policy: defaultSessionRiskPolicy(), ipIntel: heuristicSessionIPIntelligence{}}
 }
 
 func (h *UserSecurityHandler) WithJWTSecret(secret string) *UserSecurityHandler {
@@ -87,6 +88,13 @@ func (h *UserSecurityHandler) WithSessionRiskPolicyConfig(cfg config.SessionRisk
 func (h *UserSecurityHandler) WithSessionRiskResolver(resolver *configscope.Resolver) *UserSecurityHandler {
 	if h != nil {
 		h.resolver = resolver
+	}
+	return h
+}
+
+func (h *UserSecurityHandler) WithSessionIPIntelligence(provider sessionIPIntelligence) *UserSecurityHandler {
+	if h != nil && provider != nil {
+		h.ipIntel = provider
 	}
 	return h
 }
@@ -367,10 +375,10 @@ func (h *UserSecurityHandler) ListUserSessions(c *gin.Context) {
 	}
 
 	policy := h.sessionRiskPolicy(c.Request.Context())
-	riskContext := buildSessionRiskContext(sessions, policy)
+	riskContext := buildSessionRiskContext(sessions, policy, h.ipIntel)
 	items := make([]gin.H, 0, len(sessions))
 	for _, session := range sessions {
-		items = append(items, mapSessionResponse(session, false, riskContext, policy))
+		items = append(items, mapSessionResponse(session, false, riskContext, policy, h.ipIntel))
 	}
 
 	c.JSON(http.StatusOK, gin.H{

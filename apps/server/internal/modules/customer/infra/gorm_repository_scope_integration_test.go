@@ -109,3 +109,109 @@ func TestCustomerRepositoryFiltersListAndStatsByScope(t *testing.T) {
 		t.Fatalf("unexpected scoped stats: %+v", stats)
 	}
 }
+
+func TestCustomerRepositoryGetActivityStaysScoped(t *testing.T) {
+	db := newCustomerInfraTestDB(t)
+	repo := NewGormRepository(db)
+	now := time.Now()
+
+	users := []models.User{
+		{ID: 1, Username: "alice", Email: "alice@example.com", Role: "customer", Status: "active", CreatedAt: now, UpdatedAt: now},
+	}
+	if err := db.Create(&users).Error; err != nil {
+		t.Fatalf("seed users: %v", err)
+	}
+	customers := []models.Customer{
+		{UserID: 1, TenantID: "tenant-a", WorkspaceID: "workspace-a", Company: "A Co", Source: "web", Priority: "normal", CreatedAt: now, UpdatedAt: now},
+	}
+	if err := db.Create(&customers).Error; err != nil {
+		t.Fatalf("seed customers: %v", err)
+	}
+
+	sessionA := models.Session{
+		ID:          "sess-a",
+		UserID:      1,
+		Status:      "active",
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-a",
+		CreatedAt:   now.Add(-2 * time.Hour),
+		UpdatedAt:   now.Add(-2 * time.Hour),
+	}
+	sessionB := models.Session{
+		ID:          "sess-b",
+		UserID:      1,
+		Status:      "active",
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-b",
+		CreatedAt:   now.Add(-1 * time.Hour),
+		UpdatedAt:   now.Add(-1 * time.Hour),
+	}
+	if err := db.Create(&[]models.Session{sessionA, sessionB}).Error; err != nil {
+		t.Fatalf("seed sessions: %v", err)
+	}
+
+	agentID := uint(11)
+	ticketA := models.Ticket{
+		ID:          101,
+		CustomerID:  1,
+		AgentID:     &agentID,
+		Title:       "ticket-a",
+		Status:      "open",
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-a",
+		CreatedAt:   now.Add(-90 * time.Minute),
+		UpdatedAt:   now.Add(-90 * time.Minute),
+	}
+	ticketB := models.Ticket{
+		ID:          102,
+		CustomerID:  1,
+		AgentID:     &agentID,
+		Title:       "ticket-b",
+		Status:      "open",
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-b",
+		CreatedAt:   now.Add(-30 * time.Minute),
+		UpdatedAt:   now.Add(-30 * time.Minute),
+	}
+	if err := db.Create(&[]models.Ticket{ticketA, ticketB}).Error; err != nil {
+		t.Fatalf("seed tickets: %v", err)
+	}
+
+	messageA := models.Message{
+		ID:          201,
+		SessionID:   "sess-a",
+		UserID:      1,
+		Type:        "text",
+		Content:     "visible-in-a",
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-a",
+		CreatedAt:   now.Add(-80 * time.Minute),
+	}
+	messageB := models.Message{
+		ID:          202,
+		SessionID:   "sess-b",
+		UserID:      1,
+		Type:        "text",
+		Content:     "hidden-from-a",
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-b",
+		CreatedAt:   now.Add(-20 * time.Minute),
+	}
+	if err := db.Create(&[]models.Message{messageA, messageB}).Error; err != nil {
+		t.Fatalf("seed messages: %v", err)
+	}
+
+	activity, err := repo.GetCustomerActivity(scopedCustomerContext("tenant-a", "workspace-a"), 1, 10)
+	if err != nil {
+		t.Fatalf("GetCustomerActivity: %v", err)
+	}
+	if len(activity.RecentSessions) != 1 || activity.RecentSessions[0].ID != "sess-a" {
+		t.Fatalf("unexpected scoped sessions: %+v", activity.RecentSessions)
+	}
+	if len(activity.RecentTickets) != 1 || activity.RecentTickets[0].ID != 101 {
+		t.Fatalf("unexpected scoped tickets: %+v", activity.RecentTickets)
+	}
+	if len(activity.RecentMessages) != 1 || activity.RecentMessages[0].ID != 201 {
+		t.Fatalf("unexpected scoped messages: %+v", activity.RecentMessages)
+	}
+}

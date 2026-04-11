@@ -19,9 +19,9 @@ type RuntimeService interface {
 type EnhancedRuntimeService interface {
 	RuntimeService
 	ProcessQueryEnhanced(ctx context.Context, query string, sessionID string) (*services.EnhancedAIResponse, error)
-	UploadDocumentToWeKnora(ctx context.Context, title, content string, tags []string) error
+	UploadKnowledgeDocument(ctx context.Context, title, content string, tags []string) error
 	GetMetrics() *services.AIMetrics
-	SetWeKnoraEnabled(enabled bool)
+	SetKnowledgeProviderEnabled(enabled bool)
 	ResetCircuitBreaker()
 	SyncKnowledgeBase(ctx context.Context) error
 }
@@ -31,9 +31,9 @@ type HandlerService interface {
 	ProcessQuery(ctx context.Context, query string, sessionID string) (interface{}, error)
 	GetStatus(ctx context.Context) map[string]interface{}
 	GetMetrics() (*services.AIMetrics, bool)
-	UploadDocumentToWeKnora(ctx context.Context, title, content string, tags []string) error
+	UploadKnowledgeDocument(ctx context.Context, title, content string, tags []string) error
 	SyncKnowledgeBase(ctx context.Context) error
-	SetWeKnoraEnabled(enabled bool) bool
+	SetKnowledgeProviderEnabled(enabled bool) bool
 	ResetCircuitBreaker() bool
 }
 
@@ -74,7 +74,7 @@ func (a *HandlerServiceAdapter) GetMetrics() (*services.AIMetrics, bool) {
 	return enhanced.GetMetrics(), true
 }
 
-func (a *HandlerServiceAdapter) UploadDocumentToWeKnora(ctx context.Context, title, content string, tags []string) error {
+func (a *HandlerServiceAdapter) UploadKnowledgeDocument(ctx context.Context, title, content string, tags []string) error {
 	if a == nil || a.service == nil {
 		return fmt.Errorf("ai service not configured")
 	}
@@ -82,7 +82,7 @@ func (a *HandlerServiceAdapter) UploadDocumentToWeKnora(ctx context.Context, tit
 	if !ok {
 		return errUnsupportedEnhancedFeature("document upload")
 	}
-	return enhanced.UploadDocumentToWeKnora(ctx, title, content, tags)
+	return enhanced.UploadKnowledgeDocument(ctx, title, content, tags)
 }
 
 func (a *HandlerServiceAdapter) SyncKnowledgeBase(ctx context.Context) error {
@@ -96,7 +96,7 @@ func (a *HandlerServiceAdapter) SyncKnowledgeBase(ctx context.Context) error {
 	return enhanced.SyncKnowledgeBase(ctx)
 }
 
-func (a *HandlerServiceAdapter) SetWeKnoraEnabled(enabled bool) bool {
+func (a *HandlerServiceAdapter) SetKnowledgeProviderEnabled(enabled bool) bool {
 	if a == nil || a.service == nil {
 		return false
 	}
@@ -104,7 +104,7 @@ func (a *HandlerServiceAdapter) SetWeKnoraEnabled(enabled bool) bool {
 	if !ok {
 		return false
 	}
-	enhanced.SetWeKnoraEnabled(enabled)
+	enhanced.SetKnowledgeProviderEnabled(enabled)
 	return true
 }
 

@@ -259,12 +259,21 @@ func TestResolverResolveWeKnoraPrecedence(t *testing.T) {
 func TestResolverResolveSessionRiskPrecedence(t *testing.T) {
 	resolver := NewResolver(
 		&config.Config{
+			Server: config.ServerConfig{
+				Environment: "production",
+			},
 			Security: config.SecurityConfig{
 				SessionRisk: config.SessionRiskPolicyConfig{
 					HotRefreshWindowMinutes: 15,
 					ManySessionsThreshold:   3,
 					MediumRiskScore:         2,
 					HighRiskScore:           4,
+				},
+				SessionRiskProfiles: map[string]config.SessionRiskPolicyConfig{
+					"production": {
+						ManySessionsThreshold: 4,
+						HighRiskScore:         6,
+					},
 				},
 			},
 		},

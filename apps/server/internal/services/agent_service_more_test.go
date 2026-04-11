@@ -277,3 +277,34 @@ func TestAgentService_GetAgentStats(t *testing.T) {
 		t.Errorf("expected AvgResponseTime 150, got %d", stats.AvgResponseTime)
 	}
 }
+
+func TestAgentService_GetAgentStats_AppliesScope(t *testing.T) {
+	db := newAgentServiceTestDB(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.ErrorLevel)
+	svc := NewAgentService(db, logger)
+
+	if err := db.Create(&[]models.User{
+		{ID: 11, Username: "agent-a", Email: "agent-a@test.com", Name: "Agent A", Role: "agent"},
+		{ID: 12, Username: "agent-b", Email: "agent-b@test.com", Name: "Agent B", Role: "agent"},
+	}).Error; err != nil {
+		t.Fatalf("create users: %v", err)
+	}
+	if err := db.Create(&[]models.Agent{
+		{UserID: 11, TenantID: "tenant-a", WorkspaceID: "workspace-a", Status: "online", AvgResponseTime: 10, Rating: 4.8},
+		{UserID: 12, TenantID: "tenant-a", WorkspaceID: "workspace-b", Status: "busy", AvgResponseTime: 90, Rating: 2.0},
+	}).Error; err != nil {
+		t.Fatalf("create agents: %v", err)
+	}
+
+	stats, err := svc.GetAgentStats(scopedContext("tenant-a", "workspace-a"), nil)
+	if err != nil {
+		t.Fatalf("GetAgentStats() error = %v", err)
+	}
+	if stats.Total != 1 {
+		t.Fatalf("unexpected scoped agent stats: %+v", stats)
+	}
+	if stats.AvgResponseTime != 10 {
+		t.Fatalf("unexpected scoped avg response time: %+v", stats)
+	}
+}

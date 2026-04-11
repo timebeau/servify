@@ -88,6 +88,20 @@ All metrics follow Prometheus conventions: `subsystem_name_units`. Key prefixes:
 - Timeout: increase timeout config or enable circuit breaker
 - Enable fallback to alternative provider
 
+### AIHighLatency
+
+**Severity**: Warning | **Threshold**: P95 latency > 10s for 10 minutes
+
+**Investigation**:
+1. Check `ai_request_duration_seconds` by `provider`
+2. Compare latency increase with token volume spikes in `ai_llm_tokens_total`
+3. Check whether the affected provider is also approaching failure alerts
+
+**Resolution**:
+- Reduce concurrent AI load or expensive prompt paths
+- Switch to fallback mode when latency makes the product flow unusable
+- Validate provider-side latency before increasing timeouts
+
 ### WorkerJobFailures
 
 **Severity**: Warning | **Threshold**: any failures for 10 minutes

@@ -9,7 +9,21 @@ const implementationPages = [
   '/implementation/08-ai-provider-expansion',
 ];
 
-const guidePages = [
+const productPages = [
+  '/ARCHITECTURE',
+  '/remote-assistance',
+  '/deployment',
+  '/local-development',
+];
+
+const operationsPages = [
+  '/security-baseline-operations',
+  '/configuration-scopes',
+  '/token-lifecycle-and-key-rotation',
+  '/public-surface-security-checklist',
+];
+
+const appendixPages = [
   '/ARCHITECTURE',
   '/WEKNORA_INTEGRATION',
   '/CI_SELF_HOSTED',
@@ -20,11 +34,22 @@ const guidePages = [
 
 export const docsNavbar = [
   { text: '首页', link: '/' },
+  { text: '产品', link: '/remote-assistance' },
   { text: '架构', link: '/ARCHITECTURE' },
-  { text: '实施计划', link: '/implementation/' },
+  { text: '部署', link: '/deployment' },
   {
-    text: '专题',
+    text: '运行与安全',
     children: [
+      { text: '安全基线', link: '/security-baseline-operations' },
+      { text: '配置作用域', link: '/configuration-scopes' },
+      { text: 'Token 生命周期', link: '/token-lifecycle-and-key-rotation' },
+      { text: '开放接口安全清单', link: '/public-surface-security-checklist' },
+    ],
+  },
+  {
+    text: '研发附录',
+    children: [
+      { text: '实施计划', link: '/implementation/' },
       { text: 'WeKnora 集成', link: '/WEKNORA_INTEGRATION' },
       { text: 'CI / Runner', link: '/CI_SELF_HOSTED' },
       { text: '版本发布', link: '/release-versioning' },
@@ -43,12 +68,20 @@ export const docsSidebar = {
   ],
   '/': [
     {
-      text: '站点导航',
-      children: ['/', ...guidePages],
+      text: '产品与上手',
+      children: ['/', ...productPages],
     },
     {
-      text: '实施计划',
-      children: ['/implementation/', ...implementationPages],
+      text: '运行与安全',
+      children: operationsPages,
+    },
+    {
+      text: '研发附录',
+      children: [
+        '/implementation/',
+        ...implementationPages,
+        ...appendixPages.filter((page) => page !== '/ARCHITECTURE'),
+      ],
     },
   ],
 };

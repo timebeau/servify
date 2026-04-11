@@ -240,6 +240,62 @@ func TestSatisfactionService_ScopedByWorkspace(t *testing.T) {
 	}
 }
 
+func TestSatisfactionService_GetSatisfactionStats_DoesNotLeakCrossWorkspaceCategoryOrTrend(t *testing.T) {
+	db := newSatisfactionTestDB(t)
+	svc := NewSatisfactionService(db, logrus.New())
+	day := time.Date(2026, 4, 8, 12, 0, 0, 0, time.UTC)
+
+	if err := db.Create(&[]models.CustomerSatisfaction{
+		{
+			ID:          501,
+			TenantID:    "tenant-a",
+			WorkspaceID: "workspace-a",
+			TicketID:    10,
+			CustomerID:  11,
+			AgentID:     uintPtr(21),
+			Rating:      5,
+			Category:    "support",
+			CreatedAt:   day,
+		},
+		{
+			ID:          502,
+			TenantID:    "tenant-a",
+			WorkspaceID: "workspace-b",
+			TicketID:    12,
+			CustomerID:  13,
+			AgentID:     uintPtr(22),
+			Rating:      1,
+			Category:    "billing",
+			CreatedAt:   day.Add(2 * time.Hour),
+		},
+	}).Error; err != nil {
+		t.Fatalf("create satisfactions: %v", err)
+	}
+
+	start := day.Add(-time.Hour)
+	end := day.Add(6 * time.Hour)
+	stats, err := svc.GetSatisfactionStats(scopedContext("tenant-a", "workspace-a"), &start, &end)
+	if err != nil {
+		t.Fatalf("GetSatisfactionStats failed: %v", err)
+	}
+	if stats.TotalRatings != 1 || stats.AverageRating != 5 {
+		t.Fatalf("unexpected scoped stats summary: %+v", stats)
+	}
+	if len(stats.CategoryStats) != 1 {
+		t.Fatalf("expected 1 scoped category stat, got %+v", stats.CategoryStats)
+	}
+	support, ok := stats.CategoryStats["support"]
+	if !ok || support.Count != 1 || support.AverageRating != 5 {
+		t.Fatalf("unexpected scoped category stats: %+v", stats.CategoryStats)
+	}
+	if _, leaked := stats.CategoryStats["billing"]; leaked {
+		t.Fatalf("unexpected cross-workspace category leak: %+v", stats.CategoryStats)
+	}
+	if len(stats.TrendData) != 1 || stats.TrendData[0].Count != 1 || stats.TrendData[0].AverageRating != 5 {
+		t.Fatalf("unexpected scoped trend data: %+v", stats.TrendData)
+	}
+}
+
 func TestSatisfactionService_ListSatisfactions_DoesNotLeakCrossScopePreloads(t *testing.T) {
 	db := newSatisfactionTestDB(t)
 	svc := NewSatisfactionService(db, logrus.New())

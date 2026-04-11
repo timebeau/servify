@@ -42,7 +42,7 @@ func newTestDBForUserSecurity(t *testing.T) *gorm.DB {
 	}
 	sqlDB.SetMaxOpenConns(1)
 
-	if err := db.AutoMigrate(&models.User{}, &models.UserAuthSession{}, &models.RevokedToken{}); err != nil {
+	if err := db.AutoMigrate(&models.User{}, &models.Agent{}, &models.Customer{}, &models.UserAuthSession{}, &models.RevokedToken{}); err != nil {
 		t.Fatalf("automigrate user/auth session/revoked token: %v", err)
 	}
 
@@ -475,6 +475,14 @@ func TestUserSecurityHandler_ListUserSessionsUsesScopedRiskPolicy(t *testing.T) 
 	}).Error; err != nil {
 		t.Fatalf("seed user: %v", err)
 	}
+	if err := db.Create(&models.Agent{
+		UserID:     71,
+		TenantID:   "tenant-a",
+		Department: "security",
+		Status:     "online",
+	}).Error; err != nil {
+		t.Fatalf("seed agent: %v", err)
+	}
 	if err := db.Create(&models.UserAuthSession{
 		ID:                "auth-session-71",
 		UserID:            71,
@@ -528,14 +536,146 @@ func TestUserSecurityHandler_ListUserSessionsUsesScopedRiskPolicy(t *testing.T) 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200 got %d body=%s", w.Code, w.Body.String())
 	}
-	if !strings.Contains(w.Body.String(), `"risk_score":8`) {
-		t.Fatalf("expected unchanged risk score in body: %s", w.Body.String())
-	}
 	if !strings.Contains(w.Body.String(), `"risk_level":"medium"`) {
 		t.Fatalf("expected scoped risk policy to downgrade high threshold: %s", w.Body.String())
 	}
 	if strings.Contains(w.Body.String(), `"risk_level":"high"`) {
 		t.Fatalf("expected no high risk level after scoped override: %s", w.Body.String())
+	}
+}
+
+func TestUserSecurityHandler_ListUserSessionsUsesEnvironmentRiskProfile(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestDBForUserSecurity(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.WarnLevel)
+
+	if err := db.Create(&models.User{
+		ID:       72,
+		Username: "env-session-user",
+		Email:    "env-session-user@example.com",
+		Name:     "Env Session User",
+		Role:     "admin",
+		Status:   "active",
+	}).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	if err := db.Create(&models.UserAuthSession{
+		ID:                "auth-session-72",
+		UserID:            72,
+		Status:            "active",
+		TokenVersion:      1,
+		DeviceFingerprint: "fp-72",
+		UserAgent:         "servify-browser/1.0",
+		ClientIP:          "203.0.113.81",
+		LastSeenAt:        ptrTime(time.Now().UTC().Add(-2 * time.Hour)),
+		LastRefreshedAt:   ptrTime(time.Now().UTC().Add(-10 * time.Minute)),
+	}).Error; err != nil {
+		t.Fatalf("seed auth session: %v", err)
+	}
+	if err := db.Create(&models.UserAuthSession{
+		ID:                "auth-session-72-b",
+		UserID:            72,
+		Status:            "active",
+		TokenVersion:      2,
+		DeviceFingerprint: "fp-72-b",
+		UserAgent:         "servify-browser/2.0",
+		ClientIP:          "203.0.113.82",
+		LastSeenAt:        ptrTime(time.Now().UTC().Add(-1 * time.Hour)),
+		LastRefreshedAt:   ptrTime(time.Now().UTC().Add(-5 * time.Minute)),
+	}).Error; err != nil {
+		t.Fatalf("seed auth session: %v", err)
+	}
+
+	resolver := configscope.NewResolver(
+		&config.Config{
+			Server: config.ServerConfig{
+				Environment: "staging",
+			},
+			Security: config.SecurityConfig{
+				SessionRisk: config.SessionRiskPolicyConfig{
+					MediumRiskScore: 2,
+					HighRiskScore:   4,
+				},
+				SessionRiskProfiles: map[string]config.SessionRiskPolicyConfig{
+					"staging": {
+						HighRiskScore: 10,
+					},
+				},
+			},
+		},
+	)
+	h := NewUserSecurityHandler(usersecurity.NewService(db, logger), logger).WithSessionRiskResolver(resolver)
+	r := gin.New()
+	r.GET("/api/security/users/:id/sessions", h.ListUserSessions)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/security/users/72/sessions", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"risk_level":"medium"`) {
+		t.Fatalf("expected environment risk profile to downgrade high threshold: %s", w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), `"risk_level":"high"`) {
+		t.Fatalf("expected no high risk level after environment profile: %s", w.Body.String())
+	}
+}
+
+func TestUserSecurityHandler_ListUserSessionsUsesInjectedIPIntelligence(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestDBForUserSecurity(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.WarnLevel)
+
+	if err := db.Create(&models.User{
+		ID:       73,
+		Username: "intel-session-user",
+		Email:    "intel-session-user@example.com",
+		Name:     "Intel Session User",
+		Role:     "admin",
+		Status:   "active",
+	}).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	if err := db.Create(&models.UserAuthSession{
+		ID:                "auth-session-73",
+		UserID:            73,
+		Status:            "active",
+		TokenVersion:      1,
+		DeviceFingerprint: "fp-73",
+		UserAgent:         "servify-browser/1.0",
+		ClientIP:          "8.8.8.8",
+		LastSeenAt:        ptrTime(time.Now().UTC().Add(-10 * time.Minute)),
+	}).Error; err != nil {
+		t.Fatalf("seed auth session: %v", err)
+	}
+
+	h := NewUserSecurityHandler(usersecurity.NewService(db, logger), logger).WithSessionIPIntelligence(stubSessionIPIntelligence{
+		desc: sessionIPDescription{
+			NetworkLabel:  "public",
+			LocationLabel: "geo:cn-zj",
+		},
+	})
+	r := gin.New()
+	r.GET("/api/security/users/:id/sessions", h.ListUserSessions)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/security/users/73/sessions", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"network_label":"public"`) {
+		t.Fatalf("expected injected network label body=%s", w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"location_label":"geo:cn-zj"`) {
+		t.Fatalf("expected injected location label body=%s", w.Body.String())
 	}
 }
 

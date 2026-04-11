@@ -264,3 +264,21 @@ func TestAuditHandlerExportCSVRejectsInvalidFilters(t *testing.T) {
 		t.Fatalf("expected 400 got %d body=%s", w.Code, w.Body.String())
 	}
 }
+
+func TestAuditHandlerExportCSVClampsLimit(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := &stubAuditQueryService{}
+	r := gin.New()
+	RegisterAuditRoutes(&r.RouterGroup, NewAuditHandler(svc))
+
+	req := httptest.NewRequest(http.MethodGet, "/audit/logs/export?limit=99999", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 got %d body=%s", w.Code, w.Body.String())
+	}
+	if svc.query.Page != 1 || svc.query.PageSize != 5000 {
+		t.Fatalf("unexpected paging query: %+v", svc.query)
+	}
+}

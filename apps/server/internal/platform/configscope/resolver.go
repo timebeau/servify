@@ -15,6 +15,10 @@ type OpenAIConfigProvider interface {
 	LoadOpenAIConfig(ctx context.Context) (config.OpenAIConfig, bool, error)
 }
 
+type DifyConfigProvider interface {
+	LoadDifyConfig(ctx context.Context) (config.DifyConfig, bool, error)
+}
+
 type WeKnoraConfigProvider interface {
 	LoadWeKnoraConfig(ctx context.Context) (config.WeKnoraConfig, bool, error)
 }
@@ -29,6 +33,8 @@ type Resolver struct {
 	workspacePortal      PortalConfigProvider
 	tenantOpenAI         OpenAIConfigProvider
 	workspaceOpenAI      OpenAIConfigProvider
+	tenantDify          DifyConfigProvider
+	workspaceDify       DifyConfigProvider
 	tenantWeKnora        WeKnoraConfigProvider
 	workspaceWeKnora     WeKnoraConfigProvider
 	tenantSessionRisk    SessionRiskConfigProvider
@@ -68,6 +74,18 @@ func WithTenantOpenAIProvider(provider OpenAIConfigProvider) Option {
 func WithWorkspaceOpenAIProvider(provider OpenAIConfigProvider) Option {
 	return func(r *Resolver) {
 		r.workspaceOpenAI = provider
+	}
+}
+
+func WithTenantDifyProvider(provider DifyConfigProvider) Option {
+	return func(r *Resolver) {
+		r.tenantDify = provider
+	}
+}
+
+func WithWorkspaceDifyProvider(provider DifyConfigProvider) Option {
+	return func(r *Resolver) {
+		r.workspaceDify = provider
 	}
 }
 
@@ -183,6 +201,27 @@ func (r *Resolver) ResolveOpenAI(ctx context.Context, runtime *config.OpenAIConf
 	return resolved
 }
 
+func (r *Resolver) ResolveDify(ctx context.Context, runtime *config.DifyConfig) config.DifyConfig {
+	var resolved config.DifyConfig
+	if r != nil && r.system != nil {
+		resolved = r.system.Dify
+	}
+	if r != nil && r.tenantDify != nil {
+		if next, ok, err := r.tenantDify.LoadDifyConfig(ctx); err == nil && ok {
+			resolved = mergeDifyConfig(resolved, next)
+		}
+	}
+	if r != nil && r.workspaceDify != nil {
+		if next, ok, err := r.workspaceDify.LoadDifyConfig(ctx); err == nil && ok {
+			resolved = mergeDifyConfig(resolved, next)
+		}
+	}
+	if runtime != nil {
+		resolved = mergeDifyConfig(resolved, *runtime)
+	}
+	return resolved
+}
+
 func (r *Resolver) ResolveWeKnora(ctx context.Context, runtime *config.WeKnoraConfig) config.WeKnoraConfig {
 	var resolved config.WeKnoraConfig
 	if r != nil && r.system != nil {
@@ -208,6 +247,11 @@ func (r *Resolver) ResolveSessionRisk(ctx context.Context, runtime *config.Sessi
 	var resolved config.SessionRiskPolicyConfig
 	if r != nil && r.system != nil {
 		resolved = r.system.Security.SessionRisk
+		if env := strings.TrimSpace(r.system.Server.Environment); env != "" {
+			if profile, ok := r.system.Security.SessionRiskProfiles[env]; ok {
+				resolved = mergeSessionRiskConfig(resolved, profile)
+			}
+		}
 	}
 	if r != nil && r.tenantSessionRisk != nil {
 		if next, ok, err := r.tenantSessionRisk.LoadSessionRiskConfig(ctx); err == nil && ok {
@@ -243,6 +287,37 @@ func mergeOpenAIConfig(base config.OpenAIConfig, overlay config.OpenAIConfig) co
 	}
 	if overlay.Timeout != 0 {
 		base.Timeout = overlay.Timeout
+	}
+	return base
+}
+
+func mergeDifyConfig(base config.DifyConfig, overlay config.DifyConfig) config.DifyConfig {
+	if overlay.Enabled {
+		base.Enabled = true
+	}
+	if strings.TrimSpace(overlay.BaseURL) != "" {
+		base.BaseURL = overlay.BaseURL
+	}
+	if strings.TrimSpace(overlay.APIKey) != "" {
+		base.APIKey = overlay.APIKey
+	}
+	if strings.TrimSpace(overlay.DatasetID) != "" {
+		base.DatasetID = overlay.DatasetID
+	}
+	if overlay.Timeout != 0 {
+		base.Timeout = overlay.Timeout
+	}
+	if overlay.Search.TopK != 0 {
+		base.Search.TopK = overlay.Search.TopK
+	}
+	if overlay.Search.ScoreThreshold != 0 {
+		base.Search.ScoreThreshold = overlay.Search.ScoreThreshold
+	}
+	if strings.TrimSpace(overlay.Search.SearchMethod) != "" {
+		base.Search.SearchMethod = overlay.Search.SearchMethod
+	}
+	if overlay.Search.RerankingEnable {
+		base.Search.RerankingEnable = true
 	}
 	return base
 }

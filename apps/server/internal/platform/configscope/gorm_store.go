@@ -16,6 +16,7 @@ type ScopedConfigDocument struct {
 	WorkspaceID string                          `json:"workspace_id,omitempty"`
 	Portal      *config.PortalConfig            `json:"portal,omitempty"`
 	OpenAI      *config.OpenAIConfig            `json:"openai,omitempty"`
+	Dify        *config.DifyConfig              `json:"dify,omitempty"`
 	WeKnora     *config.WeKnoraConfig           `json:"weknora,omitempty"`
 	SessionRisk *config.SessionRiskPolicyConfig `json:"session_risk,omitempty"`
 }
@@ -71,6 +72,13 @@ func (s *GormConfigStore) UpsertTenantConfig(ctx context.Context, tenantID strin
 			return nil, err
 		}
 		row.OpenAIJSON = encoded
+	}
+	if payload.Dify != nil {
+		encoded, err := encodeConfig(*payload.Dify)
+		if err != nil {
+			return nil, err
+		}
+		row.DifyJSON = encoded
 	}
 	if payload.WeKnora != nil {
 		encoded, err := encodeConfig(*payload.WeKnora)
@@ -138,6 +146,13 @@ func (s *GormConfigStore) UpsertWorkspaceConfig(ctx context.Context, tenantID, w
 		}
 		row.OpenAIJSON = encoded
 	}
+	if payload.Dify != nil {
+		encoded, err := encodeConfig(*payload.Dify)
+		if err != nil {
+			return nil, err
+		}
+		row.DifyJSON = encoded
+	}
 	if payload.WeKnora != nil {
 		encoded, err := encodeConfig(*payload.WeKnora)
 		if err != nil {
@@ -174,6 +189,11 @@ func tenantRowToDocument(row models.TenantConfig) (*ScopedConfigDocument, error)
 	} else if ok {
 		doc.OpenAI = &cfg
 	}
+	if cfg, ok, err := decodeConfig[config.DifyConfig](row.DifyJSON); err != nil {
+		return nil, err
+	} else if ok {
+		doc.Dify = &cfg
+	}
 	if cfg, ok, err := decodeConfig[config.WeKnoraConfig](row.WeKnoraJSON); err != nil {
 		return nil, err
 	} else if ok {
@@ -198,6 +218,11 @@ func workspaceRowToDocument(row models.WorkspaceConfig) (*ScopedConfigDocument, 
 		return nil, err
 	} else if ok {
 		doc.OpenAI = &cfg
+	}
+	if cfg, ok, err := decodeConfig[config.DifyConfig](row.DifyJSON); err != nil {
+		return nil, err
+	} else if ok {
+		doc.Dify = &cfg
 	}
 	if cfg, ok, err := decodeConfig[config.WeKnoraConfig](row.WeKnoraJSON); err != nil {
 		return nil, err

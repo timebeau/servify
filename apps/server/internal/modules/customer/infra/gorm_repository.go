@@ -234,7 +234,7 @@ func (r *GormRepository) GetStats(ctx context.Context) (*customerapp.CustomerSta
 		return applyCustomerScope(db, ctx)
 	}).Count(&stats.Active)
 	sevenDaysAgo := time.Now().AddDate(0, 0, -7)
-	r.db.WithContext(ctx).Model(&models.User{}).Joins("JOIN customers ON customers.user_id = users.id").Where("role = ? AND created_at > ?", "customer", sevenDaysAgo).Scopes(func(db *gorm.DB) *gorm.DB {
+	r.db.WithContext(ctx).Model(&models.User{}).Joins("JOIN customers ON customers.user_id = users.id").Where("role = ? AND users.created_at > ?", "customer", sevenDaysAgo).Scopes(func(db *gorm.DB) *gorm.DB {
 		return applyCustomerScope(db, ctx)
 	}).Count(&stats.NewThisWeek)
 	applyCustomerScope(r.db.WithContext(ctx).Model(&models.Customer{}), ctx).Select("source, COUNT(*) as count").Group("source").Scan(&stats.BySource)
