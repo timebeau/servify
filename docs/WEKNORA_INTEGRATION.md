@@ -1,8 +1,9 @@
-# WeKnora 集成完整指南
+# 外部知识库集成指南：Dify 优先，WeKnora 兼容
 
 ## 🎯 项目概述
 
-本指南详细介绍了如何将腾讯开源的 WeKnora 知识库系统集成到 Servify 智能客服项目中，实现从简单的内存知识库到企业级 RAG 系统的升级。
+本指南说明 Servify 如何把外部知识库接入到 AI 编排链路中。当前推荐路径是 `Dify` 作为默认和优先的知识库 provider，`WeKnora` 保留为兼容与后备 provider，用于已有部署、协议回归和 fallback 验证。
+文档名保留 `WEKNORA_INTEGRATION` 主要是为了兼容历史链接；内容语义以通用 knowledge provider 为主。
 
 ## 📋 集成计划完成情况
 
@@ -10,22 +11,23 @@
 
 1. **项目路线图更新** ✅
    - 更新了 README.md 中的第二阶段计划
-   - 将 WeKnora 集成作为 v1.1 的最高优先级
+   - 将外部知识库 provider 集成纳入 AI 演进主路径
    - 更新了技术架构图和技术栈说明
 
 2. **技术实施方案设计** ✅
-   - 完整的 WeKnora 客户端实现 (`apps/server/pkg/weknora/`)
-   - 增强的 AI 服务设计 (`apps/server/internal/services/ai_enhanced.go`)
+   - `KnowledgeProvider` 抽象与 `QueryOrchestrator`
+   - `Dify` provider 适配 (`apps/server/internal/platform/knowledgeprovider/dify/`)
+   - `WeKnora` provider 适配 (`apps/server/internal/platform/knowledgeprovider/weknora/`)
    - 降级策略和熔断器机制
-   - 数据结构和接口定义
 
 3. **开发环境配置** ✅
-   - Docker Compose 集成配置 (`infra/compose/docker-compose.weknora.yml`)
+   - Dify / WeKnora provider 配置模板
+   - WeKnora mock 验收配置 (`infra/compose/docker-compose.weknora.yml`)
    - 数据库初始化脚本 (`scripts/init-db.sql`)
    - 环境变量配置模板 (`.env.weknora.example`)
    - 配置文件模板 (`config.weknora.yml`)
 
-4. **部署和管理脚本** ✅
+4. **兼容路径部署和管理脚本** ✅
    - 一键启动脚本 (`scripts/start-weknora.sh`)
    - 知识库初始化脚本 (`scripts/init-knowledge-base.sh`)
    - 知识库管理脚本 (`scripts/manage-knowledge-base.sh`)
@@ -36,28 +38,26 @@
 ```
 Servify 智能客服
        ↓
-   HTTP API 调用
+ Query Orchestrator
        ↓
-   WeKnora 知识库服务
-       ↓
-PostgreSQL (pgvector) + Redis + Elasticsearch
+ KnowledgeProvider
+   ├─ Dify (primary)
+   └─ WeKnora (fallback/compatibility)
 ```
 
 ### 服务部署图
 ```
 ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   Servify   │───▶│   WeKnora   │───▶│ PostgreSQL  │
-│  (Port 8080)│    │ (Port 9000) │    │ (pgvector)  │
-└─────────────┘    └─────────────┘    └─────────────┘
-                           │
-                           ▼
-                  ┌─────────────┐
-                  │    Redis    │
-                  │ (缓存+队列) │
-                  └─────────────┘
+│   Servify   │───▶│    Dify     │
+│  (Port 8080)│    │  (primary)  │
+└─────────────┘    └─────────────┘
+         │
+         └────────────▶ WeKnora (fallback / compatibility)
 ```
 
 ## 🚀 快速开始
+
+> 当前项目的默认推荐是优先接入 `Dify`。仓库里的 `infra/compose/docker-compose.weknora.yml` 仍然保留，用于 WeKnora 协议回归和 fallback 验证，不代表 WeKnora 是主路径。
 
 ### 1. 环境准备
 ```bash
@@ -77,7 +77,8 @@ cp .env.weknora.example .env
 
 # 编辑环境变量，至少需要配置：
 # - OPENAI_API_KEY: OpenAI API 密钥
-# - WEKNORA_API_KEY: WeKnora API 密钥（可保持默认）
+# - DIFY_API_KEY / DIFY_DATASET_ID: 推荐主路径
+# - WEKNORA_API_KEY: 仅在需要兼容或 fallback 验收时配置
 nano .env
 ```
 
@@ -89,13 +90,13 @@ nano .env
 # 等待服务启动完成...
 ```
 
-### 4. 初始化知识库
+### 4. 初始化兼容知识库
 ```bash
-# 创建知识库并上传示例文档
+# 创建 WeKnora compatibility 知识库并上传示例文档
 ./scripts/init-knowledge-base.sh
 ```
 
-### 5. 验证集成
+### 5. 验证 compatibility 集成
 ```bash
 # 检查服务健康状态
 curl http://localhost:8080/health
@@ -104,6 +105,41 @@ curl http://localhost:9000/api/v1/health
 # 测试知识库搜索
 ./scripts/manage-knowledge-base.sh search "远程协助"
 ```
+
+### 6. 运行 provider 验收脚本
+```bash
+# mock / 本地协议回归
+WEKNORA_ACCEPTANCE_MODE=mock \
+EVIDENCE_DIR=./scripts/test-results/weknora-acceptance/mock \
+./scripts/test-weknora-integration.sh
+
+# real / 真实 WeKnora 环境验收（仅用于兼容路径）
+WEKNORA_ACCEPTANCE_MODE=real \
+SERVIFY_URL=http://localhost:8080 \
+WEKNORA_URL=https://<real-weknora-host> \
+EVIDENCE_DIR=./scripts/test-results/weknora-acceptance/real \
+./scripts/test-weknora-integration.sh
+```
+
+脚本会输出最小验收证据：
+
+- `summary.txt`
+- `servify-health.json`
+- `weknora-health.json`（可用时）
+- `ai-status.json`
+- `ai-query.json`
+- `knowledge-upload.json`
+- `knowledge-sync.json`
+
+其中 `real` 模式针对 WeKnora 兼容路径，不是“尽量通过”，而是严格验收：
+
+- `WEKNORA_URL` 不能是 `localhost`、`127.0.0.1`、`0.0.0.0`、私网地址或 `.local/.internal` 主机名
+- 健康检查返回若标识 `service=weknora-mock`，脚本会直接拒绝作为真实证据
+- WeKnora 健康检查必须通过
+- Servify 必须运行在 `enhanced` 模式
+- `knowledge upload` 和 `knowledge sync` 必须都成功
+
+只有满足以上条件，才能把结果回填到 `docs/acceptance-checklist.md` 里，作为 WeKnora compatibility 路径的真实运行证据。
 
 ## 🔧 开发指南
 
@@ -124,14 +160,30 @@ servify/
 │       └── types.go
 │       └── internal/services/
 │           └── ai_enhanced.go     # 增强的 AI 服务
-├── infra/compose/docker-compose.weknora.yml     # WeKnora 部署配置
+├── infra/compose/docker-compose.weknora.yml     # WeKnora mock 验收配置
 ├── config.weknora.yml            # 配置文件模板
 └── .env.weknora.example          # 环境变量模板
 ```
 
 ### 核心代码示例
 
-#### WeKnora 客户端使用
+#### Dify provider 使用
+```go
+provider := difyprovider.NewProvider(
+    dify.NewClient(&dify.Config{
+        BaseURL: "https://dify.example.com/v1",
+        APIKey:  "dify-key",
+    }),
+    "dataset-id",
+    difyprovider.SearchConfig{
+        TopK:           5,
+        ScoreThreshold: 0.7,
+        SearchMethod:   "semantic_search",
+    },
+)
+```
+
+#### WeKnora compatibility 客户端使用
 ```go
 // 创建客户端
 client := weknora.NewClient(config, logger)
@@ -155,10 +207,7 @@ docInfo, err := client.UploadDocument(ctx, kbID, &weknora.Document{
 
 #### AI 服务集成
 ```go
-// 创建增强的 AI 服务
-aiService := NewEnhancedAIService(config, logger)
-
-// 处理用户查询（自动使用 WeKnora 或降级）
+// 处理用户查询（优先使用 Dify，必要时 fallback 到 WeKnora 或本地知识库）
 response, err := aiService.ProcessQuery(ctx, userQuery, sessionID)
 ```
 
@@ -166,7 +215,8 @@ response, err := aiService.ProcessQuery(ctx, userQuery, sessionID)
 
 ### 健康检查端点
 - Servify API: `GET http://localhost:8080/health`
-- WeKnora API: `GET http://localhost:9000/api/v1/health`
+- Dify API: 以 `GET /datasets/:id` 作为 dataset 级健康探针
+- WeKnora API: `GET http://localhost:9000/api/v1/health`（兼容路径）
 - PostgreSQL: `docker-compose -f infra/compose/docker-compose.yml exec postgres pg_isready`
 - Redis: `docker-compose -f infra/compose/docker-compose.yml exec redis redis-cli ping`
 
@@ -237,7 +287,7 @@ security:
    - 配置 TTL
    - 实施缓存预热
 
-3. **WeKnora 优化**：
+3. **provider 优化**：
    - 调整 chunk_size
    - 优化 embedding 模型
    - 配置检索策略
@@ -246,7 +296,7 @@ security:
 
 ### 常见问题
 
-#### 1. WeKnora 服务无法启动
+#### 1. WeKnora compatibility 服务无法启动
 ```bash
 # 检查端口占用
 lsof -i :9000
@@ -297,7 +347,7 @@ docker-compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compo
 # 备份 PostgreSQL
 docker-compose -f infra/compose/docker-compose.yml exec postgres pg_dump -U postgres servify > backup.sql
 
-# 备份 WeKnora 数据
+# 备份 WeKnora compatibility 数据
 docker cp servify_weknora:/app/data ./backup/weknora_data
 ```
 
@@ -314,9 +364,10 @@ docker cp servify_weknora:/app/data ./backup/weknora_data
 
 ## 🎯 当前状态与后续方向
 
-当前仓库里的 WeKnora 集成已经完成了角色调整：
+当前仓库里的外部知识库集成已经完成了角色调整：
 
-- WeKnora 不再作为系统内核能力存在，而是 `KnowledgeProvider` 的一个实现
+- `Dify` 是当前推荐和优先的 `KnowledgeProvider`
+- `WeKnora` 不再作为系统内核能力存在，而是 `KnowledgeProvider` 的一个兼容实现
 - AI 主流程已经迁移到 `QueryOrchestrator`，只依赖统一检索抽象
 - 标准模式和增强模式都可以在不改 handler 协议的前提下切换到编排式实现
 - 后续如果切换到其他知识库，只需要新增 provider adapter，不需要重写 AI 主流程
@@ -334,10 +385,10 @@ docker cp servify_weknora:/app/data ./backup/weknora_data
 
 如有问题或建议，请：
 1. 查看本文档的故障排除部分
-2. 检查 [WeKnora 官方文档](https://github.com/Tencent/WeKnora)
+2. 检查 `Dify` 或 WeKnora compatibility 对应 provider 文档
 3. 在项目 Issues 中提交问题
 4. 联系开发团队
 
 ---
 
-当前结论：WeKnora 可以继续作为默认适配器使用，但系统架构已经不再依赖它，后续可以按成本、维护性和能力边界自由替换。
+当前结论：`Dify` 应作为默认知识库 provider 使用；`WeKnora` 可以继续作为兼容或回退适配器保留，但系统架构已经不再依赖单一 provider。

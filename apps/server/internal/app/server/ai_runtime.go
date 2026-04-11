@@ -20,6 +20,7 @@ import (
 )
 
 type AIAssemblyOptions struct {
+	RequireKnowledgeProviderHealthy bool
 	RequireWeKnoraHealthy bool
 	SyncKnowledgeBase     bool
 	HealthCheckTimeout    time.Duration
@@ -30,6 +31,7 @@ type AIAssembly struct {
 	RuntimeService  aidelivery.RuntimeService
 	KnowledgeDriver knowledgeprovider.KnowledgeProvider
 	KnowledgeProviderID string
+	KnowledgeProviderHealthy bool
 	DifyHealthy     bool
 	DifyDatasetID   string
 	WeKnoraClient   weknora.WeKnoraInterface
@@ -50,6 +52,7 @@ func BuildAIAssembly(cfg *config.Config, logger *logrus.Logger, opts AIAssemblyO
 	}
 	resolver := configscope.NewResolver(cfg)
 	openAIConfig := resolver.ResolveOpenAI(context.Background(), nil)
+	difyConfig := resolver.ResolveDify(context.Background(), nil)
 	weKnoraConfig := resolver.ResolveWeKnora(context.Background(), nil)
 
 	baseAI := services.NewAIService(openAIConfig.APIKey, openAIConfig.BaseURL)
@@ -70,28 +73,29 @@ func BuildAIAssembly(cfg *config.Config, logger *logrus.Logger, opts AIAssemblyO
 		KnowledgeBaseID: weKnoraConfig.KnowledgeBaseID,
 	}
 
-	if cfg.Dify.Enabled {
+	if difyConfig.Enabled {
 		difyClient := dify.NewClient(&dify.Config{
-			BaseURL: cfg.Dify.BaseURL,
-			APIKey:  cfg.Dify.APIKey,
-			Timeout: cfg.Dify.Timeout,
+			BaseURL: difyConfig.BaseURL,
+			APIKey:  difyConfig.APIKey,
+			Timeout: difyConfig.Timeout,
 		})
 		ctx, cancel := context.WithTimeout(context.Background(), timeoutForHealthCheck(opts))
 		defer cancel()
-		if err := difyClient.HealthCheck(ctx, cfg.Dify.DatasetID); err != nil {
+		if err := difyClient.HealthCheck(ctx, difyConfig.DatasetID); err != nil {
 			logger.Warnf("Dify health check failed: %v", err)
-			if !weKnoraConfig.Enabled && opts.RequireWeKnoraHealthy {
+			if !weKnoraConfig.Enabled && opts.requireKnowledgeProviderHealthy() {
 				return nil, fmt.Errorf("dify health check failed: %w", err)
 			}
 		} else {
+			assembly.KnowledgeProviderHealthy = true
 			assembly.DifyHealthy = true
-			assembly.DifyDatasetID = cfg.Dify.DatasetID
+			assembly.DifyDatasetID = difyConfig.DatasetID
 			assembly.KnowledgeProviderID = "dify"
-			assembly.KnowledgeDriver = difykp.NewProvider(difyClient, cfg.Dify.DatasetID, difykp.SearchConfig{
-				TopK:            cfg.Dify.Search.TopK,
-				ScoreThreshold:  cfg.Dify.Search.ScoreThreshold,
-				SearchMethod:    cfg.Dify.Search.SearchMethod,
-				RerankingEnable: cfg.Dify.Search.RerankingEnable,
+			assembly.KnowledgeDriver = difykp.NewProvider(difyClient, difyConfig.DatasetID, difykp.SearchConfig{
+				TopK:            difyConfig.Search.TopK,
+				ScoreThreshold:  difyConfig.Search.ScoreThreshold,
+				SearchMethod:    difyConfig.Search.SearchMethod,
+				RerankingEnable: difyConfig.Search.RerankingEnable,
 			})
 			enhanced := services.NewOrchestratedEnhancedAIService(
 				baseAI,
@@ -99,7 +103,7 @@ func BuildAIAssembly(cfg *config.Config, logger *logrus.Logger, opts AIAssemblyO
 				assembly.KnowledgeDriver,
 				"dify",
 				nil,
-				cfg.Dify.DatasetID,
+				difyConfig.DatasetID,
 				logger,
 			)
 			assembly.Service = aidelivery.NewHandlerServiceAdapter(enhanced)
@@ -126,7 +130,7 @@ func BuildAIAssembly(cfg *config.Config, logger *logrus.Logger, opts AIAssemblyO
 	defer cancel()
 	if err := client.HealthCheck(ctx); err != nil {
 		logger.Warnf("WeKnora health check failed: %v", err)
-		if opts.RequireWeKnoraHealthy {
+		if opts.requireKnowledgeProviderHealthy() {
 			return nil, fmt.Errorf("weknora health check failed: %w", err)
 		}
 		if !cfg.Fallback.Enabled {
@@ -134,6 +138,7 @@ func BuildAIAssembly(cfg *config.Config, logger *logrus.Logger, opts AIAssemblyO
 		}
 		return assembly, nil
 	}
+	assembly.KnowledgeProviderHealthy = true
 	assembly.WeKnoraHealthy = true
 	assembly.KnowledgeProviderID = "weknora"
 	assembly.KnowledgeDriver = weknorakp.NewProvider(client, weKnoraConfig.KnowledgeBaseID)
@@ -164,4 +169,8 @@ func timeoutForHealthCheck(opts AIAssemblyOptions) time.Duration {
 		return opts.HealthCheckTimeout
 	}
 	return 10 * time.Second
+}
+
+func (o AIAssemblyOptions) requireKnowledgeProviderHealthy() bool {
+	return o.RequireKnowledgeProviderHealthy || o.RequireWeKnoraHealthy
 }

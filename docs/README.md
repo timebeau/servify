@@ -1,47 +1,92 @@
 ---
 home: true
 title: Servify Docs
-heroText: Servify Docs
-tagline: 架构、实施 backlog、工程化约束与集成指南
+heroText: Servify
+tagline: 面向企业独立部署的智能客服系统
 actions:
-  - text: 查看架构
+  - text: 了解产品能力
     link: /ARCHITECTURE
     type: primary
-  - text: 进入实施计划
-    link: /implementation/
+  - text: 查看部署文档
+    link: /deployment
     type: secondary
 features:
-  - title: 架构与模块边界
-    details: 先看整体架构，再进入 platform、AI、业务模块和 voice 扩展任务。
-  - title: 工程化约束
-    details: CI 质量门禁、生成物一致性、版本发布链路、测试金字塔都在文档站统一维护。
-  - title: 集成专题
-    details: WeKnora、CI Runner、Mermaid 兼容性和发布策略作为长期维护专题单独收口。
+  - title: Web 接入
+    details: 以网站客服入口为起点，把访客接待、实时会话和后续处理串成统一链路。
+  - title: AI 协同接待
+    details: 通过知识库和模型能力完成首答、澄清和建议，让 AI 成为客服流程里的协作角色。
+  - title: 远程协助
+    details: 针对需要演示、引导和排查的问题，支持远程协助场景，不只停留在文字问答。
+  - title: 人工接管与转接
+    details: 坐席可以随时接管 AI 会话，并继续转接、协作和推进复杂问题。
+  - title: 工单闭环
+    details: 无法即时解决的问题进入工单继续跟进，让服务从聊天延伸到持续处理。
+  - title: 后台运营
+    details: 在统一后台管理坐席、知识库、权限、安全策略和产品运行配置。
 footer: Servify documentation site
 ---
 
-## 推荐阅读顺序
+## 产品概览
+
+Servify 不是先做平台再兼容客服，而是先把客服主链路做完整：
+
+`Web 接入 -> AI 首答 -> 远程协助 -> 人工接管 -> 转接协作 -> 工单闭环`
+
+当前文档站的重点，也应该围绕这条链路来理解产品，而不是先从 implementation backlog 开始读。
+
+这里的远程协助，不是把“WebRTC 可用”单独当成功能名词，而是把实时指导、联合排查、人工接管和后续工单处理放进同一条服务链路里。
+
+## 为什么是 Servify
+
+### 独立部署优先
+
+Servify 适合需要独立部署、可控接入和持续演化的企业客服场景。它默认服务的是单个企业团队，而不是把多租户平台化能力放在产品正中央。
+
+### 远程协助是差异点
+
+很多客服系统只做到聊天和工单，但真实服务过程里，经常需要“看着客户做、带着客户做、一起排查问题”。Servify 把远程协助视为产品能力，而不是隐藏在底层实时通信里的附属特性。
+
+当前仓库已经具备这类能力的实时基础，包括 Web 会话、消息、WebSocket / WebRTC 相关链路、人工接管和后续工单闭环；但文档表达会刻意避免把它夸大成“已完整交付某种重型远控产品”。
+
+### AI 和人工不是割裂关系
+
+AI 负责首答、澄清、知识召回和建议，人工可以随时接管、继续处理和协作，让整个客服体验保持连续。
+
+## 推荐阅读
 
 1. [总体架构设计](/ARCHITECTURE)
-2. [实施 Backlog 索引](/implementation/)
-3. [工程化硬化与交付](/implementation/05-engineering-hardening)
+2. [部署指南](/deployment)
+3. [本地开发](/local-development)
+4. [实施计划索引](/implementation/)
 
-## 专题文档
+## 你可以从这里继续
 
-- [WeKnora 集成](/WEKNORA_INTEGRATION)
-- [配置作用域规则](/configuration-scopes)
+### 快速了解产品
+
+- [总体架构设计](/ARCHITECTURE)
+- [远程协助](/remote-assistance)
+- [部署指南](/deployment)
+- [本地开发](/local-development)
+
+### 深入运行与安全
+
 - [运行安全基线](/security-baseline-operations)
-- [Operator 可观测性](/implementation/12-operator-observability)
+- [配置作用域规则](/configuration-scopes)
 - [Token 生命周期与密钥轮换](/token-lifecycle-and-key-rotation)
 - [开放接口安全清单](/public-surface-security-checklist)
-- [CI / GitHub Hosted Runner](/CI_SELF_HOSTED)
+
+### 继续看研发与实施细节
+
+- [实施 Backlog 索引](/implementation/)
+- [外部知识库集成指南：Dify 优先，WeKnora 兼容](/WEKNORA_INTEGRATION)
 - [版本发布策略](/release-versioning)
 - [测试金字塔](/testing-pyramid)
+- [CI / GitHub Hosted Runner](/CI_SELF_HOSTED)
 - [Mermaid 兼容性](/MERMAID_COMPATIBILITY)
 
-## 常用校验入口
+## 常用入口
 
-- `make local-check`
-- `make security-check CONFIG=./config.yml`
-- `make observability-check CONFIG=./config.yml`
-- `make release-check CONFIG=./config.yml`
+- 本地自检：`make local-check`
+- 安全检查：`make security-check CONFIG=./config.yml`
+- 可观测性检查：`make observability-check CONFIG=./config.yml`
+- 发布检查：`make release-check CONFIG=./config.yml`

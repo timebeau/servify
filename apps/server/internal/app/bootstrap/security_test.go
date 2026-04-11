@@ -39,6 +39,31 @@ func TestSecurityWarnings(t *testing.T) {
 	}
 }
 
+func TestSecurityWarnings_NoExternalKnowledgeProviderEnabled(t *testing.T) {
+	cfg := config.GetDefaultConfig()
+	cfg.JWT.Secret = "prod-secret"
+	cfg.Security.RateLimiting.Enabled = true
+	cfg.Security.CORS.AllowedOrigins = []string{"https://app.example.com"}
+	cfg.Security.RateLimiting.Paths = []config.PathRateLimitConfig{
+		{Enabled: true, Prefix: "/public/", RequestsPerMinute: 120, Burst: 30},
+		{Enabled: true, Prefix: "/public/kb/", RequestsPerMinute: 60, Burst: 15},
+		{Enabled: true, Prefix: "/public/csat/", RequestsPerMinute: 30, Burst: 10},
+		{Enabled: true, Prefix: "/api/v1/auth/", RequestsPerMinute: 25, Burst: 10},
+		{Enabled: true, Prefix: "/api/v1/ws", RequestsPerMinute: 30, Burst: 10},
+		{Enabled: true, Prefix: "/uploads/", RequestsPerMinute: 90, Burst: 20},
+		{Enabled: true, Prefix: "/api/v1/metrics/ingest", RequestsPerMinute: 120, Burst: 30},
+		{Enabled: true, Prefix: "/api/", RequestsPerMinute: 90, Burst: 20},
+	}
+	cfg.AI.OpenAI.APIKey = "openai-key"
+	cfg.Dify.Enabled = false
+	cfg.WeKnora.Enabled = false
+
+	warnings := strings.Join(SecurityWarnings(cfg), "\n")
+	if !strings.Contains(warnings, "no external knowledge provider is enabled; ai will rely on fallback mode only") {
+		t.Fatalf("expected knowledge provider fallback warning, got %q", warnings)
+	}
+}
+
 func TestSecurityWarnings_PublicSurfaceRateLimitCoverage(t *testing.T) {
 	cfg := config.GetDefaultConfig()
 	cfg.JWT.Secret = "prod-secret"

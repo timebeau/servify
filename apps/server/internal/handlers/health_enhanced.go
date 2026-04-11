@@ -89,8 +89,8 @@ func (h *EnhancedHealthHandler) Health(c *gin.Context) {
 
 	// 检查知识 provider（Dify / WeKnora）
 	weKnoraConfig := configscope.NewResolver(h.config).ResolveWeKnora(context.Background(), nil)
-	if h.config.Monitoring.HealthChecks.WeKnora && (weKnoraConfig.Enabled || (h.config != nil && h.config.Dify.Enabled)) {
-		h.checkWeKnora(ctx, &response, &allHealthy)
+	if h.config.Monitoring.HealthChecks.KnowledgeProviderEnabled() && (weKnoraConfig.Enabled || (h.config != nil && h.config.Dify.Enabled)) {
+		h.checkKnowledgeProvider(ctx, &response, &allHealthy)
 	}
 
 	// 设置总体状态
@@ -259,12 +259,12 @@ func (h *EnhancedHealthHandler) checkRedis(ctx context.Context, response *Health
 	response.Services["redis"] = serviceInfo
 }
 
-// checkWeKnora 检查当前知识 provider 状态。
-func (h *EnhancedHealthHandler) checkWeKnora(ctx context.Context, response *HealthResponse, allHealthy *bool) {
+// checkKnowledgeProvider 检查当前知识 provider 状态。
+func (h *EnhancedHealthHandler) checkKnowledgeProvider(ctx context.Context, response *HealthResponse, allHealthy *bool) {
 	start := time.Now()
 	weKnoraConfig := configscope.NewResolver(h.config).ResolveWeKnora(context.Background(), nil)
 
-	// 如果是增强 AI 服务，获取 WeKnora 状态
+	// 如果是增强 AI 服务，获取当前知识 provider 状态
 	if _, ok := h.aiService.GetMetrics(); ok {
 		status := h.aiService.GetStatus(ctx)
 		providerID, _ := status["knowledge_provider"].(string)
@@ -305,7 +305,7 @@ func (h *EnhancedHealthHandler) checkWeKnora(ctx context.Context, response *Heal
 			}
 		}
 	} else {
-		response.Services["weknora"] = ServiceInfo{
+		response.Services["knowledge_provider"] = ServiceInfo{
 			Status: "disabled",
 		}
 	}

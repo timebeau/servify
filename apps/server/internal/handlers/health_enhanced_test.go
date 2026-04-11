@@ -19,6 +19,7 @@ func TestEnhancedHealthHandler_Health_And_Ready(t *testing.T) {
 	// Keep tests hermetic: skip external deps checks.
 	cfg.Monitoring.HealthChecks.Database = false
 	cfg.Monitoring.HealthChecks.Redis = false
+	cfg.Monitoring.HealthChecks.KnowledgeProvider = false
 	cfg.Monitoring.HealthChecks.WeKnora = false
 	cfg.WeKnora.Enabled = false
 
@@ -53,6 +54,7 @@ func TestEnhancedHealthHandler_Health_WithDatabaseCheck(t *testing.T) {
 	// Enable database check to increase coverage
 	cfg.Monitoring.HealthChecks.Database = true
 	cfg.Monitoring.HealthChecks.Redis = false
+	cfg.Monitoring.HealthChecks.KnowledgeProvider = false
 	cfg.Monitoring.HealthChecks.WeKnora = false
 
 	ai := services.NewAIService("", "")
@@ -80,6 +82,7 @@ func TestEnhancedHealthHandler_Health_WithRedisCheck(t *testing.T) {
 	// Enable redis check to increase coverage
 	cfg.Monitoring.HealthChecks.Database = false
 	cfg.Monitoring.HealthChecks.Redis = true
+	cfg.Monitoring.HealthChecks.KnowledgeProvider = false
 	cfg.Monitoring.HealthChecks.WeKnora = false
 
 	ai := services.NewAIService("", "")
@@ -100,14 +103,15 @@ func TestEnhancedHealthHandler_Health_WithRedisCheck(t *testing.T) {
 	}
 }
 
-func TestEnhancedHealthHandler_Health_WithWeKnoraCheck(t *testing.T) {
+func TestEnhancedHealthHandler_Health_WithKnowledgeProviderCheck(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	cfg := config.GetDefaultConfig()
-	// Enable weknora check to increase coverage
+	// Enable knowledge provider check to increase coverage.
 	cfg.Monitoring.HealthChecks.Database = false
 	cfg.Monitoring.HealthChecks.Redis = false
-	cfg.Monitoring.HealthChecks.WeKnora = true
+	cfg.Monitoring.HealthChecks.KnowledgeProvider = true
+	cfg.Monitoring.HealthChecks.WeKnora = false
 	cfg.WeKnora.Enabled = true
 
 	ai := services.NewAIService("", "")

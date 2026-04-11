@@ -118,9 +118,14 @@ func (s *StatisticsService) IncrementAIUsage(ctx context.Context) {
 	_ = s.module.IncrementDailyStat(ctx, analyticsapp.IncrementEvent{Date: time.Now(), Kind: analyticsapp.IncrementAIUsage})
 }
 
+// IncrementKnowledgeProviderUsage increases external knowledge provider usage counts.
+func (s *StatisticsService) IncrementKnowledgeProviderUsage(ctx context.Context) {
+	_ = s.module.IncrementDailyStat(ctx, analyticsapp.IncrementEvent{Date: time.Now(), Kind: analyticsapp.IncrementKnowledgeProvider})
+}
+
 // IncrementWeKnoraUsage 增加 WeKnora 使用计数
 func (s *StatisticsService) IncrementWeKnoraUsage(ctx context.Context) {
-	_ = s.module.IncrementDailyStat(ctx, analyticsapp.IncrementEvent{Date: time.Now(), Kind: analyticsapp.IncrementWeKnora})
+	s.IncrementKnowledgeProviderUsage(ctx)
 }
 
 // StartDailyStatsWorker 启动每日统计后台任务
@@ -179,6 +184,7 @@ func dashboardStatsFromDTO(dto *analyticsapp.DashboardStats) *analyticscontract.
 		AvgResolutionTime:    dto.AvgResolutionTime,
 		CustomerSatisfaction: dto.CustomerSatisfaction,
 		AIUsageToday:         dto.AIUsageToday,
+		KnowledgeProviderUsageToday: dto.KnowledgeProviderUsageToday,
 		WeKnoraUsageToday:    dto.WeKnoraUsageToday,
 	}
 }

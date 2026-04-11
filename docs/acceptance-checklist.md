@@ -23,13 +23,17 @@
 ```bash
 make migrate DB_HOST=localhost DB_PORT=5432 DB_USER=postgres DB_PASSWORD=password DB_NAME=servify
 make run-cli CONFIG=./config.yml
+make run-knowledge-provider CONFIG=./config.weknora.yml
 make run-weknora CONFIG=./config.weknora.yml
+# `run-knowledge-provider` 是通用 alias；两者都仅用于 WeKnora compatibility / mock 验收
+# 默认知识库 provider 仍以 Dify 为主
 ```
 
 常用基础验证命令：
 
 ```bash
 make build
+make build-knowledge-provider
 make build-weknora
 make test
 go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/server/pkg/weknora/...
@@ -54,7 +58,7 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 
 | 项目 | 证据 | 状态 |
 | --- | --- | --- |
-| WeKnora CLI 可构建 | `make build-weknora` 通过 | 通过 |
+| Knowledge provider compatibility CLI 可构建 | `make build-knowledge-provider` 或 `make build-weknora` 通过 | 通过 |
 | WeKnora 相关 handler/pkg 基础测试 | `go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/server/pkg/weknora/...` 通过 | 通过 |
 | 本地最小环境检查 | `make local-check` 通过 | 通过 |
 | 发布前最小自检 | `make release-check CONFIG=./config.yml` 通过 | 通过 |
@@ -62,11 +66,23 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 | 主链路人工运行验证当前阻塞 | `nc -z localhost 5432` 返回非零；`go -C apps/server run ./cmd/server --port 18080` 实际报错 `dial tcp 127.0.0.1:5432: connect: connection refused`；`redis-cli -h localhost -p 6379 ping` 返回 `Connection refused`；当前本机 Docker daemon 也不可用 | 阻塞 |
 | 主链路人工运行验证第二轮 | 本机已拉起 `redis-server` 与 `postgresql@15`；`make migrate` 完成；`go -C apps/server run ./cmd/server --port 18080` 启动成功；`curl http://localhost:18080/health` 返回 healthy；`scripts/seed-data.sh http://localhost:18080` 完成；随后已实际完成 `admin / admin123` 登录、Dashboard 查询、Workspace 查询、Ticket 列表/详情查询、补建 agent 实体后完成 Ticket assign，并通过 WebSocket 向 `g1-session-1` 写入消息再经 `/api/omni/sessions/g1-session-1/messages` 读回 | 部分通过 |
 | 主链路人工运行验证第三轮 | 本机以 `DB_USER=cui DB_NAME=servify` 完成 `make migrate`；启动 `SERVIFY_JWT_SECRET=dev-secret DB_USER=cui DB_NAME=servify go -C apps/server run ./cmd/server --port 18080`；`curl http://localhost:18080/health` 返回 healthy；更新后的 `scripts/seed-data.sh http://localhost:18080` 会创建 agent 实体并自动置为 online；随后已实际完成 `admin / admin123` 登录、`/api/statistics/dashboard`、`/api/omni/workspace`、`/api/omni/sessions/g1-session-2`、`/api/tickets`、`POST /api/tickets/30/assign`，并确认工单详情 `agent_id` 已更新为 `4` | 通过 |
-| AI 主链路人工运行验证第一轮 | 以 `admin / admin123` 登录后，实际完成 `GET /api/v1/ai/status`、`POST /api/v1/ai/query`、`GET /api/v1/ai/metrics`；其中 `status` 返回 `type=orchestrated_enhanced`、`fallback_enabled=true`，`query` 返回 `strategy=fallback`，证明在无 WeKnora 可用时主链路仍可响应 | 通过 |
-| AI 控制面人工运行验证第二轮 | 使用基于 `config.weknora.yml` 的临时配置启动服务，实际完成 `PUT /api/v1/ai/weknora/enable`、`PUT /api/v1/ai/weknora/disable`、`POST /api/v1/ai/circuit-breaker/reset`；同时确认 `GET /api/v1/ai/status` 返回 `weknora_enabled=true` 且 `weknora_healthy=false`，说明控制路由已暴露，且运行时清楚标识 WeKnora 不健康 | 部分通过 |
-| AI 知识链路人工运行验证第三轮 | 本机启动临时 `weknora-mock` 后，以基于 `config.weknora.yml` 的临时配置启动服务；随后实际完成 `POST /api/v1/ai/knowledge/upload`、`POST /api/v1/ai/knowledge/sync`，并确认 `GET /api/v1/ai/status` 返回 `weknora_enabled=true`、`weknora_healthy=true`；说明 Servify 到 WeKnora API 的上传 / 同步协议路径已跑通 | 部分通过 |
+| AI 主链路人工运行验证第一轮 | 以 `admin / admin123` 登录后，实际完成 `GET /api/v1/ai/status`、`POST /api/v1/ai/query`、`GET /api/v1/ai/metrics`；其中 `status` 返回 `type=orchestrated_enhanced`、`fallback_enabled=true`，`query` 返回 `strategy=fallback`，证明在外部 knowledge provider 不可用时主链路仍可响应 | 通过 |
+| AI 控制面人工运行验证第二轮 | 使用启用外部 knowledge provider 的临时配置启动服务，实际完成 `PUT /api/v1/ai/knowledge-provider/enable`、`PUT /api/v1/ai/knowledge-provider/disable`、`POST /api/v1/ai/circuit-breaker/reset`；同时确认 `GET /api/v1/ai/status` 返回 `knowledge_provider_enabled=true`，并根据当前激活 provider 返回对应的 `dify_healthy` 或 `weknora_healthy` 状态，说明控制路由已暴露且运行时能清楚标识当前知识源健康度 | 部分通过 |
+| AI 知识链路人工运行验证第三轮 | 本机启动临时知识库 provider 测试环境后，以启用外部 knowledge provider 的临时配置启动服务；随后实际完成 `POST /api/v1/ai/knowledge/upload`、`POST /api/v1/ai/knowledge/sync`，并确认 `GET /api/v1/ai/status` 返回 `knowledge_provider_enabled=true` 与当前激活 `knowledge_provider`；若当前 provider 为 `weknora`，则同时确认 `weknora_healthy=true`，说明 Servify 到外部知识源的上传 / 同步协议路径已跑通 | 部分通过 |
 | 配置加载口径修复回归验证 | 新增 `TestLoadConfigFindsRepoRootConfigFromNestedDir`，确认从 `apps/server` 这类嵌套目录启动时，`LoadConfig()` 仍能读到仓库根 `config.yml` | 通过 |
 | 运营高价值链路人工运行验证第一轮 | 以 `admin / admin123` 登录后，实际完成 `POST /api/customers`、`GET /api/customers/:id`、`PUT /api/customers/:id`、`POST /api/customers/:id/notes`、`PUT /api/customers/:id/tags`、`GET /api/customers/stats`、`GET /api/agents`、`POST /api/agents/:id/online`、`PUT /api/agents/:id/status`、`GET /api/agents/online`、`GET /api/agents/stats`、`GET /api/security/users/:id`、`POST /api/security/users/:id/revoke-tokens`、`GET /api/security/users/:id/sessions`、`GET /api/audit/logs?action=customers.create`、`GET /api/audit/logs/:id`、`GET /api/audit/logs/:id/diff`、`GET /api/audit/logs/export?action=customers.create&limit=5`；其中审计查询在默认限流下触发过一次 `429`，随后使用白名单 `X-API-Key: internal-test-key` 验证通过 | 部分通过 |
+| system 级 `DailyStats` 作用域回归 | `go test -tags integration ./apps/server/internal/services -run 'TestStatisticsService_(UpdateDailyStats_NewRecord|UpdateDailyStats_IgnoresRequestScopeForSystemAggregate)$'` 与 `go test -tags integration ./apps/server/internal/modules/analytics/infra -run 'TestGormRepositoryScoped(DashboardIgnoresGlobalDailyStats|TimeRangeIgnoresGlobalDailyStats|AgentPerformanceStaysScoped)'` 通过；已覆盖 scoped 读取不消费全局 `DailyStats`，以及 scoped 重算不会把 system 级日汇总写成局部数据 | 通过 |
+| 审计保留与轻量导出约束自动化回归 | `go test ./apps/server/internal/platform/audit -run 'TestGormRetentionServiceCleanup'`、`go test ./apps/server/internal/handlers -run 'TestAuditHandlerExportCSV(ClampsLimit|RejectsInvalidFilters)$'` 通过；已覆盖 `created_at < cutoff` 保留边界与导出 `limit` 最大值 `5000` 的服务端截断行为 | 通过 |
+| scoped config rollback / verify 治理链路自动化回归 | `go test ./apps/server/internal/handlers -run 'TestScopedConfigHandler(RollbackRestoresSnapshot|RollbackRequiresConfirmation|RollbackRequiresChangeControl|RollbackRequiresApprovalRefForHighRiskChange)$'` 通过；已覆盖显式确认、`change_ref` / `reason`、高风险 `approval_ref` 与 rollback 审计快照恢复约束 | 通过 |
+| session risk 环境级策略与 Geo/IP provider 管理面回归 | `go test -tags integration ./apps/server/internal/handlers -run 'TestUserSecurityHandler_ListUserSessionsUses(ScopedRiskPolicy|EnvironmentRiskProfile|InjectedIPIntelligence)$'` 通过；已覆盖 management `user-security` 会话列表对 tenant scoped risk、environment risk profile 和可注入 IP intelligence provider 的直接证据 | 通过 |
+| HTTP Geo/IP provider 契约回归 | `go test ./apps/server/internal/handlers -run 'TestHTTPSessionIPIntelligenceDescribeIP(SupportsNestedDataPayload|UsesCustomAuthHeaderWithoutBearerPrefix|ReturnsEmptyOnFailure|$)'` 通过；已覆盖嵌套 `data` JSON、非 `Authorization` 自定义鉴权头，以及上游失败时回退空结果的 adapter 契约 | 通过 |
+| WeKnora 验收脚本 guard 与证据输出回归 | `go test ./scripts -run 'TestWeKnoraIntegrationScript(RealModeRejectsLocalHost|MockModeWritesEvidence)$'` 通过；已锁定 `real` 模式对本地/私网 WeKnora 地址的拒绝策略，并覆盖 `mock` 模式的 `summary.txt`、`ai-status.json`、`knowledge-upload.json`、`knowledge-sync.json` 等关键证据文件输出 | 通过 |
+| 远程协助产品叙事文档对齐 | 已统一更新 [README.md](/Users/cui/Workspaces/servify/README.md)、[docs/README.md](/Users/cui/Workspaces/servify/docs/README.md)、[docs/remote-assistance.md](/Users/cui/Workspaces/servify/docs/remote-assistance.md)；现在一致强调“远程协助 = 实时指导/联合排查/人工接管/工单闭环中的产品能力”，并明确区分当前已具备的实时基础与尚未承诺的完整 co-browsing 工作台 | 通过 |
+| 远程协助现状入口盘点 | 已新增 [docs/remote-assistance-current-state.md](/Users/cui/Workspaces/servify/docs/remote-assistance-current-state.md)，盘点了服务端现有会话、转接、assist、voice、WebSocket/WebRTC 入口，以及管理端 `/conversation`、`/routing`、`/voice`、`/ticket/detail`、`/security` 相关页面；同时明确当前缺口在“缺统一产品入口、缺状态机、缺最小演示链路”，而不是基础 runtime 缺失 | 通过 |
+| 远程协助 MVP 链路与验收口径 | 已新增 [docs/remote-assistance-mvp.md](/Users/cui/Workspaces/servify/docs/remote-assistance-mvp.md)，把最小可交付链路定义为“Web 会话 -> 人工接管 -> 转派/实时协作基础 -> 工单闭环”，并明确了对应页面、API 和人工演示步骤；当前不再把缺少独立 co-browsing 工作台误判成“没有远程协助产品方向” | 通过 |
+| staging 口径 release readiness 演练 | 已新增 [config.staging.example.yml](/Users/cui/Workspaces/servify/config.staging.example.yml)，并实际通过 `make security-check CONFIG=config.staging.example.yml`、`make observability-check CONFIG=config.staging.example.yml`、`make release-check CONFIG=config.staging.example.yml`；同时已在 [docs/operator-runbook.md](/Users/cui/Workspaces/servify/docs/operator-runbook.md) 和 [docs/deployment.md](/Users/cui/Workspaces/servify/docs/deployment.md) 回写 staging 基线与执行步骤 | 通过 |
+| 生产模板与告警阈值对齐 | 已补齐 [config.production.secure.example.yml](/Users/cui/Workspaces/servify/config.production.secure.example.yml) 中显式的 `metrics_path` / tracing 基线，并把 `deploy/observability/alerts/rules.yaml` 中的 10 条告警阈值同步回写到 [docs/operator-runbook.md](/Users/cui/Workspaces/servify/docs/operator-runbook.md)、[docs/deployment.md](/Users/cui/Workspaces/servify/docs/deployment.md) 与 [deploy/observability/runbook/operational-runbook.md](/Users/cui/Workspaces/servify/deploy/observability/runbook/operational-runbook.md) | 通过 |
+| demo/mock/in-memory 资产边界清点 | 已新增 [docs/demo-and-mock-boundaries.md](/Users/cui/Workspaces/servify/docs/demo-and-mock-boundaries.md)，明确盘点 `apps/demo`、`apps/demo-sdk`、`scripts/demo-setup.sh`、`scripts/seed-data.sh`、`infra/compose/weknora-mock`、`scripts/test-weknora-integration.sh`、进程内 event bus、voice mock provider、Telegram/WeChat stub 的保留原因、prod-safe 判断与退出条件；现已能区分“可保留的演示/回归资产”和“不可误判为正式能力的占位实现” | 通过 |
 | 运营高价值链路人工运行验证第二轮 | 本机以 `DB_USER=cui DB_NAME=servify go run ./apps/server/cmd/server --port 18081` 启动服务，并继续使用 `admin / admin123` 登录；随后实际完成 `POST /api/sla/configs` 创建 urgent 配置、`POST /api/sla/configs` 创建 high 配置、`GET /api/sla/configs/:id`、`GET /api/sla/configs?page=1&page_size=20`、`PUT /api/sla/configs/:id`、`DELETE /api/sla/configs/:id`、`GET /api/sla/configs/priority/urgent`、`POST /api/sla/check/ticket/22`、`GET /api/sla/violations?page=1&page_size=20`、`POST /api/sla/violations/1/resolve`、`GET /api/sla/stats`；其中 ticket `22` 基于新建 urgent 配置命中 `resolution` 违约，`resolve` 后统计中的 `unresolved_violations` 变为 `0`；同时补充回归测试，确保 `CheckTicketSLA` 首次创建和重复返回违约时都会带上真实 `ticket` / `sla_config` 关联数据 | 通过 |
 | 公开入口与实时入口人工运行验证第一轮 | 本机继续以 `DB_USER=cui DB_NAME=servify go run ./apps/server/cmd/server --port 18081` 启动服务；未登录访问 `GET /public/portal/config` 返回 `brand_name=Servify` 等公开配置；以 `admin / admin123` 登录后创建知识文档 `G1-4 Public KB`，随后 `GET /public/kb/docs?search=G1-4&page=1&page_size=10` 与 `GET /public/kb/docs/16` 均可公开读取；使用 Node `ws` 客户端连到 `ws://127.0.0.1:18081/api/v1/ws?session_id=g1-4-ws` 后成功收到同会话回显消息，且在连接存活期间 `GET /api/v1/ws/stats` 返回 `connected_clients=1`；同时通过插入一条缺失的 `customers.user_id=6` 扩展记录，实际完成 `GET /public/csat/g1-4-public-csat-token` 与 `POST /public/csat/g1-4-public-csat-token/respond`，确认公开问卷可读取并可提交，提交后再次读取可见 `status=completed`；Voice 基础路径方面，已实际完成 `GET /api/voice/protocols`、`POST /api/voice/recordings/start`、`GET /api/voice/recordings/:recordingID`、`POST /api/voice/recordings/stop`、`POST /api/voice/transcripts`、`GET /api/voice/transcripts?call_id=g1-4-call`、`POST /api/voice/protocols/sip/call-events/invite|answer|hangup`、`POST /api/voice/protocols/webrtc/media-events/session_started`；WebRTC 连接链路方面，已补齐 `ws` 对 `webrtc-offer/answer/candidate` 的真实 runtime wiring，并修复 `WebSocketClient.readPump()` 的 `512B` 入站限制，否则正常 SDP offer 会直接触发断连；随后使用本地生成的真实 SDP offer 连到 `ws://127.0.0.1:18081/api/v1/ws?session_id=g1-4-webrtc-real`，成功收到 `webrtc-answer` 与多条 `webrtc-candidate`，且 `GET /api/v1/webrtc/stats?session_id=g1-4-webrtc-real` 返回 `connection_state=connecting`、`ice_connection_state=checking`，`GET /api/v1/webrtc/connections` 返回 `connection_count=1` | 通过 |
 
@@ -79,8 +95,10 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
   - `scripts/seed-data.sh` 固定 `customer_id` 导致用户关联错位，已修复为基于真实注册返回的用户 ID 建票。
   - `scripts/seed-data.sh` 未创建 agent 实体，已修复为自动创建 `/api/agents` 记录。
   - `/api/omni/sessions/:id` 曾在仅有消息落库时返回 `conversation not found`，已补最小会话读模型兜底。
-- 当前 `G1-2` 已拿到 AI 主链路、fallback、控制接口以及基于本地 `weknora-mock` 的知识上传 / 同步协议证据。
-- 当前 `G1-2` 仍未拿到“真实 WeKnora 服务部署”的运行证据；现阶段证明的是 Servify 对 WeKnora API 的调用路径可用，但不等同于真实外部 WeKnora 环境已完成验收。
+- 当前 `G1-2` 已拿到 AI 主链路、fallback、控制接口以及基于本地 provider mock 的知识上传 / 同步协议证据。
+- 当前 `G1-2` 仍未拿到“真实 Dify 主路径 + WeKnora 兼容路径”的完整双路径运行证据；现阶段已证明 Servify 对外部 knowledge provider API 的调用路径可用，但不等同于真实生产级外部环境已完成验收。
+- 当前已补 `scripts/test-weknora-integration.sh` 的证据输出能力：可通过 `WEKNORA_ACCEPTANCE_MODE=mock|real` 与 `EVIDENCE_DIR=...` 生成 `summary.txt`、`ai-status.json`、`ai-query.json`、`knowledge-upload.json`、`knowledge-sync.json` 等验收留档；其中 `real` 模式当前主要服务于 WeKnora 兼容路径，会把 “WeKnora 健康可用 + enhanced 模式 + upload/sync 成功” 作为硬性通过条件。
+- 当前 `real` 模式还会主动拒绝 `localhost` / 私网地址，以及健康检查中显式暴露 `service=weknora-mock` 的上游，避免把本地 mock 环境误填成真实 WeKnora 兼容路径运行证据。
 - `LoadConfig()` 现已补默认搜索 `.`、`..`、`../..`，避免从 `apps/server` 启动时读不到仓库根配置，导致验收口径和实际部署口径漂移。
 - 当前仍不能据此推出 `G1-2` 到 `G1-4` 已完成，它们需要各自独立验收与证据回填。
 
@@ -93,7 +111,7 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 - 核心路由返回 500 或返回结构与契约不符。
 - 创建后无法查询，或更新后状态不变化。
 - 鉴权与权限中间件失效。
-- WeKnora 不可用时没有回退或错误不可控。
+- 外部 knowledge provider 不可用时没有回退或错误不可控。
 - 关键流程只有 happy path，没有异常路径验证。
 
 ## 全量验收矩阵
@@ -120,7 +138,7 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 | 可观测性基线严格校验 | `make observability-check CONFIG=...` | 使用部署配置执行校验 | metrics/tracing 配置与 dashboard/alert/runbook/collector 资产齐备时返回 `0` | [check_observability_baseline_test.go](/Users/cui/Workspaces/servify/apps/server/cmd/cli/check_observability_baseline_test.go) | 通过 |
 | 发布前最小自检 | `make release-check CONFIG=./config.yml` | 执行统一自检脚本 | local/security/observability/focused Go tests 全部通过 | [check-release-readiness.sh](/Users/cui/Workspaces/servify/scripts/check-release-readiness.sh) | 通过 |
 | CLI 标准构建 | `make build` | 执行构建 | 生成二进制，无编译错误 | `make build` | 未验 |
-| CLI WeKnora 构建 | `make build-weknora` | 执行构建 | 生成二进制，无编译错误 | `make build-weknora` | 通过 |
+| CLI knowledge provider compatibility 构建 | `make build-knowledge-provider` | 执行构建 | 生成二进制，无编译错误 | `make build-knowledge-provider` | 通过 |
 | 本地最小环境检查 | `make local-check` | 执行环境校验脚本 | 所有关键依赖通过 | [Makefile](/Users/cui/Workspaces/servify/Makefile) | 通过 |
 
 ### 2. 实时能力
@@ -138,7 +156,7 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 | WebRTC 连接列表 | `GET /api/v1/webrtc/connections` | 建立多连接后请求 | 返回当前连接列表 | [webrtc_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/webrtc_test.go) | 通过 |
 | 平台消息路由统计 | `GET /api/v1/messages/platforms` | 模拟不同平台消息后请求 | 平台维度统计正确 | [router_stats_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/router_stats_test.go) | 未验 |
 
-### 3. AI 与 WeKnora
+### 3. AI 与外部知识库
 
 代码入口：
 
@@ -153,10 +171,10 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 | AI 指标 | `GET /api/v1/ai/metrics` | 调用多次查询后请求 | query count、latency 等可见 | [ai_handler_comprehensive_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_comprehensive_test.go) | 通过 |
 | 知识上传 | `POST /api/v1/ai/knowledge/upload` | 上传合法文档 | 上传成功并返回任务或文档信息 | [ai_handler_comprehensive_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_comprehensive_test.go) | 部分通过 |
 | 知识同步 | `POST /api/v1/ai/knowledge/sync` | 触发同步 | 返回同步结果，无 500 | [ai_handler_comprehensive_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_comprehensive_test.go) | 部分通过 |
-| 启用 WeKnora | `PUT /api/v1/ai/weknora/enable` | 启用增强能力 | 状态切换成功 | [ai_handler_comprehensive_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_comprehensive_test.go) | 通过 |
-| 禁用 WeKnora | `PUT /api/v1/ai/weknora/disable` | 禁用增强能力 | 状态切换成功 | [ai_handler_comprehensive_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_comprehensive_test.go) | 通过 |
+| 启用 Knowledge Provider | `PUT /api/v1/ai/knowledge-provider/enable` | 启用外部知识增强能力 | 状态切换成功 | [ai_handler_comprehensive_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_comprehensive_test.go) | 通过 |
+| 禁用 Knowledge Provider | `PUT /api/v1/ai/knowledge-provider/disable` | 禁用外部知识增强能力 | 状态切换成功 | [ai_handler_comprehensive_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_comprehensive_test.go) | 通过 |
 | 熔断器重置 | `POST /api/v1/ai/circuit-breaker/reset` | 先制造失败再重置 | 熔断状态恢复 | [ai_handler_comprehensive_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler_comprehensive_test.go) | 通过 |
-| WeKnora 不可用回退 | AI 查询主链路 | 关闭 WeKnora 或制造超时 | 系统进入 fallback，而不是整体不可用 | [orchestrated_ai_fallback_integration_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/orchestrated_ai_fallback_integration_test.go) | 通过 |
+| 外部 Knowledge Provider 不可用回退 | AI 查询主链路 | 关闭当前 knowledge provider 或制造超时 | 系统进入 fallback，而不是整体不可用 | [orchestrated_ai_fallback_integration_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/orchestrated_ai_fallback_integration_test.go) | 通过 |
 
 ### 3A. 认证与会话
 
@@ -376,7 +394,7 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 
 ## 建议的验收执行顺序
 
-1. 环境级：`make migrate`、`make build`、`make build-weknora`、服务启动。
+1. 环境级：`make migrate`、`make build`、`make build-knowledge-provider`、服务启动。
 2. 存活级：`/health`、`/ready`、metrics。
 3. 核心业务级：客户、客服、工单、会话转接。
 4. 增值能力级：AI、知识库、自动化、统计、SLA。

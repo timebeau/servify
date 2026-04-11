@@ -142,7 +142,7 @@ func (h *AIHandler) UploadDocument(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
 
-	if err := h.aiService.UploadDocumentToWeKnora(ctx, req.Title, req.Content, req.Tags); err != nil {
+	if err := h.aiService.UploadKnowledgeDocument(ctx, req.Title, req.Content, req.Tags); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"success": false,
 			"error":   err.Error(),
@@ -179,36 +179,46 @@ func (h *AIHandler) SyncKnowledgeBase(c *gin.Context) {
 	})
 }
 
-// EnableWeKnora 启用 WeKnora
-func (h *AIHandler) EnableWeKnora(c *gin.Context) {
-	if !h.aiService.SetWeKnoraEnabled(true) {
+// EnableKnowledgeProvider 启用外部知识库 provider
+func (h *AIHandler) EnableKnowledgeProvider(c *gin.Context) {
+	if !h.aiService.SetKnowledgeProviderEnabled(true) {
 		c.JSON(http.StatusNotFound, gin.H{
 			"success": false,
-			"error":   "WeKnora control not available for standard AI service",
+			"error":   "knowledge provider control not available for standard AI service",
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "WeKnora enabled",
+		"message": "knowledge provider enabled",
 	})
 }
 
-// DisableWeKnora 禁用 WeKnora
-func (h *AIHandler) DisableWeKnora(c *gin.Context) {
-	if !h.aiService.SetWeKnoraEnabled(false) {
+// DisableKnowledgeProvider 禁用外部知识库 provider
+func (h *AIHandler) DisableKnowledgeProvider(c *gin.Context) {
+	if !h.aiService.SetKnowledgeProviderEnabled(false) {
 		c.JSON(http.StatusNotFound, gin.H{
 			"success": false,
-			"error":   "WeKnora control not available for standard AI service",
+			"error":   "knowledge provider control not available for standard AI service",
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "WeKnora disabled",
+		"message": "knowledge provider disabled",
 	})
+}
+
+// EnableWeKnora preserves the legacy endpoint handler name.
+func (h *AIHandler) EnableWeKnora(c *gin.Context) {
+	h.EnableKnowledgeProvider(c)
+}
+
+// DisableWeKnora preserves the legacy endpoint handler name.
+func (h *AIHandler) DisableWeKnora(c *gin.Context) {
+	h.DisableKnowledgeProvider(c)
 }
 
 // ResetCircuitBreaker 重置熔断器
@@ -305,7 +315,7 @@ func (h *MetricsHandler) GetMetrics(c *gin.Context) {
 	fmt.Fprintf(b, "# TYPE servify_ai_dify_usage_total counter\n")
 	fmt.Fprintf(b, "servify_ai_dify_usage_total %d\n\n", aiDify)
 
-	fmt.Fprintf(b, "# HELP servify_ai_weknora_usage_total Total AI queries served via WeKnora\n")
+	fmt.Fprintf(b, "# HELP servify_ai_weknora_usage_total Total AI queries served via WeKnora compatibility provider\n")
 	fmt.Fprintf(b, "# TYPE servify_ai_weknora_usage_total counter\n")
 	fmt.Fprintf(b, "servify_ai_weknora_usage_total %d\n\n", aiWeKnora)
 
@@ -491,14 +501,14 @@ func (h *UploadHandler) UploadFile(c *gin.Context) {
 		}
 	}
 
-	// 4. 如果启用自动索引，上传到 WeKnora
+	// 4. 如果启用自动索引，上传到当前知识库 provider（优先 Dify，兼容 WeKnora）
 	if h.config.Upload.AutoIndex {
 		if h.aiService != nil {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 
-			if err := h.aiService.UploadDocumentToWeKnora(ctx, header.Filename, extractedText, []string{"uploaded_file"}); err != nil {
-				h.logger.Warnf("Failed to index file in WeKnora: %v", err)
+			if err := h.aiService.UploadKnowledgeDocument(ctx, header.Filename, extractedText, []string{"uploaded_file"}); err != nil {
+				h.logger.Warnf("Failed to index file in external knowledge provider: %v", err)
 			}
 		}
 	}

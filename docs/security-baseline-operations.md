@@ -11,8 +11,8 @@
 - `/api/*` 下的工单、客户、坐席、转接、集成、自动化、知识库等写操作
 - `/api/v1/ai/knowledge/upload`
 - `/api/v1/ai/knowledge/sync`
-- `/api/v1/ai/weknora/enable`
-- `/api/v1/ai/weknora/disable`
+- `/api/v1/ai/knowledge-provider/enable`
+- `/api/v1/ai/knowledge-provider/disable`
 - `/api/v1/ai/circuit-breaker/reset`
 
 风险：
@@ -91,7 +91,7 @@
 ### 启动期告警
 
 - `InitLogging` 现在会在启动时输出基础安全告警
-- 当前已覆盖默认或空 `jwt.secret`、开放式 `CORS=*`、关闭限流、空 OpenAI API key、启用 WeKnora 但未配置 API key 等场景
+- 当前已覆盖默认或空 `jwt.secret`、开放式 `CORS=*`、关闭限流、空 OpenAI API key、启用外部 knowledge provider 但缺少必要 credentials 等场景
 - 若启用了限流但没有为 `/public/`、`/public/kb/`、`/public/csat/`、`/api/v1/auth/`、`/api/v1/ws`、`/uploads/`、`/api/v1/metrics/ingest`、`/api/` 配置独立路径级限流，也会输出 warning，避免公开入口、高成本 service 面和管理面只落在全局限流下
 - 启动期仍为 warning-only，不阻断本地开发或测试启动；部署前应再执行 `check-security-baseline --strict` 做显式失败校验
 
@@ -116,7 +116,7 @@
 
 建议同时满足以下约束：
 
-- `jwt.secret`、OpenAI / WeKnora API key 不使用代码默认值
+- `jwt.secret`、OpenAI / Dify / WeKnora API key 不使用代码默认值
 - secrets 只通过环境变量或外部 secret manager 注入
 - 管理面必须部署在 TLS 后
 - `security.cors.allowed_origins` 不使用生产环境全量 `*`
@@ -127,9 +127,10 @@
 - 当前已具备单用户查询、批量安全态预览、单用户 / 批量用户 token 吊销、独立 refresh token、单 token revoke list、revoke list 查询，以及 auth session 列表查询、单 session 吊销与按用户批量 session 吊销入口；session 列表现已返回基础 client metadata（`device_fingerprint` / `user_agent` / `client_ip` / `last_seen_at`）以及衍生字段（`network_label` / `location_label` / `risk_score` / `risk_level` / `risk_reasons`），并补充 `family_public_ip_count` / `family_device_count` / `active_session_count` / `family_hot_refresh_count` / `reference_session_id` / `ip_drift` / `device_drift` / `rapid_ip_change` / `rapid_device_change` / `refresh_recency` / `rapid_refresh_activity` 这类同账号并发、漂移、短窗口切换与 refresh 活跃度上下文；denylist 过期记录会由后台 worker 自动清理，`security.session_risk` 也已成为正式配置面
 - 上述 `security/users/*` 与 `security/tokens/*` 管理入口现已补 tenant/workspace 目标用户隔离，不再允许 scoped 请求跨租户枚举、吊销或查看其它 `Agent` / `Customer` 关联用户的 token / session 记录
 - 当前剩余缺口应视为后续增强，而不是本轮 T5 阻塞：真实 Geo/IP 情报富化、更强异常模型、按环境/租户差异化策略
+- 本轮已完成的部分是：Geo/IP 已具备可注入 adapter、HTTP provider、配置项、router wiring 以及 auth / management 两侧自动化覆盖；后续再接具体外部情报厂商时，不应回退为“基础能力未完成”
 - 外部开放接口已开始通过代码级 `security surface catalog` 做最小登记校验；后续仍可继续增强为更细粒度的公开接口审批和自动化审查
 - scoped config 关键配置变更现已强制要求 `change_ref` 与 `reason`，并把这些字段带入审计 request metadata 与 history 元数据；这补上了最小变更追踪基线
-- 高风险 scoped config 变更现已补真实执行前审批约束：命中 provider endpoint、WeKnora KB mapping、session risk 核心阈值或 rollback 这类高风险场景时，执行接口不仅必须提供 `approval_ref`，还必须能按 `approval_ref + change_ref` 查到已记录审批事件，且审批人与执行人必须分离
+- 高风险 scoped config 变更现已补真实执行前审批约束：命中 provider endpoint、knowledge mapping、session risk 核心阈值或 rollback 这类高风险场景时，执行接口不仅必须提供 `approval_ref`，还必须能按 `approval_ref + change_ref` 查到已记录审批事件，且审批人与执行人必须分离
 - scoped config 现已补执行后 verification 入口，可对单条 update / rollback 审计记录写入 `passed` / `failed` 结论，并在 history 列表与详情中回显 `verification_status`、最新 verification 与 verification policy
 - 当前 verification 已补模板化检查项与最小双人复核约束：reviewer 不能与原始执行人相同，verification 请求必须提交与 `verification_template.checks` 对齐的 `checks`，`passed` 必须带 evidence 且所有必填检查项都要 `passed`，`failed` 必须带 notes 且至少要有一个检查项 `failed`
 - `verification_template` 已进一步按字段风险拆分，并返回根级 `changed_paths` 以及单 check 的 `risk_level` / `changed_paths`，便于对 provider endpoint、KB mapping、session risk threshold 这类高风险配置执行标准化验收
@@ -138,6 +139,17 @@
 - history 列表、单条详情和 verify 响应会同步返回 `verification_template` 与更细粒度的 `verification_policy`，用于前端或自动化脚本按模板执行变更后验证
 - history 列表现在还能按 `governance_status` / `risk_level` / `approval_status` / `verification_status` / `needs_action` 直接筛选治理队列，并返回 `governance_summary` 汇总，方便运营或安全值班直接拉取待办视图
 - 后续仍需把关键配置变更沉淀成完整的“执行前审批 / 执行后验证 / 回滚记录”操作手册，并补自动化验收与更细粒度审批编排
+
+## 审计与回滚操作约束
+
+- 审计导出默认只适合轻量排障或留档；单次 `GET /api/audit/logs/export` 默认最多导出 `1000` 条，服务端硬上限 `5000`
+- 超过轻量导出规模时，不应通过反复分页脚本直接从在线管理面拉全量历史；应走离线归档或后续异步导出方案
+- 在线审计库当前默认保留 `180` 天，后台 worker 会按批次清理过期记录；涉及安全事件、权限变更、关键配置变更的长期留档仍需落到外部归档策略
+- scoped config rollback 不能视为普通“恢复按钮”:
+  - 必须先用 `GET /api/security/config/{scope}/history/:audit_id` 查看 snapshot diff
+  - 高风险回滚必须提交 `approval_ref`，且审批人与执行人分离
+  - 执行后还要补 `verify` 结论，确认 portal / provider / session risk 等受影响路径已经恢复
+- 运营值班在执行 rollback 前后，至少要留存三类证据：source audit ID、rollback audit ID、verification audit ID
 
 ## 代码落点
 

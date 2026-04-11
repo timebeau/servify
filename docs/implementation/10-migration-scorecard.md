@@ -30,7 +30,7 @@
 | `ai` | `modules/ai/delivery.HandlerService` | `AIAssembly.RuntimeService` | narrow runtime contract for websocket/router | `stabilized` | handler 主路径已切到 orchestrated enhanced AI；assembly 不再暴露 legacy concrete AI service，旧 `AIServiceInterface` 已删除 |
 | `customer` | `modules/customer/delivery.HandlerService` | `modules/customer/delivery.NewHandlerService(db)` | compatibility facade + DTO mapping for old callers | `stabilized` | handler/router/runtime 主路径已直接走 module delivery，集成测试与边界脚本已守护 |
 | `automation` | `modules/automation/delivery.HandlerService` | `modules/automation/delivery.NewHandlerService(db)` | compatibility facade + event bus glue | `stabilized` | handler/router/runtime 主路径已直接走 module delivery；subscriber 仍在 legacy service，但 HTTP 入口与测试已收口 |
-| `knowledge` | `modules/knowledge/delivery.HandlerService` | `modules/knowledge/delivery.NewHandlerServiceWithProvider(db, ...)` | compatibility facade retained for old callers | `stabilized` | handler/router/runtime 的主路径已走 module delivery；index job 仓储与 WeKnora provider 装配已纳入 runtime 主路径，并进入边界脚本守护 |
+| `knowledge` | `modules/knowledge/delivery.HandlerService` | `modules/knowledge/delivery.NewHandlerServiceWithProvider(db, ...)` | compatibility facade retained for old callers | `stabilized` | handler/router/runtime 的主路径已走 module delivery；index job 仓储与 knowledge provider 装配已纳入 runtime 主路径，并进入边界脚本守护，运行时按 Dify 优先、WeKnora 兼容装配 |
 | `voice` | already module coordinator | module coordinator | not primarily legacy | `mixed` | 已较模块化，但不属于本轮 `services -> modules` 的典型迁移样式 |
 
 ## 当前结论

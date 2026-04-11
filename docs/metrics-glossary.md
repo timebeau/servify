@@ -89,6 +89,7 @@
 | `total_tickets` | 当日工单数 | `IncrementTickets` |
 | `resolved_tickets` | 当日解决工单数 | `IncrementResolved` |
 | `ai_usage_count` | AI 使用次数 | `IncrementAIUsage` |
+| `knowledge_provider_usage_count` | 外部知识库 provider 使用次数 | `IncrementKnowledgeProvider` |
 | `we_knora_usage_count` | WeKnora 使用次数 | `IncrementWeKnora` |
 | `sla_violations` | SLA 违规次数 | `IncrementSLA` |
 

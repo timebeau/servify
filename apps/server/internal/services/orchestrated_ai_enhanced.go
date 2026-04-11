@@ -24,7 +24,7 @@ type OrchestratedEnhancedAIService struct {
 	knowledgeProviderID string
 	weKnoraClient     baseweknora.WeKnoraInterface
 	knowledgeBaseID   string
-	weKnoraEnabled    bool
+	knowledgeProviderEnabled bool
 	fallbackEnabled   bool
 	circuitBreaker    *CircuitBreaker
 	metrics           *AIMetrics
@@ -55,7 +55,7 @@ func NewOrchestratedEnhancedAIService(
 		knowledgeProviderID: strings.TrimSpace(knowledgeProviderID),
 		weKnoraClient:     weKnoraClient,
 		knowledgeBaseID:   knowledgeBaseID,
-		weKnoraEnabled:    knowledgeProvider != nil,
+		knowledgeProviderEnabled: knowledgeProvider != nil,
 		fallbackEnabled:   true,
 		circuitBreaker:    NewCircuitBreaker(),
 		metrics:           &AIMetrics{ActiveKnowledgeProvider: strings.TrimSpace(knowledgeProviderID)},
@@ -99,7 +99,7 @@ func (s *OrchestratedEnhancedAIService) ProcessQueryEnhanced(ctx context.Context
 		},
 	})
 	if err != nil {
-		if s.weKnoraEnabled {
+		if s.knowledgeProviderEnabled {
 			s.circuitBreaker.OnFailure()
 		}
 		if s.fallbackEnabled {
@@ -117,7 +117,7 @@ func (s *OrchestratedEnhancedAIService) ProcessQueryEnhanced(ctx context.Context
 		}
 		return nil, err
 	}
-	if s.weKnoraEnabled {
+	if s.knowledgeProviderEnabled {
 		s.circuitBreaker.OnSuccess()
 	}
 	s.metrics.SuccessCount++
@@ -170,9 +170,9 @@ func (s *OrchestratedEnhancedAIService) GetStatus(ctx context.Context) map[strin
 	status := map[string]interface{}{
 		"type":                      "orchestrated_enhanced",
 		"knowledge_provider":        s.activeKnowledgeProviderID(),
-		"knowledge_provider_enabled": s.weKnoraEnabled,
-		"weknora_enabled":           s.weKnoraEnabled && s.activeKnowledgeProviderID() == "weknora",
-		"dify_enabled":              s.weKnoraEnabled && s.activeKnowledgeProviderID() == "dify",
+		"knowledge_provider_enabled": s.knowledgeProviderEnabled,
+		"weknora_enabled":           s.knowledgeProviderEnabled && s.activeKnowledgeProviderID() == "weknora",
+		"dify_enabled":              s.knowledgeProviderEnabled && s.activeKnowledgeProviderID() == "dify",
 		"fallback_enabled":          s.fallbackEnabled,
 		"llm_provider":              s.llmProvider != nil,
 		"knowledge_base":            "orchestrated",
@@ -205,9 +205,9 @@ func (s *OrchestratedEnhancedAIService) GetStatus(ctx context.Context) map[strin
 	return status
 }
 
-func (s *OrchestratedEnhancedAIService) UploadDocumentToWeKnora(ctx context.Context, title, content string, tags []string) error {
-	if !s.weKnoraEnabled || s.knowledgeProvider == nil {
-		return fmt.Errorf("WeKnora is not enabled")
+func (s *OrchestratedEnhancedAIService) UploadKnowledgeDocument(ctx context.Context, title, content string, tags []string) error {
+	if !s.knowledgeProviderEnabled || s.knowledgeProvider == nil {
+		return fmt.Errorf("knowledge provider is not enabled")
 	}
 	return s.knowledgeProvider.UpsertDocument(ctx, knowledgeprovider.KnowledgeDocument{
 		ID:       title,
@@ -223,8 +223,8 @@ func (s *OrchestratedEnhancedAIService) GetMetrics() *AIMetrics {
 	return &metrics
 }
 
-func (s *OrchestratedEnhancedAIService) SetWeKnoraEnabled(enabled bool) {
-	s.weKnoraEnabled = enabled
+func (s *OrchestratedEnhancedAIService) SetKnowledgeProviderEnabled(enabled bool) {
+	s.knowledgeProviderEnabled = enabled
 }
 
 func (s *OrchestratedEnhancedAIService) SetFallbackEnabled(enabled bool) {
@@ -236,7 +236,7 @@ func (s *OrchestratedEnhancedAIService) ResetCircuitBreaker() {
 }
 
 func (s *OrchestratedEnhancedAIService) SyncKnowledgeBase(ctx context.Context) error {
-	if !s.weKnoraEnabled || s.knowledgeProvider == nil {
+	if !s.knowledgeProviderEnabled || s.knowledgeProvider == nil {
 		return nil
 	}
 	for _, doc := range s.base.knowledgeBase.documents {
@@ -254,7 +254,7 @@ func (s *OrchestratedEnhancedAIService) SyncKnowledgeBase(ctx context.Context) e
 }
 
 func (s *OrchestratedEnhancedAIService) activeKnowledgeProvider() knowledgeprovider.KnowledgeProvider {
-	if s.weKnoraEnabled && s.circuitBreaker.Allow() {
+	if s.knowledgeProviderEnabled && s.circuitBreaker.Allow() {
 		return s.knowledgeProvider
 	}
 	return nil

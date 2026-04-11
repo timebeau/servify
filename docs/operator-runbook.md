@@ -37,7 +37,7 @@
 | 环境 | 用途 | 配置文件 | 数据 |
 |------|------|----------|------|
 | 本地开发 | 开发调试 | `config.yml` | 本地 PostgreSQL / Redis |
-| 测试 / Staging | 集成验证 | `config.staging.yml` | 独立测试数据库 |
+| 测试 / Staging | 集成验证 | `config.staging.example.yml` -> `config.staging.yml` | 独立测试数据库 |
 | 生产 | 线上服务 | `config.production.yml` | 生产数据库 |
 
 ### 角色与职责
@@ -84,7 +84,7 @@ curl http://localhost:8080/ready
 # 基础部署（API + DB + Redis）
 docker compose -f infra/compose/docker-compose.yml up -d
 
-# 带 WeKnora 知识库
+# 带 WeKnora mock 验收环境
 docker compose \
   -f infra/compose/docker-compose.yml \
   -f infra/compose/docker-compose.weknora.yml \
@@ -93,7 +93,7 @@ docker compose \
 # 带可观测性栈（OTel Collector + Jaeger）
 docker compose -f infra/compose/docker-compose.observability.yml up -d
 
-# 全套部署
+# 全套本地验收部署
 docker compose \
   -f infra/compose/docker-compose.yml \
   -f infra/compose/docker-compose.weknora.yml \
@@ -149,6 +149,24 @@ make release-check CONFIG=config.production.yml
 2. **Security Check** — 安全基线（JWT secret、CORS、限流、密钥注入）
 3. **Observability Check** — 可观测性基线（metrics、tracing、dashboard、alert、runbook）
 4. **Regression Tests** — 核心 Go 回归测试
+
+### 3.1A Staging 演练口径
+
+在进入正式生产前，建议先对 staging 配置执行同一轮检查：
+
+```bash
+cp config.staging.example.yml config.staging.yml
+make security-check CONFIG=config.staging.yml
+make observability-check CONFIG=config.staging.yml
+make release-check CONFIG=config.staging.yml
+```
+
+当前仓库内置的 `config.staging.example.yml` 已满足 strict baseline，用于演练：
+
+- staging 环境标签
+- staging 域名级 CORS
+- 启用 RBAC、限流、审计与 observability
+- secrets 仍通过环境变量注入，而不是写死在文件里
 
 ### 3.2 分项检查
 
@@ -219,6 +237,9 @@ redis:
   host: "localhost"
   port: 6379
 
+server:
+  environment: "production"
+
 jwt:
   secret: "${JWT_SECRET}"      # 通过环境变量注入，禁止使用默认值
 
@@ -247,6 +268,19 @@ security:
     hot_refresh_family_threshold: 2
     medium_risk_score: 2
     high_risk_score: 4
+  session_risk_profiles:
+    production:
+      hot_refresh_window_minutes: 10
+      recent_refresh_window_minutes: 30
+      rapid_change_window_hours: 12
+      stale_activity_window_days: 14
+      high_risk_score: 4
+  session_ip_intelligence:
+    enabled: false
+    base_url: "https://geo.example.com/lookup/{ip}"
+    api_key: "${SESSION_IP_API_KEY}"
+    auth_header: "Authorization"
+    timeout_ms: 1500
 
 monitoring:
   enabled: true
@@ -355,7 +389,7 @@ docker compose exec postgres psql -U postgres -d servify -f /docker-entrypoint-i
 | 端点 | 用途 | 检查内容 | 超时建议 |
 |------|------|----------|----------|
 | `GET /health` | 存活探针 (Liveness) | 进程存活 | 5s |
-| `GET /ready` | 就绪探针 (Readiness) | DB + Redis + 可选 WeKnora/OpenAI 连接 | 10s |
+| `GET /ready` | 就绪探针 (Readiness) | DB + Redis + 可选 LLM / knowledge provider 连接 | 10s |
 | `GET /metrics` | Prometheus 指标 | 全量运行时指标 | 15s |
 
 ### 7.2 探针配置建议
@@ -400,7 +434,7 @@ psql -h $DB_HOST -U $DB_USER -d servify -c "SELECT 1"
 # Redis
 redis-cli -h $REDIS_HOST ping
 
-# 可选：WeKnora
+# 可选：外部 knowledge provider
 curl -s http://$WEKNORA_HOST:9000/health
 ```
 
@@ -439,10 +473,21 @@ Servify --OTLP--> OTel Collector :4317 --> Jaeger :16686
 |------|------|----------|----------|
 | HighHTTP5xxRate | Critical | 5xx > 5% 持续 5 分钟 | 立即响应 |
 | HighP99Latency | Warning | P99 > 5s 持续 10 分钟 | 30 分钟内响应 |
+| HighRateLimitDrops | Info | 限流丢弃速率 > 10/s 持续 5 分钟 | 当班关注 |
+| HighGoroutineCount | Warning | goroutines > 10000 持续 10 分钟 | 30 分钟内响应 |
 | HighSystemErrorRate | Critical | 系统错误 > 0.01/s 持续 5 分钟 | 立即响应 |
+| HighDependencyErrorRate | Warning | 依赖错误 > 0.1/s 持续 5 分钟 | 30 分钟内响应 |
 | EventBusHandlerFailures | Warning | 事件处理失败持续 5 分钟 | 30 分钟内响应 |
+| EventBusDeadLetters | Info | dead letter 持续 10 分钟 | 当班关注 |
 | AIProviderDegraded | Critical | AI 失败率 > 20% 持续 5 分钟 | 立即响应 |
+| AIHighLatency | Warning | AI P95 > 10s 持续 10 分钟 | 30 分钟内响应 |
 | WorkerJobFailures | Warning | Worker 失败持续 10 分钟 | 1 小时内响应 |
+
+生产口径补充：
+
+- 上述阈值以 `deploy/observability/alerts/rules.yaml` 为准，runbook 只做解释和响应优先级说明
+- 若 staging 演练需要更宽阈值，应在告警平台或环境级 Prometheus 规则中调整，不要直接改写 production baseline 文件
+- `config.production.secure.example.yml` 现已显式给出 `monitoring.metrics_path` 与 tracing 基线，避免生产模板只靠代码默认值通过 strict 检查
 
 ### 8.4 告警排查详细手册
 
@@ -551,7 +596,7 @@ curl -s http://localhost:8080/metrics | grep go_sql_open_connections
 
 **常见原因**：
 - 数据库连接池耗尽：增加连接池大小或减少慢查询
-- 外部依赖（LLM、WeKnora）不可用：检查 circuit breaker 状态
+- 外部依赖（LLM、knowledge provider，默认优先 Dify）不可用：检查 circuit breaker 状态
 - 部署后配置错误：回滚或修正配置
 
 ### 10.3 AI 功能异常
@@ -801,6 +846,8 @@ make security-check CONFIG=config.yml
 - 生产环境优先收紧 `hot_refresh_window_minutes` 与 `rapid_change_window_hours`
 - 若业务经常经过共享出口或 NAT 网关，谨慎调整 `multi_public_ip_threshold`
 - 若要更早将 session 标为高风险，可降低 `high_risk_score`
+- 若希望开发 / staging / production 使用不同基线，优先通过 `server.environment + security.session_risk_profiles.{environment}` 设定环境级默认值，再用 tenant/workspace scoped config 做细化
+- 当前 auth 自助 `/api/v1/auth/sessions` 已有回归测试验证环境级 profile 会实际影响 `risk_level` 输出，而不只是停留在配置层
 
 示例：
 
@@ -817,6 +864,34 @@ security:
     hot_refresh_family_threshold: 2
     medium_risk_score: 2
     high_risk_score: 4
+  session_risk_profiles:
+    production:
+      hot_refresh_window_minutes: 10
+      recent_refresh_window_minutes: 30
+      rapid_change_window_hours: 12
+      stale_activity_window_days: 14
+      high_risk_score: 4
+```
+
+### 13.6 Geo/IP 富化 Provider 接入
+
+`security.session_ip_intelligence` 用于给 auth / management 的 session 风险视图接入外部 Geo/IP 情报。建议：
+
+- 仅在完成隐私与合规评审后启用
+- `base_url` 使用服务端可达的内部网关或受控第三方 endpoint
+- 优先让 provider 直接返回 `network_label` / `location_label`
+- 保持较短 timeout，失败时系统会自动回退到本地 heuristic 分类
+
+示例：
+
+```yaml
+security:
+  session_ip_intelligence:
+    enabled: true
+    base_url: "https://geo.example.com/lookup/{ip}"
+    api_key: "${SESSION_IP_API_KEY}"
+    auth_header: "Authorization"
+    timeout_ms: 1500
 ```
 
 ---

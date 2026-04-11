@@ -20,6 +20,7 @@ type DashboardStats struct {
 	AvgResolutionTime    float64 `json:"avg_resolution_time"`
 	CustomerSatisfaction float64 `json:"customer_satisfaction"`
 	AIUsageToday         int64   `json:"ai_usage_today"`
+	KnowledgeProviderUsageToday int64 `json:"knowledge_provider_usage_today"`
 	WeKnoraUsageToday    int64   `json:"weknora_usage_today"`
 }
 

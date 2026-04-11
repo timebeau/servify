@@ -1495,8 +1495,8 @@ func scopedConfigVerificationTemplateForChangeSet(operation string, changedSecti
 			checks = append(checks, scopedConfigVerificationCheckDefinition{
 				ID:           "weknora_provider_verified",
 				Section:      "weknora",
-				Title:        "确认 WeKnora provider、知识库映射和访问凭证在目标作用域可用",
-				EvidenceHint: "知识库查询结果、provider 健康检查或同步/检索结果",
+				Title:        "确认 knowledge provider 配置、知识库映射和访问凭证在目标作用域可用（当前兼容路径可能为 WeKnora）",
+				EvidenceHint: "知识库查询结果、provider 健康检查或同步/检索结果；若当前命中 WeKnora compatibility，也应附对应证据",
 				Required:     true,
 			})
 		case "session_risk":
@@ -1559,8 +1559,8 @@ func scopedConfigVerificationTemplateForChangeSet(operation string, changedSecti
 			Section:      "weknora",
 			RiskLevel:    "high",
 			ChangedPaths: weKnoraEndpointPaths,
-			Title:        "确认 WeKnora provider 终端、凭证和超时配置可正常访问",
-			EvidenceHint: "provider 健康检查、连接探活结果或关键接口响应",
+			Title:        "确认 knowledge provider 终端、凭证和超时配置可正常访问（当前字段为 WeKnora compatibility 配置）",
+			EvidenceHint: "provider 健康检查、连接探活结果或关键接口响应；若当前命中 WeKnora compatibility，应附兼容链路证据",
 			Required:     true,
 		})
 	}
@@ -1570,7 +1570,7 @@ func scopedConfigVerificationTemplateForChangeSet(operation string, changedSecti
 			Section:      "weknora",
 			RiskLevel:    "high",
 			ChangedPaths: weKnoraMappingPaths,
-			Title:        "确认 WeKnora 知识库映射、检索策略和启停状态符合预期",
+			Title:        "确认 knowledge provider 知识库映射、检索策略和启停状态符合预期（当前字段为 WeKnora compatibility 配置）",
 			EvidenceHint: "知识库查询结果、同步/检索结果或目标 KB 映射校验记录",
 			Required:     true,
 		})
@@ -1581,7 +1581,7 @@ func scopedConfigVerificationTemplateForChangeSet(operation string, changedSecti
 			Section:      "weknora",
 			RiskLevel:    "medium",
 			ChangedPaths: weKnoraHealthPaths,
-			Title:        "确认 WeKnora 健康检查策略与告警节奏符合预期",
+			Title:        "确认 knowledge provider 健康检查策略与告警节奏符合预期（当前字段为 WeKnora compatibility 配置）",
 			EvidenceHint: "健康检查配置读取结果、探测日志或告警样本",
 			Required:     true,
 		})

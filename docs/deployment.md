@@ -53,7 +53,7 @@
 | Redis | 6379 | 缓存/会话 |
 | OTel Collector | 4317/4318 | OTLP gRPC/HTTP |
 | Jaeger UI | 16686 | 分布式追踪面板 |
-| WeKnora | 9000/9001 | 知识库服务（可选） |
+| WeKnora | 9000/9001 | 兼容知识库 provider / mock 验收服务（可选） |
 
 ---
 
@@ -177,6 +177,7 @@ docker compose \
 需要额外环境变量：
 
 ```bash
+# Dify 为推荐主路径；WeKnora 主要用于兼容与 fallback 验收
 export WEKNORA_ENABLED=true
 export WEKNORA_API_KEY=your-weknora-api-key
 export OPENAI_API_KEY=your-openai-api-key
@@ -491,8 +492,10 @@ monitoring:
 
 | 密钥 | 说明 |
 |------|------|
-| `WEKNORA_API_KEY` | WeKnora 知识库 API Key |
-| `WEKNORA_TENANT_ID` | WeKnora 租户 ID |
+| `DIFY_API_KEY` | Dify API Key（推荐主知识源） |
+| `DIFY_DATASET_ID` | Dify dataset ID |
+| `WEKNORA_API_KEY` | WeKnora compatibility 知识库 API Key |
+| `WEKNORA_TENANT_ID` | WeKnora compatibility 租户 ID |
 | `REDIS_PASSWORD` | Redis 密码（生产建议启用） |
 
 ### 7.3 生产配置安全清单
@@ -569,7 +572,7 @@ fly secrets set JWT_SECRET=xxx OPENAI_API_KEY=sk-xxx
 | 端点 | 用途 | 检查内容 |
 |------|------|---------|
 | `GET /health` | 存活探针 | 进程存活 |
-| `GET /ready` | 就绪探针 | DB + Redis + 可选 WeKnora/OpenAI |
+| `GET /ready` | 就绪探针 | DB + Redis + 可选 LLM / knowledge provider |
 | `GET /metrics` | Prometheus | 全量指标 |
 
 ### 8.2 Docker Compose 健康检查

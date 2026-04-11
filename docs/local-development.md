@@ -16,10 +16,14 @@
 
 - 构建：
   - `make build`
+  - `make build-knowledge-provider`
+  - `build-knowledge-provider` 是 `build-weknora` 的通用 alias，用于外部 knowledge provider compatibility 构建
 - 运行服务：
   - `make run`
   - `make run-cli CONFIG=./config.yml`
+  - `make run-knowledge-provider CONFIG=./config.weknora.yml`
   - `make run-weknora CONFIG=./config.weknora.yml`
+  - `run-knowledge-provider` / `run-weknora` 都仅用于 WeKnora compatibility / mock 回归；日常知识库链路优先使用 `Dify`
 - 测试：
   - `./scripts/run-tests.sh`
   - `./scripts/run-go-race-tests.sh`

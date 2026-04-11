@@ -117,3 +117,6 @@ log:
 
 monitoring:
   enabled: true
+  health_checks:
+    knowledge_provider: true
+    weknora: true

@@ -1,4 +1,4 @@
-# 更新后的配置文件 - 支持 WeKnora 集成
+# 更新后的配置文件 - 外部知识库 provider 示例（Dify 优先，WeKnora 兼容）
 
 server:
   host: 0.0.0.0
@@ -35,7 +35,7 @@ ai:
     timeout: 30s
 
 dify:
-  enabled: false
+  enabled: true
   base_url: "https://api.dify.example/v1"
   api_key: ""
   dataset_id: ""
@@ -46,9 +46,9 @@ dify:
     search_method: "semantic_search"
     reranking_enable: false
 
-# 新增：WeKnora 配置
+# 兼容：WeKnora 配置
 weknora:
-  enabled: true  # 是否启用 WeKnora
+  enabled: false  # 仅在兼容/回退验收时启用
   base_url: "http://localhost:9000"
   api_key: "default-api-key"
   tenant_id: "default-tenant"
@@ -120,6 +120,7 @@ monitoring:
   health_checks:
     database: true
     redis: true
+    knowledge_provider: true
     weknora: true
     openai: false  # 可选，避免频繁调用
 
@@ -184,13 +185,13 @@ security:
         requests_per_minute: 60
         burst: 15
 
-# 新增：文件上传配置（支持 WeKnora 文档上传）
+# 新增：文件上传配置（支持外部 knowledge provider 文档上传）
 upload:
   enabled: true
   max_file_size: "10MB"
   allowed_types: [".pdf", ".docx", ".txt", ".md", ".png", ".jpg", ".jpeg"]
   storage_path: "./.runtime/uploads"
 
-  # WeKnora 文档处理
+  # 外部 knowledge provider 文档处理
   auto_process: true
   auto_index: true

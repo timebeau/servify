@@ -1,6 +1,7 @@
 package server
 
 import (
+	"strings"
 	"servify/apps/server/internal/config"
 	"servify/apps/server/internal/handlers"
 	"servify/apps/server/internal/middleware"
@@ -27,6 +28,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
+	"time"
 )
 
 // Dependencies contains the runtime services required to assemble the HTTP router.
@@ -95,6 +97,9 @@ func registerAuthRoutes(r *gin.Engine, deps Dependencies) {
 		configscope.WithWorkspaceSessionRiskProvider(configscope.NewGormWorkspaceConfigProvider(deps.DB)),
 	)
 	authHandler := handlers.NewAuthHandler(services.NewAuthService(deps.DB, deps.Config)).WithSessionRiskResolver(sessionRiskResolver)
+	if provider := sessionIPIntelligenceFromConfig(deps.Config); provider != nil {
+		authHandler = authHandler.WithSessionIPIntelligence(provider)
+	}
 
 	auth.POST("/register", authHandler.Register)
 	auth.POST("/login", authHandler.Login)
@@ -202,8 +207,24 @@ func registerManagementRoutes(r *gin.Engine, deps Dependencies) {
 		configscope.WithTenantSessionRiskProvider(configscope.NewGormTenantConfigProvider(deps.DB)),
 		configscope.WithWorkspaceSessionRiskProvider(configscope.NewGormWorkspaceConfigProvider(deps.DB)),
 	)
-	handlers.RegisterUserSecurityRoutes(securityAPI, handlers.NewUserSecurityHandler(usersecurity.NewService(deps.DB, deps.Logger), deps.Logger).WithJWTSecret(deps.Config.JWT.Secret).WithSessionRiskResolver(securitySessionRiskResolver))
+	userSecurityHandler := handlers.NewUserSecurityHandler(usersecurity.NewService(deps.DB, deps.Logger), deps.Logger).WithJWTSecret(deps.Config.JWT.Secret).WithSessionRiskResolver(securitySessionRiskResolver)
+	if provider := sessionIPIntelligenceFromConfig(deps.Config); provider != nil {
+		userSecurityHandler = userSecurityHandler.WithSessionIPIntelligence(provider)
+	}
+	handlers.RegisterUserSecurityRoutes(securityAPI, userSecurityHandler)
 	handlers.RegisterScopedConfigRoutes(securityAPI, handlers.NewScopedConfigHandler(configscope.NewGormConfigStore(deps.DB), auditplatform.NewGormQueryService(deps.DB)))
+}
+
+func sessionIPIntelligenceFromConfig(cfg *config.Config) *handlers.HTTPSessionIPIntelligence {
+	if cfg == nil {
+		return nil
+	}
+	providerCfg := cfg.Security.SessionIPIntelligence
+	if !providerCfg.Enabled || strings.TrimSpace(providerCfg.BaseURL) == "" {
+		return nil
+	}
+	timeout := time.Duration(providerCfg.TimeoutMs) * time.Millisecond
+	return handlers.NewHTTPSessionIPIntelligence(providerCfg.BaseURL, providerCfg.APIKey, providerCfg.AuthHeader, timeout)
 }
 
 func registerPublicRoutes(r *gin.Engine, deps Dependencies) {
@@ -239,11 +260,11 @@ func registerRealtimeRoutes(r *gin.Engine, deps Dependencies) {
 	aiAPI.POST("/query", aiHandler.ProcessQuery)
 	aiAPI.GET("/status", aiHandler.GetStatus)
 	aiAPI.GET("/metrics", aiHandler.GetMetrics)
-	if deps.Config != nil && deps.Config.WeKnora.Enabled {
+	if externalKnowledgeProviderEnabled(deps.Config) {
 		aiAPI.POST("/knowledge/upload", aiHandler.UploadDocument)
 		aiAPI.POST("/knowledge/sync", aiHandler.SyncKnowledgeBase)
-		aiAPI.PUT("/weknora/enable", aiHandler.EnableWeKnora)
-		aiAPI.PUT("/weknora/disable", aiHandler.DisableWeKnora)
+		aiAPI.PUT("/knowledge-provider/enable", aiHandler.EnableKnowledgeProvider)
+		aiAPI.PUT("/knowledge-provider/disable", aiHandler.DisableKnowledgeProvider)
 		aiAPI.POST("/circuit-breaker/reset", aiHandler.ResetCircuitBreaker)
 	}
 
@@ -253,4 +274,8 @@ func registerRealtimeRoutes(r *gin.Engine, deps Dependencies) {
 	serviceV1.Use(middleware.EnforceRequestScope())
 	serviceV1.Use(middleware.RequirePrincipalKinds("service"))
 	serviceV1.POST("/metrics/ingest", ingest.Ingest)
+}
+
+func externalKnowledgeProviderEnabled(cfg *config.Config) bool {
+	return cfg != nil && (cfg.Dify.Enabled || cfg.WeKnora.Enabled)
 }

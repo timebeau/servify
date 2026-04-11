@@ -31,7 +31,7 @@ func (m *MockEnhancedAIService) ProcessQueryEnhanced(ctx context.Context, query,
 	}, nil
 }
 
-func (m *MockEnhancedAIService) UploadDocumentToWeKnora(ctx context.Context, title, content string, tags []string) error {
+func (m *MockEnhancedAIService) UploadKnowledgeDocument(ctx context.Context, title, content string, tags []string) error {
 	return nil
 }
 
@@ -51,7 +51,7 @@ func (m *MockEnhancedAIService) GetMetrics() *services.AIMetrics {
 	return m.metrics
 }
 
-func (m *MockEnhancedAIService) SetWeKnoraEnabled(enabled bool) {
+func (m *MockEnhancedAIService) SetKnowledgeProviderEnabled(enabled bool) {
 	m.weKnoraEnabled = enabled
 }
 
@@ -250,7 +250,7 @@ func TestAIHandler_SyncKnowledgeBase_StandardService(t *testing.T) {
 	}
 }
 
-func TestAIHandler_EnableWeKnora_EnhancedService(t *testing.T) {
+func TestAIHandler_EnableKnowledgeProvider_EnhancedService(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockService := &MockEnhancedAIService{
@@ -261,9 +261,9 @@ func TestAIHandler_EnableWeKnora_EnhancedService(t *testing.T) {
 	handler := NewAIHandler(aidelivery.NewHandlerServiceAdapter(mockService))
 
 	router := gin.New()
-	router.POST("/api/v1/ai/weknora/enable", handler.EnableWeKnora)
+	router.PUT("/api/v1/ai/knowledge-provider/enable", handler.EnableKnowledgeProvider)
 
-	req := httptest.NewRequest("POST", "/api/v1/ai/weknora/enable", nil)
+	req := httptest.NewRequest("PUT", "/api/v1/ai/knowledge-provider/enable", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -273,11 +273,11 @@ func TestAIHandler_EnableWeKnora_EnhancedService(t *testing.T) {
 	}
 
 	if !mockService.weKnoraEnabled {
-		t.Error("expected WeKnora to be enabled")
+		t.Error("expected knowledge provider to be enabled")
 	}
 }
 
-func TestAIHandler_EnableWeKnora_StandardService(t *testing.T) {
+func TestAIHandler_EnableKnowledgeProvider_StandardService(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	baseService := services.NewAIService("", "")
@@ -285,9 +285,9 @@ func TestAIHandler_EnableWeKnora_StandardService(t *testing.T) {
 	handler := NewAIHandler(aidelivery.NewHandlerServiceAdapter(baseService))
 
 	router := gin.New()
-	router.POST("/api/v1/ai/weknora/enable", handler.EnableWeKnora)
+	router.PUT("/api/v1/ai/knowledge-provider/enable", handler.EnableKnowledgeProvider)
 
-	req := httptest.NewRequest("POST", "/api/v1/ai/weknora/enable", nil)
+	req := httptest.NewRequest("PUT", "/api/v1/ai/knowledge-provider/enable", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -297,7 +297,7 @@ func TestAIHandler_EnableWeKnora_StandardService(t *testing.T) {
 	}
 }
 
-func TestAIHandler_DisableWeKnora_EnhancedService(t *testing.T) {
+func TestAIHandler_DisableKnowledgeProvider_EnhancedService(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockService := &MockEnhancedAIService{
@@ -308,9 +308,9 @@ func TestAIHandler_DisableWeKnora_EnhancedService(t *testing.T) {
 	handler := NewAIHandler(aidelivery.NewHandlerServiceAdapter(mockService))
 
 	router := gin.New()
-	router.POST("/api/v1/ai/weknora/disable", handler.DisableWeKnora)
+	router.PUT("/api/v1/ai/knowledge-provider/disable", handler.DisableKnowledgeProvider)
 
-	req := httptest.NewRequest("POST", "/api/v1/ai/weknora/disable", nil)
+	req := httptest.NewRequest("PUT", "/api/v1/ai/knowledge-provider/disable", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -320,11 +320,11 @@ func TestAIHandler_DisableWeKnora_EnhancedService(t *testing.T) {
 	}
 
 	if mockService.weKnoraEnabled {
-		t.Error("expected WeKnora to be disabled")
+		t.Error("expected knowledge provider to be disabled")
 	}
 }
 
-func TestAIHandler_DisableWeKnora_StandardService(t *testing.T) {
+func TestAIHandler_DisableKnowledgeProvider_StandardService(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	baseService := services.NewAIService("", "")
@@ -332,9 +332,9 @@ func TestAIHandler_DisableWeKnora_StandardService(t *testing.T) {
 	handler := NewAIHandler(aidelivery.NewHandlerServiceAdapter(baseService))
 
 	router := gin.New()
-	router.POST("/api/v1/ai/weknora/disable", handler.DisableWeKnora)
+	router.PUT("/api/v1/ai/knowledge-provider/disable", handler.DisableKnowledgeProvider)
 
-	req := httptest.NewRequest("POST", "/api/v1/ai/weknora/disable", nil)
+	req := httptest.NewRequest("PUT", "/api/v1/ai/knowledge-provider/disable", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)

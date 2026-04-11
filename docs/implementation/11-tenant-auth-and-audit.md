@@ -32,14 +32,21 @@
 - `CustomerSatisfaction` / `SatisfactionSurvey` 已补显式 `tenant_id/workspace_id` 字段，并在 `satisfaction` service 的调查发送、响应、列表、统计、更新与删除路径按上下文过滤
 - `SuggestionService` 已补按上下文过滤的相似工单/知识库候选查询，不再跨 workspace 读取已 scope 化的 `Ticket` / `KnowledgeDoc`
 - `GamificationService` 的排行榜聚合已改为按上下文过滤 `Agent` / `Ticket` / `CustomerSatisfaction`，避免跨 workspace 汇总客服绩效
+- `SatisfactionService.GetSatisfactionStats` 现已补 scoped 回归测试，进一步锁定满意度分类统计与趋势聚合在 workspace 边界内运行
 - `Session`、`Message`、`TransferRecord`、`WaitingRecord` 已补显式 `tenant_id/workspace_id` 字段与基础索引，并在 `conversation/routing` 仓储默认按上下文过滤
 - 旧 `MessageRouter` 兼容落库路径已开始从 `UnifiedMessage.Metadata` 提取 `tenant_id/workspace_id` 写入 `Session/Message`，并拒绝同一 `sessionID` 跨 workspace 复用
 - `Ticket` 已补显式 `tenant_id/workspace_id` 字段与基础索引，并在 `ticket` 仓储主查询、统计与创建路径按上下文过滤
 - `Customer` 已补显式 `tenant_id/workspace_id` 字段，并在 `customer` 仓储读取、列表、统计与活动查询通过扩展表 scope 收口
+- `customer` 模块的 activity 聚合链路现已补 integration test，确认 `recent_sessions` / `recent_tickets` / `recent_messages` 会继续按请求 scope 过滤，不会把其它 workspace 的客户历史混入当前时间线
+- 兼容层 `CustomerService.GetCustomerStats` 现已补 scoped 回归测试，并修正 legacy 客户统计 join 中未限定表前缀的 `created_at` 条件，避免 scoped 统计在多表聚合时出现歧义列错误
 - `Agent` 已补显式 `tenant_id/workspace_id` 字段，并在 `agent` 仓储创建、读取、列表与统计路径按上下文过滤
+- 兼容层 `AgentService.GetAgentStats` 现已补 scoped 回归测试，确认 legacy agent 统计入口不会跨 workspace 混入其它 agent 主数据
 - 管理面 `security/users/*` 与 `security/tokens/*` 现已在资源权限之外，继续按目标 user 关联的 `Agent` / `Customer` scope 校验 tenant/workspace 归属；跨 scope 目标统一按 not found 处理，避免枚举或误操作其它租户用户/令牌
 - `WorkspaceService`、`analytics` 模块聚合仓储与 agent transfer runtime load 同步路径已开始按上下文过滤 `Session/Agent/Ticket/Message/Customer` 等已 scope 化主数据
-- 当前剩余缺口已从“核心主数据未建模”进一步收敛到“少量 legacy 聚合尾项与 `DailyStats` 这类系统级全局汇总表的维度设计”，详见 `docs/tenant-workspace-boundaries.md`
+- `analytics.GetAgentPerformanceStats` 与兼容层 `StatisticsService.GetAgentPerformanceStats` 现已补 scoped 回归测试，并修正 analytics 仓储中的平均解决时长聚合以兼容 sqlite / postgres 等不同 SQL 方言，避免 legacy agent performance 报表长期处于未测状态
+- `analytics.GetTicketCategoryStats` / `GetTicketPriorityStats` / `GetCustomerSourceStats` 及兼容层 `StatisticsService` 入口现已补 scoped 回归测试，进一步收口 legacy 分类、优先级与客户来源聚合的跨 workspace 泄漏风险
+- `SLAService.GetSLAStats` 的趋势聚合现已补 scoped 回归测试，确认最近 7 天合规率视图不会混入其它 workspace 的工单或违约数据
+- 当前剩余缺口已从“核心主数据未建模”进一步收敛到“后续若要做租户级日报时，需为 `DailyStats` 这类 system 级全局汇总表单独设计 tenant/workspace 维度版本”，详见 `docs/tenant-workspace-boundaries.md`
 
 ## T2 auth-and-rbac-convergence
 
@@ -103,21 +110,21 @@
 - 已定义 AI provider、knowledge provider、routing policy、portal、security baseline 的推荐作用域矩阵
 - 已定义统一覆盖顺序：`runtime -> workspace -> tenant -> system -> code default`
 - 已定义配置变更的审计与回滚约束，区分系统级发布回滚与租户/工作区配置恢复
-- 已新增 `internal/platform/configscope` 作为统一 resolver 骨架，当前已覆盖 portal config、OpenAI config 与 WeKnora config 的分层解析
-- 门户公开配置读取、AI runtime 装配与增强健康检查中的 WeKnora 展示信息已切到 resolver，不再各自拼接 system default / runtime override
-- 已为 `portal` / `OpenAI` / `WeKnora` resolver 补齐 tenant/workspace provider 接口与覆盖顺序骨架，后续可接数据库持久化 provider
+- 已新增 `internal/platform/configscope` 作为统一 resolver 骨架，当前已覆盖 portal config、OpenAI config 与 knowledge provider config 的分层解析
+- 门户公开配置读取、AI runtime 装配与增强健康检查中的 knowledge provider 展示信息已切到 resolver，不再各自拼接 system default / runtime override
+- 已为 `portal` / `OpenAI` / knowledge provider resolver 补齐 tenant/workspace provider 接口与覆盖顺序骨架，当前按 Dify 优先、WeKnora compatibility 保留
 - 已新增 `TenantConfig` / `WorkspaceConfig` 持久化模型与 GORM provider，当前已接入 `portal` 的 tenant/workspace 覆盖读取
-- `OpenAI` / `WeKnora` 的 resolver 已可消费同一批持久化 provider；管理面 `AI` handler 主路径与 `RuntimeService` 主路径都已按 request scope 解析 scoped provider
+- `OpenAI` / knowledge provider resolver 已可消费同一批持久化 provider；管理面 `AI` handler 主路径与 `RuntimeService` 主路径都已按 request scope 解析 scoped provider
 - `security.session_risk` 已纳入同一套 scoped config 文档与 resolver；auth 自助 session 列表、管理面 user security session 列表都会按请求 scope 动态解析 tenant/workspace 覆盖阈值
 - 对于 `context.Background()` 或匿名 websocket 等未携带 scope 的调用，仍会自然回退到 system config
-- 管理面已新增 tenant/workspace scoped config 的最小 `GET/PUT` 接口，可读写 `portal` / `OpenAI` / `WeKnora` / `session_risk` override
+- 管理面已新增 tenant/workspace scoped config 的最小 `GET/PUT` 接口，可读写 `portal` / `OpenAI` / knowledge provider / `session_risk` override
 - scoped config 现已新增 `history` / `rollback` 管理接口，配置写入与恢复都会写入 `AuditLog`，并保留 before/after 快照；rollback 需显式提交确认参数才会执行
 - tenant/workspace scoped config 的 `PUT` / `rollback` / `verify` 现已强制要求提交 `change_ref` 与 `reason`，支持 JSON body 或 `X-Change-Ref` / `X-Change-Reason` header，并会一并进入审计 request metadata
 - 高风险 scoped config 变更现已从“审批单号存在”推进到“真实审批记录存在”：当字段风险评估命中高风险 provider endpoint、KB mapping、session risk threshold 或 rollback 操作时，`PUT` / `rollback` 不仅必须提交 `approval_ref`，还必须能按 `approval_ref + change_ref` 查到已记录的 `scoped_config.{scope}.approve` 审计事件，且审批人与执行人必须分离；接口继续支持 JSON body 或 `X-Approval-Ref` header
 - 管理面现已支持 `POST /security/config/{scope}/verify/:audit_id`，用于给 update / rollback 结果写入执行后验证结论；verification body 除 `status` / `notes` / `evidence` 外，还需提交与 `verification_template.checks` 对齐的 `checks`
 - scoped config verification 现已从自由文本收口为模板化检查项：`passed` 必须补 evidence，且模板中所有必填检查项都必须显式标记为 `passed`；`failed` 必须补 notes，且至少要有一个模板检查项标记为 `failed`
 - `verification_template` 现已进一步按真实 `changed_paths` 细分检查项，并在模板根节点返回 `changed_paths`；单个 check 还会返回 `risk_level` 与自身覆盖的 `changed_paths`，可直接驱动前端或自动化脚本按字段风险执行验证
-- 当前细分模板已覆盖 portal public surface / locale、OpenAI endpoint / model contract、WeKnora endpoint / knowledge mapping / health check、session risk score / window / concurrency 这几类高风险配置簇
+- 当前细分模板已覆盖 portal public surface / locale、OpenAI endpoint / model contract、knowledge provider endpoint / knowledge mapping / health check、session risk score / window / concurrency 这几类高风险配置簇
 - 变更治理现已补统一状态机：响应会额外返回 `governance_status` / `governance_policy`，当前状态值至少覆盖 `awaiting_approval`、`awaiting_verification`、`verified`、`verification_failed`、`approved`、`not_required`
 - scoped config verification 现已具备最小双人复核约束：verification reviewer 必须是带 `user_id` 的已认证操作者，且不能与原始 update / rollback 执行人相同
 - 管理面现已支持在 scoped config 写入响应、history 列表、单条详情和 verify 响应中直接返回 `change_control` / `change_risk` / `approval_policy` 元数据；其中 `change_control` 会包含 `approval_ref`，`change_risk` 会给出 `risk_level` / `risk_reasons` / `changed_paths`，`approval_policy` 会声明是否必须补审批、审批记录是否已落库、最新审批审计 ID / 时间 / 审批人等真实执行前审批信息
@@ -167,7 +174,10 @@
 - 认证自助表面现已补 `GET /api/v1/auth/sessions`、`POST /api/v1/auth/sessions/logout-current`、`POST /api/v1/auth/sessions/logout-others`，已登录用户可查看自己的 auth sessions，并执行“退出当前会话”或“踢掉其它设备”
 - `UserAuthSession` 现已进一步补 `device_fingerprint`：优先使用 `X-Device-ID`，否则基于 `User-Agent + ClientIP` 生成稳定哈希，便于同一设备多次 refresh / 多会话归并查看
 - auth / management 两侧 session 列表现已返回衍生安全视图字段 `network_label`、`location_label`、`risk_score`、`risk_level`、`risk_reasons`，以及 `family_public_ip_count` / `family_device_count` / `active_session_count` / `family_hot_refresh_count` / `reference_session_id` / `ip_drift` / `device_drift` / `rapid_ip_change` / `rapid_device_change` / `refresh_recency` / `rapid_refresh_activity` 等 session-family 指标；当前已能区分 loopback/private/public、文档保留网段 / shared address space 等最小 location hint，并将同账号多公网 IP、过多活跃会话、相对最近活跃 session 的设备/IP 漂移、24 小时窗口内的快速切换，以及短时间 refresh 活跃度纳入可解释风险提示
-- 上述 session 风险启发式阈值现已集中到统一 `session risk policy`，并接入 `security.session_risk` 配置面，后续可按环境或部署模板覆盖窗口与阈值
+- session risk 的 Geo/IP 富化层现已从 handler 内联规则抽成可注入的 `session IP intelligence` adapter；默认仍使用现有 heuristic provider，auth 自助与 management user-security 两侧都可在不改风控主逻辑的前提下接入真实 Geo/IP provider，且当前已补 HTTP provider 与两侧 handler 级自动化证据
+- 已新增可直接落真实数据源的 `HTTP session IP intelligence provider` 与 `security.session_ip_intelligence` 配置项；当配置 `enabled + base_url` 时，auth / management 会话列表会通过外部 endpoint 拉取 `network_label` / `location_label`，失败时自动回退到本地 heuristic 分类；当前 adapter 已补对嵌套 `data` payload、`Authorization` 之外自定义鉴权头的兼容回归
+- 上述 session 风险启发式阈值现已集中到统一 `session risk policy`，并接入 `security.session_risk` 配置面；当前已新增 `server.environment + security.session_risk_profiles.{environment}` 环境级基线，并继续支持 tenant / workspace / runtime 逐层细化，auth 自助与 management user-security 两侧都已有自动化覆盖
+- 本轮 `G2-*` 收口标准已满足：legacy 聚合边界、HTTP Geo/IP provider adapter、环境级 session risk policy，以及 audit/rollback 运营约束都已有代码、测试与文档证据；后续若要接入某个特定外部 Geo/IP 厂商，只应视为 provider 选择或部署验收增强，而不是本轮阻塞
 - 已新增 `servify check-security-baseline --strict` 与 `scripts/check-security-baseline.sh`，可在部署前将现有 security warning 规则升级为显式失败检查，不再只依赖启动日志提醒
 - T5 当前已达到“最小安全治理骨架”验收目标；后续增强项应单独立项，不再视为本轮收尾阻塞
 

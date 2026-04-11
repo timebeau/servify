@@ -30,11 +30,11 @@ func (stubFallbackAIHandler) GetStatus(context.Context) map[string]interface{} {
 func (stubFallbackAIHandler) GetMetrics() (*services.AIMetrics, bool) {
 	return &services.AIMetrics{}, true
 }
-func (stubFallbackAIHandler) UploadDocumentToWeKnora(context.Context, string, string, []string) error {
+func (stubFallbackAIHandler) UploadKnowledgeDocument(context.Context, string, string, []string) error {
 	return nil
 }
 func (stubFallbackAIHandler) SyncKnowledgeBase(context.Context) error { return nil }
-func (stubFallbackAIHandler) SetWeKnoraEnabled(bool) bool             { return true }
+func (stubFallbackAIHandler) SetKnowledgeProviderEnabled(bool) bool   { return true }
 func (stubFallbackAIHandler) ResetCircuitBreaker() bool               { return true }
 
 func openScopedAITestDB(t *testing.T) *gorm.DB {
@@ -102,8 +102,11 @@ func TestScopedAIHandlerServiceGetStatusUsesWorkspaceWeKnoraOverride(t *testing.
 	handler := NewScopedAIHandlerService(config.GetDefaultConfig(), logrus.New(), db, stubFallbackAIHandler{})
 	ctx := platformauth.ContextWithScope(context.Background(), "tenant-a", "workspace-1")
 	status := handler.GetStatus(ctx)
-	if enabled, _ := status["weknora_enabled"].(bool); !enabled {
-		t.Fatalf("expected scoped weknora enabled status, got %+v", status)
+	if enabled, _ := status["knowledge_provider_enabled"].(bool); !enabled {
+		t.Fatalf("expected scoped knowledge provider enabled status, got %+v", status)
+	}
+	if provider, _ := status["knowledge_provider"].(string); provider != "weknora" {
+		t.Fatalf("expected scoped knowledge provider to stay weknora, got %+v", status)
 	}
 }
 
@@ -133,8 +136,11 @@ func TestRuntimeServiceFromResolvedConfigWithWeKnoraScopedKnowledgeBase(t *testi
 		Timeout:         time.Second,
 	}, logrus.New())
 	status := service.GetStatus(context.Background())
-	if enabled, _ := status["weknora_enabled"].(bool); !enabled {
-		t.Fatalf("expected weknora enabled, got %+v", status)
+	if enabled, _ := status["knowledge_provider_enabled"].(bool); !enabled {
+		t.Fatalf("expected knowledge provider enabled, got %+v", status)
+	}
+	if provider, _ := status["knowledge_provider"].(string); provider != "weknora" {
+		t.Fatalf("expected weknora knowledge provider, got %+v", status)
 	}
 }
 

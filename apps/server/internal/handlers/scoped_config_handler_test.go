@@ -884,6 +884,9 @@ func TestScopedConfigVerificationTemplateAddsFieldSpecificChecks(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected weknora_provider_endpoint_verified in %+v", template.Checks)
 	}
+	if !strings.Contains(endpointCheck.Title, "knowledge provider") {
+		t.Fatalf("expected generic knowledge provider title, got %+v", endpointCheck.Title)
+	}
 	if endpointCheck.RiskLevel != "high" {
 		t.Fatalf("expected endpoint risk high got %+v", endpointCheck)
 	}
@@ -893,6 +896,9 @@ func TestScopedConfigVerificationTemplateAddsFieldSpecificChecks(t *testing.T) {
 	mappingCheck, ok := scopedConfigTemplateCheckByID(template, "weknora_knowledge_mapping_verified")
 	if !ok {
 		t.Fatalf("expected weknora_knowledge_mapping_verified in %+v", template.Checks)
+	}
+	if !strings.Contains(mappingCheck.Title, "knowledge provider") {
+		t.Fatalf("expected generic knowledge provider mapping title, got %+v", mappingCheck.Title)
 	}
 	if len(mappingCheck.ChangedPaths) != 1 || mappingCheck.ChangedPaths[0] != "weknora.knowledge_base_id" {
 		t.Fatalf("unexpected mapping changed paths %+v", mappingCheck.ChangedPaths)

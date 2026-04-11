@@ -99,7 +99,7 @@ Servify 当前更适合这样理解：
 | `infra/` | 本地或部署环境相关的 compose、可观测性与辅助配置 |
 | `scripts/` | CI、本地开发、生成物与检查脚本 |
 | `sdk/` | SDK workspace 与示例 |
-| `config.yml`、`config.weknora.yml` | 本地运行配置样例 |
+| `config.yml`、`config.weknora.yml` | 本地运行配置样例，其中 AI/knowledge 默认推荐使用 Dify |
 | `generated-assets.manifest` | 必须提交的生成物清单 |
 | `Makefile`、`build.sh` | 常用构建与开发入口 |
 
@@ -117,7 +117,7 @@ Servify 当前更适合这样理解：
 - 🔌 **平台能力抽象**：认证、事件总线、AI/Knowledge provider、realtime/SIP 独立
 - 🌐 **多端 SDK 预留**：Web 先落地，API/App 预留 contract，不做伪实现
 - 📞 **语音能力隔离**：通过 `voice` 模块和 SIP adapter 接入，不耦合聊天链路
-- 🔄 **Provider 可替换**：WeKnora 只是 `KnowledgeProvider` 的一种实现
+- 🔄 **Provider 可替换**：Dify 是当前优先 `KnowledgeProvider`，WeKnora 是兼容实现之一
 
 ---
 
@@ -208,7 +208,8 @@ flowchart LR
     ORCH --> TOOLS[Tool Registry]
     RET --> KP[KnowledgeProvider]
     ORCH --> LLM[LLMProvider]
-    KP --> WEK[WeKnora Adapter]
+    KP --> DIFY[Dify Adapter]
+    KP --> WEK[WeKnora Compatibility Adapter]
     KP --> ALT[Future Provider]
     LLM --> OPENAI[OpenAI Adapter]
     LLM --> MOCK[Mock Adapter]
@@ -216,7 +217,7 @@ flowchart LR
 
 **结论：**
 
-- WeKnora 已经不是硬编码依赖，而是 `KnowledgeProvider` 的一个适配器
+- Dify 是当前优先知识源，WeKnora 已经不是硬编码依赖，只是 `KnowledgeProvider` 的一个 compatibility 适配器
 - 后续如果切 Milvus、Elasticsearch、pgvector、自研知识库，只需要新增 provider adapter
 - AI 主流程不应该感知具体知识库实现，只依赖统一检索 contract
 
@@ -301,7 +302,8 @@ flowchart LR
 ```bash
 make build
 make run-cli CONFIG=./config.yml
-make run-weknora CONFIG=./config.weknora.yml
+make run-knowledge-provider CONFIG=./config.weknora.yml
+# `run-knowledge-provider` 是 `run-weknora` 的通用 alias；主要用于 WeKnora compatibility / mock 回归
 make migrate DB_HOST=localhost DB_PORT=5432 DB_USER=postgres DB_PASSWORD=password DB_NAME=servify
 make repo-hygiene
 make local-check
@@ -392,7 +394,7 @@ Jaeger 默认地址：`http://localhost:16686`
 - 服务端已从“大 service 直连 handler”收敛到模块化单体结构
 - `agent`、`customer` 管理面已收口到模块化链路，不再只依赖旧 service 直连 handler
 - AI 已统一到 `QueryOrchestrator + LLMProvider + KnowledgeProvider`
-- WeKnora 已降级为 `KnowledgeProvider` 适配器，不再是内核依赖
+- Dify 已作为默认优先知识源接入，WeKnora 已降级为 `KnowledgeProvider` 兼容适配器，不再是内核依赖
 - Web SDK 已按 `core + transport + binding` 方向收口
 - API/App SDK 当前只预留 contract 和目录，不做伪实现
 - 管理面安全基线已接入首轮能力：scope、RBAC、audit、token policy、统一 user security 入口

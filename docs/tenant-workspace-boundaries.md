@@ -6,7 +6,7 @@
 
 - `tenant`
   - 代表部署级业务租户边界
-  - 当前已在配置与 provider 参数中出现，例如 WeKnora `tenant_id`
+  - 当前已在配置与 provider 参数中出现，例如 knowledge provider 的 `tenant_id`
   - 当前业务表大多尚未显式落库 `tenant_id`
 
 - `workspace`
@@ -46,10 +46,13 @@
 - `Customer`
   - 当前已补显式 `tenant_id` / `workspace_id`
   - `customer` 仓储通过扩展表 join 收口用户读取、列表、统计与活动查询
+  - `GetCustomerActivity` 现已补 integration test，确认 recent sessions / tickets / messages 三条聚合链路都会按请求 scope 过滤，不会把同一 customer_id 在其它 workspace 下的历史数据带回当前上下文
+  - 兼容层 `CustomerService.GetCustomerStats` 现已补 scoped 回归测试，并修正 legacy 统计查询中 `users/customers` join 下未限定表前缀的 `created_at` 条件，避免 scoped 客户统计在多表聚合时出现歧义列错误
 
 - `Agent`
   - 当前已补显式 `tenant_id` / `workspace_id`
   - `agent` 仓储与 transfer runtime load 同步路径已按上下文过滤
+  - 兼容层 `AgentService.GetAgentStats` 现已补 scoped 回归测试，确认 legacy 统计入口不会跨 workspace 混入其它 agent 主数据
 
 - `KnowledgeDoc`
   - 当前 provider 层支持 `tenant_id`
@@ -82,6 +85,7 @@
 - `CustomerSatisfaction` / `SatisfactionSurvey`
   - 已补显式 `tenant_id` / `workspace_id`
   - `satisfaction` service 的调查发送、响应、列表、统计、更新与删除路径已默认按上下文过滤
+  - `GetSatisfactionStats` 现已补 scoped 回归测试，确认 category stats 与 trend data 两条聚合视图不会混入其它 workspace 的满意度记录
 
 - `SuggestionService`
   - 依赖已 scope 化的 `Ticket` / `KnowledgeDoc`
@@ -141,6 +145,7 @@ JWT claims 已支持透传：
 - `Customer` 现已补显式 scope 字段；`customer` 仓储通过 `customers` 扩展表 join 收口用户读取、列表、统计与活动查询
 - `Agent` 现已补显式 scope 字段，并在 `agent` 仓储的创建、读取、列表与统计路径按上下文过滤
 - `WorkspaceService`、`analytics` 模块聚合仓储、`gamification` 排行榜聚合、agent transfer load 同步路径已开始按上下文过滤已 scope 化主数据
+  - `customer` 模块的 activity 聚合链路现已补回归测试，确认 `recent_sessions` / `recent_tickets` / `recent_messages` 三条历史视图不会因 legacy join 把其它 workspace 的数据混入当前客户时间线
   - `WorkspaceService.GetOverview` 的 `recent_sessions` 关联链现已要求 `sessions -> tickets -> customers -> agents` 保持同一 `tenant_id/workspace_id`，避免 legacy join 因脏外键把其他 workspace 的客户或客服姓名带入当前工作台
 - `SLAService.ListSLAViolations`
   - 现已对 `Ticket` / `SLAConfig` preload 继续施加当前 scope，避免 scoped 违约列表因脏外键把其他 workspace 的工单或 SLA 配置详情带回管理面
@@ -150,6 +155,7 @@ JWT claims 已支持透传：
 - `SLAService.GetSLAStats`
   - 按优先级 / 客户等级统计违约时，现已要求 `sla_violations -> sla_configs` 保持同一 `tenant_id/workspace_id`
   - 避免 scoped 统计因脏 `sla_config_id` 关联把其他 workspace 的优先级或客户等级维度带入当前报表
+  - `TrendData` 现已补 scoped 回归测试，确认最近 7 天 SLA 合规趋势不会把其它 workspace 的当天工单或违约数混入当前视图
 - `SatisfactionService`
   - `CreateSatisfaction` / `GetSatisfaction` / `ListSatisfactions` / `GetSatisfactionByTicket` / `UpdateSatisfaction` 现已统一使用 scope-aware preload
   - `Ticket` / `Customer` 继续按当前 scope 过滤，`Agent` 通过 `agents.user_id` 关联后再校验 `tenant_id/workspace_id`，避免满意度列表与详情回显跨 workspace 的工单、客户或客服身份
@@ -161,15 +167,16 @@ JWT claims 已支持透传：
 - `MacroService.ApplyToTicket`
   - 现已在当前 scope 下确认目标 `Ticket` 存在后才创建评论，避免旧宏服务把宏内容写入其他 workspace 或不存在的工单
 - `analytics` 模块现已进一步避免在 scoped dashboard / time-range 请求中直接读取全局 `DailyStats`
-  - `GetDashboardStats` 的 `AIUsageToday` / `WeKnoraUsageToday` 仅在 system 级请求下消费 `DailyStats`
+  - `GetDashboardStats` 的 `AIUsageToday` / `KnowledgeProviderUsageToday` / `WeKnoraUsageToday` 仅在 system 级请求下消费 `DailyStats`
   - `GetTimeRangeStats` 在 scoped 请求下不再回填全局 `DailyStats.AvgResponseTime` / `CustomerSatisfaction`，其中满意度改为按 scoped `CustomerSatisfaction` 日维度重算，避免跨 tenant/workspace 泄漏
+  - `GetAgentPerformanceStats` 现已补 scoped integration test，并把平均解决时长聚合改为按 SQL 方言选择表达式；兼容层 `StatisticsService.GetAgentPerformanceStats` 也已补回归测试，确认 legacy 绩效榜单不会把其它 workspace 的工单汇总进当前报表
+  - `GetTicketCategoryStats` / `GetTicketPriorityStats` / `GetCustomerSourceStats` 及其兼容层 `StatisticsService` 入口现已补 scoped 回归测试，确认 legacy 分类/优先级/来源聚合不会混入其它 workspace 的工单或客户维度
 - 尚未统一 scope 化的主要剩余面：
-  - 仍保留在旧 `services/*` 中、未完全迁移到 modules 的少量 legacy 聚合查询
-  - `DailyStats` 这类跨租户全局聚合表，当前仍按系统级统计处理，而非 tenant/workspace 维度拆分
+  - 仍保留在旧 `services/*` 中、未完全迁移到 modules 的少量兼容层入口，但当前已覆盖到的 legacy 聚合查询都已有 scoped 回归测试，不再是本轮阻塞
+  - `DailyStats` 这类跨租户全局聚合表，当前明确按 system 级统计处理；`GetDashboardStats` / `GetTimeRangeStats` 在 scoped 读取时不会消费它，而 `UpdateDailyStats` 也已固定为重算全局主数据，不再受请求 scope 影响
 
 ## 下一步建议
 
 1. 将 `T4 configuration-scopes` 作为下一阶段重点，明确系统级与租户级配置边界
-2. 继续压缩旧 `services/*` 中残留的少量 legacy 聚合查询，避免新增绕过 modules scope 的读写路径
-3. 若后续需要租户级报表，补 `DailyStats` 等全局汇总表的 tenant/workspace 维度设计
-4. 若要继续降低兼容层风险，逐步把旧 `MessageRouter` / 旧 service 聚合路径迁到 modules 边界
+2. 若后续需要租户级报表，新增 tenant/workspace 维度的日报或汇总表，而不是直接复用当前 system 级 `DailyStats`
+3. 若要继续降低兼容层风险，逐步把旧 `MessageRouter` / 旧 service 聚合路径迁到 modules 边界

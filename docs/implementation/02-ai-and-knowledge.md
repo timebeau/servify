@@ -26,20 +26,22 @@
 
 验收：
 
-- provider 接口不暴露 OpenAI/WeKnora 私有 DTO
+- provider 接口不暴露 OpenAI、Dify、WeKnora compatibility 私有 DTO
 
 ## A2 provider adapters
 
 - [x] 新增 `llm/openai/provider.go`
 - [x] 迁移模型 HTTP 调用逻辑
 - [x] 新增 `llm/mock/provider.go`
+- [x] 新增 `knowledgeprovider/dify/provider.go`
+- [x] 包装 `pkg/dify`
 - [x] 新增 `knowledgeprovider/weknora/provider.go`
 - [x] 包装 `pkg/weknora`
 - [x] 新增 `knowledgeprovider/mock/provider.go`
 
 验收：
 
-- AI 模块可在 mock provider 下运行
+- AI 模块可在 mock provider 下运行，且 runtime 可按 `Dify -> WeKnora compatibility -> fallback` 装配
 
 ## A3 ai module skeleton
 

@@ -4311,6 +4311,9 @@ const docTemplate = `{
                 "customer_satisfaction": {
                     "type": "number"
                 },
+                "knowledge_provider_usage_today": {
+                    "type": "integer"
+                },
                 "online_agents": {
                     "type": "integer"
                 },

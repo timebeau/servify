@@ -150,10 +150,15 @@ type PerformanceMonitorConfig struct {
 }
 
 type HealthChecksConfig struct {
-	Database bool `yaml:"database"`
-	Redis    bool `yaml:"redis"`
-	WeKnora  bool `yaml:"weknora"`
-	OpenAI   bool `yaml:"openai"`
+	Database          bool `yaml:"database"`
+	Redis             bool `yaml:"redis"`
+	KnowledgeProvider bool `yaml:"knowledge_provider"`
+	WeKnora           bool `yaml:"weknora"`
+	OpenAI            bool `yaml:"openai"`
+}
+
+func (c HealthChecksConfig) KnowledgeProviderEnabled() bool {
+	return c.KnowledgeProvider || c.WeKnora
 }
 
 // TracingConfig OpenTelemetry 追踪配置
@@ -377,10 +382,11 @@ func GetDefaultConfig() *Config {
 				EnableRequestLogging: true,
 			},
 			HealthChecks: HealthChecksConfig{
-				Database: true,
-				Redis:    true,
-				WeKnora:  true,
-				OpenAI:   false,
+				Database:          true,
+				Redis:             true,
+				KnowledgeProvider: true,
+				WeKnora:           true,
+				OpenAI:            false,
 			},
 			Tracing: TracingConfig{
 				Enabled:     false,

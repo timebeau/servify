@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# WeKnora 集成启动脚本
+# WeKnora compatibility / mock acceptance 启动脚本
 # 使用方法: ./scripts/start-weknora.sh [dev|prod]
 
 set -e
@@ -12,7 +12,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 # 环境类型
 ENV=${1:-dev}
 
-echo "🚀 启动 Servify + WeKnora 集成环境 (${ENV})"
+echo "🚀 启动 Servify + WeKnora compatibility/mock 验收环境 (${ENV})"
 
 # 检查必要文件
 if [ ! -f "$PROJECT_ROOT/.env" ]; then
@@ -70,18 +70,18 @@ if [ "$ENV" = "dev" ]; then
         exit 1
     fi
 
-    # 启动 WeKnora 服务
-    echo "🧠 启动 WeKnora 知识库服务..."
+    # 启动 WeKnora mock 服务
+    echo "🧠 启动 WeKnora compatibility mock 服务..."
     docker-compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.weknora.yml up -d weknora
 
-    # 等待 WeKnora 启动
-    echo "⏳ 等待 WeKnora 服务启动..."
+    # 等待 WeKnora mock 启动
+    echo "⏳ 等待 WeKnora compatibility mock 服务启动..."
     timeout 120 bash -c 'until curl -s http://localhost:9000/api/v1/health > /dev/null; do sleep 5; done'
 
     if [ $? -eq 0 ]; then
-        echo "✅ WeKnora 服务已就绪"
+        echo "✅ WeKnora compatibility mock 服务已就绪"
     else
-        echo "⚠️  WeKnora 服务启动可能需要更多时间，继续启动主服务..."
+        echo "⚠️  WeKnora compatibility mock 服务启动可能需要更多时间，继续启动主服务..."
     fi
 
     # 启动主服务
@@ -153,7 +153,7 @@ echo ""
 echo "📚 快速测试："
 echo "   健康检查:       curl http://localhost:8080/health"
 echo "   WebSocket:      wscat -c ws://localhost:8080/api/v1/ws"
-echo "   WeKnora 健康:   curl http://localhost:9000/api/v1/health"
+echo "   Knowledge provider 健康: curl http://localhost:9000/api/v1/health"
 echo ""
 echo "📋 管理命令："
 echo "   查看日志:       docker-compose logs -f"
@@ -165,7 +165,7 @@ echo ""
 # 如果是开发环境，提供额外的开发提示
 if [ "$ENV" = "dev" ]; then
     echo "🛠️  开发环境提示："
-    echo "   配置文件:       config.weknora.yml"
+    echo "   配置文件:       config.weknora.yml  (Dify 优先, WeKnora compatibility)"
     echo "   环境变量:       .env"
     echo "   日志目录:       ./logs/"
     echo "   上传目录:       ./uploads/"
@@ -176,4 +176,4 @@ if [ "$ENV" = "dev" ]; then
     echo ""
 fi
 
-echo "✨ 享受使用 Servify + WeKnora！"
+echo "ℹ️  当前环境用于 WeKnora compatibility mock 协议回归；Dify 仍是项目默认优先知识源。"

@@ -4,7 +4,7 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS hstore;
 
--- 创建 WeKnora 与 Servify 的映射表
+-- 创建 WeKnora compatibility 与 Servify 的映射表
 CREATE TABLE IF NOT EXISTS servify_weknora_mappings (
     id SERIAL PRIMARY KEY,
     servify_doc_id INTEGER,
@@ -24,7 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_mappings_kb ON servify_weknora_mappings(weknora_k
 -- 创建 AI 服务监控表
 CREATE TABLE IF NOT EXISTS ai_service_metrics (
     id SERIAL PRIMARY KEY,
-    service_type VARCHAR(50) NOT NULL, -- 'weknora', 'fallback', 'openai'
+    service_type VARCHAR(50) NOT NULL, -- compatibility values include 'weknora', plus 'fallback' and 'openai'
     query_count BIGINT DEFAULT 0,
     success_count BIGINT DEFAULT 0,
     error_count BIGINT DEFAULT 0,

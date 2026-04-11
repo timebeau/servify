@@ -32,6 +32,8 @@ func NewScopedAIHandlerService(cfg *config.Config, logger *logrus.Logger, db *go
 		cfg,
 		configscope.WithTenantOpenAIProvider(configscope.NewGormTenantConfigProvider(db)),
 		configscope.WithWorkspaceOpenAIProvider(configscope.NewGormWorkspaceConfigProvider(db)),
+		configscope.WithTenantDifyProvider(configscope.NewGormTenantConfigProvider(db)),
+		configscope.WithWorkspaceDifyProvider(configscope.NewGormWorkspaceConfigProvider(db)),
 		configscope.WithTenantWeKnoraProvider(configscope.NewGormTenantConfigProvider(db)),
 		configscope.WithWorkspaceWeKnoraProvider(configscope.NewGormWorkspaceConfigProvider(db)),
 	)
@@ -55,9 +57,9 @@ func (s *scopedAIHandlerService) GetMetrics() (*services.AIMetrics, bool) {
 	return s.fallback.GetMetrics()
 }
 
-func (s *scopedAIHandlerService) UploadDocumentToWeKnora(ctx context.Context, title, content string, tags []string) error {
+func (s *scopedAIHandlerService) UploadKnowledgeDocument(ctx context.Context, title, content string, tags []string) error {
 	service := s.buildService(ctx)
-	return aidelivery.NewHandlerServiceAdapter(service).UploadDocumentToWeKnora(ctx, title, content, tags)
+	return aidelivery.NewHandlerServiceAdapter(service).UploadKnowledgeDocument(ctx, title, content, tags)
 }
 
 func (s *scopedAIHandlerService) SyncKnowledgeBase(ctx context.Context) error {
@@ -65,11 +67,11 @@ func (s *scopedAIHandlerService) SyncKnowledgeBase(ctx context.Context) error {
 	return aidelivery.NewHandlerServiceAdapter(service).SyncKnowledgeBase(ctx)
 }
 
-func (s *scopedAIHandlerService) SetWeKnoraEnabled(enabled bool) bool {
+func (s *scopedAIHandlerService) SetKnowledgeProviderEnabled(enabled bool) bool {
 	if s == nil || s.fallback == nil {
 		return false
 	}
-	return s.fallback.SetWeKnoraEnabled(enabled)
+	return s.fallback.SetKnowledgeProviderEnabled(enabled)
 }
 
 func (s *scopedAIHandlerService) ResetCircuitBreaker() bool {
@@ -87,11 +89,8 @@ func (s *scopedAIHandlerService) buildService(ctx context.Context) aidelivery.Ru
 		return runtimeServiceFromResolvedConfig(config.OpenAIConfig{}, config.DifyConfig{}, config.WeKnoraConfig{}, s.logger)
 	}
 	openAIConfig := s.resolver.ResolveOpenAI(ctx, nil)
+	difyConfig := s.resolver.ResolveDify(ctx, nil)
 	weKnoraConfig := s.resolver.ResolveWeKnora(ctx, nil)
-	difyConfig := config.DifyConfig{}
-	if s.cfg != nil {
-		difyConfig = s.cfg.Dify
-	}
 	return runtimeServiceFromResolvedConfig(openAIConfig, difyConfig, weKnoraConfig, s.logger)
 }
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# WeKnora 知识库初始化脚本
+# WeKnora compatibility 知识库初始化脚本
 # 使用方法: ./scripts/init-knowledge-base.sh
 
 set -e
@@ -8,22 +8,22 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-echo "🧠 初始化 WeKnora 知识库..."
+echo "🧠 初始化 WeKnora compatibility 知识库..."
 
 # 配置变量
 WEKNORA_URL="http://localhost:9000"
 API_KEY="default-api-key"
 TENANT_ID="default-tenant"
 
-# 检查 WeKnora 服务是否运行
-echo "🔍 检查 WeKnora 服务状态..."
+# 检查 WeKnora compatibility 服务是否运行
+echo "🔍 检查 WeKnora compatibility 服务状态..."
 if ! curl -s "$WEKNORA_URL/api/v1/health" > /dev/null; then
-    echo "❌ WeKnora 服务未运行，请先启动服务"
+    echo "❌ WeKnora compatibility 服务未运行，请先启动服务"
     echo "   运行: ./scripts/start-weknora.sh"
     exit 1
 fi
 
-echo "✅ WeKnora 服务运行正常"
+echo "✅ WeKnora compatibility 服务运行正常"
 
 # 创建租户（如果不存在）
 echo "🏢 创建/检查租户..."
@@ -348,6 +348,6 @@ echo "   查看文档: ./scripts/manage-knowledge-base.sh list"
 echo "   查看统计: ./scripts/manage-knowledge-base.sh stats"
 echo ""
 echo "🌐 Web 界面："
-echo "   WeKnora 管理界面: http://localhost:9001"
+echo "   WeKnora compatibility 管理界面: http://localhost:9001"
 echo ""
 echo "✨ 现在可以测试智能客服功能了！"

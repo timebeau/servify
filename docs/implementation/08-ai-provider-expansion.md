@@ -38,7 +38,7 @@
 
 验收：
 
-- WeKnora 成为可替换实现，而不是唯一实现
+- WeKnora compatibility provider 成为可替换实现，而不是唯一实现
 
 ## A4 orchestration-hardening
 

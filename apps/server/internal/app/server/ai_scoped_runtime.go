@@ -28,6 +28,8 @@ func NewScopedAIRuntimeService(cfg *config.Config, logger *logrus.Logger, db *go
 		cfg,
 		configscope.WithTenantOpenAIProvider(configscope.NewGormTenantConfigProvider(db)),
 		configscope.WithWorkspaceOpenAIProvider(configscope.NewGormWorkspaceConfigProvider(db)),
+		configscope.WithTenantDifyProvider(configscope.NewGormTenantConfigProvider(db)),
+		configscope.WithWorkspaceDifyProvider(configscope.NewGormWorkspaceConfigProvider(db)),
 		configscope.WithTenantWeKnoraProvider(configscope.NewGormTenantConfigProvider(db)),
 		configscope.WithWorkspaceWeKnoraProvider(configscope.NewGormWorkspaceConfigProvider(db)),
 	)
@@ -69,10 +71,7 @@ func (s *scopedAIRuntimeService) buildService(ctx context.Context) aidelivery.Ru
 		return s.fallback
 	}
 	openAIConfig := s.resolver.ResolveOpenAI(ctx, nil)
+	difyConfig := s.resolver.ResolveDify(ctx, nil)
 	weKnoraConfig := s.resolver.ResolveWeKnora(ctx, nil)
-	difyConfig := config.DifyConfig{}
-	if s.cfg != nil {
-		difyConfig = s.cfg.Dify
-	}
 	return runtimeServiceFromResolvedConfig(openAIConfig, difyConfig, weKnoraConfig, s.logger)
 }

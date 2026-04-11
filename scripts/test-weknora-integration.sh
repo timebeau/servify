@@ -1,20 +1,73 @@
 #!/bin/bash
 
-# WeKnora 集成测试脚本
-# 用于验证 Servify + WeKnora 集成是否正常工作
+# WeKnora compatibility 集成测试脚本
+# 用于验证 Servify 外部 knowledge provider 链路中的 WeKnora 兼容路径是否正常工作
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-echo "🧪 WeKnora 集成测试开始..."
+echo "🧪 WeKnora compatibility 集成测试开始..."
 
 # 服务端点（可被环境变量覆盖）
 SERVIFY_URL=${SERVIFY_URL:-"http://localhost:8080"}
 WEKNORA_URL=${WEKNORA_URL:-"http://localhost:9000"}
 WEKNORA_ENABLED=${WEKNORA_ENABLED:-true}
 JWT_SECRET=${JWT_SECRET:-"default-secret-key"}
+WEKNORA_ACCEPTANCE_MODE=${WEKNORA_ACCEPTANCE_MODE:-"mock"}
+EVIDENCE_DIR=${EVIDENCE_DIR:-"$PROJECT_ROOT/scripts/test-results/weknora-acceptance"}
+
+mkdir -p "$EVIDENCE_DIR"
+
+save_response() {
+  local name=$1
+  local body=$2
+  printf '%s\n' "$body" > "$EVIDENCE_DIR/$name.json"
+}
+
+append_summary() {
+  printf '%s\n' "$1" >> "$EVIDENCE_DIR/summary.txt"
+}
+
+host_from_url() {
+  local url="${1:-}"
+  url="${url#http://}"
+  url="${url#https://}"
+  url="${url%%/*}"
+  url="${url%%:*}"
+  printf '%s' "$url"
+}
+
+is_private_or_local_host() {
+  local host
+  host=$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')
+  case "$host" in
+    localhost|127.*|0.0.0.0|::1)
+      return 0
+      ;;
+    10.*|192.168.*)
+      return 0
+      ;;
+    172.1[6-9].*|172.2[0-9].*|172.3[0-1].*)
+      return 0
+      ;;
+    *.local|*.internal|host.docker.internal)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+cat > "$EVIDENCE_DIR/summary.txt" <<EOF
+WeKnora compatibility acceptance summary
+mode=$WEKNORA_ACCEPTANCE_MODE
+servify_url=$SERVIFY_URL
+weknora_url=$WEKNORA_URL
+weknora_enabled=$WEKNORA_ENABLED
+EOF
+
+echo "🗂️ 证据输出目录: $EVIDENCE_DIR"
 
 create_service_token() {
   python3 - "$JWT_SECRET" <<'PY'
@@ -50,6 +103,21 @@ PY
 AUTH_TOKEN=$(create_service_token)
 AUTH_HEADER="Authorization: Bearer ${AUTH_TOKEN}"
 
+if [ "$WEKNORA_ACCEPTANCE_MODE" != "mock" ] && [ "$WEKNORA_ACCEPTANCE_MODE" != "real" ]; then
+  echo "❌ 不支持的 WEKNORA_ACCEPTANCE_MODE: $WEKNORA_ACCEPTANCE_MODE"
+  exit 1
+fi
+
+WEKNORA_HOST=$(host_from_url "$WEKNORA_URL")
+append_summary "weknora_host=$WEKNORA_HOST"
+
+if [ "$WEKNORA_ACCEPTANCE_MODE" = "real" ] && is_private_or_local_host "$WEKNORA_HOST"; then
+  echo "❌ real 模式拒绝使用本地或私网 WeKnora compatibility 地址: $WEKNORA_HOST"
+  echo "   请显式指向外部真实 WeKnora 兼容环境，再重新执行验收。"
+  append_summary "real_mode_guard=blocked_private_or_local_host"
+  exit 1
+fi
+
 # 小工具：带重试的等待
 wait_for() {
   local name=$1 url=$2 max=$3 sleep_s=$4
@@ -71,6 +139,8 @@ echo "🔍 检查服务状态..."
 # 等待服务启动
 wait_for "Servify Health" "$SERVIFY_URL/health" 30 2
 WEKNORA_AVAILABLE=false
+WEKNORA_HEALTH_BODY=""
+WEKNORA_HEALTH_SERVICE="unknown"
 if [ "$WEKNORA_ENABLED" = "true" ]; then
   if wait_for "WeKnora Health" "$WEKNORA_URL/api/v1/health" 30 2; then
     WEKNORA_AVAILABLE=true
@@ -81,7 +151,9 @@ fi
 
 # 1. 测试 Servify 健康检查
 echo "  ✓ 测试 Servify 健康检查..."
-if curl -fsS "$SERVIFY_URL/health" > /dev/null; then
+SERVIFY_HEALTH=$(curl -fsS "$SERVIFY_URL/health")
+save_response "servify-health" "$SERVIFY_HEALTH"
+if [ -n "$SERVIFY_HEALTH" ]; then
     echo "    ✅ Servify 健康检查通过"
 else
     echo "    ❌ Servify 健康检查失败"
@@ -90,11 +162,17 @@ fi
 
 # 2. 测试 WeKnora 健康检查（如果启用）
 if [ "${WEKNORA_ENABLED:-false}" = "true" ]; then
-    echo "  ✓ 测试 WeKnora 健康检查..."
-    if curl -fsS "$WEKNORA_URL/api/v1/health" > /dev/null; then
-        echo "    ✅ WeKnora 健康检查通过"
+    echo "  ✓ 测试 WeKnora compatibility 健康检查..."
+    if WEKNORA_HEALTH_BODY=$(curl -fsS "$WEKNORA_URL/api/v1/health"); then
+        echo "    ✅ WeKnora compatibility 健康检查通过"
+        save_response "weknora-health" "$WEKNORA_HEALTH_BODY"
+        if command -v jq >/dev/null 2>&1; then
+          WEKNORA_HEALTH_SERVICE=$(echo "$WEKNORA_HEALTH_BODY" | jq -r '.service // "unknown"' 2>/dev/null || echo "unknown")
+        fi
+        append_summary "weknora_health_service=$WEKNORA_HEALTH_SERVICE"
     else
-        echo "    ⚠️  WeKnora 健康检查失败，但降级机制可用"
+        echo "    ⚠️  WeKnora compatibility 健康检查失败，但降级机制可用"
+        append_summary "weknora_health=unavailable"
     fi
 fi
 
@@ -110,6 +188,7 @@ AI_RESPONSE=$(curl -fsS -X POST "$SERVIFY_URL/api/v1/ai/query" \
         "query": "你好，我想了解远程协助功能",
         "session_id": "test_session_123"
     }')
+save_response "ai-query" "$AI_RESPONSE"
 
 if echo "$AI_RESPONSE" | grep -q '"success":true'; then
     echo "    ✅ AI 查询测试通过"
@@ -129,6 +208,7 @@ echo "  ✓ 测试 AI 服务状态..."
 AI_STATUS=$(curl -fsS \
     -H "$AUTH_HEADER" \
     "$SERVIFY_URL/api/v1/ai/status")
+save_response "ai-status" "$AI_STATUS"
 SERVICE_TYPE="unknown"
 
 if echo "$AI_STATUS" | grep -q '"success":true'; then
@@ -136,15 +216,18 @@ if echo "$AI_STATUS" | grep -q '"success":true'; then
 
     # 显示服务类型
     if command -v jq >/dev/null 2>&1; then
-  # 优先读取 type；若缺失则根据 weknora_enabled 推断
-  SERVICE_TYPE=$(echo "$AI_STATUS" | jq -r '.data.type // ( .data.weknora_enabled == true and "enhanced" or "standard" )')
+  # 优先读取 type；若缺失则根据 knowledge_provider_enabled 推断
+  SERVICE_TYPE=$(echo "$AI_STATUS" | jq -r '.data.type // ( .data.knowledge_provider_enabled == true and "enhanced" or "standard" )')
+  ACTIVE_PROVIDER=$(echo "$AI_STATUS" | jq -r '.data.knowledge_provider // "unknown"')
     else
       SERVICE_TYPE="unknown"
+      ACTIVE_PROVIDER="unknown"
     fi
     echo "    📊 服务类型: $SERVICE_TYPE"
+    echo "    📊 当前 knowledge provider: $ACTIVE_PROVIDER"
 
     if [ "$SERVICE_TYPE" = "enhanced" ]; then
-        echo "    🚀 使用增强型 AI 服务 (WeKnora 集成)"
+        echo "    🚀 使用增强型 AI 服务 (knowledge provider enabled)"
     else
         echo "    📚 使用标准 AI 服务 (传统知识库)"
     fi
@@ -153,15 +236,19 @@ else
     echo "    📝 错误响应: $AI_STATUS"
 fi
 
-# 5. 测试 WeKnora 专用功能（如果是增强服务）
+# 5. 测试 WeKnora compatibility 专用功能（如果是增强服务）
+UPLOAD_OK=false
+SYNC_OK=false
+ACTIVE_PROVIDER=${ACTIVE_PROVIDER:-unknown}
 if [ "$SERVICE_TYPE" = "enhanced" ]; then
-  echo "🔧 测试 WeKnora 专用功能..."
+  echo "🔧 测试 knowledge provider / WeKnora compatibility 功能..."
 
     # 测试指标查询
     echo "  ✓ 测试服务指标..."
     METRICS_RESPONSE=$(curl -fsS \
         -H "$AUTH_HEADER" \
         "$SERVIFY_URL/api/v1/ai/metrics")
+    save_response "ai-metrics" "$METRICS_RESPONSE"
 
     if echo "$METRICS_RESPONSE" | grep -q '"success":true'; then
         echo "    ✅ 指标查询通过"
@@ -176,7 +263,7 @@ if [ "$SERVICE_TYPE" = "enhanced" ]; then
         fi
 
         echo "    📊 查询总数: $QUERY_COUNT"
-        echo "    📊 WeKnora 使用次数: $WEKNORA_COUNT"
+        echo "    📊 WeKnora compatibility 使用次数: $WEKNORA_COUNT"
         echo "    📊 降级使用次数: $FALLBACK_COUNT"
     else
         echo "    ⚠️  指标查询失败: $METRICS_RESPONSE"
@@ -189,17 +276,32 @@ if [ "$SERVICE_TYPE" = "enhanced" ]; then
         -H "Content-Type: application/json" \
         -d '{
             "title": "测试文档",
-            "content": "这是一个测试文档，用于验证 WeKnora 集成功能。包含远程协助、智能客服等功能介绍。",
+            "content": "这是一个测试文档，用于验证外部 knowledge provider 集成功能。包含远程协助、智能客服等功能介绍。",
             "tags": ["测试", "集成", "验证"]
         }')
 
     if echo "$UPLOAD_RESPONSE" | grep -q '"success":true'; then
         echo "    ✅ 文档上传测试通过"
+        UPLOAD_OK=true
     else
         echo "    ⚠️  文档上传测试失败：$UPLOAD_RESPONSE"
         if [ "$WEKNORA_AVAILABLE" != "true" ]; then
-          echo "       （提示：当前处于降级模式，WeKnora 不可用）"
+          echo "       （提示：当前处于降级模式，外部 knowledge provider 不可用）"
         fi
+    fi
+    save_response "knowledge-upload" "$UPLOAD_RESPONSE"
+
+    echo "  ✓ 测试知识同步..."
+    SYNC_RESPONSE=$(curl -fsS -X POST "$SERVIFY_URL/api/v1/ai/knowledge/sync" \
+        -H "$AUTH_HEADER" \
+        -H "Content-Type: application/json" \
+        -d '{}')
+    save_response "knowledge-sync" "$SYNC_RESPONSE"
+    if echo "$SYNC_RESPONSE" | grep -q '"success":true'; then
+        echo "    ✅ 知识同步测试通过"
+        SYNC_OK=true
+    else
+        echo "    ⚠️  知识同步测试失败：$SYNC_RESPONSE"
     fi
 fi
 
@@ -210,6 +312,7 @@ echo "🔌 测试 WebSocket 连接..."
 WS_STATS=$(curl -fsS \
     -H "$AUTH_HEADER" \
     "$SERVIFY_URL/api/v1/ws/stats")
+save_response "ws-stats" "$WS_STATS"
 
 if echo "$WS_STATS" | grep -q '"success":true'; then
     echo "    ✅ WebSocket 服务正常"
@@ -226,6 +329,7 @@ echo "📡 测试 WebRTC 服务..."
 WEBRTC_STATS=$(curl -fsS \
     -H "$AUTH_HEADER" \
     "$SERVIFY_URL/api/v1/webrtc/connections")
+save_response "webrtc-connections" "$WEBRTC_STATS"
 
 if echo "$WEBRTC_STATS" | grep -q '"success":true'; then
     echo "    ✅ WebRTC 服务正常"
@@ -277,11 +381,11 @@ fi
 case "$OVERALL_STATUS" in
     "healthy")
         echo "🎉 所有服务运行正常！"
-        echo "✅ Servify + WeKnora 集成测试通过"
+        echo "✅ Servify + WeKnora compatibility 集成测试通过"
         ;;
     "degraded")
         echo "⚠️  部分服务降级运行"
-        echo "✅ 核心功能正常，WeKnora 可能不可用但有降级保护"
+        echo "✅ 核心功能正常，外部 knowledge provider 可能不可用但有降级保护"
         ;;
     *)
         echo "❌ 服务状态异常: $OVERALL_STATUS"
@@ -289,6 +393,35 @@ case "$OVERALL_STATUS" in
         exit 1
         ;;
 esac
+
+append_summary "overall_status=$OVERALL_STATUS"
+append_summary "service_type=$SERVICE_TYPE"
+append_summary "weknora_available=$WEKNORA_AVAILABLE"
+append_summary "knowledge_upload_ok=$UPLOAD_OK"
+append_summary "knowledge_sync_ok=$SYNC_OK"
+
+if [ "$WEKNORA_ACCEPTANCE_MODE" = "real" ]; then
+    echo ""
+    echo "🔍 严格验收模式: real"
+    if [ "$WEKNORA_HEALTH_SERVICE" = "weknora-mock" ]; then
+        echo "❌ real 模式命中了 weknora-mock，不能作为真实 WeKnora 兼容环境证据"
+        append_summary "real_mode_guard=blocked_weknora_mock"
+        exit 1
+    fi
+    if [ "$WEKNORA_AVAILABLE" != "true" ]; then
+        echo "❌ real 模式要求真实 WeKnora 兼容服务健康可用"
+        exit 1
+    fi
+    if [ "$SERVICE_TYPE" != "enhanced" ]; then
+        echo "❌ real 模式要求 Servify 运行在 enhanced AI 模式"
+        exit 1
+    fi
+    if [ "$UPLOAD_OK" != "true" ] || [ "$SYNC_OK" != "true" ]; then
+        echo "❌ real 模式要求知识上传和同步都成功"
+        exit 1
+    fi
+    echo "✅ real 模式验收通过，可将 $EVIDENCE_DIR 下证据回填到 docs/acceptance-checklist.md"
+fi
 
 echo ""
 echo "🔗 服务地址:"
@@ -311,7 +444,7 @@ echo "   ✅ WebRTC 连接管理"
 echo "   ✅ 并发请求处理"
 
 if [ "$SERVICE_TYPE" = "enhanced" ]; then
-    echo "   ✅ WeKnora 知识库集成"
+    echo "   ✅ WeKnora compatibility 知识库集成"
     echo "   ✅ 降级机制和熔断器"
     echo "   ✅ 服务指标监控"
     echo "   ✅ 文档上传功能"
@@ -324,12 +457,12 @@ echo "   2. 使用 WebSocket 客户端测试实时聊天"
 echo "   3. 如需测试远程协助，请使用支持 WebRTC 的浏览器"
 
 if [ "$SERVICE_TYPE" = "enhanced" ]; then
-    echo "   4. 通过 WeKnora Web UI 管理知识库: $WEKNORA_URL:9001"
+    echo "   4. 通过 WeKnora Web UI 管理兼容知识库: $WEKNORA_URL:9001"
     echo "   5. 使用 API 上传更多文档到知识库"
 fi
 
 echo ""
-echo "✨ WeKnora 集成测试完成！"
+echo "✨ WeKnora compatibility 集成测试完成！"
 echo ""
 echo "🛡️ 进行基础鉴权测试（管理类 API）..."
 

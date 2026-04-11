@@ -7,7 +7,7 @@
 本规范覆盖以下密钥与令牌：
 
 - `jwt.secret`
-- OpenAI / WeKnora / 第三方 provider API key
+- OpenAI / Dify / WeKnora / 第三方 provider API key
 - service token / internal integration token
 - 未来 tenant 或 workspace 级 secret reference 对应的外部凭据
 
@@ -107,7 +107,7 @@
 - 通用 admin/security 入口：`GET /api/security/users/:id`、`POST /api/security/users/:id/revoke-tokens`、`POST /api/security/tokens/revoke`、`GET /api/security/tokens/revoked`
 - session 家族治理入口：`GET /api/security/users/:id/sessions`、`POST /api/security/users/:id/sessions/revoke`、`POST /api/security/users/:id/sessions/revoke-all`
 - session 元数据：`user_auth_sessions` 当前会记录 `device_fingerprint`、`user_agent`、`client_ip`、`last_seen_at`，列表响应还会派生 `network_label`、`location_label`、`risk_score`、`risk_level`、`risk_reasons`，并提供 `family_public_ip_count`、`family_device_count`、`active_session_count`、`family_hot_refresh_count`、`reference_session_id`、`ip_drift`、`device_drift`、`rapid_ip_change`、`rapid_device_change`、`refresh_recency`、`rapid_refresh_activity` 作为 session-family 排查辅助字段
-- 上述 session 风险字段当前定位为运维排查辅助信号，不应视为严格风控判定；真实 Geo/IP 与更强异常检测仍留待后续增强
+- 上述 session 风险字段当前定位为运维排查辅助信号，不应视为严格风控判定；Geo/IP 富化层现已具备可注入 provider adapter，默认仍使用启发式 IP 分类，真实 Geo/IP 数据源与更强异常检测仍留待后续增强
 - auth 自助管理入口：`GET /api/v1/auth/sessions`、`POST /api/v1/auth/sessions/logout-current`、`POST /api/v1/auth/sessions/logout-others`
 - 管理面 / service 面路由表面：`apps/server/internal/app/server/router.go`
 - 审计脱敏：`apps/server/internal/platform/audit/gin_middleware.go`

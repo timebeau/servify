@@ -121,6 +121,9 @@ log:
 
 monitoring:
   enabled: true
+  health_checks:
+    knowledge_provider: true
+    weknora: true
   metrics_path: "/metrics"
   tracing:
     enabled: true

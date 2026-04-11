@@ -52,7 +52,7 @@
 - `ai`
   - 旧 `services/AIService` 与增强 AI 实现仍存在，但已不再通过 `AIServiceInterface` 暴露给 handler/runtime 顶层
   - handler 已开始收口到 `modules/ai/delivery.HandlerService`
-  - `AIAssembly` 已去掉未消费的 `LegacyService *services.AIService` 暴露，仅保留 handler-facing contract、runtime-facing `RuntimeService` 与 WeKnora state
+  - `AIAssembly` 已去掉未消费的 `LegacyService *services.AIService` 暴露，仅保留 handler-facing contract、runtime-facing `RuntimeService` 与 knowledge provider state
   - 旧 `services/AIServiceInterface` / `services.OrchestratedAIService` 已删除
   - `services/router.go` 与 `services/websocket.go` 只依赖局部最小 AI runtime 接口
   - 结论：`ai` 已完成 handler/runtime 主路径收口，后续重点是继续收缩 runtime 局部接口

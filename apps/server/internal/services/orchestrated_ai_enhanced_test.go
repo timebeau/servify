@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"servify/apps/server/internal/models"
 	"servify/apps/server/internal/platform/knowledgeprovider"
 	mockkp "servify/apps/server/internal/platform/knowledgeprovider/mock"
 	"servify/apps/server/internal/platform/llm"
@@ -47,6 +48,87 @@ func TestOrchestratedEnhancedAIServiceProcessQueryEnhanced(t *testing.T) {
 	metrics := svc.GetMetrics()
 	if metrics.QueryCount != 1 || metrics.SuccessCount != 1 || metrics.WeKnoraUsageCount != 1 {
 		t.Fatalf("unexpected metrics: %+v", metrics)
+	}
+}
+
+func TestOrchestratedEnhancedAIServiceProcessQueryEnhancedWithDifyProvider(t *testing.T) {
+	base := NewAIService("", "")
+	base.InitializeKnowledgeBase()
+
+	svc := NewOrchestratedEnhancedAIService(
+		base,
+		&mockllm.Provider{
+			ChatResponse: llm.ChatResponse{Content: "dify-answer", TokenUsage: &llm.TokenUsage{TotalTokens: 21}},
+		},
+		&mockkp.Provider{
+			Hits: []knowledgeprovider.KnowledgeHit{
+				{DocumentID: "doc-dify-1", Title: "Refund", Content: "Dify refund policy", Score: 0.93, Source: "dify"},
+			},
+		},
+		"dify",
+		nil,
+		"dataset-1",
+		nil,
+	)
+
+	resp, err := svc.ProcessQueryEnhanced(context.Background(), "refund", "session-dify-1")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if resp.Strategy != "dify" {
+		t.Fatalf("expected dify strategy, got %s", resp.Strategy)
+	}
+	metrics := svc.GetMetrics()
+	if metrics.DifyUsageCount != 1 || metrics.WeKnoraUsageCount != 0 {
+		t.Fatalf("unexpected provider metrics: %+v", metrics)
+	}
+	status := svc.GetStatus(context.Background())
+	if provider, _ := status["knowledge_provider"].(string); provider != "dify" {
+		t.Fatalf("expected dify knowledge provider, got %+v", status)
+	}
+	if enabled, _ := status["knowledge_provider_enabled"].(bool); !enabled {
+		t.Fatalf("expected knowledge provider enabled, got %+v", status)
+	}
+	if difyEnabled, _ := status["dify_enabled"].(bool); !difyEnabled {
+		t.Fatalf("expected dify enabled status, got %+v", status)
+	}
+}
+
+func TestOrchestratedEnhancedAIServiceUploadAndSyncWithDifyProvider(t *testing.T) {
+	base := NewAIService("", "")
+	base.InitializeKnowledgeBase()
+	base.knowledgeBase.AddDocument(models.KnowledgeDoc{Title: "Billing FAQ", Content: "Billing answer", Category: "billing", Tags: "faq"})
+	base.knowledgeBase.AddDocument(models.KnowledgeDoc{Title: "Refund FAQ", Content: "Refund answer", Category: "refund", Tags: "faq"})
+
+	provider := &mockkp.Provider{}
+	svc := NewOrchestratedEnhancedAIService(
+		base,
+		&mockllm.Provider{},
+		provider,
+		"dify",
+		nil,
+		"dataset-1",
+		nil,
+	)
+
+	if err := svc.UploadKnowledgeDocument(context.Background(), "Manual Doc", "Manual content", []string{"manual"}); err != nil {
+		t.Fatalf("UploadKnowledgeDocument() error = %v", err)
+	}
+	if len(provider.Documents) != 1 {
+		t.Fatalf("expected 1 uploaded document, got %+v", provider.Documents)
+	}
+
+	if err := svc.SyncKnowledgeBase(context.Background()); err != nil {
+		t.Fatalf("SyncKnowledgeBase() error = %v", err)
+	}
+	if len(provider.Documents) < 3 {
+		t.Fatalf("expected synced documents to be indexed via dify provider, got %+v", provider.Documents)
+	}
+	if _, ok := provider.Documents["Billing FAQ"]; !ok {
+		t.Fatalf("expected Billing FAQ to be synced, got %+v", provider.Documents)
+	}
+	if _, ok := provider.Documents["Manual Doc"]; !ok {
+		t.Fatalf("expected manual document upload to stay indexed, got %+v", provider.Documents)
 	}
 }
 

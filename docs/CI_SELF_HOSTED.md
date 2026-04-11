@@ -19,7 +19,7 @@
 - `go vet`
 - 单元测试与覆盖率门槛检查
 - 标准二进制构建
-- WeKnora tag 构建
+- WeKnora compatibility tag 构建
 
 ### Module checks
 
@@ -43,7 +43,7 @@
 
 ### Integration
 
-- 使用 `docker compose` 拉起 WeKnora 集成环境
+- 使用 `docker compose` 拉起 Dify 优先、WeKnora compatibility mock 集成环境
 - 健康检查轮询
 - 执行 `scripts/test-weknora-integration.sh`
 - 失败时输出 compose logs

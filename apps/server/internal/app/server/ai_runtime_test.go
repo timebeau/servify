@@ -13,9 +13,10 @@ import (
 
 func TestAIAssemblyKnowledgeProviderUsesResolvedKnowledgeBaseID(t *testing.T) {
 	assembly := &AIAssembly{
-		WeKnoraHealthy:  true,
-		WeKnoraClient:   nil,
-		KnowledgeBaseID: "kb-resolved",
+		KnowledgeProviderHealthy: true,
+		WeKnoraHealthy:           true,
+		WeKnoraClient:            nil,
+		KnowledgeBaseID:          "kb-resolved",
 	}
 	if provider := assembly.KnowledgeProvider(&config.Config{}); provider != nil {
 		t.Fatal("expected nil provider without client")
@@ -52,6 +53,9 @@ func TestBuildAIAssemblyPrefersDifyOverWeKnora(t *testing.T) {
 	}
 	if assembly.KnowledgeProviderID != "dify" {
 		t.Fatalf("knowledge provider = %q", assembly.KnowledgeProviderID)
+	}
+	if !assembly.KnowledgeProviderHealthy {
+		t.Fatalf("expected knowledge provider health to be tracked")
 	}
 	status := assembly.RuntimeService.GetStatus(context.Background())
 	if provider, _ := status["knowledge_provider"].(string); provider != "dify" {

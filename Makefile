@@ -1,16 +1,18 @@
 # Servify Makefile
 
-.PHONY: help build build-cli build-weknora run run-cli run-weknora migrate migrate-seed test clean clean-runtime docker-build docker-run docker-up-weknora docker-down docker-logs-weknora docker-up-observ docker-down-observ dev-setup fmt lint update-deps docs changelog release-changelog sdk-sync-versions sdk-check-versions repo-hygiene generated-assets local-check security-check observability-check release-check
+.PHONY: help build build-cli build-weknora build-knowledge-provider run run-cli run-weknora run-knowledge-provider migrate migrate-seed test clean clean-runtime docker-build docker-run docker-up-weknora docker-up-knowledge-provider docker-down docker-logs-weknora docker-logs-knowledge-provider docker-up-observ docker-down-observ dev-setup fmt lint update-deps docs changelog release-changelog sdk-sync-versions sdk-check-versions repo-hygiene generated-assets local-check security-check observability-check release-check
 
 # Default target
 help:
 	@echo "Available commands:"
 	@echo "  build         - Build the application"
 	@echo "  build-cli     - Build CLI (standard)"
-	@echo "  build-weknora - Build CLI with WeKnora tag"
+	@echo "  build-weknora - Build CLI with WeKnora compatibility tag"
+	@echo "  build-knowledge-provider - Alias of build-weknora for generic provider compatibility runs"
 	@echo "  run           - Run the application"
 	@echo "  run-cli       - Run CLI (standard)"
-	@echo "  run-weknora   - Run CLI with WeKnora tag"
+	@echo "  run-weknora   - Run CLI with WeKnora compatibility config"
+	@echo "  run-knowledge-provider - Alias of run-weknora for external provider compatibility runs"
 	@echo "  migrate       - Run database migrations"
 	@echo "  migrate-seed  - Run database migrations with seed data"
 	@echo "  test          - Run tests"
@@ -18,9 +20,11 @@ help:
 	@echo "  clean-runtime - Remove local runtime output directories"
 	@echo "  docker-build  - Build Docker image"
 	@echo "  docker-run    - Run with Docker Compose"
-	@echo "  docker-up-weknora - Up WeKnora compose (server+weknora+db)"
+	@echo "  docker-up-weknora - Up WeKnora compatibility/mock compose (server+weknora+db)"
+	@echo "  docker-up-knowledge-provider - Alias of docker-up-weknora for compatibility/mock provider stack"
 	@echo "  docker-down      - Down compose services"
 	@echo "  docker-logs-weknora - Tail servify logs"
+	@echo "  docker-logs-knowledge-provider - Alias of docker-logs-weknora"
 	@echo "  docker-up-observ    - Up OTel Collector + Jaeger"
 	@echo "  docker-down-observ  - Down observability stack"
 	@echo "  docker-stop   - Stop Docker Compose services"
@@ -46,8 +50,10 @@ build-cli:
 	$(MAKE) _build-cli-with-ldflags
 
 build-weknora:
-	@echo "Building CLI (weknora)..."
+	@echo "Building CLI (weknora compatibility)..."
 	$(MAKE) _build-cli-weknora-with-ldflags
+
+build-knowledge-provider: build-weknora
 
 # Run the application
 run:
@@ -59,8 +65,10 @@ run-cli:
 	go -C apps/server run ./cmd -c $(or $(CONFIG),../../config.yml) run
 
 run-weknora:
-	@echo "Running CLI (weknora)..."
+	@echo "Running CLI (weknora compatibility)..."
 	go -C apps/server run -tags weknora ./cmd -c $(or $(CONFIG),../../config.weknora.yml) run
+
+run-knowledge-provider: run-weknora
 
 # Run database migrations
 migrate:
@@ -100,16 +108,20 @@ docker-run:
 	docker-compose up -d
 
 docker-up-weknora:
-	@echo "Starting WeKnora stack..."
+	@echo "Starting WeKnora compatibility/mock stack..."
 	docker-compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.weknora.yml up -d
+
+docker-up-knowledge-provider: docker-up-weknora
 
 docker-down:
 	@echo "Stopping services..."
 	docker-compose -f infra/compose/docker-compose.yml down
 
 docker-logs-weknora:
-	@echo "Tailing servify logs..."
+	@echo "Tailing servify logs (weknora compatibility stack)..."
 	docker-compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.weknora.yml logs -f servify
+
+docker-logs-knowledge-provider: docker-logs-weknora
 
 docker-up-observ:
 	@echo "Starting observability stack (OTel Collector + Jaeger)..."

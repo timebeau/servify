@@ -41,7 +41,7 @@ func (r *GormRepository) GetDashboardStats(ctx context.Context) (*analyticsapp.D
 	applyEntityScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Select("AVG(avg_response_time)").Row().Scan(&stats.AvgResponseTime)
 
 	var avgResolution float64
-	applyEntityScope(r.db.WithContext(ctx).Model(&models.Ticket{}), ctx).Where("resolved_at IS NOT NULL").Select("AVG(EXTRACT(epoch FROM (resolved_at - created_at)))").Row().Scan(&avgResolution)
+	applyEntityScope(r.db.WithContext(ctx).Model(&models.Ticket{}), ctx).Where("resolved_at IS NOT NULL").Select(avgResolutionExpr(r.db, "resolved_at", "created_at")).Row().Scan(&avgResolution)
 	stats.AvgResolutionTime = avgResolution
 
 	// Real satisfaction: average rating from customer_satisfactions
@@ -53,6 +53,7 @@ func (r *GormRepository) GetDashboardStats(ctx context.Context) (*analyticsapp.D
 	var dailyStat models.DailyStats
 	if shouldUseGlobalDailyStats(ctx) && r.db.WithContext(ctx).Where("date = ?", today).First(&dailyStat).Error == nil {
 		stats.AIUsageToday = int64(dailyStat.AIUsageCount)
+		stats.KnowledgeProviderUsageToday = int64(dailyStat.WeKnoraUsageCount)
 		stats.WeKnoraUsageToday = int64(dailyStat.WeKnoraUsageCount)
 	}
 	return stats, nil
@@ -90,7 +91,7 @@ func (r *GormRepository) GetTimeRangeStats(ctx context.Context, startDate, endDa
 
 func (r *GormRepository) GetAgentPerformanceStats(ctx context.Context, startDate, endDate time.Time, limit int) ([]analyticsapp.AgentPerformanceStats, error) {
 	var stats []analyticsapp.AgentPerformanceStats
-	query := `
+	query := fmt.Sprintf(`
 		SELECT
 			a.user_id as agent_id,
 			u.name as agent_name,
@@ -99,7 +100,7 @@ func (r *GormRepository) GetAgentPerformanceStats(ctx context.Context, startDate
 			COUNT(CASE WHEN t.status = 'resolved' OR t.status = 'closed' THEN 1 END) as resolved_tickets,
 			a.avg_response_time,
 			AVG(CASE WHEN t.resolved_at IS NOT NULL
-				THEN EXTRACT(epoch FROM (t.resolved_at - t.created_at))
+				THEN %s
 				END) as avg_resolution_time,
 			a.rating
 		FROM agents a
@@ -112,7 +113,7 @@ func (r *GormRepository) GetAgentPerformanceStats(ctx context.Context, startDate
 			AND (? = '' OR a.workspace_id = ?)
 		GROUP BY a.user_id, u.name, a.department, a.avg_response_time, a.rating
 		ORDER BY total_tickets DESC
-	`
+	`, avgResolutionExpr(r.db, "t.resolved_at", "t.created_at"))
 	if limit > 0 {
 		query += fmt.Sprintf(" LIMIT %d", limit)
 	}
@@ -153,6 +154,7 @@ func (r *GormRepository) GetCustomerSourceStats(ctx context.Context) ([]analytic
 func (r *GormRepository) UpdateDailyStats(ctx context.Context, date time.Time) error {
 	date = date.Truncate(24 * time.Hour)
 	nextDay := date.Add(24 * time.Hour)
+	statsCtx := systemScopeContext(ctx)
 	var dailyStats models.DailyStats
 	err := r.db.WithContext(ctx).Where("date = ?", date).First(&dailyStats).Error
 	if err != nil {
@@ -163,23 +165,23 @@ func (r *GormRepository) UpdateDailyStats(ctx context.Context, date time.Time) e
 		}
 	}
 	var totalSessions, totalMessages, totalTickets, resolvedTickets int64
-	applyEntityScope(r.db.WithContext(ctx).Model(&models.Session{}), ctx).Where("created_at >= ? AND created_at < ?", date, nextDay).Count(&totalSessions)
-	applyEntityScope(r.db.WithContext(ctx).Model(&models.Message{}), ctx).Where("created_at >= ? AND created_at < ?", date, nextDay).Count(&totalMessages)
-	applyEntityScope(r.db.WithContext(ctx).Model(&models.Ticket{}), ctx).Where("created_at >= ? AND created_at < ?", date, nextDay).Count(&totalTickets)
-	applyEntityScope(r.db.WithContext(ctx).Model(&models.Ticket{}), ctx).Where("resolved_at >= ? AND resolved_at < ?", date, nextDay).Count(&resolvedTickets)
+	applyEntityScope(r.db.WithContext(ctx).Model(&models.Session{}), statsCtx).Where("created_at >= ? AND created_at < ?", date, nextDay).Count(&totalSessions)
+	applyEntityScope(r.db.WithContext(ctx).Model(&models.Message{}), statsCtx).Where("created_at >= ? AND created_at < ?", date, nextDay).Count(&totalMessages)
+	applyEntityScope(r.db.WithContext(ctx).Model(&models.Ticket{}), statsCtx).Where("created_at >= ? AND created_at < ?", date, nextDay).Count(&totalTickets)
+	applyEntityScope(r.db.WithContext(ctx).Model(&models.Ticket{}), statsCtx).Where("resolved_at >= ? AND resolved_at < ?", date, nextDay).Count(&resolvedTickets)
 	dailyStats.TotalSessions = int(totalSessions)
 	dailyStats.TotalMessages = int(totalMessages)
 	dailyStats.TotalTickets = int(totalTickets)
 	dailyStats.ResolvedTickets = int(resolvedTickets)
 	var avgResponseTime, avgResolutionTime float64
-	applyEntityScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Select("AVG(avg_response_time)").Row().Scan(&avgResponseTime)
-	applyEntityScope(r.db.WithContext(ctx).Model(&models.Ticket{}), ctx).Where("resolved_at >= ? AND resolved_at < ? AND resolved_at IS NOT NULL", date, nextDay).Select("AVG(EXTRACT(epoch FROM (resolved_at - created_at)))").Row().Scan(&avgResolutionTime)
+	applyEntityScope(r.db.WithContext(ctx).Model(&models.Agent{}), statsCtx).Select("AVG(avg_response_time)").Row().Scan(&avgResponseTime)
+	applyEntityScope(r.db.WithContext(ctx).Model(&models.Ticket{}), statsCtx).Where("resolved_at >= ? AND resolved_at < ? AND resolved_at IS NOT NULL", date, nextDay).Select(avgResolutionExpr(r.db, "resolved_at", "created_at")).Row().Scan(&avgResolutionTime)
 	dailyStats.AvgResponseTime = int(avgResponseTime)
 	dailyStats.AvgResolutionTime = int(avgResolutionTime)
 
 	// Real satisfaction: average rating from customer_satisfactions for this day
 	var avgSat float64
-	applyEntityScope(r.db.WithContext(ctx).Model(&models.CustomerSatisfaction{}), ctx).
+	applyEntityScope(r.db.WithContext(ctx).Model(&models.CustomerSatisfaction{}), statsCtx).
 		Where("created_at >= ? AND created_at < ?", date, nextDay).
 		Select("COALESCE(AVG(rating), 0)").Row().Scan(&avgSat)
 	dailyStats.CustomerSatisfaction = avgSat
@@ -230,6 +232,19 @@ func shouldUseGlobalDailyStats(ctx context.Context) bool {
 	return tenantID == "" && workspaceID == ""
 }
 
+func systemScopeContext(context.Context) context.Context {
+	return context.Background()
+}
+
+func avgResolutionExpr(db *gorm.DB, resolvedColumn, createdColumn string) string {
+	switch db.Dialector.Name() {
+	case "sqlite":
+		return fmt.Sprintf("((julianday(%s) - julianday(%s)) * 86400.0)", resolvedColumn, createdColumn)
+	default:
+		return fmt.Sprintf("EXTRACT(epoch FROM (%s - %s))", resolvedColumn, createdColumn)
+	}
+}
+
 func (r *GormRepository) IncrementDailyStat(ctx context.Context, event analyticsapp.IncrementEvent) error {
 	date := event.Date.Truncate(24 * time.Hour)
 	column := ""
@@ -244,7 +259,7 @@ func (r *GormRepository) IncrementDailyStat(ctx context.Context, event analytics
 		column = "resolved_tickets"
 	case analyticsapp.IncrementAIUsage:
 		column = "ai_usage_count"
-	case analyticsapp.IncrementWeKnora:
+	case analyticsapp.IncrementKnowledgeProvider, analyticsapp.IncrementWeKnora:
 		column = "we_knora_usage_count"
 	case analyticsapp.IncrementSLA:
 		column = "sla_violations"

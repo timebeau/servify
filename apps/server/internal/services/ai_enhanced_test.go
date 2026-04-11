@@ -120,6 +120,21 @@ func TestEnhancedAIService_UploadDocumentToWeKnora_Success(t *testing.T) {
 	}
 }
 
+func TestEnhancedAIService_UploadKnowledgeDocument_Success(t *testing.T) {
+	base := NewAIService("", "")
+	mockClient := &MockWeKnoraClient{}
+	logger := logrus.New()
+	logger.SetLevel(logrus.ErrorLevel)
+
+	enh := NewEnhancedAIService(base, mockClient, "kb-test", logger)
+
+	err := enh.UploadKnowledgeDocument(context.Background(), "Test Title", "Test Content", []string{"test", "doc"})
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestEnhancedAIService_UploadDocumentToWeKnora_Error(t *testing.T) {
 	base := NewAIService("", "")
 	mockClient := &MockWeKnoraClient{
