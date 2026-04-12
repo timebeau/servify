@@ -146,6 +146,23 @@ definitions:
       priority:
         type: string
     type: object
+  contract.RemoteAssistTicketStats:
+    properties:
+      avg_close_hours:
+        type: number
+      closed:
+        type: integer
+      closed_rate:
+        type: number
+      open:
+        type: integer
+      resolved:
+        type: integer
+      resolved_rate:
+        type: number
+      total:
+        type: integer
+    type: object
   contract.StatusCount:
     properties:
       count:
@@ -3393,6 +3410,25 @@ paths:
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
       summary: 获取仪表板统计数据
+      tags:
+      - 统计
+  /api/statistics/remote-assist-tickets:
+    get:
+      consumes:
+      - application/json
+      description: 获取远程协助来源工单的总量、待处理、已解决、已关闭统计
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/contract.RemoteAssistTicketStats'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: 获取远程协助工单统计
       tags:
       - 统计
   /api/statistics/ticket-category:

@@ -3072,6 +3072,35 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/statistics/remote-assist-tickets": {
+            "get": {
+                "description": "获取远程协助来源工单的总量、待处理、已解决、已关闭统计",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "统计"
+                ],
+                "summary": "获取远程协助工单统计",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/contract.RemoteAssistTicketStats"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/statistics/ticket-category": {
             "get": {
                 "description": "获取不同类别工单的数量统计",
@@ -4357,6 +4386,32 @@ const docTemplate = `{
                 },
                 "priority": {
                     "type": "string"
+                }
+            }
+        },
+        "contract.RemoteAssistTicketStats": {
+            "type": "object",
+            "properties": {
+                "avg_close_hours": {
+                    "type": "number"
+                },
+                "closed": {
+                    "type": "integer"
+                },
+                "closed_rate": {
+                    "type": "number"
+                },
+                "open": {
+                    "type": "integer"
+                },
+                "resolved": {
+                    "type": "integer"
+                },
+                "resolved_rate": {
+                    "type": "number"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         },
