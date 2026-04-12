@@ -12,7 +12,9 @@ import {
   ChatSession,
   Message,
   Ticket,
-  CustomerSatisfaction
+  CustomerSatisfaction,
+  RemoteAssistStartOptions,
+  RemoteAssistState,
 } from './types';
 
 export class ServifySDK extends EventEmitter<ServifyEventMap> implements ClientSession<Record<string, unknown>, ServifyEventMap> {
@@ -23,6 +25,8 @@ export class ServifySDK extends EventEmitter<ServifyEventMap> implements ClientS
   private currentSession: ChatSession | null = null;
   private currentAgent: Agent | null = null;
   private messageQueue: Message[] = [];
+  private remoteAssistPeer: RTCPeerConnection | null = null;
+  private remoteAssistStream: MediaStream | null = null;
   private isInitialized = false;
   readonly id: string;
   readonly capabilities: CapabilitySet;
@@ -99,9 +103,10 @@ export class ServifySDK extends EventEmitter<ServifyEventMap> implements ClientS
     }
 
     const wsUrl = this.config.wsUrl || this.config.apiUrl.replace(/^http/, 'ws') + '/ws';
+    const realtimeSessionID = this.resolveRealtimeSessionID();
 
     this.ws = new WebSocketManager({
-      url: `${wsUrl}?customer_id=${this.currentCustomer.id}`,
+      url: `${wsUrl}?session_id=${encodeURIComponent(realtimeSessionID)}`,
       reconnectAttempts: this.config.reconnectAttempts!,
       reconnectDelay: this.config.reconnectDelay!,
       reconnectPolicy: this.config.reconnectPolicy,
@@ -124,6 +129,10 @@ export class ServifySDK extends EventEmitter<ServifyEventMap> implements ClientS
       this.emit('agent_assigned', agent);
     });
     this.ws.on('agent_typing', (isTyping) => this.emit('agent_typing', isTyping));
+    this.ws.on('webrtc:offer', (offer) => this.emit('webrtc:offer', offer));
+    this.ws.on('webrtc:answer', (answer) => this.emit('webrtc:answer', answer));
+    this.ws.on('webrtc:candidate', (candidate) => this.emit('webrtc:candidate', candidate));
+    this.ws.on('webrtc:state', (state) => this.updateRemoteAssistState(state));
     this.ws.on('error', (error) => this.emit('error', error));
 
     await this.ws.connect();
@@ -131,6 +140,7 @@ export class ServifySDK extends EventEmitter<ServifyEventMap> implements ClientS
 
   // 断开连接
   disconnect(): void {
+    void this.endRemoteAssist();
     this.ws?.disconnect();
     this.ws = null;
   }
@@ -210,6 +220,8 @@ export class ServifySDK extends EventEmitter<ServifyEventMap> implements ClientS
       return;
     }
 
+    await this.endRemoteAssist();
+
     const response = await this.api.endSession(this.currentSession.id);
     if (!response.success) {
       throw new Error(response.error || 'Failed to end session');
@@ -246,6 +258,115 @@ export class ServifySDK extends EventEmitter<ServifyEventMap> implements ClientS
 
     this.emit('ticket_created', response.data);
     return response.data;
+  }
+
+  async startRemoteAssist(options?: RemoteAssistStartOptions): Promise<RTCPeerConnection> {
+    if (!this.ws?.isConnected()) {
+      throw new Error('WebSocket not connected. Call connect() first.');
+    }
+
+    this.updateRemoteAssistState('starting');
+    await this.endRemoteAssist();
+
+    const peer = new RTCPeerConnection({
+      iceServers: options?.iceServers || this.config.remoteAssist?.iceServers || [],
+    });
+    this.remoteAssistPeer = peer;
+
+    peer.createDataChannel(
+      options?.dataChannelLabel ||
+        this.config.remoteAssist?.dataChannelLabel ||
+        'servify-remote-assist',
+    );
+
+    peer.onicecandidate = (event) => {
+      if (!event.candidate || !this.ws?.isConnected()) {
+        return;
+      }
+
+      void this.ws.send({
+        type: 'webrtc-candidate',
+        data: event.candidate.toJSON(),
+      });
+    };
+
+    peer.onconnectionstatechange = () => {
+      const state = peer.connectionState;
+      if (state === 'connected') {
+        this.updateRemoteAssistState('connected');
+      } else if (state === 'connecting') {
+        this.updateRemoteAssistState('connecting');
+      } else if (state === 'failed') {
+        this.updateRemoteAssistState('failed');
+      } else if (state === 'closed' || state === 'disconnected') {
+        this.updateRemoteAssistState('ended');
+      }
+    };
+
+    peer.ontrack = (event) => {
+      this.emit('webrtc:track', event);
+    };
+
+    const shouldCaptureScreen =
+      options?.captureScreen ?? this.config.remoteAssist?.captureScreen ?? false;
+    if (shouldCaptureScreen) {
+      this.remoteAssistStream = await this.captureRemoteAssistStream(options);
+      for (const track of this.remoteAssistStream.getTracks()) {
+        peer.addTrack(track, this.remoteAssistStream);
+      }
+    }
+
+    const offer = await peer.createOffer();
+    await peer.setLocalDescription(offer);
+    const localDescription = peer.localDescription;
+    if (!localDescription) {
+      throw new Error('Failed to create local WebRTC description');
+    }
+
+    await this.ws.send({
+      type: 'webrtc-offer',
+      data: localDescription.toJSON(),
+    });
+    this.emit('webrtc:offer', localDescription.toJSON());
+    this.updateRemoteAssistState('offered');
+
+    return peer;
+  }
+
+  async acceptRemoteAnswer(answer: RTCSessionDescriptionInit): Promise<void> {
+    if (!this.remoteAssistPeer) {
+      throw new Error('Remote assist has not started');
+    }
+
+    await this.remoteAssistPeer.setRemoteDescription(answer);
+    this.updateRemoteAssistState('connecting');
+  }
+
+  async addRemoteIce(candidate: RTCIceCandidateInit): Promise<void> {
+    if (!this.remoteAssistPeer) {
+      throw new Error('Remote assist has not started');
+    }
+
+    await this.remoteAssistPeer.addIceCandidate(candidate);
+  }
+
+  async endRemoteAssist(): Promise<void> {
+    if (this.remoteAssistStream) {
+      for (const track of this.remoteAssistStream.getTracks()) {
+        track.stop();
+      }
+      this.remoteAssistStream = null;
+    }
+
+    if (this.remoteAssistPeer) {
+      this.remoteAssistPeer.onicecandidate = null;
+      this.remoteAssistPeer.onconnectionstatechange = null;
+      this.remoteAssistPeer.ontrack = null;
+      this.remoteAssistPeer.close();
+      this.remoteAssistPeer = null;
+    }
+
+    this.updateRemoteAssistState('ended');
   }
 
   // 提交满意度评价
@@ -387,6 +508,34 @@ export class ServifySDK extends EventEmitter<ServifyEventMap> implements ClientS
   private handleIncomingMessage(message: Message): void {
     this.messageQueue.push(message);
     this.emit('message', message);
+  }
+
+  private resolveRealtimeSessionID(): string {
+    const sessionID = this.currentSession?.id;
+    if (typeof sessionID === 'string' || typeof sessionID === 'number') {
+      return String(sessionID);
+    }
+
+    return this.id;
+  }
+
+  private async captureRemoteAssistStream(options?: RemoteAssistStartOptions): Promise<MediaStream> {
+    if (
+      typeof navigator === 'undefined' ||
+      !navigator.mediaDevices ||
+      typeof navigator.mediaDevices.getDisplayMedia !== 'function'
+    ) {
+      throw new Error('Screen capture is not supported in this browser');
+    }
+
+    return navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: options?.audio ?? this.config.remoteAssist?.audio ?? false,
+    });
+  }
+
+  private updateRemoteAssistState(state: RemoteAssistState): void {
+    this.emit('webrtc:state', state);
   }
 
   // 私有方法：日志输出

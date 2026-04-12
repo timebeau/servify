@@ -15,5 +15,6 @@ type HandlerService interface {
 	GetTicketCategoryStats(ctx context.Context, startDate, endDate time.Time) ([]analyticscontract.CategoryStats, error)
 	GetTicketPriorityStats(ctx context.Context, startDate, endDate time.Time) ([]analyticscontract.CategoryStats, error)
 	GetCustomerSourceStats(ctx context.Context) ([]analyticscontract.CategoryStats, error)
+	GetRemoteAssistTicketStats(ctx context.Context) (*analyticscontract.RemoteAssistTicketStats, error)
 	UpdateDailyStats(ctx context.Context, date time.Time) error
 }

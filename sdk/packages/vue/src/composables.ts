@@ -1,6 +1,13 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useServify } from './plugin';
-import { ChatSession, Message, Agent, Ticket } from '@servify/core';
+import {
+  ChatSession,
+  Message,
+  Agent,
+  Ticket,
+  RemoteAssistStartOptions,
+  RemoteAssistState,
+} from '@servify/core';
 
 export function useChat() {
   const sdk = useServify();
@@ -260,5 +267,116 @@ export function useSatisfaction() {
     isLoading,
     error,
     submitRating,
+  };
+}
+
+export function useRemoteAssist() {
+  const sdk = useServify();
+  const state = ref<RemoteAssistState>('idle');
+  const isActive = ref(false);
+  const error = ref<Error | null>(null);
+  const remoteStream = ref<MediaStream | null>(null);
+
+  const syncActive = (nextState: RemoteAssistState) => {
+    isActive.value =
+      nextState === 'starting' ||
+      nextState === 'offered' ||
+      nextState === 'connecting' ||
+      nextState === 'connected';
+  };
+
+  const startRemoteAssist = async (options?: RemoteAssistStartOptions) => {
+    try {
+      error.value = null;
+      await sdk.startRemoteAssist(options);
+    } catch (err) {
+      error.value = err as Error;
+      throw err;
+    }
+  };
+
+  const acceptRemoteAnswer = async (answer: RTCSessionDescriptionInit) => {
+    try {
+      error.value = null;
+      await sdk.acceptRemoteAnswer(answer);
+    } catch (err) {
+      error.value = err as Error;
+      throw err;
+    }
+  };
+
+  const addRemoteIce = async (candidate: RTCIceCandidateInit) => {
+    try {
+      error.value = null;
+      await sdk.addRemoteIce(candidate);
+    } catch (err) {
+      error.value = err as Error;
+      throw err;
+    }
+  };
+
+  const endRemoteAssist = async () => {
+    try {
+      error.value = null;
+      await sdk.endRemoteAssist();
+      remoteStream.value = null;
+    } catch (err) {
+      error.value = err as Error;
+      throw err;
+    }
+  };
+
+  const handleState = (nextState: RemoteAssistState) => {
+    state.value = nextState;
+    syncActive(nextState);
+    if (nextState === 'idle' || nextState === 'ended' || nextState === 'failed') {
+      remoteStream.value = null;
+    }
+  };
+
+  const handleAnswer = (answer: RTCSessionDescriptionInit) => {
+    void acceptRemoteAnswer(answer).catch(() => undefined);
+  };
+
+  const handleCandidate = (candidate: RTCIceCandidateInit) => {
+    void addRemoteIce(candidate).catch(() => undefined);
+  };
+
+  const handleTrack = (event: RTCTrackEvent) => {
+    const [stream] = event.streams;
+    if (stream) {
+      remoteStream.value = stream;
+    }
+  };
+
+  const handleError = (err: Error) => {
+    error.value = err;
+  };
+
+  onMounted(() => {
+    sdk.on('webrtc:state', handleState);
+    sdk.on('webrtc:answer', handleAnswer);
+    sdk.on('webrtc:candidate', handleCandidate);
+    sdk.on('webrtc:track', handleTrack);
+    sdk.on('error', handleError);
+  });
+
+  onUnmounted(() => {
+    sdk.off('webrtc:state', handleState);
+    sdk.off('webrtc:answer', handleAnswer);
+    sdk.off('webrtc:candidate', handleCandidate);
+    sdk.off('webrtc:track', handleTrack);
+    sdk.off('error', handleError);
+  });
+
+  return {
+    state,
+    isActive,
+    error,
+    remoteStream,
+    startRemoteAssist,
+    acceptRemoteAnswer,
+    addRemoteIce,
+    endRemoteAssist,
   };
 }

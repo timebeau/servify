@@ -77,7 +77,7 @@ export function useServifyReady() {
   });
 
   return {
-    isReady: isReady.value,
-    isConnected: isConnected.value,
+    isReady,
+    isConnected,
   };
 }

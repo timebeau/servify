@@ -33,8 +33,8 @@ type Resolver struct {
 	workspacePortal      PortalConfigProvider
 	tenantOpenAI         OpenAIConfigProvider
 	workspaceOpenAI      OpenAIConfigProvider
-	tenantDify          DifyConfigProvider
-	workspaceDify       DifyConfigProvider
+	tenantDify           DifyConfigProvider
+	workspaceDify        DifyConfigProvider
 	tenantWeKnora        WeKnoraConfigProvider
 	workspaceWeKnora     WeKnoraConfigProvider
 	tenantSessionRisk    SessionRiskConfigProvider

@@ -33,6 +33,7 @@ Servify 是一个面向企业独立部署的开源智能客服系统。
 - ✅ 已形成智能客服产品骨架：`conversation`、`routing`、`ticket`
 - ✅ 已具备 AI 与知识库基础能力：`ai`、`knowledge`
 - ✅ 已具备远程协助所需的实时能力基础：WebSocket / WebRTC 相关链路、会话承接与统计入口已纳入产品演化
+- ✅ 管理端会话页已提供最小远程协助入口：可按会话发起/结束协助并观察连接状态
 - ✅ 已完成客服后台关键模块迁移：`agent`、`customer`
 - ✅ 已补齐管理面安全基线首轮能力：认证、审计、token state revoke、session security surface
 - ✅ 已明确 Web 优先、多端预留的演化方向
@@ -62,7 +63,7 @@ Servify 当前更适合这样理解：
 - AI、人工接管、实时交互和工单不是割裂的工具，而是一条连续服务链路
 - 远程协助结束后，客服仍可以继续转接、协作或沉淀工单，而不是把上下文丢到外部系统
 
-当前仓库已经具备这条能力链路的实时基础，包括会话、消息、WebSocket、WebRTC stats / connections、人工接管和后续工单衔接能力；但它现在还不是一个“已经交付完整 co-browsing 产品”的承诺。
+当前仓库已经具备这条能力链路的实时基础，包括会话、消息、WebSocket、WebRTC stats / connections、人工接管和后续工单衔接能力；管理端会话页也已经有最小协助入口，但它现在还不是一个“已经交付完整 co-browsing 产品”的承诺。
 
 ---
 

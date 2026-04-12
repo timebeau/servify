@@ -4,6 +4,8 @@
 package handlers
 
 import (
+	"encoding/json"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -175,5 +177,61 @@ func TestStatisticsHandler_GetCustomerSourceStats(t *testing.T) {
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d, body: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestStatisticsHandler_GetRemoteAssistTicketStats(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestDBForStatistics(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.WarnLevel)
+
+	now := time.Now()
+	if err := db.Create(&models.Ticket{Title: "ra-open", CustomerID: 1, Status: "open", Source: "remote_assist", Tags: "remote_assist", CreatedAt: now, UpdatedAt: now}).Error; err != nil {
+		t.Fatalf("seed open remote assist ticket: %v", err)
+	}
+	closedAt := now.Add(2 * time.Hour)
+	if err := db.Create(&models.Ticket{Title: "ra-resolved", CustomerID: 1, Status: "resolved", Source: "remote_assist", Tags: "remote_assist", CreatedAt: now, UpdatedAt: now, ClosedAt: &closedAt}).Error; err != nil {
+		t.Fatalf("seed resolved remote assist ticket: %v", err)
+	}
+	if err := db.Create(&models.Ticket{Title: "other", CustomerID: 1, Status: "closed", Source: "web", Tags: "normal", CreatedAt: now, UpdatedAt: now}).Error; err != nil {
+		t.Fatalf("seed non remote assist ticket: %v", err)
+	}
+
+	svc := services.NewStatisticsService(db, logger)
+	h := NewStatisticsHandler(svc, logger)
+
+	r := gin.New()
+	r.GET("/api/statistics/remote-assist-tickets", h.GetRemoteAssistTicketStats)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/api/statistics/remote-assist-tickets", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d, body: %s", w.Code, w.Body.String())
+	}
+
+	var got struct {
+		Total        int64   `json:"total"`
+		Open         int64   `json:"open"`
+		Resolved     int64   `json:"resolved"`
+		Closed       int64   `json:"closed"`
+		ResolvedRate float64 `json:"resolved_rate"`
+		ClosedRate   float64 `json:"closed_rate"`
+		AvgCloseHours float64 `json:"avg_close_hours"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal stats: %v body=%s", err, w.Body.String())
+	}
+	if got.Total != 2 || got.Open != 1 || got.Resolved != 1 || got.Closed != 0 {
+		t.Fatalf("unexpected remote assist stats: %+v", got)
+	}
+	if got.ResolvedRate != 0.5 || got.ClosedRate != 0 {
+		t.Fatalf("unexpected remote assist rates: %+v", got)
+	}
+	if math.Abs(got.AvgCloseHours-2) > 0.001 {
+		t.Fatalf("unexpected avg close hours: %+v", got)
 	}
 }

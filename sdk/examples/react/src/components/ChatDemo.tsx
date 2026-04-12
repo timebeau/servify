@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { useServify, useChat, useAI, useSatisfaction } from '@servify/react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useServify, useChat, useAI, useSatisfaction, useRemoteAssist } from '@servify/react';
 
 const ChatDemo: React.FC = () => {
   const { isConnected } = useServify();
@@ -18,9 +18,26 @@ const ChatDemo: React.FC = () => {
 
   const { askAI } = useAI();
   const { submitRating } = useSatisfaction();
+  const {
+    state: remoteAssistState,
+    isActive: remoteAssistActive,
+    error: remoteAssistError,
+    remoteStream,
+    startRemoteAssist,
+    endRemoteAssist,
+  } = useRemoteAssist();
 
   const [messageText, setMessageText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (!remoteVideoRef.current) {
+      return;
+    }
+
+    remoteVideoRef.current.srcObject = remoteStream;
+  }, [remoteStream]);
 
   const handleSendMessage = async () => {
     if (!messageText.trim() || !session) return;
@@ -46,9 +63,30 @@ const ChatDemo: React.FC = () => {
 
   const handleEndChat = async () => {
     try {
+      await endRemoteAssist();
       await endChat();
     } catch (err) {
       alert('结束聊天失败: ' + (err as Error).message);
+    }
+  };
+
+  const handleStartRemoteAssist = async () => {
+    try {
+      if (!session) {
+        alert('请先开始聊天，再发起远程协助');
+        return;
+      }
+      await startRemoteAssist({ captureScreen: true, audio: false });
+    } catch (err) {
+      alert('发起远程协助失败: ' + (err as Error).message);
+    }
+  };
+
+  const handleStopRemoteAssist = async () => {
+    try {
+      await endRemoteAssist();
+    } catch (err) {
+      alert('结束远程协助失败: ' + (err as Error).message);
     }
   };
 
@@ -133,9 +171,61 @@ const ChatDemo: React.FC = () => {
           </div>
         ))}
 
-        {error && (
-          <div className="message system">
-            错误: {error.message}
+      {error && (
+        <div className="message system">
+          错误: {error.message}
+        </div>
+      )}
+
+      <div className="message system">
+        远程协助状态: {remoteAssistState}
+      </div>
+      {remoteAssistError && (
+        <div className="message system">
+          远程协助错误: {remoteAssistError.message}
+        </div>
+      )}
+      <div className="message system">
+        远端媒体: {remoteStream ? '已接入' : '未接入'}
+      </div>
+    </div>
+
+      <div style={{
+        margin: '12px 0',
+        padding: 12,
+        border: '1px solid #d9d9d9',
+        borderRadius: 8,
+        background: '#fafafa',
+      }}
+      >
+        <div style={{ marginBottom: 8, fontSize: 14, color: '#555' }}>
+          远程协助媒体预览
+        </div>
+        <video
+          ref={remoteVideoRef}
+          autoPlay
+          playsInline
+          muted
+          style={{
+            width: '100%',
+            minHeight: 160,
+            background: '#111',
+            borderRadius: 6,
+            display: remoteStream ? 'block' : 'none',
+          }}
+        />
+        {!remoteStream && (
+          <div style={{
+            minHeight: 160,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#888',
+            background: '#111',
+            borderRadius: 6,
+          }}
+          >
+            尚未收到远端媒体流
           </div>
         )}
       </div>
@@ -205,6 +295,20 @@ const ChatDemo: React.FC = () => {
             disabled={!session}
           >
             评价服务
+          </button>
+          <button
+            className="btn secondary"
+            onClick={handleStartRemoteAssist}
+            disabled={!session || remoteAssistActive}
+          >
+            开始屏幕协助
+          </button>
+          <button
+            className="btn danger"
+            onClick={handleStopRemoteAssist}
+            disabled={!remoteAssistActive}
+          >
+            结束屏幕协助
           </button>
         </div>
 

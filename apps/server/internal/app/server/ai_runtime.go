@@ -21,22 +21,22 @@ import (
 
 type AIAssemblyOptions struct {
 	RequireKnowledgeProviderHealthy bool
-	RequireWeKnoraHealthy bool
-	SyncKnowledgeBase     bool
-	HealthCheckTimeout    time.Duration
+	RequireWeKnoraHealthy           bool
+	SyncKnowledgeBase               bool
+	HealthCheckTimeout              time.Duration
 }
 
 type AIAssembly struct {
-	Service         aidelivery.HandlerService
-	RuntimeService  aidelivery.RuntimeService
-	KnowledgeDriver knowledgeprovider.KnowledgeProvider
-	KnowledgeProviderID string
+	Service                  aidelivery.HandlerService
+	RuntimeService           aidelivery.RuntimeService
+	KnowledgeDriver          knowledgeprovider.KnowledgeProvider
+	KnowledgeProviderID      string
 	KnowledgeProviderHealthy bool
-	DifyHealthy     bool
-	DifyDatasetID   string
-	WeKnoraClient   weknora.WeKnoraInterface
-	WeKnoraHealthy  bool
-	KnowledgeBaseID string
+	DifyHealthy              bool
+	DifyDatasetID            string
+	WeKnoraClient            weknora.WeKnoraInterface
+	WeKnoraHealthy           bool
+	KnowledgeBaseID          string
 }
 
 func (a *AIAssembly) KnowledgeProvider(cfg *config.Config) knowledgeprovider.KnowledgeProvider {

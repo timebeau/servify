@@ -42,3 +42,8 @@ export async function getAgentPerformanceStats(params: {
 export async function getCustomerSourceStats() {
   return request('/api/statistics/customer-source');
 }
+
+/** 远程协助工单统计 */
+export async function getRemoteAssistTicketStats() {
+  return request<API.RemoteAssistTicketStats>('/api/statistics/remote-assist-tickets');
+}

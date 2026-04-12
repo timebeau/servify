@@ -11,11 +11,117 @@ import (
 
 	ticketcontract "servify/apps/server/internal/modules/ticket/contract"
 	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
+	"servify/apps/server/internal/models"
 	auditplatform "servify/apps/server/internal/platform/audit"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
+
+type ticketResponse struct {
+	ID                uint                   `json:"id"`
+	Title             string                 `json:"title"`
+	Description       string                 `json:"description,omitempty"`
+	CustomerID        uint                   `json:"customer_id"`
+	CustomerName      string                 `json:"customer_name,omitempty"`
+	AgentID           *uint                  `json:"agent_id,omitempty"`
+	AgentName         string                 `json:"agent_name,omitempty"`
+	SessionID         *string                `json:"session_id,omitempty"`
+	Category          string                 `json:"category"`
+	Priority          string                 `json:"priority"`
+	Status            string                 `json:"status"`
+	Source            string                 `json:"source,omitempty"`
+	Tags              string                 `json:"tags"`
+	TagList           []string               `json:"tag_list,omitempty"`
+	CustomFields      map[string]interface{} `json:"custom_fields,omitempty"`
+	CreatedAt         time.Time              `json:"created_at"`
+	UpdatedAt         time.Time              `json:"updated_at"`
+	ResolvedAt        *time.Time             `json:"resolved_at,omitempty"`
+	ClosedAt          *time.Time             `json:"closed_at,omitempty"`
+}
+
+func buildTicketResponse(ticket *models.Ticket) *ticketResponse {
+	if ticket == nil {
+		return nil
+	}
+
+	resp := &ticketResponse{
+		ID:           ticket.ID,
+		Title:        ticket.Title,
+		Description:  ticket.Description,
+		CustomerID:   ticket.CustomerID,
+		AgentID:      ticket.AgentID,
+		SessionID:    ticket.SessionID,
+		Category:     ticket.Category,
+		Priority:     ticket.Priority,
+		Status:       ticket.Status,
+		Source:       ticket.Source,
+		Tags:         ticket.Tags,
+		TagList:      splitCSV(ticket.Tags),
+		CustomFields: buildTicketCustomFields(ticket),
+		CreatedAt:    ticket.CreatedAt,
+		UpdatedAt:    ticket.UpdatedAt,
+		ResolvedAt:   ticket.ResolvedAt,
+		ClosedAt:     ticket.ClosedAt,
+	}
+
+	if ticket.Customer.Name != "" {
+		resp.CustomerName = ticket.Customer.Name
+	}
+	if ticket.Agent != nil && ticket.Agent.Name != "" {
+		resp.AgentName = ticket.Agent.Name
+	}
+
+	return resp
+}
+
+func buildTicketResponses(items []models.Ticket) []ticketResponse {
+	out := make([]ticketResponse, 0, len(items))
+	for i := range items {
+		if resp := buildTicketResponse(&items[i]); resp != nil {
+			out = append(out, *resp)
+		}
+	}
+	return out
+}
+
+func buildTicketCustomFields(ticket *models.Ticket) map[string]interface{} {
+	if ticket == nil || len(ticket.CustomFieldValues) == 0 {
+		return nil
+	}
+
+	fields := make(map[string]interface{}, len(ticket.CustomFieldValues))
+	for _, item := range ticket.CustomFieldValues {
+		if item.CustomField.Key == "" {
+			continue
+		}
+		fields[item.CustomField.Key] = item.Value
+	}
+	if len(fields) == 0 {
+		return nil
+	}
+	return fields
+}
+
+func splitCSV(tags string) []string {
+	if strings.TrimSpace(tags) == "" {
+		return nil
+	}
+
+	raw := strings.Split(tags, ",")
+	out := make([]string, 0, len(raw))
+	for _, tag := range raw {
+		tag = strings.TrimSpace(tag)
+		if tag == "" {
+			continue
+		}
+		out = append(out, tag)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
 
 // TicketHandler 工单处理器
 type TicketHandler struct {
@@ -97,7 +203,7 @@ func (h *TicketHandler) GetTicket(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, ticket)
+	c.JSON(http.StatusOK, buildTicketResponse(ticket))
 }
 
 // UpdateTicket 更新工单
@@ -155,7 +261,7 @@ func (h *TicketHandler) UpdateTicket(c *gin.Context) {
 	}
 
 	auditplatform.SetAfter(c, ticket)
-	c.JSON(http.StatusOK, ticket)
+	c.JSON(http.StatusOK, buildTicketResponse(ticket))
 }
 
 // ListTickets 获取工单列表
@@ -201,7 +307,7 @@ func (h *TicketHandler) ListTickets(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, PaginatedResponse{
-		Data:     tickets,
+		Data:     buildTicketResponses(tickets),
 		Total:    total,
 		Page:     req.Page,
 		PageSize: req.PageSize,

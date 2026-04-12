@@ -2,6 +2,18 @@ import { request } from '@/lib/request';
 
 const API = '/api/tickets';
 
+export interface CreateTicketPayload extends Omit<Partial<API.Ticket>, 'tags'> {
+  session_id?: string;
+  tags?: string[] | string;
+}
+
+function normalizeTicketPayload(data: CreateTicketPayload) {
+  return {
+    ...data,
+    tags: Array.isArray(data.tags) ? data.tags.join(',') : data.tags,
+  };
+}
+
 export async function listTickets(params: API.TicketListParams) {
   return request<API.PaginatedResponse<API.Ticket>>(API, { params });
 }
@@ -10,8 +22,8 @@ export async function getTicket(id: number) {
   return request<API.Ticket>(`${API}/${id}`);
 }
 
-export async function createTicket(data: Partial<API.Ticket>) {
-  return request<API.Ticket>(API, { method: 'POST', data });
+export async function createTicket(data: CreateTicketPayload) {
+  return request<API.Ticket>(API, { method: 'POST', data: normalizeTicketPayload(data) });
 }
 
 export async function updateTicket(id: number, data: Partial<API.Ticket>) {

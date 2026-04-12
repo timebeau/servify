@@ -135,6 +135,44 @@
             padding: 10px;
             text-align: center;
         }
+        .assist-panel {
+            margin-top: 16px;
+            padding: 16px;
+            border: 1px solid #dfe3e8;
+            border-radius: 10px;
+            background: #fff;
+        }
+        .assist-status {
+            margin-bottom: 12px;
+            color: #445;
+            font-size: 14px;
+        }
+        .assist-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .assist-note {
+            font-size: 12px;
+            color: #667;
+            line-height: 1.5;
+        }
+        .assist-preview {
+            min-height: 180px;
+            border-radius: 10px;
+            background: #101418;
+            color: #d0d7de;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .assist-preview video {
+            width: 100%;
+            display: none;
+            background: #000;
+        }
     </style>
 </head>
 <body>
@@ -179,6 +217,24 @@
                 <button class="btn secondary" onclick="showRating()" id="rating-btn">评价服务</button>
             </div>
 
+            <div class="assist-panel">
+                <div class="assist-status">
+                    远程协助状态：<strong id="assist-status">idle</strong>
+                </div>
+                <div class="assist-actions">
+                    <button class="btn secondary" onclick="startRemoteAssist()" id="assist-start-btn">开始屏幕协助</button>
+                    <button class="btn danger" onclick="stopRemoteAssist()" id="assist-stop-btn" disabled>结束屏幕协助</button>
+                </div>
+                <div class="assist-note">
+                    该示例使用 Web SDK 的远程协助基础链路：会话内 WebRTC 信令、可选屏幕采集和状态事件。
+                    如果没有对端返回 <code>webrtc-answer</code>，连接会停留在 offered 或 connecting。
+                </div>
+                <div class="assist-preview" id="assist-preview">
+                    <video id="assist-video" autoplay playsinline muted></video>
+                    <span id="assist-preview-empty">尚未收到远端媒体流</span>
+                </div>
+            </div>
+
             <input type="file" id="file-input" class="file-input" onchange="uploadFile(event)">
         </div>
     </div>
@@ -209,6 +265,11 @@
         const startBtn = document.getElementById('start-btn');
         const endBtn = document.getElementById('end-btn');
         const sendBtn = document.getElementById('send-btn');
+        const assistStatus = document.getElementById('assist-status');
+        const assistStartBtn = document.getElementById('assist-start-btn');
+        const assistStopBtn = document.getElementById('assist-stop-btn');
+        const assistVideo = document.getElementById('assist-video');
+        const assistPreviewEmpty = document.getElementById('assist-preview-empty');
 
         // 初始化 SDK
         async function initSDK() {
@@ -267,6 +328,46 @@
             addMessage('system', `错误: ${error.message}`);
         });
 
+        servify.on('webrtc:state', (state) => {
+            assistStatus.textContent = state;
+            assistStartBtn.disabled = state === 'starting' || state === 'offered' || state === 'connecting' || state === 'connected';
+            assistStopBtn.disabled = state === 'idle' || state === 'ended' || state === 'failed';
+            if (state === 'ended' || state === 'failed' || state === 'idle') {
+                assistVideo.srcObject = null;
+                assistVideo.style.display = 'none';
+                assistPreviewEmpty.style.display = 'block';
+            }
+            addMessage('system', `远程协助状态: ${state}`);
+        });
+
+        servify.on('webrtc:answer', async (answer) => {
+            try {
+                await servify.acceptRemoteAnswer(answer);
+            } catch (error) {
+                console.error('处理远程应答失败:', error);
+                addMessage('system', '处理远程协助应答失败');
+            }
+        });
+
+        servify.on('webrtc:candidate', async (candidate) => {
+            try {
+                await servify.addRemoteIce(candidate);
+            } catch (error) {
+                console.error('处理远程 ICE candidate 失败:', error);
+            }
+        });
+
+        servify.on('webrtc:track', (event) => {
+            const [stream] = event.streams || [];
+            if (!stream) {
+                return;
+            }
+            assistVideo.srcObject = stream;
+            assistVideo.style.display = 'block';
+            assistPreviewEmpty.style.display = 'none';
+            addMessage('system', '已收到远端媒体流');
+        });
+
         // 功能函数
         async function startChat() {
             try {
@@ -294,9 +395,32 @@
 
         async function endChat() {
             try {
+                await servify.endRemoteAssist();
                 await servify.endChat();
             } catch (error) {
                 alert('结束聊天失败: ' + error.message);
+            }
+        }
+
+        async function startRemoteAssist() {
+            try {
+                if (!servify.getSession()) {
+                    addMessage('system', '请先开始聊天，再发起远程协助');
+                    return;
+                }
+                await servify.startRemoteAssist({ captureScreen: true, audio: false });
+                addMessage('system', '远程协助 offer 已发送，等待对端应答');
+            } catch (error) {
+                alert('发起远程协助失败: ' + error.message);
+            }
+        }
+
+        async function stopRemoteAssist() {
+            try {
+                await servify.endRemoteAssist();
+                addMessage('system', '远程协助已结束');
+            } catch (error) {
+                alert('结束远程协助失败: ' + error.message);
             }
         }
 

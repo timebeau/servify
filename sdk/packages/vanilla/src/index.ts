@@ -8,6 +8,7 @@ import {
   type Agent,
   type Ticket,
   type CustomerSatisfaction,
+  type RemoteAssistStartOptions,
 } from '@servify/core';
 
 /**
@@ -47,6 +48,11 @@ export class VanillaServifySDK {
     this.sdk.on('agent_typing', (isTyping) => this.triggerCallback('agentTyping', isTyping));
     this.sdk.on('error', (error) => this.triggerCallback('error', error));
     this.sdk.on('ticket_created', (ticket) => this.triggerCallback('ticketCreated', ticket));
+    this.sdk.on('webrtc:offer', (offer) => this.triggerCallback('webrtc:offer', offer));
+    this.sdk.on('webrtc:answer', (answer) => this.triggerCallback('webrtc:answer', answer));
+    this.sdk.on('webrtc:candidate', (candidate) => this.triggerCallback('webrtc:candidate', candidate));
+    this.sdk.on('webrtc:track', (event) => this.triggerCallback('webrtc:track', event));
+    this.sdk.on('webrtc:state', (state) => this.triggerCallback('webrtc:state', state));
   }
 
   /**
@@ -95,6 +101,34 @@ export class VanillaServifySDK {
    */
   async endChat(): Promise<void> {
     return this.sdk.endSession();
+  }
+
+  /**
+   * 发起远程协助基础链路
+   */
+  async startRemoteAssist(options?: RemoteAssistStartOptions): Promise<RTCPeerConnection> {
+    return this.sdk.startRemoteAssist(options);
+  }
+
+  /**
+   * 接收对端 WebRTC answer
+   */
+  async acceptRemoteAnswer(answer: RTCSessionDescriptionInit): Promise<void> {
+    return this.sdk.acceptRemoteAnswer(answer);
+  }
+
+  /**
+   * 注入对端 ICE candidate
+   */
+  async addRemoteIce(candidate: RTCIceCandidateInit): Promise<void> {
+    return this.sdk.addRemoteIce(candidate);
+  }
+
+  /**
+   * 结束远程协助
+   */
+  async endRemoteAssist(): Promise<void> {
+    return this.sdk.endRemoteAssist();
   }
 
   /**

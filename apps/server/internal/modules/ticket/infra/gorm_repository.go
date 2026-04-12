@@ -613,6 +613,12 @@ func applyListTicketFilters(db *gorm.DB, query application.ListTicketsQuery) *go
 	if len(query.Category) > 0 {
 		db = db.Where("category IN ?", query.Category)
 	}
+	if len(query.Source) > 0 {
+		db = db.Where("source IN ?", query.Source)
+	}
+	if tag := strings.TrimSpace(query.Tag); tag != "" {
+		db = db.Where("tags LIKE ?", "%"+tag+"%")
+	}
 	if query.AgentID != nil {
 		db = db.Where("agent_id = ?", *query.AgentID)
 	}

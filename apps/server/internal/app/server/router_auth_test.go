@@ -358,10 +358,10 @@ func TestBuildRouter_AuthSessionsUsesConfiguredSessionIPIntelligence(t *testing.
 	})
 
 	token := createTestHS256JWT(t, map[string]interface{}{
-		"user_id":        7,
-		"principal_kind": "admin",
-		"roles":          []string{"admin"},
-		"session_id":     "sess-router",
+		"user_id":               7,
+		"principal_kind":        "admin",
+		"roles":                 []string{"admin"},
+		"session_id":            "sess-router",
 		"session_token_version": 1,
 	}, "test-secret")
 

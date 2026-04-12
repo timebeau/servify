@@ -16,6 +16,7 @@ export interface ServifyConfig {
   reconnectPolicy?: ReconnectPolicy;
   authProvider?: AuthProvider;
   onTokenRefreshRequired?: () => Promise<void>;
+  remoteAssist?: RemoteAssistConfig;
 }
 
 export interface Customer {
@@ -98,9 +99,43 @@ export interface CustomerSatisfaction {
 
 // WebSocket 消息类型
 export interface WSMessage {
-  type: 'message' | 'session_update' | 'agent_status' | 'typing' | 'error' | 'system';
+  type:
+    | 'message'
+    | 'session_update'
+    | 'agent_status'
+    | 'typing'
+    | 'error'
+    | 'system'
+    | 'webrtc-offer'
+    | 'webrtc-answer'
+    | 'webrtc-candidate'
+    | 'webrtc-state-change';
   data: unknown;
   timestamp?: string;
+}
+
+export interface RemoteAssistConfig {
+  enabled?: boolean;
+  captureScreen?: boolean;
+  audio?: boolean;
+  iceServers?: RTCIceServer[];
+  dataChannelLabel?: string;
+}
+
+export interface RemoteAssistStartOptions extends RemoteAssistConfig {}
+
+export type RemoteAssistState =
+  | 'idle'
+  | 'starting'
+  | 'offered'
+  | 'connecting'
+  | 'connected'
+  | 'failed'
+  | 'ended';
+
+export interface RemoteAssistRuntimeState {
+  connectionId?: string;
+  state: string;
 }
 
 // 事件类型
@@ -117,6 +152,11 @@ export type ServifyEventMap = {
   'error': [error: Error];
   'ticket_created': [ticket: Ticket];
   'ticket_updated': [ticket: Ticket];
+  'webrtc:offer': [offer: RTCSessionDescriptionInit];
+  'webrtc:answer': [answer: RTCSessionDescriptionInit];
+  'webrtc:candidate': [candidate: RTCIceCandidateInit];
+  'webrtc:track': [event: RTCTrackEvent];
+  'webrtc:state': [state: RemoteAssistState];
 };
 
 // API 响应类型

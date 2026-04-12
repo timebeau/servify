@@ -237,11 +237,15 @@ func systemScopeContext(context.Context) context.Context {
 }
 
 func avgResolutionExpr(db *gorm.DB, resolvedColumn, createdColumn string) string {
+	return AvgDurationExpr(db, resolvedColumn, createdColumn)
+}
+
+func AvgDurationExpr(db *gorm.DB, endColumn, startColumn string) string {
 	switch db.Dialector.Name() {
 	case "sqlite":
-		return fmt.Sprintf("((julianday(%s) - julianday(%s)) * 86400.0)", resolvedColumn, createdColumn)
+		return fmt.Sprintf("((julianday(%s) - julianday(%s)) * 86400.0)", endColumn, startColumn)
 	default:
-		return fmt.Sprintf("EXTRACT(epoch FROM (%s - %s))", resolvedColumn, createdColumn)
+		return fmt.Sprintf("EXTRACT(epoch FROM (%s - %s))", endColumn, startColumn)
 	}
 }
 

@@ -97,4 +97,69 @@ describe('WebSocketManager', () => {
       code: 'auth_refresh_required',
     });
   });
+
+  it('emits WebRTC signaling events from websocket messages', async () => {
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+
+    const manager = new WebSocketManager({
+      url: 'ws://localhost:8080/ws?session_id=test-session',
+    });
+
+    const offerSpy = vi.fn();
+    const answerSpy = vi.fn();
+    const candidateSpy = vi.fn();
+    const stateSpy = vi.fn();
+    manager.on('webrtc:offer', offerSpy);
+    manager.on('webrtc:answer', answerSpy);
+    manager.on('webrtc:candidate', candidateSpy);
+    manager.on('webrtc:state', stateSpy);
+
+    const connectPromise = manager.connect();
+    await vi.waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
+    FakeWebSocket.instances[0].open();
+    await connectPromise;
+
+    FakeWebSocket.instances[0].onmessage?.({
+      data: JSON.stringify({
+        type: 'webrtc-offer',
+        data: { type: 'offer', sdp: 'offer-sdp' },
+      }),
+    });
+    FakeWebSocket.instances[0].onmessage?.({
+      data: JSON.stringify({
+        type: 'webrtc-answer',
+        data: { type: 'answer', sdp: 'answer-sdp' },
+      }),
+    });
+    FakeWebSocket.instances[0].onmessage?.({
+      data: JSON.stringify({
+        type: 'webrtc-candidate',
+        data: {
+          candidate: {
+            candidate: 'candidate:1 1 UDP 2122260223 192.0.2.1 3478 typ host',
+            sdpMid: '0',
+            sdpMLineIndex: 0,
+          },
+        },
+      }),
+    });
+    FakeWebSocket.instances[0].onmessage?.({
+      data: JSON.stringify({
+        type: 'webrtc-state-change',
+        data: {
+          connection_id: 'webrtc_demo_1',
+          state: 'connected',
+        },
+      }),
+    });
+
+    expect(offerSpy).toHaveBeenCalledWith({ type: 'offer', sdp: 'offer-sdp' });
+    expect(answerSpy).toHaveBeenCalledWith({ type: 'answer', sdp: 'answer-sdp' });
+    expect(candidateSpy).toHaveBeenCalledWith({
+      candidate: 'candidate:1 1 UDP 2122260223 192.0.2.1 3478 typ host',
+      sdpMid: '0',
+      sdpMLineIndex: 0,
+    });
+    expect(stateSpy).toHaveBeenCalledWith('connected');
+  });
 });

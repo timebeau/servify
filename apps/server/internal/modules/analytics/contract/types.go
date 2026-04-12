@@ -2,26 +2,26 @@ package contract
 
 // DashboardStats 仪表板统计数据
 type DashboardStats struct {
-	TotalCustomers       int64   `json:"total_customers"`
-	TotalAgents          int64   `json:"total_agents"`
-	TotalTickets         int64   `json:"total_tickets"`
-	TotalSessions        int64   `json:"total_sessions"`
-	TodayTickets         int64   `json:"today_tickets"`
-	TodaySessions        int64   `json:"today_sessions"`
-	TodayMessages        int64   `json:"today_messages"`
-	OpenTickets          int64   `json:"open_tickets"`
-	AssignedTickets      int64   `json:"assigned_tickets"`
-	ResolvedTickets      int64   `json:"resolved_tickets"`
-	ClosedTickets        int64   `json:"closed_tickets"`
-	OnlineAgents         int64   `json:"online_agents"`
-	BusyAgents           int64   `json:"busy_agents"`
-	ActiveSessions       int64   `json:"active_sessions"`
-	AvgResponseTime      float64 `json:"avg_response_time"`
-	AvgResolutionTime    float64 `json:"avg_resolution_time"`
-	CustomerSatisfaction float64 `json:"customer_satisfaction"`
-	AIUsageToday         int64   `json:"ai_usage_today"`
-	KnowledgeProviderUsageToday int64 `json:"knowledge_provider_usage_today"`
-	WeKnoraUsageToday    int64   `json:"weknora_usage_today"`
+	TotalCustomers              int64   `json:"total_customers"`
+	TotalAgents                 int64   `json:"total_agents"`
+	TotalTickets                int64   `json:"total_tickets"`
+	TotalSessions               int64   `json:"total_sessions"`
+	TodayTickets                int64   `json:"today_tickets"`
+	TodaySessions               int64   `json:"today_sessions"`
+	TodayMessages               int64   `json:"today_messages"`
+	OpenTickets                 int64   `json:"open_tickets"`
+	AssignedTickets             int64   `json:"assigned_tickets"`
+	ResolvedTickets             int64   `json:"resolved_tickets"`
+	ClosedTickets               int64   `json:"closed_tickets"`
+	OnlineAgents                int64   `json:"online_agents"`
+	BusyAgents                  int64   `json:"busy_agents"`
+	ActiveSessions              int64   `json:"active_sessions"`
+	AvgResponseTime             float64 `json:"avg_response_time"`
+	AvgResolutionTime           float64 `json:"avg_resolution_time"`
+	CustomerSatisfaction        float64 `json:"customer_satisfaction"`
+	AIUsageToday                int64   `json:"ai_usage_today"`
+	KnowledgeProviderUsageToday int64   `json:"knowledge_provider_usage_today"`
+	WeKnoraUsageToday           int64   `json:"weknora_usage_today"`
 }
 
 // TimeRangeStats 时间范围统计
@@ -52,4 +52,15 @@ type AgentPerformanceStats struct {
 type CategoryStats struct {
 	Category string `json:"category"`
 	Count    int64  `json:"count"`
+}
+
+// RemoteAssistTicketStats 远程协助工单统计
+type RemoteAssistTicketStats struct {
+	Total        int64   `json:"total"`
+	Open         int64   `json:"open"`
+	Resolved     int64   `json:"resolved"`
+	Closed       int64   `json:"closed"`
+	ResolvedRate float64 `json:"resolved_rate"`
+	ClosedRate   float64 `json:"closed_rate"`
+	AvgCloseHours float64 `json:"avg_close_hours"`
 }

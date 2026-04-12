@@ -1,7 +1,6 @@
 package server
 
 import (
-	"strings"
 	"servify/apps/server/internal/config"
 	"servify/apps/server/internal/handlers"
 	"servify/apps/server/internal/middleware"
@@ -24,6 +23,7 @@ import (
 	"servify/apps/server/internal/platform/usersecurity"
 	"servify/apps/server/internal/platform/voiceprotocol"
 	"servify/apps/server/internal/services"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"

@@ -7,6 +7,77 @@ import { navigateTo } from '@/lib/navigation';
 import { TICKET_STATUS_MAP, TICKET_PRIORITY_MAP } from '@/utils/constants';
 import { getTicket, getComments, addComment, getTicketConversations } from '@/services/ticket';
 
+function extractRemoteAssistInfo(ticket: API.Ticket) {
+  const customFields = ticket.custom_fields || {};
+  const structuredRemoteAssist = customFields.remote_assist as Record<string, unknown> | undefined;
+
+  if (structuredRemoteAssist && typeof structuredRemoteAssist === 'object') {
+    return {
+      sessionId:
+        typeof structuredRemoteAssist.session_id === 'string'
+          ? structuredRemoteAssist.session_id
+          : undefined,
+      customer:
+        typeof structuredRemoteAssist.customer_name === 'string'
+          ? structuredRemoteAssist.customer_name
+          : undefined,
+      channel:
+        typeof structuredRemoteAssist.platform === 'string'
+          ? structuredRemoteAssist.platform
+          : undefined,
+      assistState:
+        typeof structuredRemoteAssist.assist_state_label === 'string'
+          ? structuredRemoteAssist.assist_state_label
+          : typeof structuredRemoteAssist.assist_state === 'string'
+            ? structuredRemoteAssist.assist_state
+            : undefined,
+      result:
+        typeof structuredRemoteAssist.result_preset === 'string' && structuredRemoteAssist.result_preset
+          ? structuredRemoteAssist.result_preset
+          : undefined,
+      followup:
+        typeof structuredRemoteAssist.summary === 'string'
+          ? structuredRemoteAssist.summary
+          : undefined,
+      structured: true,
+    };
+  }
+
+  const title = ticket.title || '';
+  const description = ticket.description || '';
+  const lines = description
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const isRemoteAssistTicket =
+    title.includes('远程协助') ||
+    lines.some((line) => line.startsWith('会话ID:')) ||
+    lines.some((line) => line.startsWith('协助结果:')) ||
+    lines.some((line) => line.startsWith('远程协助状态:'));
+
+  if (!isRemoteAssistTicket) {
+    return null;
+  }
+
+  const sessionLine = lines.find((line) => line.startsWith('会话ID:'));
+  const customerLine = lines.find((line) => line.startsWith('客户:'));
+  const channelLine = lines.find((line) => line.startsWith('渠道:'));
+  const assistStateLine = lines.find((line) => line.startsWith('远程协助状态:'));
+  const resultLine = lines.find((line) => line.startsWith('协助结果:'));
+  const followupLine = lines.find((line) => line.startsWith('后续动作:'));
+
+  return {
+    sessionId: sessionLine?.replace('会话ID:', '').trim(),
+    customer: customerLine?.replace('客户:', '').trim(),
+    channel: channelLine?.replace('渠道:', '').trim(),
+    assistState: assistStateLine?.replace('远程协助状态:', '').trim(),
+    result: resultLine?.replace('协助结果:', '').trim(),
+    followup: followupLine?.replace('后续动作:', '').trim(),
+    structured: false,
+  };
+}
+
 const TicketDetailPage: React.FC = () => {
   const { id } = useDetailParams();
   const [loading, setLoading] = useState(true);
@@ -92,6 +163,7 @@ const TicketDetailPage: React.FC = () => {
 
   const statusItem = TICKET_STATUS_MAP[ticket.status];
   const priorityItem = TICKET_PRIORITY_MAP[ticket.priority];
+  const remoteAssistInfo = extractRemoteAssistInfo(ticket);
 
   const statusStepMap: Record<string, number> = {
     open: 0,
@@ -181,6 +253,44 @@ const TicketDetailPage: React.FC = () => {
       <ProCard title="状态流转" style={{ marginTop: 16 }}>
         <Steps current={statusStepMap[ticket.status] ?? 0} items={statusSteps} />
       </ProCard>
+
+      {remoteAssistInfo && (
+        <ProCard title="远程协助来源" style={{ marginTop: 16 }}>
+          <Alert
+            type="info"
+            showIcon
+            message={(
+              <Space wrap>
+                <Tag color="blue">来自远程协助</Tag>
+                {remoteAssistInfo.assistState && <Tag>{remoteAssistInfo.assistState}</Tag>}
+                {remoteAssistInfo.result && <Tag color="green">{remoteAssistInfo.result}</Tag>}
+              </Space>
+            )}
+            description={(
+              <div style={{ display: 'grid', gap: 8 }}>
+                {remoteAssistInfo.sessionId && (
+                  <div>
+                    会话 ID:
+                    {' '}
+                    <Button
+                      type="link"
+                      size="small"
+                      style={{ paddingInline: 4 }}
+                      onClick={() => navigateTo(`/conversation?id=${remoteAssistInfo.sessionId}`)}
+                    >
+                      {remoteAssistInfo.sessionId}
+                    </Button>
+                  </div>
+                )}
+                {remoteAssistInfo.customer && <div>客户: {remoteAssistInfo.customer}</div>}
+                {remoteAssistInfo.channel && <div>渠道: {remoteAssistInfo.channel}</div>}
+                <div>数据来源: {remoteAssistInfo.structured ? '结构化字段' : '描述文本解析'}</div>
+                {remoteAssistInfo.followup && <div>后续动作: {remoteAssistInfo.followup}</div>}
+              </div>
+            )}
+          />
+        </ProCard>
+      )}
 
       <ProCard title="沟通记录" style={{ marginTop: 16 }}>
         {commentsError && (

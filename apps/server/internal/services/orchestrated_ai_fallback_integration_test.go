@@ -26,6 +26,7 @@ func TestOrchestratedEnhancedAIServiceFallbackWhenKnowledgeProviderFailsIntegrat
 		&mockkp.Provider{
 			SearchError: errors.New("knowledge provider unavailable"),
 		},
+		"",
 		nil,
 		"kb-1",
 		nil,
@@ -60,6 +61,7 @@ func TestOrchestratedEnhancedAIServiceFallbackWhenLLMProviderFailsIntegration(t 
 				{DocumentID: "doc-1", Title: "退款", Content: "退款说明", Score: 0.92},
 			},
 		},
+		"",
 		nil,
 		"kb-1",
 		nil,

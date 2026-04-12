@@ -15,12 +15,20 @@ function assertIncludes(content, expected, label) {
 
 const reactPackage = mustRead(path.join(workspaceRoot, "examples", "react", "package.json"));
 const reactMain = mustRead(path.join(workspaceRoot, "examples", "react", "src", "main.tsx"));
+const vuePackage = mustRead(path.join(workspaceRoot, "examples", "vue", "package.json"));
+const vueMain = mustRead(path.join(workspaceRoot, "examples", "vue", "src", "main.ts"));
+const vueApp = mustRead(path.join(workspaceRoot, "examples", "vue", "src", "App.vue"));
 const vanillaHtml = mustRead(path.join(workspaceRoot, "examples", "vanilla", "index.html"));
 
 assertIncludes(reactPackage, "\"@servify/react\"", "sdk/examples/react/package.json");
 assertIncludes(reactPackage, "\"build\": \"vite build\"", "sdk/examples/react/package.json");
 assertIncludes(reactMain, "ReactDOM.createRoot", "sdk/examples/react/src/main.tsx");
 assertIncludes(reactMain, "App", "sdk/examples/react/src/main.tsx");
+
+assertIncludes(vuePackage, "\"@servify/vue\"", "sdk/examples/vue/package.json");
+assertIncludes(vuePackage, "\"build\": \"vite build\"", "sdk/examples/vue/package.json");
+assertIncludes(vueMain, "ServifyPlugin", "sdk/examples/vue/src/main.ts");
+assertIncludes(vueApp, "useRemoteAssist", "sdk/examples/vue/src/App.vue");
 
 assertIncludes(vanillaHtml, "../../packages/vanilla/dist/index.js", "sdk/examples/vanilla/index.html");
 assertIncludes(vanillaHtml, "new Servify(", "sdk/examples/vanilla/index.html");

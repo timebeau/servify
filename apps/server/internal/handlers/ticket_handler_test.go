@@ -309,6 +309,146 @@ func TestTicketHandler_CustomFields_Create_Filter_Export(t *testing.T) {
 	}
 }
 
+func TestTicketHandler_GetAndListExposeTicketViewFields(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestDBForTickets(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.WarnLevel)
+
+	now := time.Now()
+	if err := db.Create(&models.User{ID: 1, Username: "customer1", Name: "客户一", Email: "c1@example.com", Role: "customer"}).Error; err != nil {
+		t.Fatalf("seed customer: %v", err)
+	}
+	if err := db.Create(&models.User{ID: 2, Username: "agent1", Name: "客服一", Email: "a1@example.com", Role: "agent"}).Error; err != nil {
+		t.Fatalf("seed agent: %v", err)
+	}
+	if err := db.Create(&models.CustomField{
+		Resource:  "ticket",
+		Key:       "remote_assist",
+		Name:      "Remote Assist",
+		Type:      "string",
+		Active:    true,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}).Error; err != nil {
+		t.Fatalf("seed custom field: %v", err)
+	}
+
+	sessionID := "sess-ra-1"
+	ticket := &models.Ticket{
+		Title:      "远程协助跟进 - 客户一",
+		Description: "desc",
+		CustomerID: 1,
+		AgentID:    ptrUintTicket(2),
+		SessionID:  &sessionID,
+		Status:     "open",
+		Priority:   "high",
+		Category:   "remote-assist",
+		Source:     "remote_assist",
+		Tags:       "remote_assist,followup",
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	}
+	if err := db.Create(ticket).Error; err != nil {
+		t.Fatalf("seed ticket: %v", err)
+	}
+	var field models.CustomField
+	if err := db.Where("key = ?", "remote_assist").First(&field).Error; err != nil {
+		t.Fatalf("load custom field: %v", err)
+	}
+	if err := db.Create(&models.TicketCustomFieldValue{
+		TicketID:      ticket.ID,
+		CustomFieldID: field.ID,
+		Value:         `{"session_id":"sess-ra-1"}`,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}).Error; err != nil {
+		t.Fatalf("seed custom field value: %v", err)
+	}
+
+	h := NewTicketHandler(ticketdelivery.NewHandlerServiceWithDependencies(ticketdelivery.HandlerAssemblyDependencies{
+		DB:     db,
+		Logger: logger,
+	}), logger)
+
+	r := gin.New()
+	r.GET("/api/tickets", h.ListTickets)
+	r.GET("/api/tickets/:id", h.GetTicket)
+
+	w1 := httptest.NewRecorder()
+	req1 := httptest.NewRequest(http.MethodGet, "/api/tickets/"+toStr(ticket.ID), nil)
+	r.ServeHTTP(w1, req1)
+	if w1.Code != http.StatusOK {
+		t.Fatalf("get status=%d body=%s", w1.Code, w1.Body.String())
+	}
+	var got struct {
+		CustomerName string                 `json:"customer_name"`
+		AgentName    string                 `json:"agent_name"`
+		Source       string                 `json:"source"`
+		SessionID    string                 `json:"session_id"`
+		Tags         string                 `json:"tags"`
+		TagList      []string               `json:"tag_list"`
+		CustomFields map[string]interface{} `json:"custom_fields"`
+	}
+	if err := json.Unmarshal(w1.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal get: %v body=%s", err, w1.Body.String())
+	}
+	if got.CustomerName != "客户一" || got.AgentName != "客服一" {
+		t.Fatalf("expected customer/agent names, got %+v", got)
+	}
+	if got.Source != "remote_assist" || got.SessionID != "sess-ra-1" {
+		t.Fatalf("expected source/session in response, got %+v", got)
+	}
+	if got.Tags != "remote_assist,followup" || len(got.TagList) != 2 {
+		t.Fatalf("expected tags and tag_list in response, got %+v", got)
+	}
+	if got.CustomFields["remote_assist"] != `{"session_id":"sess-ra-1"}` {
+		t.Fatalf("expected custom_fields.remote_assist, got %+v", got.CustomFields)
+	}
+
+	w2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest(http.MethodGet, "/api/tickets?page=1&page_size=10", nil)
+	r.ServeHTTP(w2, req2)
+	if w2.Code != http.StatusOK {
+		t.Fatalf("list status=%d body=%s", w2.Code, w2.Body.String())
+	}
+	var listResp struct {
+		Data []struct {
+			Source       string                 `json:"source"`
+			TagList      []string               `json:"tag_list"`
+			CustomFields map[string]interface{} `json:"custom_fields"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w2.Body.Bytes(), &listResp); err != nil {
+		t.Fatalf("unmarshal list: %v body=%s", err, w2.Body.String())
+	}
+	if len(listResp.Data) != 1 {
+		t.Fatalf("expected 1 ticket, got %d", len(listResp.Data))
+	}
+	if listResp.Data[0].Source != "remote_assist" || len(listResp.Data[0].TagList) != 2 {
+		t.Fatalf("expected source/tag_list in list response, got %+v", listResp.Data[0])
+	}
+
+	w3 := httptest.NewRecorder()
+	req3 := httptest.NewRequest(http.MethodGet, "/api/tickets?page=1&page_size=10&source=remote_assist&tag=followup", nil)
+	r.ServeHTTP(w3, req3)
+	if w3.Code != http.StatusOK {
+		t.Fatalf("list filtered status=%d body=%s", w3.Code, w3.Body.String())
+	}
+	var filteredResp struct {
+		Data []struct {
+			ID uint `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w3.Body.Bytes(), &filteredResp); err != nil {
+		t.Fatalf("unmarshal filtered list: %v body=%s", err, w3.Body.String())
+	}
+	if len(filteredResp.Data) != 1 || filteredResp.Data[0].ID != ticket.ID {
+		t.Fatalf("expected filtered response to contain remote assist ticket, got %+v", filteredResp.Data)
+	}
+}
+
 func TestTicketHandler_AuditSnapshotsForUpdateAssignClose(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -418,6 +558,10 @@ func toStr(v uint) string {
 		v /= 10
 	}
 	return string(b[i:])
+}
+
+func ptrUintTicket(v uint) *uint {
+	return &v
 }
 
 func TestTicketHandler_GetRelatedConversations(t *testing.T) {

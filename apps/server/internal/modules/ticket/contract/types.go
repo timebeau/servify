@@ -32,6 +32,8 @@ type ListTicketRequest struct {
 	Status             []string          `form:"status"`
 	Priority           []string          `form:"priority"`
 	Category           []string          `form:"category"`
+	Source             []string          `form:"source"`
+	Tag                string            `form:"tag"`
 	AgentID            *uint             `form:"agent_id"`
 	CustomerID         *uint             `form:"customer_id"`
 	Search             string            `form:"search"`

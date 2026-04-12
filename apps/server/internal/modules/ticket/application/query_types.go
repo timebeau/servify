@@ -8,6 +8,8 @@ type ListTicketsQuery struct {
 	Status             []string
 	Priority           []string
 	Category           []string
+	Source             []string
+	Tag                string
 	AgentID            *uint
 	CustomerID         *uint
 	Search             string

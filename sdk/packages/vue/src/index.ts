@@ -1,6 +1,6 @@
 // 导出插件和组合式 API
 export { ServifyPlugin, useServify, useServifyReady } from './plugin';
-export { useChat, useAI, useTickets, useSatisfaction } from './composables';
+export { useChat, useAI, useTickets, useSatisfaction, useRemoteAssist } from './composables';
 
 // 导出核心类型
 export * from '@servify/core';

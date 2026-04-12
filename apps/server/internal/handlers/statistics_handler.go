@@ -308,6 +308,29 @@ func (h *StatisticsHandler) GetCustomerSourceStats(c *gin.Context) {
 	c.JSON(http.StatusOK, stats)
 }
 
+// GetRemoteAssistTicketStats 获取远程协助工单统计
+// @Summary 获取远程协助工单统计
+// @Description 获取远程协助来源工单的总量、待处理、已解决、已关闭统计
+// @Tags 统计
+// @Accept json
+// @Produce json
+// @Success 200 {object} contract.RemoteAssistTicketStats
+// @Failure 500 {object} ErrorResponse
+// @Router /api/statistics/remote-assist-tickets [get]
+func (h *StatisticsHandler) GetRemoteAssistTicketStats(c *gin.Context) {
+	stats, err := h.statsService.GetRemoteAssistTicketStats(c.Request.Context())
+	if err != nil {
+		h.logger.Errorf("Failed to get remote assist ticket stats: %v", err)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "Failed to get remote assist ticket statistics",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, stats)
+}
+
 // UpdateDailyStats 手动更新每日统计
 // @Summary 手动更新每日统计
 // @Description 手动触发指定日期的统计数据更新
@@ -356,6 +379,7 @@ func RegisterStatisticsRoutes(r *gin.RouterGroup, handler *StatisticsHandler) {
 		stats.GET("/ticket-category", handler.GetTicketCategoryStats)
 		stats.GET("/ticket-priority", handler.GetTicketPriorityStats)
 		stats.GET("/customer-source", handler.GetCustomerSourceStats)
+		stats.GET("/remote-assist-tickets", handler.GetRemoteAssistTicketStats)
 		stats.POST("/update-daily", handler.UpdateDailyStats)
 	}
 }

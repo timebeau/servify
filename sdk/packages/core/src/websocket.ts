@@ -7,7 +7,7 @@ import {
   shouldReconnect,
 } from './contracts/reconnect';
 import type { Transport, TransportConnectOptions, TransportSendOptions, ReconnectPolicy, TransportState } from './contracts/transport';
-import { WSMessage, ServifyEventMap, Message, ChatSession } from './types';
+import { WSMessage, ServifyEventMap, Message, ChatSession, RemoteAssistRuntimeState, RemoteAssistState } from './types';
 
 export interface WebSocketManagerOptions {
   url: string;
@@ -224,9 +224,58 @@ export class WebSocketManager extends EventEmitter<ServifyEventMap> implements T
           this.log('收到心跳响应');
         }
         break;
+      case 'webrtc-offer':
+        this.emit('webrtc:offer', message.data as RTCSessionDescriptionInit);
+        break;
+      case 'webrtc-answer':
+        this.emit('webrtc:answer', message.data as RTCSessionDescriptionInit);
+        break;
+      case 'webrtc-candidate':
+        this.emit('webrtc:candidate', this.extractICECandidate(message.data));
+        break;
+      case 'webrtc-state-change':
+        this.emit('webrtc:state', this.extractRemoteAssistState(message.data));
+        break;
       default:
         this.log('未知消息类型:', message.type);
     }
+  }
+
+  private extractRemoteAssistState(data: unknown): RemoteAssistState {
+    const runtimeState = this.extractRemoteAssistRuntimeState(data);
+
+    switch (runtimeState.state) {
+      case 'new':
+      case 'checking':
+      case 'connecting':
+        return 'connecting';
+      case 'connected':
+        return 'connected';
+      case 'failed':
+        return 'failed';
+      case 'closed':
+      case 'disconnected':
+        return 'ended';
+      default:
+        return 'connecting';
+    }
+  }
+
+  private extractRemoteAssistRuntimeState(data: unknown): RemoteAssistRuntimeState {
+    if (typeof data === 'object' && data !== null) {
+      return {
+        connectionId:
+          'connection_id' in data && typeof data.connection_id === 'string'
+            ? data.connection_id
+            : undefined,
+        state:
+          'state' in data && typeof data.state === 'string'
+            ? data.state
+            : 'connecting',
+      };
+    }
+
+    return { state: 'connecting' };
   }
 
   private scheduleReconnect(): void {
@@ -314,5 +363,19 @@ export class WebSocketManager extends EventEmitter<ServifyEventMap> implements T
     }
 
     return null;
+  }
+
+  private extractICECandidate(data: unknown): RTCIceCandidateInit {
+    if (
+      typeof data === 'object' &&
+      data !== null &&
+      'candidate' in data &&
+      typeof data.candidate === 'object' &&
+      data.candidate !== null
+    ) {
+      return data.candidate as RTCIceCandidateInit;
+    }
+
+    return data as RTCIceCandidateInit;
   }
 }

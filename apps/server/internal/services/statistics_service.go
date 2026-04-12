@@ -8,6 +8,8 @@ import (
 	analyticscontract "servify/apps/server/internal/modules/analytics/contract"
 	analyticsdelivery "servify/apps/server/internal/modules/analytics/delivery"
 	analyticsinfra "servify/apps/server/internal/modules/analytics/infra"
+	"servify/apps/server/internal/models"
+	platformauth "servify/apps/server/internal/platform/auth"
 	"servify/apps/server/internal/platform/eventbus"
 
 	"github.com/sirupsen/logrus"
@@ -53,6 +55,7 @@ type DashboardStats = analyticscontract.DashboardStats
 type TimeRangeStats = analyticscontract.TimeRangeStats
 type AgentPerformanceStats = analyticscontract.AgentPerformanceStats
 type CategoryStats = analyticscontract.CategoryStats
+type RemoteAssistTicketStats = analyticscontract.RemoteAssistTicketStats
 
 // GetDashboardStats 获取仪表板统计数据
 func (s *StatisticsService) GetDashboardStats(ctx context.Context) (*DashboardStats, error) {
@@ -106,6 +109,47 @@ func (s *StatisticsService) GetCustomerSourceStats(ctx context.Context) ([]Categ
 		return nil, err
 	}
 	return categoryStatsFromDTO(stats), nil
+}
+
+func (s *StatisticsService) GetRemoteAssistTicketStats(ctx context.Context) (*RemoteAssistTicketStats, error) {
+	stats := &RemoteAssistTicketStats{}
+	base := s.db.WithContext(ctx).Model(&models.Ticket{}).
+		Where("source = ? OR category = ? OR tags LIKE ?", "remote_assist", "remote-assist", "%remote_assist%")
+	if tenantID := platformauth.TenantIDFromContext(ctx); tenantID != "" {
+		base = base.Where("tenant_id = ?", tenantID)
+	}
+	if workspaceID := platformauth.WorkspaceIDFromContext(ctx); workspaceID != "" {
+		base = base.Where("workspace_id = ?", workspaceID)
+	}
+
+	if err := base.Count(&stats.Total).Error; err != nil {
+		return nil, err
+	}
+	if err := base.Session(&gorm.Session{}).Where("status = ?", "open").Count(&stats.Open).Error; err != nil {
+		return nil, err
+	}
+	if err := base.Session(&gorm.Session{}).Where("status = ?", "resolved").Count(&stats.Resolved).Error; err != nil {
+		return nil, err
+	}
+	if err := base.Session(&gorm.Session{}).Where("status = ?", "closed").Count(&stats.Closed).Error; err != nil {
+		return nil, err
+	}
+	var avgCloseSeconds float64
+	if err := base.Session(&gorm.Session{}).
+		Where("closed_at IS NOT NULL").
+		Select(analyticsinfra.AvgDurationExpr(s.db, "closed_at", "created_at")).
+		Row().
+		Scan(&avgCloseSeconds); err != nil {
+		return nil, err
+	}
+	if stats.Total > 0 {
+		stats.ResolvedRate = float64(stats.Resolved) / float64(stats.Total)
+		stats.ClosedRate = float64(stats.Closed) / float64(stats.Total)
+	}
+	if avgCloseSeconds > 0 {
+		stats.AvgCloseHours = avgCloseSeconds / 3600.0
+	}
+	return stats, nil
 }
 
 // UpdateDailyStats 更新每日统计数据
@@ -166,26 +210,26 @@ func dashboardStatsFromDTO(dto *analyticsapp.DashboardStats) *analyticscontract.
 		return nil
 	}
 	return &analyticscontract.DashboardStats{
-		TotalCustomers:       dto.TotalCustomers,
-		TotalAgents:          dto.TotalAgents,
-		TotalTickets:         dto.TotalTickets,
-		TotalSessions:        dto.TotalSessions,
-		TodayTickets:         dto.TodayTickets,
-		TodaySessions:        dto.TodaySessions,
-		TodayMessages:        dto.TodayMessages,
-		OpenTickets:          dto.OpenTickets,
-		AssignedTickets:      dto.AssignedTickets,
-		ResolvedTickets:      dto.ResolvedTickets,
-		ClosedTickets:        dto.ClosedTickets,
-		OnlineAgents:         dto.OnlineAgents,
-		BusyAgents:           dto.BusyAgents,
-		ActiveSessions:       dto.ActiveSessions,
-		AvgResponseTime:      dto.AvgResponseTime,
-		AvgResolutionTime:    dto.AvgResolutionTime,
-		CustomerSatisfaction: dto.CustomerSatisfaction,
-		AIUsageToday:         dto.AIUsageToday,
+		TotalCustomers:              dto.TotalCustomers,
+		TotalAgents:                 dto.TotalAgents,
+		TotalTickets:                dto.TotalTickets,
+		TotalSessions:               dto.TotalSessions,
+		TodayTickets:                dto.TodayTickets,
+		TodaySessions:               dto.TodaySessions,
+		TodayMessages:               dto.TodayMessages,
+		OpenTickets:                 dto.OpenTickets,
+		AssignedTickets:             dto.AssignedTickets,
+		ResolvedTickets:             dto.ResolvedTickets,
+		ClosedTickets:               dto.ClosedTickets,
+		OnlineAgents:                dto.OnlineAgents,
+		BusyAgents:                  dto.BusyAgents,
+		ActiveSessions:              dto.ActiveSessions,
+		AvgResponseTime:             dto.AvgResponseTime,
+		AvgResolutionTime:           dto.AvgResolutionTime,
+		CustomerSatisfaction:        dto.CustomerSatisfaction,
+		AIUsageToday:                dto.AIUsageToday,
 		KnowledgeProviderUsageToday: dto.KnowledgeProviderUsageToday,
-		WeKnoraUsageToday:    dto.WeKnoraUsageToday,
+		WeKnoraUsageToday:           dto.WeKnoraUsageToday,
 	}
 }
 

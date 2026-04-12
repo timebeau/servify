@@ -39,6 +39,8 @@ declare namespace API {
     status: string;
     priority: string;
     category?: string;
+    source?: string;
+    session_id?: string;
     customer_id: number;
     customer_name?: string;
     agent_id?: number;
@@ -48,7 +50,8 @@ declare namespace API {
     resolved_at?: string;
     closed_at?: string;
     custom_fields?: Record<string, any>;
-    tags?: string[];
+    tags?: string[] | string;
+    tag_list?: string[];
     satisfaction_score?: number;
   }
 
@@ -58,6 +61,8 @@ declare namespace API {
     status?: string;
     priority?: string;
     category?: string;
+    source?: string;
+    tag?: string;
     agent_id?: number;
     customer_id?: number;
     search?: string;
@@ -223,6 +228,16 @@ declare namespace API {
     customer_satisfaction: number;
     ai_usage_today: number;
     weknora_usage_today: number;
+  }
+
+  interface RemoteAssistTicketStats {
+    total: number;
+    open: number;
+    resolved: number;
+    closed: number;
+    resolved_rate: number;
+    closed_rate: number;
+    avg_close_hours: number;
   }
 
   interface WorkspaceSession {

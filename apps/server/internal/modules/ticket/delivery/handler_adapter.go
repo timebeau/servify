@@ -109,6 +109,8 @@ func (a *HandlerServiceAdapter) ListTickets(ctx context.Context, req *ticketcont
 		Status:             req.Status,
 		Priority:           req.Priority,
 		Category:           req.Category,
+		Source:             req.Source,
+		Tag:                req.Tag,
 		AgentID:            req.AgentID,
 		CustomerID:         req.CustomerID,
 		Search:             req.Search,

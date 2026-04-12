@@ -3,6 +3,7 @@ import { ChatSession } from '../../core/src/index.ts';
 import { Customer } from '../../core/src/index.ts';
 import { CustomerSatisfaction } from '../../core/src/index.ts';
 import { Message } from '../../core/src/index.ts';
+import { RemoteAssistStartOptions } from '../../core/src/index.ts';
 import { WebServifyConfig as ServifyConfig } from '../../core/src/index.ts';
 import { Ticket } from '../../core/src/index.ts';
 
@@ -52,6 +53,22 @@ declare class VanillaServifySDK {
      * 结束会话
      */
     endChat(): Promise<void>;
+    /**
+     * 发起远程协助基础链路
+     */
+    startRemoteAssist(options?: RemoteAssistStartOptions): Promise<RTCPeerConnection>;
+    /**
+     * 接收对端 WebRTC answer
+     */
+    acceptRemoteAnswer(answer: RTCSessionDescriptionInit): Promise<void>;
+    /**
+     * 注入对端 ICE candidate
+     */
+    addRemoteIce(candidate: RTCIceCandidateInit): Promise<void>;
+    /**
+     * 结束远程协助
+     */
+    endRemoteAssist(): Promise<void>;
     /**
      * AI 问答
      */

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ProTable, ProCard } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
 import {
+  Alert,
   Button,
   Empty,
   Input,
@@ -15,7 +16,10 @@ import {
   Tooltip,
 } from 'antd';
 import {
+  DisconnectOutlined,
+  LinkOutlined,
   ReloadOutlined,
+  VideoCameraOutlined,
 } from '@ant-design/icons';
 import {
   getConversationMessages,
@@ -24,8 +28,9 @@ import {
   transferConversation,
   closeConversation,
 } from '@/services/conversation';
+import { createTicket } from '@/services/ticket';
 import { getWorkspaceOverview } from '@/services/workspace';
-import { useQueryParam } from '@/lib/navigation';
+import { navigateTo, useQueryParam } from '@/lib/navigation';
 
 const STATUS_MAP: Record<string, { color: string; label: string }> = {
   active: { color: 'green', label: '进行中' },
@@ -50,6 +55,62 @@ interface ConversationRecord {
   started_at: string;
 }
 
+type RemoteAssistState =
+  | 'idle'
+  | 'connecting'
+  | 'offered'
+  | 'connected'
+  | 'failed'
+  | 'ended';
+
+const REMOTE_ASSIST_STATE_MAP: Record<RemoteAssistState, { color: string; label: string }> = {
+  idle: { color: 'default', label: '未启动' },
+  connecting: { color: 'processing', label: '连接中' },
+  offered: { color: 'cyan', label: '已发起' },
+  connected: { color: 'green', label: '已连接' },
+  failed: { color: 'red', label: '失败' },
+  ended: { color: 'default', label: '已结束' },
+};
+
+const REMOTE_ASSIST_WS_STATUS_MAP: Record<string, { color: string; label: string }> = {
+  disconnected: { color: 'default', label: '未连接' },
+  connecting: { color: 'processing', label: '信令连接中' },
+  connected: { color: 'green', label: '信令已连接' },
+  failed: { color: 'red', label: '信令异常' },
+};
+
+const ASSIST_RESULT_PRESETS = [
+  {
+    key: 'resolved',
+    label: '已解决',
+    priority: 'normal' as const,
+    summary: '协助结果: 已解决\n后续动作: 无需继续跟进，建议客户观察并回访确认。',
+  },
+  {
+    key: 'followup',
+    label: '待回访',
+    priority: 'normal' as const,
+    summary: '协助结果: 已完成初步排查\n后续动作: 需要回访确认处理效果。',
+  },
+  {
+    key: 'escalate',
+    label: '转二线',
+    priority: 'high' as const,
+    summary: '协助结果: 一线未能闭环\n后续动作: 转交二线技术支持继续排查。',
+  },
+  {
+    key: 'ticket',
+    label: '转工单',
+    priority: 'high' as const,
+    summary: '协助结果: 需要异步跟进\n后续动作: 已转工单，等待后续处理。',
+  },
+];
+
+function buildRemoteAssistWebSocketURL(sessionId: string) {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${window.location.host}/api/v1/ws?session_id=${encodeURIComponent(sessionId)}`;
+}
+
 const ConversationPage: React.FC = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const preselectedId = useQueryParam('id');
@@ -64,7 +125,24 @@ const ConversationPage: React.FC = () => {
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [transferTarget, setTransferTarget] = useState<number | null>(null);
   const [operating, setOperating] = useState(false);
+  const [remoteAssistOperating, setRemoteAssistOperating] = useState(false);
+  const [remoteAssistState, setRemoteAssistState] = useState<RemoteAssistState>('idle');
+  const [remoteAssistSignalState, setRemoteAssistSignalState] = useState<'disconnected' | 'connecting' | 'connected' | 'failed'>('disconnected');
+  const [remoteAssistError, setRemoteAssistError] = useState<string | null>(null);
+  const [remoteAssistConnectionId, setRemoteAssistConnectionId] = useState<string | null>(null);
+  const [remoteAssistHasStream, setRemoteAssistHasStream] = useState(false);
+  const [ticketModalOpen, setTicketModalOpen] = useState(false);
+  const [ticketCreating, setTicketCreating] = useState(false);
+  const [assistSummary, setAssistSummary] = useState('');
+  const [assistResultPreset, setAssistResultPreset] = useState<string>('manual');
+  const [ticketTitle, setTicketTitle] = useState('');
+  const [ticketDescription, setTicketDescription] = useState('');
+  const [ticketPriority, setTicketPriority] = useState<'low' | 'normal' | 'high' | 'urgent'>('normal');
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const remoteAssistPeerRef = useRef<RTCPeerConnection | null>(null);
+  const remoteAssistSocketRef = useRef<WebSocket | null>(null);
+  const remoteAssistStreamRef = useRef<MediaStream | null>(null);
+  const remoteAssistVideoRef = useRef<HTMLVideoElement | null>(null);
 
   const fetchOverview = useCallback(async () => {
     setLoading(true);
@@ -227,14 +305,187 @@ const ConversationPage: React.FC = () => {
     });
   };
 
-  const columns: ProColumns<ConversationRecord>[] = [
-    { title: 'ID', dataIndex: 'id', width: 80, render: (_, r) => <Tooltip title={r.id}><span style={{ fontFamily: 'monospace', fontSize: 12 }}>{r.id.length > 8 ? `${r.id.slice(0, 8)}...` : r.id}</span></Tooltip> },
-    { title: '客户', dataIndex: 'customer_name', width: 120, search: true },
-    { title: '客服', dataIndex: 'agent_name', width: 120 },
-    { title: '渠道', dataIndex: 'platform', width: 80 },
-    { title: '状态', dataIndex: 'status', width: 100, render: (_, r) => { const c = STATUS_MAP[r.status] || { color: 'default', label: r.status }; return <Tag color={c.color}>{c.label}</Tag>; } },
-    { title: '开始时间', dataIndex: 'started_at', valueType: 'dateTime', width: 160 },
-  ];
+  const teardownRemoteAssist = useCallback((nextState: RemoteAssistState = 'ended') => {
+    const socket = remoteAssistSocketRef.current;
+    if (socket) {
+      socket.onopen = null;
+      socket.onmessage = null;
+      socket.onerror = null;
+      socket.onclose = null;
+      if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+        socket.close();
+      }
+      remoteAssistSocketRef.current = null;
+    }
+
+    const peer = remoteAssistPeerRef.current;
+    if (peer) {
+      peer.onicecandidate = null;
+      peer.onconnectionstatechange = null;
+      peer.ontrack = null;
+      peer.close();
+      remoteAssistPeerRef.current = null;
+    }
+
+    const stream = remoteAssistStreamRef.current;
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+      remoteAssistStreamRef.current = null;
+    }
+
+    if (remoteAssistVideoRef.current) {
+      remoteAssistVideoRef.current.srcObject = null;
+    }
+
+    setRemoteAssistSignalState('disconnected');
+    setRemoteAssistConnectionId(null);
+    setRemoteAssistHasStream(false);
+    setRemoteAssistState(nextState);
+  }, []);
+
+  const handleStartRemoteAssist = useCallback(async () => {
+    if (!selectedId) {
+      message.warning('请先选择会话');
+      return;
+    }
+
+    setRemoteAssistOperating(true);
+    setRemoteAssistError(null);
+    setRemoteAssistState('connecting');
+    setRemoteAssistSignalState('connecting');
+
+    try {
+      teardownRemoteAssist('idle');
+
+      const socket = new WebSocket(buildRemoteAssistWebSocketURL(selectedId));
+      remoteAssistSocketRef.current = socket;
+
+      socket.onerror = () => {
+        setRemoteAssistSignalState('failed');
+        setRemoteAssistState('failed');
+        setRemoteAssistError('远程协助信令连接失败');
+        setRemoteAssistOperating(false);
+      };
+
+      socket.onclose = () => {
+        setRemoteAssistSignalState('disconnected');
+        setRemoteAssistState((prev) => (prev === 'failed' ? prev : 'ended'));
+        setRemoteAssistOperating(false);
+      };
+
+      socket.onopen = async () => {
+        setRemoteAssistSignalState('connected');
+
+        try {
+          const peer = new RTCPeerConnection({
+            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+          });
+          remoteAssistPeerRef.current = peer;
+
+          peer.createDataChannel('servify-admin-remote-assist');
+
+          peer.onicecandidate = (event) => {
+            if (!event.candidate || socket.readyState !== WebSocket.OPEN) {
+              return;
+            }
+
+            socket.send(JSON.stringify({
+              type: 'webrtc-candidate',
+              data: event.candidate.toJSON(),
+            }));
+          };
+
+          peer.onconnectionstatechange = () => {
+            const state = peer.connectionState;
+            if (state === 'connected') {
+              setRemoteAssistState('connected');
+            } else if (state === 'connecting') {
+              setRemoteAssistState('connecting');
+            } else if (state === 'failed') {
+              setRemoteAssistState('failed');
+              setRemoteAssistError('远程协助连接建立失败');
+            } else if (state === 'closed' || state === 'disconnected') {
+              setRemoteAssistState('ended');
+            }
+          };
+
+          peer.ontrack = (event) => {
+            const [stream] = event.streams;
+            if (!stream) {
+              return;
+            }
+            remoteAssistStreamRef.current = stream;
+            setRemoteAssistHasStream(true);
+            if (remoteAssistVideoRef.current) {
+              remoteAssistVideoRef.current.srcObject = stream;
+            }
+          };
+
+          socket.onmessage = async (event) => {
+            try {
+              const payload = JSON.parse(event.data);
+              if (payload.type === 'webrtc-answer' && payload.data) {
+                await peer.setRemoteDescription(payload.data);
+                setRemoteAssistState('connecting');
+                return;
+              }
+
+              if (payload.type === 'webrtc-candidate' && payload.data) {
+                const candidate = payload.data?.candidate ?? payload.data;
+                await peer.addIceCandidate(candidate);
+                return;
+              }
+
+              if (payload.type === 'webrtc-state-change' && payload.data) {
+                const state = String(payload.data.state || '');
+                const connectionId = String(payload.data.connection_id || '');
+                if (connectionId) {
+                  setRemoteAssistConnectionId(connectionId);
+                }
+                if (state === 'connected') {
+                  setRemoteAssistState('connected');
+                } else if (state === 'connecting' || state === 'new') {
+                  setRemoteAssistState('connecting');
+                } else if (state === 'failed') {
+                  setRemoteAssistState('failed');
+                }
+              }
+            } catch (error) {
+              setRemoteAssistError((error as Error).message);
+              setRemoteAssistState('failed');
+            }
+          };
+
+          const offer = await peer.createOffer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: true,
+          });
+          await peer.setLocalDescription(offer);
+
+          socket.send(JSON.stringify({
+            type: 'webrtc-offer',
+            data: offer,
+          }));
+          setRemoteAssistState('offered');
+        } catch (error) {
+          setRemoteAssistError((error as Error).message);
+          setRemoteAssistState('failed');
+          setRemoteAssistSignalState('failed');
+        } finally {
+          setRemoteAssistOperating(false);
+        }
+      };
+    } catch (error) {
+      setRemoteAssistError((error as Error).message);
+      setRemoteAssistState('failed');
+      setRemoteAssistSignalState('failed');
+      setRemoteAssistOperating(false);
+    }
+  }, [selectedId, teardownRemoteAssist]);
+
+  const handleEndRemoteAssist = useCallback(() => {
+    teardownRemoteAssist('ended');
+  }, [teardownRemoteAssist]);
 
   const sessions = overview?.recent_sessions || [];
   const selectedSession = sessions.find((s) => s.id === selectedId) || null;
@@ -243,6 +494,125 @@ const ConversationPage: React.FC = () => {
   const isClosed = sessionStatus === 'closed';
   const isWaiting = sessionStatus === 'waiting_human';
   const isActive = sessionStatus === 'active';
+  const remoteAssistActive =
+    remoteAssistState === 'connecting' ||
+    remoteAssistState === 'offered' ||
+    remoteAssistState === 'connected';
+  const remoteAssistStatusCfg = REMOTE_ASSIST_STATE_MAP[remoteAssistState];
+  const remoteAssistSignalCfg = REMOTE_ASSIST_WS_STATUS_MAP[remoteAssistSignalState];
+
+  const openCreateTicketModal = useCallback(() => {
+    if (!selectedSession) {
+      message.warning('请先选择会话');
+      return;
+    }
+
+    const defaultTitle = `远程协助跟进 - ${selectedSession.customer_name || selectedSession.id}`;
+    const defaultDescription = [
+      `会话ID: ${selectedSession.id}`,
+      `客户: ${selectedSession.customer_name || '未识别客户'}`,
+      `渠道: ${selectedSession.platform || 'unknown'}`,
+      `当前会话状态: ${selectedSession.status}`,
+      `远程协助状态: ${remoteAssistStatusCfg.label}`,
+      assistSummary.trim() ? '' : '协助摘要: ',
+      assistSummary.trim(),
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    setTicketTitle(defaultTitle);
+    setTicketDescription(defaultDescription);
+    setTicketPriority(remoteAssistState === 'failed' ? 'high' : 'normal');
+    setTicketModalOpen(true);
+  }, [assistSummary, remoteAssistState, remoteAssistStatusCfg.label, selectedSession]);
+
+  const applyAssistPreset = useCallback((presetKey: string) => {
+    const preset = ASSIST_RESULT_PRESETS.find((item) => item.key === presetKey);
+    if (!preset) {
+      setAssistResultPreset('manual');
+      return;
+    }
+
+    setAssistResultPreset(preset.key);
+    setAssistSummary(preset.summary);
+    setTicketPriority(preset.priority);
+  }, []);
+
+  const handleCreateTicket = useCallback(async () => {
+    if (!selectedSession) {
+      return;
+    }
+    if (!ticketTitle.trim()) {
+      message.warning('请输入工单标题');
+      return;
+    }
+
+    setTicketCreating(true);
+    try {
+      const ticket = await createTicket({
+        title: ticketTitle.trim(),
+        description: ticketDescription.trim(),
+        priority: ticketPriority,
+        category: 'remote-assist',
+        source: 'remote_assist',
+        customer_id: selectedSession.customer_id,
+        session_id: selectedSession.id,
+        tags: [
+          'remote_assist',
+          ...(assistResultPreset !== 'manual' ? [assistResultPreset] : []),
+        ],
+        custom_fields: {
+          source: 'remote_assist',
+          session_id: selectedSession.id,
+          remote_assist: {
+            session_id: selectedSession.id,
+            customer_name: selectedSession.customer_name || '',
+            platform: selectedSession.platform || '',
+            assist_state: remoteAssistState,
+            assist_state_label: remoteAssistStatusCfg.label,
+            result_preset: assistResultPreset === 'manual' ? '' : assistResultPreset,
+            summary: assistSummary.trim(),
+          },
+        },
+      });
+      message.success(`工单 #${ticket.id} 已创建`);
+      setTicketModalOpen(false);
+      navigateTo(`/ticket/detail/${ticket.id}`);
+    } catch (error) {
+      message.error('创建工单失败: ' + (error as Error).message);
+    } finally {
+      setTicketCreating(false);
+    }
+  }, [
+    assistResultPreset,
+    assistSummary,
+    remoteAssistState,
+    remoteAssistStatusCfg.label,
+    selectedSession,
+    ticketDescription,
+    ticketPriority,
+    ticketTitle,
+  ]);
+
+  useEffect(() => () => {
+    teardownRemoteAssist('ended');
+  }, [teardownRemoteAssist]);
+
+  useEffect(() => {
+    setRemoteAssistError(null);
+    teardownRemoteAssist('idle');
+    setAssistResultPreset('manual');
+    setAssistSummary('');
+  }, [selectedId, teardownRemoteAssist]);
+
+  const columns: ProColumns<ConversationRecord>[] = [
+    { title: 'ID', dataIndex: 'id', width: 80, render: (_, r) => <Tooltip title={r.id}><span style={{ fontFamily: 'monospace', fontSize: 12 }}>{r.id.length > 8 ? `${r.id.slice(0, 8)}...` : r.id}</span></Tooltip> },
+    { title: '客户', dataIndex: 'customer_name', width: 120, search: true },
+    { title: '客服', dataIndex: 'agent_name', width: 120 },
+    { title: '渠道', dataIndex: 'platform', width: 80 },
+    { title: '状态', dataIndex: 'status', width: 100, render: (_, r) => { const c = STATUS_MAP[r.status] || { color: 'default', label: r.status }; return <Tag color={c.color}>{c.label}</Tag>; } },
+    { title: '开始时间', dataIndex: 'started_at', valueType: 'dateTime', width: 160 },
+  ];
 
   const onlineAgents = (overview?.agent_stats?.available_agents || []).filter(
     (a: any) => a.id !== selectedSession?.agent_id,
@@ -288,6 +658,7 @@ const ConversationPage: React.FC = () => {
               <Space>
                 <span>会话 {selectedId.slice(0, 8)}</span>
                 {sessionStatus && <Tag color={statusCfg.color}>{statusCfg.label || sessionStatus}</Tag>}
+                {selectedSession && <Tag color={remoteAssistStatusCfg.color}>协助: {remoteAssistStatusCfg.label}</Tag>}
               </Space>
             ) : '聊天区域'
           }
@@ -309,6 +680,17 @@ const ConversationPage: React.FC = () => {
                         转派
                       </Button>
                     )}
+                    <Button
+                      size="small"
+                      icon={remoteAssistActive ? <DisconnectOutlined /> : <VideoCameraOutlined />}
+                      onClick={remoteAssistActive ? handleEndRemoteAssist : handleStartRemoteAssist}
+                      loading={remoteAssistOperating}
+                    >
+                      {remoteAssistActive ? '结束协助' : '发起协助'}
+                    </Button>
+                    <Button size="small" onClick={openCreateTicketModal}>
+                      转工单
+                    </Button>
                     {!isClosed && (
                       <Button size="small" danger onClick={handleClose} loading={operating}>
                         结束
@@ -322,6 +704,100 @@ const ConversationPage: React.FC = () => {
           style={{ height: '100%' }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            {selectedId && (
+              <div style={{ marginBottom: 12 }}>
+                <Alert
+                  type={remoteAssistState === 'failed' ? 'error' : 'info'}
+                  showIcon
+                  message={(
+                    <Space size="middle" wrap>
+                      <span>远程协助</span>
+                      <Tag color={remoteAssistStatusCfg.color}>{remoteAssistStatusCfg.label}</Tag>
+                      <Tag color={remoteAssistSignalCfg.color}>{remoteAssistSignalCfg.label}</Tag>
+                      {remoteAssistConnectionId && (
+                        <span style={{ fontFamily: 'monospace' }}>连接 {remoteAssistConnectionId}</span>
+                      )}
+                    </Space>
+                  )}
+                  description={(
+                    <div>
+                      <div>当前按会话级 WebSocket/WebRTC 建立协助链路，先打通最小发起与状态观测。</div>
+                      {remoteAssistError && <div style={{ marginTop: 4, color: '#ff4d4f' }}>{remoteAssistError}</div>}
+                    </div>
+                  )}
+                  action={(
+                    <Button
+                      size="small"
+                      type={remoteAssistActive ? 'default' : 'primary'}
+                      icon={remoteAssistActive ? <DisconnectOutlined /> : <LinkOutlined />}
+                      onClick={remoteAssistActive ? handleEndRemoteAssist : handleStartRemoteAssist}
+                      loading={remoteAssistOperating}
+                    >
+                      {remoteAssistActive ? '结束协助' : '连接协助'}
+                    </Button>
+                  )}
+                />
+                <div style={{ marginTop: 8 }}>
+                  <Space size={[8, 8]} wrap>
+                    <span style={{ color: '#666' }}>协助结果模板</span>
+                    {ASSIST_RESULT_PRESETS.map((preset) => (
+                      <Tag
+                        key={preset.key}
+                        color={assistResultPreset === preset.key ? 'blue' : 'default'}
+                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        onClick={() => applyAssistPreset(preset.key)}
+                      >
+                        {preset.label}
+                      </Tag>
+                    ))}
+                    <Tag
+                      color={assistResultPreset === 'manual' ? 'blue' : 'default'}
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => setAssistResultPreset('manual')}
+                    >
+                      手动
+                    </Tag>
+                  </Space>
+                </div>
+                <Input.TextArea
+                  rows={3}
+                  style={{ marginTop: 8 }}
+                  placeholder="记录协助摘要、排查结论或后续动作，转工单时会自动带入。"
+                  value={assistSummary}
+                  onChange={(e) => setAssistSummary(e.target.value)}
+                />
+                <div style={{
+                  marginTop: 8,
+                  minHeight: 180,
+                  borderRadius: 8,
+                  border: '1px dashed #d9d9d9',
+                  background: '#fcfcfc',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                }}
+                >
+                  <video
+                    ref={remoteAssistVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    style={{
+                      width: '100%',
+                      maxHeight: 240,
+                      display: remoteAssistHasStream ? 'block' : 'none',
+                      background: '#000',
+                    }}
+                  />
+                  {!remoteAssistHasStream && (
+                    <div style={{ color: '#999', padding: 24 }}>
+                      尚未收到远端媒体流，当前面板用于发起协助和观察连接状态。
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             <div style={{ flex: 1, overflowY: 'auto', padding: 12, background: '#fafafa', borderRadius: 8 }}>
               {!selectedId ? (
                 <Empty description="请先从左侧选择一个会话。" style={{ marginTop: 96 }} />
@@ -405,6 +881,48 @@ const ConversationPage: React.FC = () => {
             options={onlineAgents.map((a: any) => ({ label: a.name || `客服 #${a.id}`, value: a.id }))}
           />
         )}
+      </Modal>
+      <Modal
+        title="创建跟进工单"
+        open={ticketModalOpen}
+        onCancel={() => setTicketModalOpen(false)}
+        onOk={handleCreateTicket}
+        confirmLoading={ticketCreating}
+        okText="创建并查看"
+      >
+        <div style={{ display: 'grid', gap: 12 }}>
+          <div>
+            <div style={{ marginBottom: 6 }}>标题</div>
+            <Input
+              value={ticketTitle}
+              onChange={(e) => setTicketTitle(e.target.value)}
+              placeholder="输入工单标题"
+            />
+          </div>
+          <div>
+            <div style={{ marginBottom: 6 }}>优先级</div>
+            <Select
+              style={{ width: '100%' }}
+              value={ticketPriority}
+              onChange={(value) => setTicketPriority(value)}
+              options={[
+                { label: '低', value: 'low' },
+                { label: '普通', value: 'normal' },
+                { label: '高', value: 'high' },
+                { label: '紧急', value: 'urgent' },
+              ]}
+            />
+          </div>
+          <div>
+            <div style={{ marginBottom: 6 }}>描述</div>
+            <Input.TextArea
+              rows={8}
+              value={ticketDescription}
+              onChange={(e) => setTicketDescription(e.target.value)}
+              placeholder="输入跟进说明"
+            />
+          </div>
+        </div>
       </Modal>
     </div>
   );

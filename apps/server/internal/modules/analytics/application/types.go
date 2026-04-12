@@ -3,26 +3,26 @@ package application
 import "time"
 
 type DashboardStats struct {
-	TotalCustomers       int64   `json:"total_customers"`
-	TotalAgents          int64   `json:"total_agents"`
-	TotalTickets         int64   `json:"total_tickets"`
-	TotalSessions        int64   `json:"total_sessions"`
-	TodayTickets         int64   `json:"today_tickets"`
-	TodaySessions        int64   `json:"today_sessions"`
-	TodayMessages        int64   `json:"today_messages"`
-	OpenTickets          int64   `json:"open_tickets"`
-	AssignedTickets      int64   `json:"assigned_tickets"`
-	ResolvedTickets      int64   `json:"resolved_tickets"`
-	ClosedTickets        int64   `json:"closed_tickets"`
-	OnlineAgents         int64   `json:"online_agents"`
-	BusyAgents           int64   `json:"busy_agents"`
-	ActiveSessions       int64   `json:"active_sessions"`
-	AvgResponseTime      float64 `json:"avg_response_time"`
-	AvgResolutionTime    float64 `json:"avg_resolution_time"`
-	CustomerSatisfaction float64 `json:"customer_satisfaction"`
-	AIUsageToday         int64   `json:"ai_usage_today"`
-	KnowledgeProviderUsageToday int64 `json:"knowledge_provider_usage_today"`
-	WeKnoraUsageToday    int64   `json:"weknora_usage_today"`
+	TotalCustomers              int64   `json:"total_customers"`
+	TotalAgents                 int64   `json:"total_agents"`
+	TotalTickets                int64   `json:"total_tickets"`
+	TotalSessions               int64   `json:"total_sessions"`
+	TodayTickets                int64   `json:"today_tickets"`
+	TodaySessions               int64   `json:"today_sessions"`
+	TodayMessages               int64   `json:"today_messages"`
+	OpenTickets                 int64   `json:"open_tickets"`
+	AssignedTickets             int64   `json:"assigned_tickets"`
+	ResolvedTickets             int64   `json:"resolved_tickets"`
+	ClosedTickets               int64   `json:"closed_tickets"`
+	OnlineAgents                int64   `json:"online_agents"`
+	BusyAgents                  int64   `json:"busy_agents"`
+	ActiveSessions              int64   `json:"active_sessions"`
+	AvgResponseTime             float64 `json:"avg_response_time"`
+	AvgResolutionTime           float64 `json:"avg_resolution_time"`
+	CustomerSatisfaction        float64 `json:"customer_satisfaction"`
+	AIUsageToday                int64   `json:"ai_usage_today"`
+	KnowledgeProviderUsageToday int64   `json:"knowledge_provider_usage_today"`
+	WeKnoraUsageToday           int64   `json:"weknora_usage_today"`
 }
 
 type TimeRangeStats struct {
@@ -55,14 +55,14 @@ type CategoryStats struct {
 type IncrementKind string
 
 const (
-	IncrementSessions IncrementKind = "sessions"
-	IncrementMessages IncrementKind = "messages"
-	IncrementTickets  IncrementKind = "tickets"
-	IncrementResolved IncrementKind = "resolved"
-	IncrementAIUsage  IncrementKind = "ai_usage"
+	IncrementSessions          IncrementKind = "sessions"
+	IncrementMessages          IncrementKind = "messages"
+	IncrementTickets           IncrementKind = "tickets"
+	IncrementResolved          IncrementKind = "resolved"
+	IncrementAIUsage           IncrementKind = "ai_usage"
 	IncrementKnowledgeProvider IncrementKind = "knowledge_provider_usage"
-	IncrementWeKnora  IncrementKind = "weknora_usage"
-	IncrementSLA      IncrementKind = "sla_violations"
+	IncrementWeKnora           IncrementKind = "weknora_usage"
+	IncrementSLA               IncrementKind = "sla_violations"
 )
 
 type IncrementEvent struct {

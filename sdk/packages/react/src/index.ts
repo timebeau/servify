@@ -2,6 +2,7 @@
 export { ServifyProvider, useServify } from './ServifyProvider';
 export { useChat } from './useChat';
 export { useTickets, useAI, useSatisfaction } from './hooks';
+export { useRemoteAssist } from './useRemoteAssist';
 
 // 导出核心类型
 export * from '@servify/core';
@@ -10,6 +11,7 @@ export { createWebServifySDK } from '@servify/core';
 // 导出类型定义
 export type { ServifyProviderProps } from './ServifyProvider';
 export type { UseChatReturn } from './useChat';
+export type { UseRemoteAssistReturn } from './useRemoteAssist';
 export type {
   UseTicketsReturn,
   UseAIReturn,

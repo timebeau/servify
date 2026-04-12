@@ -17,18 +17,18 @@ import (
 
 // OrchestratedEnhancedAIService keeps the legacy enhanced AI surface while delegating query flow to the AI module.
 type OrchestratedEnhancedAIService struct {
-	base              *AIService
-	orchestrator      *aimodule.QueryOrchestrator
-	llmProvider       llm.LLMProvider
-	knowledgeProvider knowledgeprovider.KnowledgeProvider
-	knowledgeProviderID string
-	weKnoraClient     baseweknora.WeKnoraInterface
-	knowledgeBaseID   string
+	base                     *AIService
+	orchestrator             *aimodule.QueryOrchestrator
+	llmProvider              llm.LLMProvider
+	knowledgeProvider        knowledgeprovider.KnowledgeProvider
+	knowledgeProviderID      string
+	weKnoraClient            baseweknora.WeKnoraInterface
+	knowledgeBaseID          string
 	knowledgeProviderEnabled bool
-	fallbackEnabled   bool
-	circuitBreaker    *CircuitBreaker
-	metrics           *AIMetrics
-	logger            *logrus.Logger
+	fallbackEnabled          bool
+	circuitBreaker           *CircuitBreaker
+	metrics                  *AIMetrics
+	logger                   *logrus.Logger
 }
 
 func NewOrchestratedEnhancedAIService(
@@ -48,18 +48,18 @@ func NewOrchestratedEnhancedAIService(
 	}
 	orchestrator := aimodule.NewQueryOrchestrator(llmProvider, knowledgeProvider)
 	return &OrchestratedEnhancedAIService{
-		base:              base,
-		orchestrator:      orchestrator,
-		llmProvider:       llmProvider,
-		knowledgeProvider: knowledgeProvider,
-		knowledgeProviderID: strings.TrimSpace(knowledgeProviderID),
-		weKnoraClient:     weKnoraClient,
-		knowledgeBaseID:   knowledgeBaseID,
+		base:                     base,
+		orchestrator:             orchestrator,
+		llmProvider:              llmProvider,
+		knowledgeProvider:        knowledgeProvider,
+		knowledgeProviderID:      strings.TrimSpace(knowledgeProviderID),
+		weKnoraClient:            weKnoraClient,
+		knowledgeBaseID:          knowledgeBaseID,
 		knowledgeProviderEnabled: knowledgeProvider != nil,
-		fallbackEnabled:   true,
-		circuitBreaker:    NewCircuitBreaker(),
-		metrics:           &AIMetrics{ActiveKnowledgeProvider: strings.TrimSpace(knowledgeProviderID)},
-		logger:            logger,
+		fallbackEnabled:          true,
+		circuitBreaker:           NewCircuitBreaker(),
+		metrics:                  &AIMetrics{ActiveKnowledgeProvider: strings.TrimSpace(knowledgeProviderID)},
+		logger:                   logger,
 	}
 }
 
@@ -168,16 +168,16 @@ func (s *OrchestratedEnhancedAIService) InitializeKnowledgeBase() {
 
 func (s *OrchestratedEnhancedAIService) GetStatus(ctx context.Context) map[string]interface{} {
 	status := map[string]interface{}{
-		"type":                      "orchestrated_enhanced",
-		"knowledge_provider":        s.activeKnowledgeProviderID(),
+		"type":                       "orchestrated_enhanced",
+		"knowledge_provider":         s.activeKnowledgeProviderID(),
 		"knowledge_provider_enabled": s.knowledgeProviderEnabled,
-		"weknora_enabled":           s.knowledgeProviderEnabled && s.activeKnowledgeProviderID() == "weknora",
-		"dify_enabled":              s.knowledgeProviderEnabled && s.activeKnowledgeProviderID() == "dify",
-		"fallback_enabled":          s.fallbackEnabled,
-		"llm_provider":              s.llmProvider != nil,
-		"knowledge_base":            "orchestrated",
-		"document_count":            len(s.base.knowledgeBase.documents),
-		"metrics":                   s.GetMetrics(),
+		"weknora_enabled":            s.knowledgeProviderEnabled && s.activeKnowledgeProviderID() == "weknora",
+		"dify_enabled":               s.knowledgeProviderEnabled && s.activeKnowledgeProviderID() == "dify",
+		"fallback_enabled":           s.fallbackEnabled,
+		"llm_provider":               s.llmProvider != nil,
+		"knowledge_base":             "orchestrated",
+		"document_count":             len(s.base.knowledgeBase.documents),
+		"metrics":                    s.GetMetrics(),
 		"circuit_breaker": map[string]interface{}{
 			"state":         s.circuitBreaker.State(),
 			"failure_count": s.circuitBreaker.FailureCount(),
