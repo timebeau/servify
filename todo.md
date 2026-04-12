@@ -63,18 +63,23 @@
     - Conversation 页面与 workspace overview contract 对齐
     - 为 admin typings 增加工作台/统计真实结构
 
-- [ ] 核心运营链路闭环第一阶段
+- [x] 核心运营链路闭环第一阶段
   - 目标：先让“登录 -> 看板 -> 会话工作台 -> 工单处理”成为可演示、可继续迭代的主链路
   - 范围：
     - 去除 Dashboard/Conversation 的关键占位依赖
     - 补齐会话列表展示与空态
     - 为核心页补基础错误态和加载态
+  - 备注：核心页面与主链路已落地；剩余主要收敛到验收证据回填，见 `Gap A`
 
-- [ ] 产品化差距后续收口
+- [-] 产品化差距后续收口
   - 范围：
     - 逐步替换 mock / in-memory 运行时能力
     - 让 analytics 指标脱离硬编码
     - 继续把 legacy services 收口进 modules 边界
+  - 当前判断：
+    - analytics 真实聚合已完成
+    - services -> modules 主路径迁移已基本完成，但仍保留少量 compatibility facade / glue
+    - mock / in-memory 运行时仍有尾项，且 AI 双路径真实环境验收尚未全部补齐
 
 当前产品化判断：
 

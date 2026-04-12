@@ -29,6 +29,8 @@ Thumbs.db
 *.tmp
 *.temp
 .runtime/
+.git-rewrite/
+dump.rdb
 
 # 测试覆盖率
 # go test 常见产物/覆盖率文件
