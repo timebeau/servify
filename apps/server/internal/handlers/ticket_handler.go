@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"servify/apps/server/internal/models"
 	ticketcontract "servify/apps/server/internal/modules/ticket/contract"
 	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
-	"servify/apps/server/internal/models"
 	auditplatform "servify/apps/server/internal/platform/audit"
 
 	"github.com/gin-gonic/gin"
@@ -19,25 +19,25 @@ import (
 )
 
 type ticketResponse struct {
-	ID                uint                   `json:"id"`
-	Title             string                 `json:"title"`
-	Description       string                 `json:"description,omitempty"`
-	CustomerID        uint                   `json:"customer_id"`
-	CustomerName      string                 `json:"customer_name,omitempty"`
-	AgentID           *uint                  `json:"agent_id,omitempty"`
-	AgentName         string                 `json:"agent_name,omitempty"`
-	SessionID         *string                `json:"session_id,omitempty"`
-	Category          string                 `json:"category"`
-	Priority          string                 `json:"priority"`
-	Status            string                 `json:"status"`
-	Source            string                 `json:"source,omitempty"`
-	Tags              string                 `json:"tags"`
-	TagList           []string               `json:"tag_list,omitempty"`
-	CustomFields      map[string]interface{} `json:"custom_fields,omitempty"`
-	CreatedAt         time.Time              `json:"created_at"`
-	UpdatedAt         time.Time              `json:"updated_at"`
-	ResolvedAt        *time.Time             `json:"resolved_at,omitempty"`
-	ClosedAt          *time.Time             `json:"closed_at,omitempty"`
+	ID           uint                   `json:"id"`
+	Title        string                 `json:"title"`
+	Description  string                 `json:"description,omitempty"`
+	CustomerID   uint                   `json:"customer_id"`
+	CustomerName string                 `json:"customer_name,omitempty"`
+	AgentID      *uint                  `json:"agent_id,omitempty"`
+	AgentName    string                 `json:"agent_name,omitempty"`
+	SessionID    *string                `json:"session_id,omitempty"`
+	Category     string                 `json:"category"`
+	Priority     string                 `json:"priority"`
+	Status       string                 `json:"status"`
+	Source       string                 `json:"source,omitempty"`
+	Tags         string                 `json:"tags"`
+	TagList      []string               `json:"tag_list,omitempty"`
+	CustomFields map[string]interface{} `json:"custom_fields,omitempty"`
+	CreatedAt    time.Time              `json:"created_at"`
+	UpdatedAt    time.Time              `json:"updated_at"`
+	ResolvedAt   *time.Time             `json:"resolved_at,omitempty"`
+	ClosedAt     *time.Time             `json:"closed_at,omitempty"`
 }
 
 func buildTicketResponse(ticket *models.Ticket) *ticketResponse {

@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
+	"servify/apps/server/internal/models"
 	analyticsapp "servify/apps/server/internal/modules/analytics/application"
 	analyticscontract "servify/apps/server/internal/modules/analytics/contract"
 	analyticsdelivery "servify/apps/server/internal/modules/analytics/delivery"
 	analyticsinfra "servify/apps/server/internal/modules/analytics/infra"
-	"servify/apps/server/internal/models"
 	platformauth "servify/apps/server/internal/platform/auth"
 	"servify/apps/server/internal/platform/eventbus"
 

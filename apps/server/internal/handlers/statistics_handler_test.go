@@ -214,12 +214,12 @@ func TestStatisticsHandler_GetRemoteAssistTicketStats(t *testing.T) {
 	}
 
 	var got struct {
-		Total        int64   `json:"total"`
-		Open         int64   `json:"open"`
-		Resolved     int64   `json:"resolved"`
-		Closed       int64   `json:"closed"`
-		ResolvedRate float64 `json:"resolved_rate"`
-		ClosedRate   float64 `json:"closed_rate"`
+		Total         int64   `json:"total"`
+		Open          int64   `json:"open"`
+		Resolved      int64   `json:"resolved"`
+		Closed        int64   `json:"closed"`
+		ResolvedRate  float64 `json:"resolved_rate"`
+		ClosedRate    float64 `json:"closed_rate"`
 		AvgCloseHours float64 `json:"avg_close_hours"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {

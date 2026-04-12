@@ -56,11 +56,11 @@ type CategoryStats struct {
 
 // RemoteAssistTicketStats 远程协助工单统计
 type RemoteAssistTicketStats struct {
-	Total        int64   `json:"total"`
-	Open         int64   `json:"open"`
-	Resolved     int64   `json:"resolved"`
-	Closed       int64   `json:"closed"`
-	ResolvedRate float64 `json:"resolved_rate"`
-	ClosedRate   float64 `json:"closed_rate"`
+	Total         int64   `json:"total"`
+	Open          int64   `json:"open"`
+	Resolved      int64   `json:"resolved"`
+	Closed        int64   `json:"closed"`
+	ResolvedRate  float64 `json:"resolved_rate"`
+	ClosedRate    float64 `json:"closed_rate"`
 	AvgCloseHours float64 `json:"avg_close_hours"`
 }

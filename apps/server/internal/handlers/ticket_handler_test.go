@@ -337,18 +337,18 @@ func TestTicketHandler_GetAndListExposeTicketViewFields(t *testing.T) {
 
 	sessionID := "sess-ra-1"
 	ticket := &models.Ticket{
-		Title:      "远程协助跟进 - 客户一",
+		Title:       "远程协助跟进 - 客户一",
 		Description: "desc",
-		CustomerID: 1,
-		AgentID:    ptrUintTicket(2),
-		SessionID:  &sessionID,
-		Status:     "open",
-		Priority:   "high",
-		Category:   "remote-assist",
-		Source:     "remote_assist",
-		Tags:       "remote_assist,followup",
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		CustomerID:  1,
+		AgentID:     ptrUintTicket(2),
+		SessionID:   &sessionID,
+		Status:      "open",
+		Priority:    "high",
+		Category:    "remote-assist",
+		Source:      "remote_assist",
+		Tags:        "remote_assist,followup",
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 	if err := db.Create(ticket).Error; err != nil {
 		t.Fatalf("seed ticket: %v", err)
