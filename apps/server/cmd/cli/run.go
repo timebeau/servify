@@ -63,6 +63,7 @@ func run(cmd *cobra.Command, args []string) {
 		baseAI,
 		openAIProvider,
 		nil,
+		"",
 		nil,
 		"",
 		app.Logger,
