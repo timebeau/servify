@@ -27,11 +27,13 @@ jobs:
         shell: bash
     steps:
       - name: Checkout
+        timeout-minutes: 3
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Setup Go
+        timeout-minutes: 3
         uses: actions/setup-go@v5
         with:
           go-version-file: apps/server/go.mod
@@ -40,6 +42,7 @@ jobs:
             go.work.sum
 
       - name: Setup Node
+        timeout-minutes: 3
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -50,6 +53,7 @@ jobs:
             apps/website-worker/package-lock.json
 
       - name: Validate release version format
+        timeout-minutes: 1
         run: |
           if ! [[ "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
             echo "Version must be semver-like"
@@ -57,17 +61,21 @@ jobs:
           fi
 
       - name: Check SDK workspace versions
+        timeout-minutes: 2
         run: npm -C sdk run version:check
 
       - name: Build release artifacts
+        timeout-minutes: 15
         run: make VERSION="${{ inputs.version }}" build build-weknora
 
       - name: Generate changelog draft
+        timeout-minutes: 2
         run: |
           chmod +x scripts/generate-changelog.sh
           ./scripts/generate-changelog.sh "${{ inputs.previous_ref }}" HEAD > RELEASE_CHANGELOG.md
 
       - name: Upload release bundle
+        timeout-minutes: 3
         uses: actions/upload-artifact@v4
         with:
           name: release-${{ inputs.version }}

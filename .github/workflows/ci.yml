@@ -26,9 +26,11 @@ jobs:
         shell: bash
     steps:
       - name: Checkout
+        timeout-minutes: 3
         uses: actions/checkout@v4
 
       - name: Setup Go
+        timeout-minutes: 3
         uses: actions/setup-go@v5
         with:
           go-version-file: apps/server/go.mod
@@ -37,6 +39,7 @@ jobs:
             go.work.sum
 
       - name: Verify formatting
+        timeout-minutes: 2
         run: |
           mapfile -t files < <(git ls-files '*.go')
           if [ ${#files[@]} -eq 0 ]; then
@@ -50,24 +53,29 @@ jobs:
           fi
 
       - name: Go mod tidy check
+        timeout-minutes: 5
         run: |
           go -C apps/server mod tidy
           git diff --exit-code -- go.work.sum apps/server/go.mod apps/server/go.sum
 
       - name: Go vet
+        timeout-minutes: 2
         run: go -C apps/server vet ./...
 
       - name: Run unit tests with coverage
+        timeout-minutes: 10
         env:
           TEST_COVERAGE_TARGET: "5"
         run: ./scripts/run-tests.sh
 
       - name: Run Go race tests
+        timeout-minutes: 10
         env:
           CGO_ENABLED: "1"
         run: ./scripts/run-go-race-tests.sh
 
       - name: Upload test artifacts
+        timeout-minutes: 3
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -76,9 +84,11 @@ jobs:
           if-no-files-found: ignore
 
       - name: Build server binaries
+        timeout-minutes: 15
         run: make build
 
       - name: Build WeKnora CLI
+        timeout-minutes: 15
         run: make build-weknora
 
   module-checks:
@@ -90,9 +100,11 @@ jobs:
         shell: bash
     steps:
       - name: Checkout
+        timeout-minutes: 3
         uses: actions/checkout@v4
 
       - name: Setup Go
+        timeout-minutes: 3
         uses: actions/setup-go@v5
         with:
           go-version-file: apps/server/go.mod
@@ -101,6 +113,7 @@ jobs:
             go.work.sum
 
       - name: Test modular packages
+        timeout-minutes: 10
         run: |
           go test \
             ./apps/server/internal/modules/... \
@@ -109,6 +122,7 @@ jobs:
             ./apps/server/internal/handlers/...
 
       - name: Build modular entrypoints
+        timeout-minutes: 15
         run: |
           go build \
             ./apps/server/internal/modules/... \
@@ -125,9 +139,11 @@ jobs:
         shell: bash
     steps:
       - name: Checkout
+        timeout-minutes: 3
         uses: actions/checkout@v4
 
       - name: Setup Node
+        timeout-minutes: 3
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -135,31 +151,39 @@ jobs:
           cache-dependency-path: sdk/package-lock.json
 
       - name: Install SDK dependencies
+        timeout-minutes: 5
         run: npm -C sdk ci --no-audit --no-fund
 
       - name: Lint SDK
+        timeout-minutes: 2
         run: npm -C sdk run lint
 
       - name: Build SDK
+        timeout-minutes: 15
         run: npm -C sdk run build
 
       - name: Typecheck SDK
+        timeout-minutes: 5
         run: npm -C sdk run typecheck
 
       - name: Test SDK
+        timeout-minutes: 10
         run: npm -C sdk run test
 
       - name: Sync SDK to admin
+        timeout-minutes: 2
         run: |
           chmod +x scripts/sync-sdk-to-admin.sh
           ./scripts/sync-sdk-to-admin.sh
 
       - name: Verify generated assets manifest
+        timeout-minutes: 2
         run: |
           chmod +x scripts/verify-generated-assets.sh
           ./scripts/verify-generated-assets.sh
 
       - name: Verify generated assets are committed
+        timeout-minutes: 2
         run: |
           chmod +x scripts/check-generated-drift.sh
           ./scripts/check-generated-drift.sh \
@@ -176,9 +200,11 @@ jobs:
         shell: bash
     steps:
       - name: Checkout
+        timeout-minutes: 3
         uses: actions/checkout@v4
 
       - name: Setup Go
+        timeout-minutes: 3
         uses: actions/setup-go@v5
         with:
           go-version-file: apps/server/go.mod
@@ -187,6 +213,7 @@ jobs:
             go.work.sum
 
       - name: Setup Node
+        timeout-minutes: 3
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -194,9 +221,11 @@ jobs:
           cache-dependency-path: docs/package-lock.json
 
       - name: Install docs dependencies
+        timeout-minutes: 5
         run: npm -C docs ci --no-audit --no-fund
 
       - name: Verify docs lockfile is committed
+        timeout-minutes: 2
         run: |
           chmod +x scripts/check-generated-drift.sh
           ./scripts/check-generated-drift.sh \
@@ -205,12 +234,15 @@ jobs:
             docs/package-lock.json
 
       - name: Generate API docs
+        timeout-minutes: 10
         run: go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g apps/server/cmd/server/main.go -o docs/generated/api
 
       - name: Build docs site
+        timeout-minutes: 15
         run: npm -C docs run build
 
       - name: Verify docs generated assets are committed
+        timeout-minutes: 2
         run: |
           chmod +x scripts/check-generated-drift.sh
           ./scripts/check-generated-drift.sh \
@@ -220,6 +252,7 @@ jobs:
             docs/package-lock.json
 
       - name: Upload docs artifact
+        timeout-minutes: 3
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -236,9 +269,11 @@ jobs:
         shell: bash
     steps:
       - name: Checkout
+        timeout-minutes: 3
         uses: actions/checkout@v4
 
       - name: Validate shell syntax
+        timeout-minutes: 2
         run: |
           mapfile -t files < <(find scripts -type f -name '*.sh' | sort)
           if [ ${#files[@]} -eq 0 ]; then
@@ -247,14 +282,17 @@ jobs:
           bash -n "${files[@]}"
 
       - name: Validate repository hygiene
+        timeout-minutes: 2
         run: |
           chmod +x scripts/check-repo-hygiene.sh
           ./scripts/check-repo-hygiene.sh
 
       - name: Install ripgrep
+        timeout-minutes: 5
         run: sudo apt-get update && sudo apt-get install -y ripgrep
 
       - name: Validate module boundaries
+        timeout-minutes: 2
         run: |
           chmod +x scripts/check-module-boundaries.sh
           ./scripts/check-module-boundaries.sh
@@ -268,9 +306,11 @@ jobs:
         shell: bash
     steps:
       - name: Checkout
+        timeout-minutes: 3
         uses: actions/checkout@v4
 
       - name: Setup Go
+        timeout-minutes: 3
         uses: actions/setup-go@v5
         with:
           go-version-file: apps/server/go.mod
@@ -279,6 +319,7 @@ jobs:
             go.work.sum
 
       - name: Setup Node
+        timeout-minutes: 3
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -286,9 +327,11 @@ jobs:
           cache-dependency-path: sdk/package-lock.json
 
       - name: Install SDK dependencies
+        timeout-minutes: 5
         run: npm -C sdk ci --no-audit --no-fund
 
       - name: Run smoke suite
+        timeout-minutes: 10
         run: |
           chmod +x scripts/run-smoke-tests.sh
           ./scripts/run-smoke-tests.sh
@@ -302,23 +345,28 @@ jobs:
         shell: bash
     steps:
       - name: Checkout
+        timeout-minutes: 3
         uses: actions/checkout@v4
 
       - name: Setup Node
+        timeout-minutes: 3
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: Setup pnpm
+        timeout-minutes: 3
         uses: pnpm/action-setup@v4
         with:
           version: 9
 
       - name: Get pnpm store directory
+        timeout-minutes: 1
         shell: bash
         run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
       - name: Setup pnpm cache
+        timeout-minutes: 3
         uses: actions/cache@v4
         with:
           path: ${{ env.STORE_PATH }}
@@ -327,12 +375,15 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Install admin dependencies
+        timeout-minutes: 5
         run: pnpm --dir apps/admin install --frozen-lockfile
 
       - name: Build admin frontend
+        timeout-minutes: 15
         run: pnpm --dir apps/admin run build
 
       - name: Upload admin build artifact
+        timeout-minutes: 3
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -356,15 +407,19 @@ jobs:
         shell: bash
     steps:
       - name: Checkout
+        timeout-minutes: 3
         uses: actions/checkout@v4
 
       - name: Compose version
+        timeout-minutes: 1
         run: docker compose version
 
       - name: Compose up
+        timeout-minutes: 10
         run: docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.weknora.yml up -d --build
 
       - name: Wait for health
+        timeout-minutes: 5
         run: |
           for i in {1..90}; do
             if curl -fsS http://localhost:8080/health; then
@@ -375,6 +430,7 @@ jobs:
           exit 1
 
       - name: Run integration script
+        timeout-minutes: 10
         env:
           SERVIFY_URL: http://localhost:8080
           WEKNORA_URL: http://localhost:9000
@@ -383,9 +439,11 @@ jobs:
           ./scripts/test-weknora-integration.sh
 
       - name: Dump compose logs
+        timeout-minutes: 2
         if: failure()
         run: docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.weknora.yml logs --no-color
 
       - name: Compose down
+        timeout-minutes: 3
         if: always()
         run: docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.weknora.yml down -v

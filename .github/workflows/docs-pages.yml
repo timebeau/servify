@@ -32,9 +32,11 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
+        timeout-minutes: 3
         uses: actions/checkout@v4
 
       - name: Setup Node
+        timeout-minutes: 3
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -42,6 +44,7 @@ jobs:
           cache-dependency-path: docs/package-lock.json
 
       - name: Setup Go
+        timeout-minutes: 3
         uses: actions/setup-go@v5
         with:
           go-version-file: apps/server/go.mod
@@ -50,22 +53,28 @@ jobs:
             go.work.sum
 
       - name: Install docs dependencies
+        timeout-minutes: 5
         run: npm -C docs ci --no-audit --no-fund
 
       - name: Generate API docs
+        timeout-minutes: 10
         run: go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g apps/server/cmd/server/main.go -o docs/generated/api
 
       - name: Build docs
+        timeout-minutes: 15
         run: npm -C docs run build
 
       - name: Configure Pages
+        timeout-minutes: 3
         uses: actions/configure-pages@v5
 
       - name: Upload Pages Artifact
+        timeout-minutes: 3
         uses: actions/upload-pages-artifact@v3
         with:
           path: docs/.vuepress/dist
 
       - name: Deploy to GitHub Pages
+        timeout-minutes: 3
         id: deployment
         uses: actions/deploy-pages@v4
