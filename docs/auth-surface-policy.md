@@ -101,10 +101,10 @@
 
 ## 实现落点
 
-- 路由装配：[apps/server/internal/app/server/router.go](/D:/workspaces/servify/apps/server/internal/app/server/router.go)
-- 路由安全表面目录：[apps/server/internal/app/server/security_surface.go](/D:/workspaces/servify/apps/server/internal/app/server/security_surface.go)
-- JWT 与 claims 归一化：[apps/server/internal/platform/auth](/D:/workspaces/servify/apps/server/internal/platform/auth)
-- Gin 兼容入口：[apps/server/internal/middleware](/D:/workspaces/servify/apps/server/internal/middleware)
+- 路由装配：[router.go](https://github.com/timebeau/servify/blob/main/apps/server/internal/app/server/router.go)
+- 路由安全表面目录：[security_surface.go](https://github.com/timebeau/servify/blob/main/apps/server/internal/app/server/security_surface.go)
+- JWT 与 claims 归一化：[platform/auth](https://github.com/timebeau/servify/tree/main/apps/server/internal/platform/auth)
+- Gin 兼容入口：[internal/middleware](https://github.com/timebeau/servify/tree/main/apps/server/internal/middleware)
 
 ## 后续扩展
 

@@ -667,7 +667,7 @@ docker compose -f infra/compose/docker-compose.observability.yml logs otel-colle
 
 ### 运维手册
 
-详细的告警排查步骤见：[`deploy/observability/runbook/operational-runbook.md`](../deploy/observability/runbook/operational-runbook.md)
+详细的告警排查步骤见：[`deploy/observability/runbook/operational-runbook.md`](https://github.com/timebeau/servify/blob/main/deploy/observability/runbook/operational-runbook.md)
 
 ---
 

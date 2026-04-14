@@ -91,6 +91,6 @@
 
 ## 与现有文档的关系
 
-- 路由表面分类：[docs/auth-surface-policy.md](/D:/workspaces/servify/docs/auth-surface-policy.md)
-- 运行安全基线：[docs/security-baseline-operations.md](/D:/workspaces/servify/docs/security-baseline-operations.md)
-- token / key 轮换：[docs/token-lifecycle-and-key-rotation.md](/D:/workspaces/servify/docs/token-lifecycle-and-key-rotation.md)
+- 路由表面分类：[auth-surface-policy.md](auth-surface-policy.md)
+- 运行安全基线：[security-baseline-operations.md](security-baseline-operations.md)
+- token / key 轮换：[token-lifecycle-and-key-rotation.md](token-lifecycle-and-key-rotation.md)
