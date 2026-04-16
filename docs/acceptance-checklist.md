@@ -158,7 +158,7 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 | WebSocket 统计 | `GET /api/v1/ws/stats` | 建连前后各请求一次 | client 数量正确变化 | [websocket_processing_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/websocket_processing_test.go) | 通过 |
 | WebRTC 统计 | `GET /api/v1/webrtc/stats` | 建立会话后请求 | 返回连接统计 | [webrtc_stats_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/webrtc_stats_test.go) | 通过 |
 | WebRTC 连接列表 | `GET /api/v1/webrtc/connections` | 建立多连接后请求 | 返回当前连接列表 | [webrtc_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/webrtc_test.go) | 通过 |
-| 平台消息路由统计 | `GET /api/v1/messages/platforms` | 模拟不同平台消息后请求 | 平台维度统计正确 | [router_stats_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/router_stats_test.go) | 未验 |
+| 平台消息路由统计 | `GET /api/v1/messages/platforms` | 模拟不同平台消息后请求 | 平台维度统计正确 | [router_stats_test.go](/Users/cui/Workspaces/servify/apps/server/internal/services/router_stats_test.go)、[message_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/message_handler_test.go) | 通过 |
 
 ### 3. AI 与外部知识库
 
@@ -229,16 +229,16 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 
 | 功能项 | 入口 | 验收步骤 | 预期结果 | 自动化证据 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| 创建工单 | `POST /api/tickets` | 提交合法工单 | 创建成功，返回 ID | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 部分通过 |
-| 批量更新工单 | `POST /api/tickets/bulk` | 批量更新多个工单 | 返回批量结果，数据一致 | [ticket_handler.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler.go) | 未验 |
+| 创建工单 | `POST /api/tickets` | 提交合法工单 | 创建成功，返回 ID | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 通过 |
+| 批量更新工单 | `POST /api/tickets/bulk` | 批量更新多个工单 | 返回批量结果，数据一致 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go)、[command_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/ticket/application/command_service_test.go) | 通过 |
 | 工单列表 | `GET /api/tickets` | 创建后查询 | 支持筛选和分页 | [query_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/ticket/application/query_service_test.go)、[ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 通过 |
-| 导出工单 CSV | `GET /api/tickets/export` | 准备样本后导出 | 下载成功，字段完整 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 未验 |
-| 工单统计 | `GET /api/tickets/stats` | 准备不同状态工单后查询 | 统计值正确 | [query_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/ticket/application/query_service_test.go) | 未验 |
+| 导出工单 CSV | `GET /api/tickets/export` | 准备样本后导出 | 下载成功，字段完整 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 通过 |
+| 工单统计 | `GET /api/tickets/stats` | 准备不同状态工单后查询 | 统计值正确 | [query_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/ticket/application/query_service_test.go) | 通过 |
 | 工单详情 | `GET /api/tickets/:id` | 查询已存在工单 | 返回正确详情 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 通过 |
-| 更新工单 | `PUT /api/tickets/:id` | 更新标题、优先级、状态 | 数据被持久化 | [command_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/ticket/application/command_service_test.go) | 部分通过 |
+| 更新工单 | `PUT /api/tickets/:id` | 更新标题、优先级、状态 | 数据被持久化 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go)、[command_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/ticket/application/command_service_test.go) | 通过 |
 | 指派工单 | `POST /api/tickets/:id/assign` | 指派给客服 | 负责人变化正确 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 通过 |
-| 添加评论 | `POST /api/tickets/:id/comments` | 添加评论后重查 | 评论可读出 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 部分通过 |
-| 关闭工单 | `POST /api/tickets/:id/close` | 关闭后重查 | 状态变为关闭，关闭时间正确 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 部分通过 |
+| 添加评论 | `POST /api/tickets/:id/comments` | 添加评论后重查 | 评论可读出 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go)、[command_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/ticket/application/command_service_test.go) | 通过 |
+| 关闭工单 | `POST /api/tickets/:id/close` | 关闭后重查 | 状态变为关闭，关闭时间正确 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go)、[command_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/ticket/application/command_service_test.go) | 通过 |
 
 ### 6A. 会话工作台
 

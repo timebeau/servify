@@ -507,6 +507,13 @@ func TestTicketHandler_AuditSnapshotsForUpdateAssignClose(t *testing.T) {
 	if w1.Code != http.StatusOK {
 		t.Fatalf("update status=%d body=%s", w1.Code, w1.Body.String())
 	}
+	var updatedTicket models.Ticket
+	if err := db.First(&updatedTicket, ticket.ID).Error; err != nil {
+		t.Fatalf("load updated ticket: %v", err)
+	}
+	if updatedTicket.Title != "after-title" {
+		t.Fatalf("updated title=%q want after-title", updatedTicket.Title)
+	}
 
 	assignBody, _ := json.Marshal(map[string]any{"agent_id": 2})
 	w2 := httptest.NewRecorder()
@@ -524,6 +531,16 @@ func TestTicketHandler_AuditSnapshotsForUpdateAssignClose(t *testing.T) {
 	r.ServeHTTP(w3, req3)
 	if w3.Code != http.StatusOK {
 		t.Fatalf("close status=%d body=%s", w3.Code, w3.Body.String())
+	}
+	var closedTicket models.Ticket
+	if err := db.First(&closedTicket, ticket.ID).Error; err != nil {
+		t.Fatalf("load closed ticket: %v", err)
+	}
+	if closedTicket.Status != "closed" {
+		t.Fatalf("closed status=%q want closed", closedTicket.Status)
+	}
+	if closedTicket.ClosedAt == nil || closedTicket.ClosedAt.IsZero() {
+		t.Fatalf("expected closed_at to be set")
 	}
 
 	if len(recorder.entries) != 3 {
@@ -674,5 +691,74 @@ func TestTicketHandler_GetRelatedConversations_NoTicket(t *testing.T) {
 	json.Unmarshal(w.Body.Bytes(), &resp)
 	if len(resp.Data) != 0 {
 		t.Fatalf("expected 0 sessions for non-existent ticket, got %d", len(resp.Data))
+	}
+}
+
+func TestTicketHandler_AddComment(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestDBForTickets(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.WarnLevel)
+
+	if err := db.Create(&models.User{ID: 1, Username: "c1", Name: "c1", Email: "c1@example.com", Role: "customer"}).Error; err != nil {
+		t.Fatalf("seed customer: %v", err)
+	}
+	ticket := &models.Ticket{
+		Title:      "comment-ticket",
+		CustomerID: 1,
+		Status:     "open",
+		Priority:   "normal",
+		Category:   "general",
+	}
+	if err := db.Create(ticket).Error; err != nil {
+		t.Fatalf("seed ticket: %v", err)
+	}
+
+	h := NewTicketHandler(ticketdelivery.NewHandlerServiceWithDependencies(ticketdelivery.HandlerAssemblyDependencies{
+		DB:     db,
+		Logger: logger,
+	}), logger)
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", uint(99))
+		c.Next()
+	})
+	r.POST("/api/tickets/:id/comments", h.AddComment)
+
+	body, _ := json.Marshal(map[string]any{
+		"content": "follow-up note",
+		"type":    "internal",
+	})
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/tickets/"+toStr(ticket.ID)+"/comments", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("add comment status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	var got models.TicketComment
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal comment: %v body=%s", err, w.Body.String())
+	}
+	if got.TicketID != ticket.ID {
+		t.Fatalf("comment ticket_id=%d want %d", got.TicketID, ticket.ID)
+	}
+	if got.UserID != 99 {
+		t.Fatalf("comment user_id=%d want 99", got.UserID)
+	}
+	if got.Content != "follow-up note" {
+		t.Fatalf("comment content=%q want follow-up note", got.Content)
+	}
+
+	var persisted models.TicketComment
+	if err := db.First(&persisted, got.ID).Error; err != nil {
+		t.Fatalf("load persisted comment: %v", err)
+	}
+	if persisted.Content != "follow-up note" {
+		t.Fatalf("persisted content=%q want follow-up note", persisted.Content)
 	}
 }
