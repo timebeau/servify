@@ -1,17 +1,22 @@
 package config
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/viper"
 )
 
+const DefaultOpenAIModel = "gpt-4.1-mini"
+
 type Config struct {
 	Server     ServerConfig     `yaml:"server"`
+	EventBus   EventBusConfig   `yaml:"event_bus"`
 	Database   DatabaseConfig   `yaml:"database"`
 	Redis      RedisConfig      `yaml:"redis"`
 	WebRTC     WebRTCConfig     `yaml:"webrtc"`
+	Voice      VoiceConfig      `yaml:"voice"`
 	AI         AIConfig         `yaml:"ai"`
 	Dify       DifyConfig       `yaml:"dify"`
 	WeKnora    WeKnoraConfig    `yaml:"weknora"`
@@ -28,6 +33,10 @@ type ServerConfig struct {
 	Host        string `yaml:"host"`
 	Port        int    `yaml:"port"`
 	Environment string `yaml:"environment"`
+}
+
+type EventBusConfig struct {
+	Provider string `yaml:"provider"`
 }
 
 type DatabaseConfig struct {
@@ -52,6 +61,11 @@ type RedisConfig struct {
 
 type WebRTCConfig struct {
 	STUNServer string `yaml:"stun_server"`
+}
+
+type VoiceConfig struct {
+	RecordingProvider  string `yaml:"recording_provider"`
+	TranscriptProvider string `yaml:"transcript_provider"`
 }
 
 type AIConfig struct {
@@ -107,9 +121,10 @@ type WeKnoraHealthConfig struct {
 }
 
 type FallbackConfig struct {
-	Enabled         bool                 `yaml:"enabled"`
-	LegacyKBEnabled bool                 `yaml:"legacy_kb_enabled"`
-	CircuitBreaker  CircuitBreakerConfig `yaml:"circuit_breaker"`
+	Enabled              bool                 `yaml:"enabled"`
+	KnowledgeBaseEnabled bool                 `yaml:"knowledge_base_enabled"`
+	LegacyKBEnabled      bool                 `yaml:"legacy_kb_enabled" json:"-"`
+	CircuitBreaker       CircuitBreakerConfig `yaml:"circuit_breaker"`
 }
 
 type CircuitBreakerConfig struct {
@@ -268,7 +283,7 @@ type UploadConfig struct {
 	AutoIndex    bool     `yaml:"auto_index"`
 }
 
-func Load() *Config {
+func Load() (*Config, error) {
 	// Start with default config to ensure all fields have valid defaults
 	config := GetDefaultConfig()
 	// Viper unmarshalling uses mapstructure tags by default; explicitly decode via our `yaml` tags
@@ -276,9 +291,24 @@ func Load() *Config {
 	if err := viper.Unmarshal(config, func(dc *mapstructure.DecoderConfig) {
 		dc.TagName = "yaml"
 	}); err != nil {
-		panic(err)
+		return nil, fmt.Errorf("unmarshal config: %w", err)
 	}
-	return config
+	normalizeConfig(config)
+	return config, nil
+}
+
+func normalizeConfig(cfg *Config) {
+	knowledgeBaseConfigured := viper.IsSet("fallback.knowledge_base_enabled")
+	legacyConfigured := viper.IsSet("fallback.legacy_kb_enabled")
+
+	switch {
+	case knowledgeBaseConfigured:
+		cfg.Fallback.LegacyKBEnabled = cfg.Fallback.KnowledgeBaseEnabled
+	case legacyConfigured:
+		cfg.Fallback.KnowledgeBaseEnabled = cfg.Fallback.LegacyKBEnabled
+	default:
+		cfg.Fallback.LegacyKBEnabled = cfg.Fallback.KnowledgeBaseEnabled
+	}
 }
 
 // GetDefaultConfig 返回默认配置
@@ -288,6 +318,9 @@ func GetDefaultConfig() *Config {
 			Host:        "0.0.0.0",
 			Port:        8080,
 			Environment: "development",
+		},
+		EventBus: EventBusConfig{
+			Provider: "inmemory",
 		},
 		Database: DatabaseConfig{
 			Host:            "localhost",
@@ -310,10 +343,14 @@ func GetDefaultConfig() *Config {
 		WebRTC: WebRTCConfig{
 			STUNServer: "stun:stun.l.google.com:19302",
 		},
+		Voice: VoiceConfig{
+			RecordingProvider:  "disabled",
+			TranscriptProvider: "disabled",
+		},
 		AI: AIConfig{
 			OpenAI: OpenAIConfig{
 				BaseURL:     "https://api.openai.com/v1",
-				Model:       "gpt-3.5-turbo",
+				Model:       DefaultOpenAIModel,
 				Temperature: 0.7,
 				MaxTokens:   1000,
 				Timeout:     30 * time.Second,
@@ -350,8 +387,9 @@ func GetDefaultConfig() *Config {
 			},
 		},
 		Fallback: FallbackConfig{
-			Enabled:         true,
-			LegacyKBEnabled: true,
+			Enabled:              true,
+			KnowledgeBaseEnabled: true,
+			LegacyKBEnabled:      true,
 			CircuitBreaker: CircuitBreakerConfig{
 				Enabled:         true,
 				MaxFailures:     5,

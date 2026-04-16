@@ -1,9 +1,11 @@
 package bootstrap
 
 import (
+	"errors"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"servify/apps/server/internal/config"
 )
@@ -57,5 +59,27 @@ func TestAutoMigrateEnabled(t *testing.T) {
 		if got := AutoMigrateEnabled(); got != tt.want {
 			t.Fatalf("AutoMigrateEnabled(%q)=%v want %v", tt.value, got, tt.want)
 		}
+	}
+}
+
+func TestOpenDatabaseWithRetryFailsAfterAttempts(t *testing.T) {
+	start := time.Now()
+	_, err := OpenDatabaseWithRetry(config.GetDefaultConfig(), DatabaseOptions{
+		DSN: "host=127.0.0.1 user=invalid password=invalid dbname=invalid port=1 sslmode=disable TimeZone=UTC",
+	}, DatabaseRetryOptions{
+		MaxRetries: 2,
+		RetryDelay: time.Nanosecond,
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "connect database after 2 attempts") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if errors.Unwrap(err) == nil {
+		t.Fatalf("expected wrapped database error: %v", err)
+	}
+	if time.Since(start) > 5*time.Second {
+		t.Fatal("retry test took too long")
 	}
 }

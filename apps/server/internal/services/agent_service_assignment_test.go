@@ -53,7 +53,7 @@ func TestAgentService_AssignSessionToAgent_Success(t *testing.T) {
 	}
 
 	// Verify agent load increased
-	agentInfo, ok := svc.GetOnlineAgent(agent.ID)
+	agentInfo, ok := svc.GetOnlineAgent(context.Background(), agent.ID)
 	if !ok {
 		t.Fatal("agent not found in online agents")
 	}
@@ -79,7 +79,7 @@ func TestAgentService_AssignSessionToAgent_AgentNotOnline(t *testing.T) {
 
 	agent := &models.Agent{
 		UserID: user.ID,
-		Status: "online",
+		Status: "offline",
 	}
 	db.Create(agent)
 
@@ -175,7 +175,7 @@ func TestAgentService_ReleaseSessionFromAgent_Success(t *testing.T) {
 	}
 
 	// Verify agent load decreased
-	agentInfo, ok := svc.GetOnlineAgent(agent.ID)
+	agentInfo, ok := svc.GetOnlineAgent(context.Background(), agent.ID)
 	if !ok {
 		t.Fatal("agent not found in online agents")
 	}

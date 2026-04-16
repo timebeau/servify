@@ -29,7 +29,7 @@ ai:
   openai:
     api_key: ""
     base_url: "https://api.openai.com/v1"
-    model: "gpt-3.5-turbo"
+    model: "gpt-4.1-mini"
     temperature: 0.7
     max_tokens: 1000
     timeout: 30s
@@ -70,7 +70,7 @@ weknora:
 # 新增：降级策略配置
 fallback:
   enabled: true
-  legacy_kb_enabled: true
+  knowledge_base_enabled: true
 
   # 熔断器配置
   circuit_breaker:

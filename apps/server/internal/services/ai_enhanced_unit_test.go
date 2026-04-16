@@ -28,8 +28,11 @@ func TestEnhancedAI_Toggles(t *testing.T) {
 	s.SetFallbackEnabled(false)
 	// simple smoke: status map should reflect toggles
 	st := s.GetStatus(context.Background())
-	if st["weknora_enabled"].(bool) != true {
-		t.Fatalf("weknora_enabled not set")
+	if st["knowledge_provider_enabled"].(bool) != true {
+		t.Fatalf("knowledge_provider_enabled not set")
+	}
+	if st["knowledge_provider"] != "weknora" {
+		t.Fatalf("expected knowledge_provider weknora, got %v", st["knowledge_provider"])
 	}
 	if st["fallback_enabled"].(bool) != false {
 		t.Fatalf("fallback_enabled not set")

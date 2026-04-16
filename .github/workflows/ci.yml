@@ -170,11 +170,11 @@ jobs:
         timeout-minutes: 10
         run: npm -C sdk run test
 
-      - name: Sync SDK to admin
+      - name: Sync SDK to demo-sdk
         timeout-minutes: 2
         run: |
-          chmod +x scripts/sync-sdk-to-admin.sh
-          ./scripts/sync-sdk-to-admin.sh
+          chmod +x scripts/sync-sdk-to-demo.sh
+          ./scripts/sync-sdk-to-demo.sh
 
       - name: Verify generated assets manifest
         timeout-minutes: 2
@@ -280,6 +280,11 @@ jobs:
             exit 0
           fi
           bash -n "${files[@]}"
+
+      - name: Verify provider acceptance scripts
+        timeout-minutes: 5
+        run: |
+          go test ./scripts -run "Test(WeKnoraIntegrationScript(RealModeRejectsLocalHost|MockModeWritesEvidence)|DifyIntegrationScript(RealModeRejectsLocalHost|MockModeWritesEvidence))$"
 
       - name: Validate repository hygiene
         timeout-minutes: 2

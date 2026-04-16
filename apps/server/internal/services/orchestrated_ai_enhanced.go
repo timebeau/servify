@@ -167,16 +167,19 @@ func (s *OrchestratedEnhancedAIService) InitializeKnowledgeBase() {
 }
 
 func (s *OrchestratedEnhancedAIService) GetStatus(ctx context.Context) map[string]interface{} {
+	documentCount := 0
+	if s.base != nil && s.base.knowledgeBase != nil {
+		documentCount = len(s.base.knowledgeBase.documents)
+	}
+
 	status := map[string]interface{}{
 		"type":                       "orchestrated_enhanced",
 		"knowledge_provider":         s.activeKnowledgeProviderID(),
 		"knowledge_provider_enabled": s.knowledgeProviderEnabled,
-		"weknora_enabled":            s.knowledgeProviderEnabled && s.activeKnowledgeProviderID() == "weknora",
-		"dify_enabled":               s.knowledgeProviderEnabled && s.activeKnowledgeProviderID() == "dify",
 		"fallback_enabled":           s.fallbackEnabled,
 		"llm_provider":               s.llmProvider != nil,
-		"knowledge_base":             "orchestrated",
-		"document_count":             len(s.base.knowledgeBase.documents),
+		"knowledge_mode":             "orchestrated",
+		"document_count":             documentCount,
 		"metrics":                    s.GetMetrics(),
 		"circuit_breaker": map[string]interface{}{
 			"state":         s.circuitBreaker.State(),
@@ -188,18 +191,6 @@ func (s *OrchestratedEnhancedAIService) GetStatus(ctx context.Context) map[strin
 		status["knowledge_provider_healthy"] = err == nil
 		if err != nil {
 			status["knowledge_provider_error"] = err.Error()
-		}
-		switch s.activeKnowledgeProviderID() {
-		case "dify":
-			status["dify_healthy"] = err == nil
-			if err != nil {
-				status["dify_error"] = err.Error()
-			}
-		case "weknora":
-			status["weknora_healthy"] = err == nil
-			if err != nil {
-				status["weknora_error"] = err.Error()
-			}
 		}
 	}
 	return status
@@ -261,6 +252,9 @@ func (s *OrchestratedEnhancedAIService) activeKnowledgeProvider() knowledgeprovi
 }
 
 func (s *OrchestratedEnhancedAIService) activeKnowledgeProviderID() string {
+	if !s.knowledgeProviderEnabled {
+		return ""
+	}
 	if strings.TrimSpace(s.knowledgeProviderID) == "" {
 		return "weknora"
 	}

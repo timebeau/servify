@@ -2,21 +2,14 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"os"
-	"strconv"
 	"time"
 
 	appbootstrap "servify/apps/server/internal/app/bootstrap"
-	appserver "servify/apps/server/internal/app/server"
 	appworker "servify/apps/server/internal/app/worker"
-	auditplatform "servify/apps/server/internal/platform/audit"
-	"servify/apps/server/internal/platform/eventbus"
-	"servify/apps/server/internal/platform/usersecurity"
 
 	"github.com/sirupsen/logrus"
-	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
 
@@ -25,67 +18,21 @@ func main() {
 	if err != nil {
 		logrus.Fatalf("Failed to load config: %v", err)
 	}
-	app := appbootstrap.BuildApp(cfg)
 
-	// 允许通过 flags/env 覆盖数据库连接（保持与 migrate 一致的接口）
-	var (
-		flagDSN   string
-		dbHost    string
-		dbPortStr string
-		dbUser    string
-		dbPass    string
-		dbName    string
-		dbSSLMode string
-		dbTZ      string
-		srvHost   string
-		srvPort   int
-	)
-	// 延迟导入以避免顶层 import 冲突
-	{
-		// 标准库 flag 在此作用域使用
-		type strptr = *string
-		_ = strptr(nil)
-	}
-	// 使用标准库 flag
-	flagSet := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
-	flagSet.SetOutput(os.Stdout)
-	flagSet.StringVar(&flagDSN, "dsn", os.Getenv("DB_DSN"), "Postgres DSN, if set overrides other DB flags")
-	flagSet.StringVar(&dbHost, "db-host", getenvDefault("DB_HOST", cfg.Database.Host), "database host")
-	flagSet.StringVar(&dbPortStr, "db-port", getenvDefault("DB_PORT", fmt.Sprintf("%d", cfg.Database.Port)), "database port")
-	flagSet.StringVar(&dbUser, "db-user", getenvDefault("DB_USER", cfg.Database.User), "database user")
-	flagSet.StringVar(&dbPass, "db-pass", getenvDefault("DB_PASSWORD", cfg.Database.Password), "database password")
-	flagSet.StringVar(&dbName, "db-name", getenvDefault("DB_NAME", cfg.Database.Name), "database name")
-	flagSet.StringVar(&dbSSLMode, "db-sslmode", getenvDefault("DB_SSLMODE", "disable"), "sslmode (disable, require, verify-ca, verify-full)")
-	flagSet.StringVar(&dbTZ, "db-timezone", getenvDefault("DB_TIMEZONE", "UTC"), "database timezone")
-	flagSet.StringVar(&srvHost, "host", getenvDefault("SERVIFY_HOST", cfg.Server.Host), "server host (listen)")
-	flagSet.IntVar(&srvPort, "port", func() int {
-		if p := os.Getenv("SERVIFY_PORT"); p != "" {
-			if n, err := strconv.Atoi(p); err == nil {
-				return n
-			}
-		}
-		return cfg.Server.Port
-	}(), "server port (listen)")
-	_ = flagSet.Parse(os.Args[1:])
-
-	// 组装 DSN
-	dsn := flagDSN
-	if dsn == "" {
-		host := firstNonEmpty(dbHost, cfg.Database.Host)
-		user := firstNonEmpty(dbUser, cfg.Database.User)
-		pass := firstNonEmpty(dbPass, cfg.Database.Password)
-		name := firstNonEmpty(dbName, cfg.Database.Name)
-		port := dbPortStr
-		if port == "" && cfg.Database.Port != 0 {
-			port = fmt.Sprintf("%d", cfg.Database.Port)
-		}
-		ssl := dbSSLMode
-		tz := dbTZ
-		dsn = fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=%s", host, user, pass, name, port, ssl, tz)
+	overrides, err := appbootstrap.ResolveRuntimeOverrides(cfg, os.Args[1:], os.Stdout)
+	if err != nil {
+		logrus.Fatalf("Failed to parse startup options: %v", err)
 	}
 	appLogger, err := appbootstrap.InitLogging(cfg)
 	if err != nil {
 		logrus.Warnf("init logger: %v", err)
+	}
+	if appLogger == nil {
+		appLogger = logrus.StandardLogger()
+	}
+	app, err := appbootstrap.BuildApp(cfg)
+	if err != nil {
+		appLogger.Fatalf("Failed to build app: %v", err)
 	}
 	app.Logger = appLogger
 
@@ -93,27 +40,16 @@ func main() {
 		appLogger.Warnf("init tracing: %v", err)
 	}
 
-	// Open database with retry logic for container startup
-	var db *gorm.DB
-	maxRetries := 10
-	retryDelay := 2 * time.Second
-
-	for i := 0; i < maxRetries; i++ {
-		db, err = appbootstrap.OpenDatabase(cfg, appbootstrap.DatabaseOptions{
-			DSN:           dsn,
-			LogLevel:      logger.Info,
-			EnableTracing: cfg.Monitoring.Tracing.Enabled,
-		})
-		if err == nil {
-			break
-		}
-		if i < maxRetries-1 {
-			appLogger.Warnf("Failed to connect to database (attempt %d/%d): %v, retrying in %v...", i+1, maxRetries, err, retryDelay)
-			time.Sleep(retryDelay)
-		}
-	}
+	dbOpts := overrides.Database
+	dbOpts.LogLevel = logger.Info
+	dbOpts.EnableTracing = cfg.Monitoring.Tracing.Enabled
+	db, err := appbootstrap.OpenDatabaseWithRetry(cfg, dbOpts, appbootstrap.DatabaseRetryOptions{
+		MaxRetries: 10,
+		RetryDelay: 2 * time.Second,
+		Logger:     appLogger,
+	})
 	if err != nil {
-		appLogger.Fatalf("Failed to connect to database after %d attempts: %v", maxRetries, err)
+		appLogger.Fatalf("Failed to connect to database: %v", err)
 	}
 	app.DB = db
 
@@ -123,75 +59,31 @@ func main() {
 		}
 	}
 
-	bus := eventbus.NewInMemoryBus()
-	app.EventBus = bus
-
-	runtime, err := appserver.BuildRuntime(cfg, appLogger, db, bus)
+	runtime, err := app.BuildServerRuntime()
 	if err != nil {
 		appLogger.Fatalf("Failed to build runtime: %v", err)
 	}
-	if err := runtime.Start(); err != nil {
+	if err := app.StartRuntime(); err != nil {
 		appLogger.Fatalf("Failed to start runtime: %v", err)
 	}
 
-	app.RegisterWorker(appworker.NewStatisticsWorker(runtime.StatisticsServiceForWorker(), time.Hour))
-	app.RegisterWorker(appworker.NewSLAMonitorWorker(runtime.SLAServiceForWorker(), 5*time.Minute))
-	if cfg.Security.Audit.Enabled {
-		app.RegisterWorker(appworker.NewAuditCleanupWorker(
-			auditplatform.NewGormRetentionService(db, cfg.Security.Audit.Retention, cfg.Security.Audit.CleanupBatchSize),
-			cfg.Security.Audit.CleanupInterval,
-		))
-	}
-	if cfg.Security.TokenRevocation.Enabled {
-		app.RegisterWorker(appworker.NewRevokedTokenCleanupWorker(
-			usersecurity.NewGormRevokedTokenRetentionService(db, cfg.Security.TokenRevocation.CleanupBatchSize),
-			cfg.Security.TokenRevocation.CleanupInterval,
-		))
-	}
+	appworker.RegisterDefaultWorkers(app, cfg, db, runtime)
 	if err := app.StartWorkers(); err != nil {
 		appLogger.Fatalf("Failed to start workers: %v", err)
 	}
 
-	r := appserver.BuildRouter(runtime.RouterDependencies())
-	app.Router = r
-
-	srv := appbootstrap.NewHTTPServer(cfg, r, appbootstrap.HTTPServerOptions{
-		Host: firstNonEmpty(srvHost, cfg.Server.Host),
-		Port: srvPort,
-	})
+	srv := appbootstrap.BuildHTTPServer(app, overrides.HTTP)
 	appbootstrap.StartHTTPServer(srv, appLogger, fmt.Sprintf("Starting server on %s", srv.Addr))
 
 	appbootstrap.WaitForShutdownSignal()
 	appLogger.Info("Shutting down server...")
 	shutdownCtx, cancel := appbootstrap.ShutdownContext(30 * time.Second)
 	defer cancel()
-	if err := app.StopWorkers(shutdownCtx); err != nil {
-		appLogger.Errorf("Failed to stop workers cleanly: %v", err)
-	}
-	if err := runtime.Stop(shutdownCtx); err != nil {
-		appLogger.Errorf("Failed to stop runtime cleanly: %v", err)
-	}
-	if err := app.RunShutdownHooks(); err != nil {
-		appLogger.Errorf("Failed to run shutdown hooks: %v", err)
+	if err := app.Shutdown(shutdownCtx); err != nil {
+		appLogger.Errorf("Failed to shutdown cleanly: %v", err)
 	}
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		appLogger.Fatalf("Server forced to shutdown: %v", err)
 	}
 	appLogger.Info("Server exited")
-}
-
-// helpers (copied from migrate for consistency)
-func getenvDefault(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
-}
-func firstNonEmpty(vals ...string) string {
-	for _, v := range vals {
-		if v != "" {
-			return v
-		}
-	}
-	return ""
 }

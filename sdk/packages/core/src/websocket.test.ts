@@ -41,7 +41,7 @@ describe('WebSocketManager', () => {
     vi.stubGlobal('WebSocket', FakeWebSocket);
 
     const manager = new WebSocketManager({
-      url: 'ws://localhost:8080/ws?customer_id=1',
+      url: 'ws://localhost:8080/api/v1/ws?customer_id=1',
       authProvider: {
         getToken: async () => ({ accessToken: 'token-123' }),
       },
@@ -63,7 +63,7 @@ describe('WebSocketManager', () => {
     const refreshToken = vi.fn(async () => ({ accessToken: 'refreshed-token' }));
 
     const manager = new WebSocketManager({
-      url: 'ws://localhost:8080/ws',
+      url: 'ws://localhost:8080/api/v1/ws',
       authProvider: {
         getToken: async () => null,
         refreshToken,
@@ -85,7 +85,7 @@ describe('WebSocketManager', () => {
     vi.stubGlobal('WebSocket', FakeWebSocket);
 
     const manager = new WebSocketManager({
-      url: 'ws://localhost:8080/ws',
+      url: 'ws://localhost:8080/api/v1/ws',
       authProvider: {
         getToken: async () => null,
         refreshToken: async () => null,
@@ -102,7 +102,7 @@ describe('WebSocketManager', () => {
     vi.stubGlobal('WebSocket', FakeWebSocket);
 
     const manager = new WebSocketManager({
-      url: 'ws://localhost:8080/ws?session_id=test-session',
+      url: 'ws://localhost:8080/api/v1/ws?session_id=test-session',
     });
 
     const offerSpy = vi.fn();

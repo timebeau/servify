@@ -1,17 +1,25 @@
 package bootstrap
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"net/http"
+	"strings"
 	"testing"
 
 	"servify/apps/server/internal/config"
+
+	"github.com/sirupsen/logrus"
 )
 
 func TestBuildApp(t *testing.T) {
 	cfg := config.GetDefaultConfig()
 
-	app := BuildApp(cfg)
+	app, err := BuildApp(cfg)
+	if err != nil {
+		t.Fatalf("BuildApp() error = %v", err)
+	}
 	if app == nil {
 		t.Fatal("expected app")
 	}
@@ -40,6 +48,24 @@ type stubWorker struct {
 	stopErr  error
 }
 
+type stubRuntime struct {
+	started  bool
+	stopped  bool
+	startErr error
+	stopErr  error
+	router   http.Handler
+}
+
+func newTestLogger(buf *bytes.Buffer) *logrus.Logger {
+	logger := logrus.New()
+	logger.SetOutput(buf)
+	logger.SetFormatter(&logrus.TextFormatter{
+		DisableTimestamp: true,
+		DisableQuote:     true,
+	})
+	return logger
+}
+
 func (w *stubWorker) Name() string { return w.name }
 func (w *stubWorker) Start() error {
 	w.started = true
@@ -50,8 +76,25 @@ func (w *stubWorker) Stop(context.Context) error {
 	return w.stopErr
 }
 
+func (r *stubRuntime) Start() error {
+	r.started = true
+	return r.startErr
+}
+
+func (r *stubRuntime) Stop(context.Context) error {
+	r.stopped = true
+	return r.stopErr
+}
+
+func (r *stubRuntime) Router() http.Handler {
+	return r.router
+}
+
 func TestAppWorkerLifecycle(t *testing.T) {
-	app := BuildApp(config.GetDefaultConfig())
+	app, err := BuildApp(config.GetDefaultConfig())
+	if err != nil {
+		t.Fatalf("BuildApp() error = %v", err)
+	}
 	w1 := &stubWorker{name: "w1"}
 	w2 := &stubWorker{name: "w2"}
 	app.RegisterWorker(w1)
@@ -72,8 +115,74 @@ func TestAppWorkerLifecycle(t *testing.T) {
 	}
 }
 
+func TestAppRuntimeLifecycle(t *testing.T) {
+	app, err := BuildApp(config.GetDefaultConfig())
+	if err != nil {
+		t.Fatalf("BuildApp() error = %v", err)
+	}
+	router := http.NewServeMux()
+	rt := &stubRuntime{router: router}
+
+	app.AttachHTTPRuntime(rt)
+	if app.Runtime != rt {
+		t.Fatal("expected runtime to be assigned")
+	}
+	if app.Router != router {
+		t.Fatal("expected router to be assigned from runtime")
+	}
+
+	if err := app.StartRuntime(); err != nil {
+		t.Fatalf("StartRuntime() error = %v", err)
+	}
+	if !rt.started {
+		t.Fatal("expected runtime to start")
+	}
+	if err := app.StopRuntime(context.Background()); err != nil {
+		t.Fatalf("StopRuntime() error = %v", err)
+	}
+	if !rt.stopped {
+		t.Fatal("expected runtime to stop")
+	}
+}
+
+func TestAppShutdownAggregatesErrors(t *testing.T) {
+	app, err := BuildApp(config.GetDefaultConfig())
+	if err != nil {
+		t.Fatalf("BuildApp() error = %v", err)
+	}
+	rt := &stubRuntime{router: http.NewServeMux(), stopErr: errors.New("runtime stop failed")}
+	app.AttachHTTPRuntime(rt)
+	app.RegisterWorker(&stubWorker{name: "broken-worker", stopErr: errors.New("worker stop failed")})
+	app.AddShutdownHook(func() error {
+		return errors.New("hook failed")
+	})
+
+	err = app.Shutdown(context.Background())
+	if err == nil {
+		t.Fatal("expected shutdown error")
+	}
+	for _, want := range []string{"worker stop failed", "runtime stop failed", "hook failed"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("shutdown error missing %q: %v", want, err)
+		}
+	}
+	if !rt.stopped {
+		t.Fatal("expected runtime stop to be called")
+	}
+}
+
+func TestBuildServerRuntimeRejectsNilApp(t *testing.T) {
+	var app *App
+	if _, err := app.BuildServerRuntime(); err == nil {
+		t.Fatal("expected nil app error")
+	}
+}
+
 func TestAppStartWorkersError(t *testing.T) {
-	app := BuildApp(config.GetDefaultConfig())
+	app, err := BuildApp(config.GetDefaultConfig())
+	if err != nil {
+		t.Fatalf("BuildApp() error = %v", err)
+	}
 	app.RegisterWorker(&stubWorker{name: "broken", startErr: errors.New("boom")})
 
 	if err := app.StartWorkers(); err == nil {
@@ -82,7 +191,10 @@ func TestAppStartWorkersError(t *testing.T) {
 }
 
 func TestAppShutdownHooks(t *testing.T) {
-	app := BuildApp(config.GetDefaultConfig())
+	app, err := BuildApp(config.GetDefaultConfig())
+	if err != nil {
+		t.Fatalf("BuildApp() error = %v", err)
+	}
 	order := make([]string, 0, 2)
 	app.AddShutdownHook(func() error {
 		order = append(order, "first")
@@ -98,5 +210,37 @@ func TestAppShutdownHooks(t *testing.T) {
 	}
 	if len(order) != 2 || order[0] != "second" || order[1] != "first" {
 		t.Fatalf("unexpected hook order: %v", order)
+	}
+}
+
+func TestBuildEventBusWarnsForInMemoryInProduction(t *testing.T) {
+	cfg := config.GetDefaultConfig()
+	cfg.Server.Environment = "production"
+
+	var buf bytes.Buffer
+	logger := newTestLogger(&buf)
+
+	bus, err := BuildEventBus(cfg, logger)
+	if err != nil {
+		t.Fatalf("BuildEventBus() error = %v", err)
+	}
+	if bus == nil {
+		t.Fatal("expected event bus")
+	}
+	if !strings.Contains(buf.String(), "not durable") {
+		t.Fatalf("expected production inmemory warning, got %q", buf.String())
+	}
+}
+
+func TestBuildEventBusRejectsUnsupportedProvider(t *testing.T) {
+	cfg := config.GetDefaultConfig()
+	cfg.EventBus.Provider = "kafka"
+
+	bus, err := BuildEventBus(cfg, nil)
+	if err == nil {
+		t.Fatal("expected error for unsupported provider")
+	}
+	if bus != nil {
+		t.Fatal("expected nil bus for unsupported provider")
 	}
 }

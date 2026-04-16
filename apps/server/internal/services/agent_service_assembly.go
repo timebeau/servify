@@ -1,8 +1,6 @@
 package services
 
 import (
-	"context"
-
 	agentapp "servify/apps/server/internal/modules/agent/application"
 	agentinfra "servify/apps/server/internal/modules/agent/infra"
 
@@ -11,16 +9,14 @@ import (
 )
 
 type AgentServiceAssembly struct {
-	Service       *AgentService
-	Maintenance   *agentRuntimeMaintenance
-	LegacyRuntime *agentLegacyRuntimeAdapter
+	Service     *AgentService
+	Maintenance *agentRuntimeMaintenance
 }
 
 type AgentServiceDependencies struct {
-	DB            *gorm.DB
-	Logger        *logrus.Logger
-	Module        *agentapp.Service
-	LegacyRuntime *agentLegacyRuntimeAdapter
+	DB     *gorm.DB
+	Logger *logrus.Logger
+	Module *agentapp.Service
 }
 
 func BuildAgentServiceAssembly(db *gorm.DB, logger *logrus.Logger) *AgentServiceAssembly {
@@ -31,18 +27,14 @@ func BuildAgentServiceAssembly(db *gorm.DB, logger *logrus.Logger) *AgentService
 	repo := agentinfra.NewGormRepository(db)
 	registry := agentinfra.NewInMemoryRegistry()
 	module := agentapp.NewService(repo, registry)
-	cache := &agentRuntimeCache{}
-	legacyRuntime := newAgentLegacyRuntimeAdapter(cache)
 	service := NewAgentServiceWithDependencies(AgentServiceDependencies{
-		DB:            db,
-		Logger:        logger,
-		Module:        module,
-		LegacyRuntime: legacyRuntime,
+		DB:     db,
+		Logger: logger,
+		Module: module,
 	})
 
 	return &AgentServiceAssembly{
-		Service:       service,
-		Maintenance:   newAgentRuntimeMaintenance(logger, module, func(ctx context.Context) { legacyRuntime.Sync(ctx, module) }),
-		LegacyRuntime: legacyRuntime,
+		Service:     service,
+		Maintenance: newAgentRuntimeMaintenance(logger, module),
 	}
 }

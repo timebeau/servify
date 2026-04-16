@@ -4,6 +4,10 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"servify/apps/server/internal/app/bootstrap"
+	"servify/apps/server/internal/config"
+	"servify/apps/server/internal/services"
 )
 
 type fakeLoop struct {
@@ -57,6 +61,19 @@ func (f *fakeRevokedTokenRetentionService) Cleanup(ctx context.Context, now time
 	}
 	<-ctx.Done()
 	return 0, ctx.Err()
+}
+
+type fakeRuntimeWorkerDependencies struct {
+	statistics *services.StatisticsService
+	sla        *services.SLAService
+}
+
+func (f *fakeRuntimeWorkerDependencies) StatisticsServiceForWorker() *services.StatisticsService {
+	return f.statistics
+}
+
+func (f *fakeRuntimeWorkerDependencies) SLAServiceForWorker() *services.SLAService {
+	return f.sla
 }
 
 func TestStatisticsWorkerLifecycle(t *testing.T) {
@@ -153,4 +170,24 @@ func TestRevokedTokenCleanupWorkerLifecycle(t *testing.T) {
 	if err := w.Stop(stopCtx); err != nil {
 		t.Fatalf("Stop() error = %v", err)
 	}
+}
+
+func TestRegisterDefaultWorkers(t *testing.T) {
+	app, err := bootstrap.BuildApp(config.GetDefaultConfig())
+	if err != nil {
+		t.Fatalf("BuildApp() error = %v", err)
+	}
+	cfg := config.GetDefaultConfig()
+	cfg.Security.Audit.Enabled = false
+	cfg.Security.TokenRevocation.Enabled = false
+
+	RegisterDefaultWorkers(app, cfg, nil, &fakeRuntimeWorkerDependencies{})
+
+	if len(app.Workers) != 2 {
+		t.Fatalf("expected 2 workers, got %d", len(app.Workers))
+	}
+}
+
+func TestRegisterDefaultWorkersWithNilArgs(t *testing.T) {
+	RegisterDefaultWorkers(nil, nil, nil, nil)
 }

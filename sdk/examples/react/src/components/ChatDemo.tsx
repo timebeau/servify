@@ -40,13 +40,15 @@ const ChatDemo: React.FC = () => {
   }, [remoteStream]);
 
   const handleSendMessage = async () => {
-    if (!messageText.trim() || !session) return;
+    if (!messageText.trim() || !session) {
+      return;
+    }
 
     try {
       await sendMessage(messageText);
       setMessageText('');
     } catch (err) {
-      alert('发送消息失败: ' + (err as Error).message);
+      window.alert(`Send message failed: ${(err as Error).message}`);
     }
   };
 
@@ -54,10 +56,10 @@ const ChatDemo: React.FC = () => {
     try {
       await startChat({
         priority: 'normal',
-        message: '您好，我需要帮助',
+        message: 'Hello, I need help with my current issue.',
       });
     } catch (err) {
-      alert('开始聊天失败: ' + (err as Error).message);
+      window.alert(`Start chat failed: ${(err as Error).message}`);
     }
   };
 
@@ -66,19 +68,20 @@ const ChatDemo: React.FC = () => {
       await endRemoteAssist();
       await endChat();
     } catch (err) {
-      alert('结束聊天失败: ' + (err as Error).message);
+      window.alert(`End chat failed: ${(err as Error).message}`);
     }
   };
 
   const handleStartRemoteAssist = async () => {
+    if (!session) {
+      window.alert('Start a chat before opening remote assist.');
+      return;
+    }
+
     try {
-      if (!session) {
-        alert('请先开始聊天，再发起远程协助');
-        return;
-      }
       await startRemoteAssist({ captureScreen: true, audio: false });
     } catch (err) {
-      alert('发起远程协助失败: ' + (err as Error).message);
+      window.alert(`Start remote assist failed: ${(err as Error).message}`);
     }
   };
 
@@ -86,121 +89,116 @@ const ChatDemo: React.FC = () => {
     try {
       await endRemoteAssist();
     } catch (err) {
-      alert('结束远程协助失败: ' + (err as Error).message);
+      window.alert(`Stop remote assist failed: ${(err as Error).message}`);
     }
   };
 
   const handleAskAI = async () => {
-    const question = prompt('请输入您的问题：');
-    if (!question) return;
+    const question = window.prompt('Ask the AI assistant:');
+    if (!question) {
+      return;
+    }
 
     try {
       const response = await askAI(question);
-      // 添加系统消息显示 AI 回答
-      console.log('AI 回答:', response);
+      window.alert(`AI answer (${(response.confidence * 100).toFixed(1)}%): ${response.answer}`);
     } catch (err) {
-      alert('AI 问答失败: ' + (err as Error).message);
+      window.alert(`AI request failed: ${(err as Error).message}`);
     }
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !session) return;
+    if (!file || !session) {
+      return;
+    }
 
     try {
       const result = await uploadFile(file);
-      console.log('文件上传成功:', result);
+      window.alert(`Uploaded ${result.fileName} (${Math.round(result.fileSize / 1024)} KB)`);
     } catch (err) {
-      alert('文件上传失败: ' + (err as Error).message);
+      window.alert(`File upload failed: ${(err as Error).message}`);
+    } finally {
+      event.target.value = '';
     }
   };
 
   const handleRating = async () => {
-    const rating = prompt('请为服务评分 (1-5)：');
-    const ratingNum = parseInt(rating || '');
+    const rating = window.prompt('Rate the support experience (1-5):');
+    const ratingNum = Number.parseInt(rating || '', 10);
 
-    if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
-      alert('请输入有效的评分 (1-5)');
+    if (!Number.isInteger(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+      window.alert('Enter an integer from 1 to 5.');
       return;
     }
 
-    const comment = prompt('请输入评价内容（可选）：') || '';
+    const comment = window.prompt('Optional comment:') || '';
 
     try {
       await submitRating({
         rating: ratingNum,
         comment,
       });
-      alert('感谢您的评价！');
+      window.alert('Thanks for the feedback.');
     } catch (err) {
-      alert('提交评价失败: ' + (err as Error).message);
+      window.alert(`Submit rating failed: ${(err as Error).message}`);
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey && session) {
-      e.preventDefault();
-      handleSendMessage();
+  const handleKeyPress = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey && session) {
+      event.preventDefault();
+      void handleSendMessage();
     }
   };
 
   return (
     <>
-      {/* 状态栏 */}
       <div className="status-bar">
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <div className={`status-dot ${isConnected ? 'connected' : 'disconnected'}`}></div>
-          <span>{isConnected ? '已连接' : '已断开连接'}</span>
+          <span>{isConnected ? 'Realtime connected' : 'Realtime disconnected'}</span>
         </div>
+        <div><strong>Contract:</strong> <code>ws://localhost:8080/api/v1/ws</code></div>
         {agent && (
           <div>
-            客服代理：<strong>{agent.name}</strong>
+            Agent: <strong>{agent.name}</strong>
           </div>
         )}
       </div>
 
-      {/* 聊天区域 */}
       <div className="chat-area">
         <div className="message system">
-          欢迎使用 Servify 客服系统！请开始聊天。
+          This example uses the current WebSocket-first chat flow. Session history still reads from
+          <code>/api/omni/sessions/:id/messages</code>.
         </div>
 
-        {messages.map((message, index) => (
-          <div key={index} className={`message ${message.sender_type}`}>
+        {messages.map((message) => (
+          <div key={String(message.id)} className={`message ${message.sender_type}`}>
             {message.content}
           </div>
         ))}
 
-      {error && (
+        {error && <div className="message system">Error: {error.message}</div>}
+        <div className="message system">Remote assist state: {remoteAssistState}</div>
+        {remoteAssistError && (
+          <div className="message system">Remote assist error: {remoteAssistError.message}</div>
+        )}
         <div className="message system">
-          错误: {error.message}
+          Remote media: {remoteStream ? 'stream attached' : 'waiting for remote track'}
         </div>
-      )}
-
-      <div className="message system">
-        远程协助状态: {remoteAssistState}
       </div>
-      {remoteAssistError && (
-        <div className="message system">
-          远程协助错误: {remoteAssistError.message}
-        </div>
-      )}
-      <div className="message system">
-        远端媒体: {remoteStream ? '已接入' : '未接入'}
-      </div>
-    </div>
 
-      <div style={{
-        margin: '12px 0',
-        padding: 12,
-        border: '1px solid #d9d9d9',
-        borderRadius: 8,
-        background: '#fafafa',
-      }}
+      <div
+        style={{
+          margin: '12px 0',
+          padding: 12,
+          border: '1px solid #d9d9d9',
+          borderRadius: 8,
+          background: '#fafafa',
+        }}
       >
-        <div style={{ marginBottom: 8, fontSize: 14, color: '#555' }}>
-          远程协助媒体预览
-        </div>
+        <div style={{ marginBottom: 8, fontSize: 14, color: '#555' }}>Remote assist preview</div>
         <video
           ref={remoteVideoRef}
           autoPlay
@@ -215,38 +213,32 @@ const ChatDemo: React.FC = () => {
           }}
         />
         {!remoteStream && (
-          <div style={{
-            minHeight: 160,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#888',
-            background: '#111',
-            borderRadius: 6,
-          }}
+          <div
+            style={{
+              minHeight: 160,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#888',
+              background: '#111',
+              borderRadius: 6,
+            }}
           >
-            尚未收到远端媒体流
+            No remote media stream yet.
           </div>
         )}
       </div>
 
-      {/* 输入提示 */}
-      {isAgentTyping && (
-        <div className="typing-indicator">
-          客服正在输入...
-        </div>
-      )}
+      {isAgentTyping && <div className="typing-indicator">Agent is typing...</div>}
 
-      {/* 控制区域 */}
       <div className="controls">
-        {/* 消息输入 */}
         <div className="input-group">
           <input
             type="text"
             value={messageText}
-            onChange={(e) => setMessageText(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="输入您的消息..."
+            onChange={(event) => setMessageText(event.target.value)}
+            onKeyDown={handleKeyPress}
+            placeholder="Type a message for the realtime channel..."
             maxLength={1000}
             disabled={!session}
           />
@@ -255,64 +247,42 @@ const ChatDemo: React.FC = () => {
             onClick={() => fileInputRef.current?.click()}
             disabled={!session}
           >
-            📎
+            Upload
           </button>
           <button
             className="btn primary"
             onClick={handleSendMessage}
             disabled={!session || !messageText.trim() || isLoading}
           >
-            发送
+            Send
           </button>
         </div>
 
-        {/* 功能按钮 */}
         <div>
-          <button
-            className="btn success"
-            onClick={handleStartChat}
-            disabled={!!session || isLoading}
-          >
-            开始聊天
+          <button className="btn success" onClick={handleStartChat} disabled={!!session || isLoading}>
+            Start chat
           </button>
-          <button
-            className="btn danger"
-            onClick={handleEndChat}
-            disabled={!session || isLoading}
-          >
-            结束聊天
+          <button className="btn danger" onClick={handleEndChat} disabled={!session || isLoading}>
+            End chat
           </button>
-          <button
-            className="btn secondary"
-            onClick={handleAskAI}
-            disabled={isLoading}
-          >
-            AI 助手
+          <button className="btn secondary" onClick={handleAskAI} disabled={isLoading}>
+            Ask AI
           </button>
-          <button
-            className="btn secondary"
-            onClick={handleRating}
-            disabled={!session}
-          >
-            评价服务
+          <button className="btn secondary" onClick={handleRating} disabled={!session}>
+            Rate support
           </button>
           <button
             className="btn secondary"
             onClick={handleStartRemoteAssist}
             disabled={!session || remoteAssistActive}
           >
-            开始屏幕协助
+            Start remote assist
           </button>
-          <button
-            className="btn danger"
-            onClick={handleStopRemoteAssist}
-            disabled={!remoteAssistActive}
-          >
-            结束屏幕协助
+          <button className="btn danger" onClick={handleStopRemoteAssist} disabled={!remoteAssistActive}>
+            Stop remote assist
           </button>
         </div>
 
-        {/* 隐藏的文件输入 */}
         <input
           ref={fileInputRef}
           type="file"

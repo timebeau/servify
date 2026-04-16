@@ -28,8 +28,16 @@ func TestAIService_GetStatus(t *testing.T) {
 		t.Error("expected openai_enabled to be true")
 	}
 
-	if status["knowledge_base"] != "legacy" {
-		t.Errorf("expected knowledge_base 'legacy', got %v", status["knowledge_base"])
+	if status["knowledge_provider"] != "embedded" {
+		t.Errorf("expected knowledge_provider 'embedded', got %v", status["knowledge_provider"])
+	}
+
+	if status["knowledge_provider_enabled"] != true {
+		t.Errorf("expected knowledge_provider_enabled true, got %v", status["knowledge_provider_enabled"])
+	}
+
+	if status["knowledge_mode"] != "embedded" {
+		t.Errorf("expected knowledge_mode 'embedded', got %v", status["knowledge_mode"])
 	}
 
 	if status["document_count"] != 2 {
@@ -49,6 +57,10 @@ func TestAIService_GetStatus_NoAPIKey(t *testing.T) {
 
 	if status["openai_enabled"] != false {
 		t.Error("expected openai_enabled to be false when no API key")
+	}
+
+	if status["knowledge_provider_enabled"] != true {
+		t.Errorf("expected knowledge_provider_enabled true, got %v", status["knowledge_provider_enabled"])
 	}
 
 	if status["document_count"] != 0 {

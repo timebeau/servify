@@ -1,6 +1,6 @@
 # Servify Makefile
 
-.PHONY: help build build-cli build-weknora build-knowledge-provider run run-cli run-weknora run-knowledge-provider migrate migrate-seed test clean clean-runtime docker-build docker-run docker-up-weknora docker-up-knowledge-provider docker-down docker-logs-weknora docker-logs-knowledge-provider docker-up-observ docker-down-observ dev-setup fmt lint update-deps docs changelog release-changelog sdk-sync-versions sdk-check-versions repo-hygiene generated-assets local-check security-check observability-check release-check
+.PHONY: help build build-cli build-weknora build-knowledge-provider run run-cli run-weknora run-knowledge-provider migrate migrate-seed test clean clean-runtime docker-build docker-run docker-up-weknora docker-up-knowledge-provider docker-down docker-logs-weknora docker-logs-knowledge-provider docker-up-observ docker-down-observ dev-setup fmt lint update-deps docs changelog release-changelog sdk-sync-versions sdk-check-versions repo-hygiene generated-assets local-check security-check observability-check release-check dify-acceptance weknora-acceptance knowledge-provider-acceptance
 
 # Default target
 help:
@@ -38,6 +38,9 @@ help:
 	@echo "  security-check - Validate the config security baseline in strict mode"
 	@echo "  observability-check - Validate the observability baseline in strict mode"
 	@echo "  release-check - Run the minimal release-readiness verification"
+	@echo "  dify-acceptance - Run the Dify primary-path acceptance script"
+	@echo "  weknora-acceptance - Run the WeKnora compatibility acceptance script"
+	@echo "  knowledge-provider-acceptance - Alias of weknora-acceptance for provider compatibility runs"
 
 # Build the application
 build:
@@ -209,11 +212,23 @@ release-check:
 	@echo "Running release-readiness validation..."
 	sh ./scripts/check-release-readiness.sh $(or $(CONFIG),config.yml)
 
+dify-acceptance:
+	@echo "Running Dify primary-path acceptance..."
+	chmod +x ./scripts/test-dify-integration.sh
+	./scripts/test-dify-integration.sh
+
+weknora-acceptance:
+	@echo "Running WeKnora compatibility acceptance..."
+	chmod +x ./scripts/test-weknora-integration.sh
+	./scripts/test-weknora-integration.sh
+
+knowledge-provider-acceptance: weknora-acceptance
+
 # Internal targets with ldflags (version info)
 VERSION ?= dev
-GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
-BUILD_TIME := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
-LDFLAGS := -X 'servify/apps/server/internal/version.Version=$(VERSION)' -X 'servify/apps/server/internal/version.Commit=$(GIT_COMMIT)' -X 'servify/apps/server/internal/version.BuildTime=$(BUILD_TIME)'
+GIT_COMMIT = $(shell sh -lc 'git rev-parse --short HEAD 2>/dev/null || printf none')
+BUILD_TIME = $(shell sh -lc 'date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || printf unknown')
+LDFLAGS = -X 'servify/apps/server/internal/version.Version=$(VERSION)' -X 'servify/apps/server/internal/version.Commit=$(GIT_COMMIT)' -X 'servify/apps/server/internal/version.BuildTime=$(BUILD_TIME)'
 
 _build-with-ldflags:
 	go -C apps/server build -ldflags "$(LDFLAGS)" -o ../../bin/servify ./cmd/server
@@ -240,11 +255,11 @@ logs:
 	@echo "Showing application logs..."
 	docker-compose -f infra/compose/docker-compose.yml logs -f servify
 
-# Sync SDK bundles into admin web
+# Sync SDK bundles into demo-sdk
 demo-sync-sdk:
 	@echo "Syncing SDK bundles into apps/demo-sdk ..."
-	chmod +x ./scripts/sync-sdk-to-admin.sh
-	./scripts/sync-sdk-to-admin.sh
+	chmod +x ./scripts/sync-sdk-to-demo.sh
+	./scripts/sync-sdk-to-demo.sh
 
 # Admin panel commands
 admin-install:
@@ -259,14 +274,14 @@ admin-build:
 	@echo "Building admin panel..."
 	cd apps/admin && pnpm install --frozen-lockfile && pnpm build
 
-# Website (Cloudflare Worker) commands
+# Website (Cloudflare static assets) commands
 website-dev:
-	@echo "Starting Cloudflare Worker dev for website..."
-	npm -C apps/website-worker run dev
+	@echo "Starting local static preview for website..."
+	@(python3 -m http.server -d apps/website 8081 || python -m http.server -d apps/website 8081)
 
 website-deploy:
-	@echo "Deploying website to Cloudflare Workers (requires wrangler login and secrets)..."
-	npx --yes wrangler deploy --config apps/website-worker/wrangler.toml
+	@echo "Deploying website static assets with Wrangler..."
+	npx --yes wrangler deploy --config apps/website/wrangler.jsonc
 
 website-pages-deploy:
 	@echo "Deploying website to Cloudflare Pages..."

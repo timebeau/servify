@@ -95,15 +95,18 @@ export class ApiClient {
 
   // 会话相关 API
   async createSession(sessionData: Partial<ChatSession>): Promise<ApiResponse<ChatSession>> {
-    return this.request<ChatSession>('POST', '/api/sessions', sessionData);
+    return this.unsupported<ChatSession>(
+      'REST session creation is not exposed by the current server contract. Use the WebSocket chat flow instead.',
+      sessionData,
+    );
   }
 
-  async getSession(sessionId: number): Promise<ApiResponse<ChatSession>> {
-    return this.request<ChatSession>('GET', `/api/sessions/${sessionId}`);
+  async getSession(sessionId: string | number): Promise<ApiResponse<ChatSession>> {
+    return this.request<ChatSession>('GET', `/api/omni/sessions/${encodeURIComponent(String(sessionId))}`);
   }
 
-  async endSession(sessionId: number): Promise<ApiResponse<void>> {
-    return this.request<void>('PUT', `/api/sessions/${sessionId}/end`);
+  async endSession(sessionId: string | number): Promise<ApiResponse<void>> {
+    return this.request<void>('POST', `/api/omni/sessions/${encodeURIComponent(String(sessionId))}/close`);
   }
 
   async getCustomerSessions(customerId: number): Promise<ApiResponse<ChatSession[]>> {
@@ -112,10 +115,19 @@ export class ApiClient {
 
   // 消息相关 API
   async sendMessage(messageData: Partial<Message>): Promise<ApiResponse<Message>> {
-    return this.request<Message>('POST', '/api/messages', messageData);
+    const sessionId = messageData.session_id;
+    if (sessionId === undefined || sessionId === null || String(sessionId).trim() === '') {
+      return { success: false, error: 'session_id is required' };
+    }
+
+    return this.request<Message>(
+      'POST',
+      `/api/omni/sessions/${encodeURIComponent(String(sessionId))}/messages`,
+      { content: messageData.content },
+    );
   }
 
-  async getSessionMessages(sessionId: number, options?: {
+  async getSessionMessages(sessionId: string | number, options?: {
     page?: number;
     limit?: number;
   }): Promise<ApiResponse<{ messages: Message[]; total: number; page: number }>> {
@@ -124,16 +136,53 @@ export class ApiClient {
     if (options?.limit) params.append('limit', options.limit.toString());
 
     const query = params.toString() ? `?${params.toString()}` : '';
-    return this.request('GET', `/api/sessions/${sessionId}/messages${query}`);
+    const response = await this.request<Message[]>(
+      'GET',
+      `/api/omni/sessions/${encodeURIComponent(String(sessionId))}/messages${query}`,
+    );
+    if (!response.success) {
+      return {
+        success: false,
+        error: response.error,
+        message: response.message,
+      };
+    }
+
+    const messages = Array.isArray(response.data) ? response.data : [];
+    return {
+      success: true,
+      data: {
+        messages,
+        total: messages.length,
+        page: options?.page ?? 1,
+      },
+      message: response.message,
+    };
   }
 
   // AI 相关 API
-  async askAI(question: string, sessionId?: number): Promise<ApiResponse<{ answer: string; confidence: number }>> {
-    return this.request('POST', '/api/ai/ask', { question, session_id: sessionId });
+  async askAI(question: string, sessionId?: string | number): Promise<ApiResponse<{ answer: string; confidence: number }>> {
+    const response = await this.request<{
+      answer?: string;
+      content?: string;
+      confidence?: number;
+    }>('POST', '/api/v1/ai/query', { query: question, session_id: sessionId ? String(sessionId) : '' });
+    if (!response.success) {
+      return response as ApiResponse<{ answer: string; confidence: number }>;
+    }
+
+    return {
+      success: true,
+      data: {
+        answer: response.data?.answer ?? response.data?.content ?? '',
+        confidence: response.data?.confidence ?? 0,
+      },
+      message: response.message,
+    };
   }
 
   async getAIStatus(): Promise<ApiResponse<{ status: string; models: string[] }>> {
-    return this.request('GET', '/api/ai/status');
+    return this.request('GET', '/api/v1/ai/status');
   }
 
   // 工单相关 API
@@ -150,12 +199,12 @@ export class ApiClient {
   }
 
   async getCustomerTickets(customerId: number): Promise<ApiResponse<Ticket[]>> {
-    return this.request<Ticket[]>('GET', `/api/customers/${customerId}/tickets`);
+    return this.request<Ticket[]>('GET', `/api/tickets?customer_id=${encodeURIComponent(String(customerId))}`);
   }
 
   // 满意度评价 API
   async submitSatisfaction(satisfactionData: Partial<CustomerSatisfaction>): Promise<ApiResponse<CustomerSatisfaction>> {
-    return this.request<CustomerSatisfaction>('POST', '/api/satisfaction', satisfactionData);
+    return this.request<CustomerSatisfaction>('POST', '/api/satisfactions', satisfactionData);
   }
 
   async getSatisfactionByTicket(ticketId: number): Promise<ApiResponse<CustomerSatisfaction>> {
@@ -168,7 +217,7 @@ export class ApiClient {
     priority?: string;
     estimated_wait?: number;
   }): Promise<ApiResponse<{ queue_position: number; estimated_wait: number }>> {
-    return this.request('POST', '/api/queue/join', queueData);
+    return this.unsupported('Queue join is not exposed by the current server contract.', queueData);
   }
 
   async getQueueStatus(customerId: number): Promise<ApiResponse<{
@@ -176,15 +225,15 @@ export class ApiClient {
     position?: number;
     estimated_wait?: number;
   }>> {
-    return this.request('GET', `/api/queue/status/${customerId}`);
+    return this.unsupported('Queue status is not exposed by the current server contract.', customerId);
   }
 
   async leaveQueue(customerId: number): Promise<ApiResponse<void>> {
-    return this.request('DELETE', `/api/queue/leave/${customerId}`);
+    return this.unsupported('Queue leave is not exposed by the current server contract.', customerId);
   }
 
   // 文件上传 API
-  async uploadFile(file: File, sessionId: number): Promise<ApiResponse<{
+  async uploadFile(file: File, sessionId: string | number): Promise<ApiResponse<{
     file_url: string;
     file_name: string;
     file_size: number;
@@ -193,7 +242,7 @@ export class ApiClient {
     formData.append('file', file);
     formData.append('session_id', sessionId.toString());
 
-    const url = `${this.options.baseUrl}/api/upload`;
+    const url = `${this.options.baseUrl}/api/v1/upload`;
 
     try {
       const response = await fetch(url, {
@@ -241,18 +290,21 @@ export class ApiClient {
     call_id: number;
     ice_servers: RTCIceServer[];
   }>> {
-    return this.request('POST', `/api/webrtc/call/start`, { session_id: sessionId, type: callType });
+    return this.unsupported(
+      'WebRTC call REST endpoints are not exposed by the current server contract. Use WebSocket signaling instead.',
+      { session_id: sessionId, type: callType },
+    );
   }
 
   async endCall(callId: number): Promise<ApiResponse<void>> {
-    return this.request('PUT', `/api/webrtc/call/${callId}/end`);
+    return this.unsupported('WebRTC call REST endpoints are not exposed by the current server contract.', callId);
   }
 
   async getCallStatus(callId: number): Promise<ApiResponse<{
     status: string;
     duration?: number;
   }>> {
-    return this.request('GET', `/api/webrtc/call/${callId}/status`);
+    return this.unsupported('WebRTC call REST endpoints are not exposed by the current server contract.', callId);
   }
 
   // 设置认证头
@@ -269,5 +321,10 @@ export class ApiClient {
     if (this.options.debug) {
       console.warn('[ServifyAPI]', ...args);
     }
+  }
+
+  private unsupported<T>(error: string, context?: unknown): Promise<ApiResponse<T>> {
+    this.log(error, context);
+    return Promise.resolve({ success: false, error });
   }
 }

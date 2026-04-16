@@ -112,7 +112,7 @@ weknora:
 ```yaml
 fallback:
   enabled: true                    # 启用降级
-  legacy_kb_enabled: true          # 保留传统知识库
+  knowledge_base_enabled: true     # 保留内置知识库回退
 
   circuit_breaker:
     enabled: true                  # 启用熔断器

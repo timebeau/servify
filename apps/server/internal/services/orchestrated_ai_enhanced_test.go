@@ -89,8 +89,8 @@ func TestOrchestratedEnhancedAIServiceProcessQueryEnhancedWithDifyProvider(t *te
 	if enabled, _ := status["knowledge_provider_enabled"].(bool); !enabled {
 		t.Fatalf("expected knowledge provider enabled, got %+v", status)
 	}
-	if difyEnabled, _ := status["dify_enabled"].(bool); !difyEnabled {
-		t.Fatalf("expected dify enabled status, got %+v", status)
+	if mode, _ := status["knowledge_mode"].(string); mode != "orchestrated" {
+		t.Fatalf("expected orchestrated knowledge mode, got %+v", status)
 	}
 }
 

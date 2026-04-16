@@ -21,10 +21,9 @@ import (
 //
 // 后续迁移中，HTTP 层应只依赖 modules/agent/delivery.HandlerService，而不是直接依赖此具体类型。
 type AgentService struct {
-	db            *gorm.DB
-	logger        *logrus.Logger
-	legacyRuntime *agentLegacyRuntimeAdapter
-	module        *agentapp.Service
+	db     *gorm.DB
+	logger *logrus.Logger
+	module *agentapp.Service
 }
 
 // NewAgentService 创建人工客服服务。
@@ -39,14 +38,9 @@ func NewAgentServiceWithDependencies(deps AgentServiceDependencies) *AgentServic
 	}
 
 	service := &AgentService{
-		db:            deps.DB,
-		logger:        logger,
-		module:        deps.Module,
-		legacyRuntime: deps.LegacyRuntime,
-	}
-	if service.legacyRuntime == nil {
-		cache := &agentRuntimeCache{}
-		service.legacyRuntime = newAgentLegacyRuntimeAdapter(cache)
+		db:     deps.DB,
+		logger: logger,
+		module: deps.Module,
 	}
 	return service
 }
@@ -86,7 +80,6 @@ func (s *AgentService) AgentGoOnline(ctx context.Context, userID uint) error {
 	if err := s.module.GoOnline(ctx, userID); err != nil {
 		return err
 	}
-	s.syncLegacyRuntime(ctx)
 	s.logger.Infof("Agent %d went online", userID)
 	return nil
 }
@@ -95,7 +88,6 @@ func (s *AgentService) AgentGoOffline(ctx context.Context, userID uint) error {
 	if err := s.module.GoOffline(ctx, userID); err != nil {
 		return err
 	}
-	s.syncLegacyRuntime(ctx)
 	s.logger.Infof("Agent %d went offline", userID)
 	return nil
 }
@@ -104,7 +96,6 @@ func (s *AgentService) UpdateAgentStatus(ctx context.Context, userID uint, statu
 	if err := s.module.UpdateStatus(ctx, userID, status); err != nil {
 		return err
 	}
-	s.syncLegacyRuntime(ctx)
 	s.logger.Infof("Agent %d status updated to %s", userID, status)
 	return nil
 }
@@ -122,7 +113,6 @@ func (s *AgentService) AssignSessionToAgent(ctx context.Context, sessionID strin
 	if err := s.module.AssignSession(ctx, sessionID, agentID); err != nil {
 		return err
 	}
-	s.syncLegacyRuntime(ctx)
 	s.logger.Infof("Assigned session %s to agent %d", sessionID, agentID)
 	return nil
 }
@@ -131,7 +121,6 @@ func (s *AgentService) ReleaseSessionFromAgent(ctx context.Context, sessionID st
 	if err := s.module.ReleaseSession(ctx, sessionID, agentID); err != nil {
 		return err
 	}
-	s.syncLegacyRuntime(ctx)
 	s.logger.Infof("Released session %s from agent %d", sessionID, agentID)
 	return nil
 }
@@ -154,8 +143,12 @@ func (s *AgentService) GetOnlineAgents(ctx context.Context) []*AgentInfo {
 	return out
 }
 
-func (s *AgentService) GetOnlineAgent(userID uint) (*AgentInfo, bool) {
-	return s.legacyRuntime.GetOnlineAgent(userID)
+func (s *AgentService) GetOnlineAgent(ctx context.Context, userID uint) (*AgentInfo, bool) {
+	runtime, err := s.module.GetOnlineAgent(ctx, userID)
+	if err != nil {
+		return nil, false
+	}
+	return mapRuntimeToLegacy(runtime), true
 }
 
 func (s *AgentService) GetAgentStats(ctx context.Context, agentID *uint) (*AgentStats, error) {
@@ -193,11 +186,6 @@ func (s *AgentService) ApplySessionTransfer(ctx context.Context, sessionID strin
 	if err := s.module.ApplySessionTransfer(ctx, sessionID, fromAgentID, toAgentID); err != nil {
 		s.logger.Warnf("apply session transfer to agent module failed: %v", err)
 	}
-	s.syncLegacyRuntime(ctx)
-}
-
-func (s *AgentService) syncLegacyRuntime(ctx context.Context) {
-	s.legacyRuntime.Sync(ctx, s.module)
 }
 
 func mapRuntimeToLegacy(runtime *agentapp.AgentRuntimeDTO) *AgentInfo {

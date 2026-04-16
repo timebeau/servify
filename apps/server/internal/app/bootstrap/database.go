@@ -2,9 +2,11 @@ package bootstrap
 
 import (
 	"fmt"
+	"time"
 
 	"servify/apps/server/internal/config"
 
+	"github.com/sirupsen/logrus"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -22,6 +24,12 @@ type DatabaseOptions struct {
 	TimeZone      string
 	LogLevel      logger.LogLevel
 	EnableTracing bool
+}
+
+type DatabaseRetryOptions struct {
+	MaxRetries int
+	RetryDelay time.Duration
+	Logger     *logrus.Logger
 }
 
 // BuildPostgresDSN composes a DSN from explicit options and config defaults.
@@ -67,6 +75,36 @@ func OpenDatabase(cfg *config.Config, opts DatabaseOptions) (*gorm.DB, error) {
 		_ = db.Use(gormtracing.NewPlugin())
 	}
 	return db, nil
+}
+
+// OpenDatabaseWithRetry opens the database with bounded retry for container startup.
+func OpenDatabaseWithRetry(cfg *config.Config, opts DatabaseOptions, retryOpts DatabaseRetryOptions) (*gorm.DB, error) {
+	maxRetries := retryOpts.MaxRetries
+	if maxRetries <= 0 {
+		maxRetries = 1
+	}
+	retryDelay := retryOpts.RetryDelay
+	if retryDelay <= 0 {
+		retryDelay = 2 * time.Second
+	}
+	logger := retryOpts.Logger
+	if logger == nil {
+		logger = logrus.StandardLogger()
+	}
+
+	var lastErr error
+	for i := 0; i < maxRetries; i++ {
+		db, err := OpenDatabase(cfg, opts)
+		if err == nil {
+			return db, nil
+		}
+		lastErr = err
+		if i < maxRetries-1 {
+			logger.Warnf("Failed to connect to database (attempt %d/%d): %v, retrying in %v...", i+1, maxRetries, err, retryDelay)
+			time.Sleep(retryDelay)
+		}
+	}
+	return nil, fmt.Errorf("connect database after %d attempts: %w", maxRetries, lastErr)
 }
 
 func firstNonEmpty(vals ...string) string {

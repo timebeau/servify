@@ -52,7 +52,10 @@ var decodeTokenCmd = &cobra.Command{
 		if decVerify {
 			secret := decSecret
 			if secret == "" {
-				cfg := config.Load()
+				cfg, cfgErr := config.Load()
+				if cfgErr != nil {
+					return fmt.Errorf("load config: %w", cfgErr)
+				}
 				secret = cfg.JWT.Secret
 			}
 			if secret == "" {

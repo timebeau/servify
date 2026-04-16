@@ -9,7 +9,7 @@
     "build": "npx vite build",
     "dev": "npx vite build --watch",
     "test": "npx vitest run",
-    "typecheck": "npx tsc --noEmit"
+    "typecheck": "node ../../node_modules/typescript/bin/tsc --noEmit"
   },
   "dependencies": {
     "@servify/core": "1.0.0"

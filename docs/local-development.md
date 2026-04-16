@@ -28,6 +28,12 @@
   - `./scripts/run-tests.sh`
   - `./scripts/run-go-race-tests.sh`
   - `./scripts/run-smoke-tests.sh`
+  - `make dify-acceptance`
+  - `make weknora-acceptance`
+  - `make knowledge-provider-acceptance`
+  - `dify-acceptance` 用于 Dify 主路径验收；默认 `DIFY_ACCEPTANCE_MODE=mock`
+  - `weknora-acceptance` 用于 WeKnora compatibility 验收；默认 `WEKNORA_ACCEPTANCE_MODE=mock`
+  - 两个脚本都会把证据写到 `./scripts/test-results/...`，真实环境验收前需显式覆盖 `SERVIFY_URL`、provider 地址与数据集/凭证
 - 生成物与仓库卫生：
   - `make demo-sync-sdk`
   - `make generated-assets`
@@ -73,8 +79,11 @@ git config --global --add safe.directory /mnt/c/Users/cui/Workspaces/servify
 
 - 推荐先跑：
   - `make local-check`
+  - `make dify-acceptance`
+  - `make weknora-acceptance`
   - 发布前再补：`make release-check CONFIG=./config.yml`
 - `go test ./apps/server/internal/config ./apps/server/internal/handlers`
+- `go test ./scripts -run "Test(WeKnoraIntegrationScript(RealModeRejectsLocalHost|MockModeWritesEvidence)|DifyIntegrationScript(RealModeRejectsLocalHost|MockModeWritesEvidence))$"`
 - `sh scripts/check-repo-hygiene.sh`
 - 如果改了生成物流程，再补：
   - `sh scripts/regenerate-generated-assets.sh`

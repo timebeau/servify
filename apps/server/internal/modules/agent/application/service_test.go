@@ -15,6 +15,7 @@ type stubRepo struct {
 	profile         *agentdomain.AgentProfile
 	model           *models.Agent
 	stats           *AgentStatsDTO
+	runtimes        []AgentRuntimeDTO
 	statusUpdates   []string
 	lastChatLoad    int
 	sessionAssigned string
@@ -49,6 +50,53 @@ func (s *stubRepo) ListAgents(ctx context.Context, limit int) ([]models.Agent, e
 	return []models.Agent{*s.model}, nil
 }
 
+func (s *stubRepo) GetAgentRuntimeByUserID(ctx context.Context, userID uint) (*AgentRuntimeDTO, error) {
+	for _, runtime := range s.runtimes {
+		if runtime.UserID == userID {
+			copy := runtime
+			return &copy, nil
+		}
+	}
+	if s.profile == nil || s.model == nil || s.model.UserID != userID {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return &AgentRuntimeDTO{
+		UserID:             s.profile.UserID,
+		Username:           s.profile.Username,
+		Name:               s.profile.Name,
+		Department:         s.profile.Department,
+		Skills:             append([]string(nil), s.profile.Skills...),
+		Status:             string(agentdomain.PresenceStatusOnline),
+		MaxChatConcurrency: s.profile.MaxChatConcurrency,
+		CurrentChatLoad:    s.lastChatLoad,
+		Rating:             s.profile.Rating,
+		AvgResponseTime:    s.profile.AvgResponseTime,
+	}, nil
+}
+
+func (s *stubRepo) ListActiveAgentRuntimes(ctx context.Context) ([]AgentRuntimeDTO, error) {
+	if len(s.runtimes) > 0 {
+		out := make([]AgentRuntimeDTO, len(s.runtimes))
+		copy(out, s.runtimes)
+		return out, nil
+	}
+	if s.profile == nil {
+		return nil, nil
+	}
+	return []AgentRuntimeDTO{{
+		UserID:             s.profile.UserID,
+		Username:           s.profile.Username,
+		Name:               s.profile.Name,
+		Department:         s.profile.Department,
+		Skills:             append([]string(nil), s.profile.Skills...),
+		Status:             string(agentdomain.PresenceStatusOnline),
+		MaxChatConcurrency: s.profile.MaxChatConcurrency,
+		CurrentChatLoad:    s.lastChatLoad,
+		Rating:             s.profile.Rating,
+		AvgResponseTime:    s.profile.AvgResponseTime,
+	}}, nil
+}
+
 func (s *stubRepo) UpdatePresenceStatus(ctx context.Context, userID uint, status agentdomain.PresenceStatus) error {
 	s.statusUpdates = append(s.statusUpdates, string(status))
 	return nil
@@ -56,6 +104,11 @@ func (s *stubRepo) UpdatePresenceStatus(ctx context.Context, userID uint, status
 
 func (s *stubRepo) UpdateChatLoad(ctx context.Context, userID uint, currentLoad int) error {
 	s.lastChatLoad = currentLoad
+	for i := range s.runtimes {
+		if s.runtimes[i].UserID == userID {
+			s.runtimes[i].CurrentChatLoad = currentLoad
+		}
+	}
 	return nil
 }
 
@@ -97,6 +150,17 @@ func TestServiceGoOnlineAndAssignSession(t *testing.T) {
 			Rating:              4.8,
 		},
 		model: &models.Agent{UserID: 7, MaxConcurrent: 2},
+		runtimes: []AgentRuntimeDTO{{
+			UserID:             7,
+			Username:           "agent7",
+			Name:               "Agent Seven",
+			Department:         "",
+			Skills:             []string{"billing", "chat"},
+			Status:             string(agentdomain.PresenceStatusOnline),
+			MaxChatConcurrency: 2,
+			CurrentChatLoad:    0,
+			Rating:             4.8,
+		}},
 	}
 	registry := newStubRegistry()
 	svc := NewService(repo, registry)
@@ -116,6 +180,42 @@ func TestServiceGoOnlineAndAssignSession(t *testing.T) {
 	}
 	if repo.lastChatLoad != 1 {
 		t.Fatalf("UpdateChatLoad() = %d, want 1", repo.lastChatLoad)
+	}
+}
+
+func TestServiceFindAvailableAgent_UsesDatabaseRuntimeWithoutRegistryState(t *testing.T) {
+	repo := &stubRepo{
+		runtimes: []AgentRuntimeDTO{
+			{
+				UserID:             9,
+				Username:           "db-agent",
+				Name:               "DB Agent",
+				Skills:             []string{"billing"},
+				Status:             string(agentdomain.PresenceStatusOnline),
+				MaxChatConcurrency: 2,
+				CurrentChatLoad:    1,
+				Rating:             4.5,
+			},
+			{
+				UserID:             10,
+				Username:           "busy-agent",
+				Name:               "Busy Agent",
+				Skills:             []string{"billing"},
+				Status:             string(agentdomain.PresenceStatusBusy),
+				MaxChatConcurrency: 1,
+				CurrentChatLoad:    1,
+				Rating:             5.0,
+			},
+		},
+	}
+	svc := NewService(repo, newStubRegistry())
+
+	got, err := svc.FindAvailableAgent(context.Background(), []string{"billing"}, "high")
+	if err != nil {
+		t.Fatalf("FindAvailableAgent() error = %v", err)
+	}
+	if got.UserID != 9 {
+		t.Fatalf("FindAvailableAgent() user_id = %d, want 9", got.UserID)
 	}
 }
 

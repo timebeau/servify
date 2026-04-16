@@ -4,6 +4,13 @@
 server:
   environment: "production"
 
+event_bus:
+  provider: "inmemory"
+
+voice:
+  recording_provider: "disabled"
+  transcript_provider: "disabled"
+
 jwt:
   secret: "${SERVIFY_JWT_SECRET}"
   expires_in: "12h"

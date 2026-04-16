@@ -5,7 +5,7 @@
   "description": "Reserved package for future Servify HTTP transport",
   "type": "module",
   "scripts": {
-    "typecheck": "npx tsc --noEmit"
+    "typecheck": "node ../../node_modules/typescript/bin/tsc --noEmit"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

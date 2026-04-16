@@ -42,10 +42,18 @@ func run(cmd *cobra.Command, args []string) {
 	if err != nil {
 		logrus.Fatalf("Failed to load config: %v", err)
 	}
-	app := appbootstrap.BuildApp(cfg)
-	if app.Logger, err = appbootstrap.InitLogging(cfg); err != nil {
+	appLogger, err := appbootstrap.InitLogging(cfg)
+	if err != nil {
 		logrus.Fatalf("Failed to initialize logger: %v", err)
 	}
+	if appLogger == nil {
+		appLogger = logrus.StandardLogger()
+	}
+	app, err := appbootstrap.BuildApp(cfg)
+	if err != nil {
+		appLogger.Fatalf("Failed to build app: %v", err)
+	}
+	app.Logger = appLogger
 	if err := appbootstrap.SetupObservability(context.Background(), cfg, app); err != nil {
 		logrus.Warnf("init tracing: %v", err)
 	}

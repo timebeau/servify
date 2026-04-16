@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"net/http"
 
 	"servify/apps/server/internal/config"
 	"servify/apps/server/internal/handlers"
@@ -21,7 +22,6 @@ import (
 	voiceapp "servify/apps/server/internal/modules/voice/application"
 	voicedelivery "servify/apps/server/internal/modules/voice/delivery"
 	voiceinfra "servify/apps/server/internal/modules/voice/infra"
-	voiceprovidermock "servify/apps/server/internal/modules/voice/provider/mock"
 	svcmetrics "servify/apps/server/internal/observability/metrics"
 	"servify/apps/server/internal/platform/eventbus"
 	"servify/apps/server/internal/platform/pstnprovider"
@@ -122,13 +122,21 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	wsHub.SetAIService(rt.AIService)
 
 	voiceService := voiceapp.NewService(voiceinfra.NewGormRepository(db), bus)
+	recordingProvider, err := buildVoiceRecordingProvider(cfg, logger)
+	if err != nil {
+		return nil, err
+	}
+	transcriptProvider, err := buildVoiceTranscriptProvider(cfg, logger)
+	if err != nil {
+		return nil, err
+	}
 	recordingService := voiceapp.NewRecordingService(
-		voiceprovidermock.NewRecordingProvider(),
+		recordingProvider,
 		voiceinfra.NewGormRecordingRepository(db),
 		bus,
 	)
 	transcriptService := voiceapp.NewTranscriptService(
-		voiceprovidermock.NewTranscriptProvider(),
+		transcriptProvider,
 		voiceinfra.NewGormTranscriptRepository(db),
 		bus,
 	)
@@ -209,6 +217,11 @@ func (rt *Runtime) Stop(context.Context) error {
 		return nil
 	}
 	return rt.MessageRouter.Stop()
+}
+
+// Router builds the HTTP router for this runtime.
+func (rt *Runtime) Router() http.Handler {
+	return BuildRouter(rt.RouterDependencies())
 }
 
 // StatisticsServiceForWorker returns the concrete statistics service for worker use.

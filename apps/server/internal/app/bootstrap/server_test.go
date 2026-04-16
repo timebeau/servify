@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"net/http"
 	"testing"
 	"time"
 
@@ -29,5 +30,35 @@ func TestShutdownContextDefault(t *testing.T) {
 	}
 	if time.Until(deadline) <= 0 {
 		t.Fatal("expected future deadline")
+	}
+}
+
+func TestNewHTTPServerForAppAssignsRouter(t *testing.T) {
+	app := &App{Config: config.GetDefaultConfig()}
+	handler := http.NewServeMux()
+
+	srv := NewHTTPServerForApp(app, handler, HTTPServerOptions{Host: "127.0.0.1", Port: 9090})
+	if srv.Addr != "127.0.0.1:9090" {
+		t.Fatalf("server addr = %q", srv.Addr)
+	}
+	if app.Router != handler {
+		t.Fatal("expected app router to be assigned")
+	}
+	if app.Server != srv {
+		t.Fatal("expected app server to be assigned")
+	}
+}
+
+func TestBuildHTTPServerUsesAppRouter(t *testing.T) {
+	app := &App{
+		Config: config.GetDefaultConfig(),
+		Router: http.NewServeMux(),
+	}
+	srv := BuildHTTPServer(app, HTTPServerOptions{Host: "127.0.0.1", Port: 18080})
+	if srv.Addr != "127.0.0.1:18080" {
+		t.Fatalf("server addr = %q", srv.Addr)
+	}
+	if app.Server != srv {
+		t.Fatal("expected app server to be assigned")
 	}
 }

@@ -35,6 +35,28 @@ func (r *maintenanceRepo) ListAgents(ctx context.Context, limit int) ([]models.A
 	return nil, nil
 }
 
+func (r *maintenanceRepo) GetAgentRuntimeByUserID(ctx context.Context, userID uint) (*agentapp.AgentRuntimeDTO, error) {
+	if r.profile == nil || r.model == nil || r.model.UserID != userID {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return &agentapp.AgentRuntimeDTO{
+		UserID:             r.profile.UserID,
+		Status:             r.model.Status,
+		MaxChatConcurrency: r.profile.MaxChatConcurrency,
+	}, nil
+}
+
+func (r *maintenanceRepo) ListActiveAgentRuntimes(ctx context.Context) ([]agentapp.AgentRuntimeDTO, error) {
+	if r.profile == nil || r.model == nil {
+		return nil, nil
+	}
+	return []agentapp.AgentRuntimeDTO{{
+		UserID:             r.profile.UserID,
+		Status:             string(agentdomain.PresenceStatusOnline),
+		MaxChatConcurrency: r.profile.MaxChatConcurrency,
+	}}, nil
+}
+
 func (r *maintenanceRepo) UpdatePresenceStatus(ctx context.Context, userID uint, status agentdomain.PresenceStatus) error {
 	r.statusUpdates = append(r.statusUpdates, string(status))
 	return nil
@@ -129,10 +151,7 @@ func TestAgentRuntimeMaintenance_CleanupInactiveAgents(t *testing.T) {
 	}
 	module := agentapp.NewService(repo, registry)
 
-	synced := false
-	maintenance := newAgentRuntimeMaintenance(logrus.New(), module, func(context.Context) {
-		synced = true
-	})
+	maintenance := newAgentRuntimeMaintenance(logrus.New(), module)
 
 	maintenance.cleanupInactiveAgents(context.Background(), 5*time.Minute)
 
@@ -141,8 +160,5 @@ func TestAgentRuntimeMaintenance_CleanupInactiveAgents(t *testing.T) {
 	}
 	if runtime, ok := registry.Get(7); !ok || runtime.Status != string(agentdomain.PresenceStatusAway) {
 		t.Fatalf("expected runtime status away, got %+v ok=%v", runtime, ok)
-	}
-	if !synced {
-		t.Fatal("expected sync callback to run")
 	}
 }

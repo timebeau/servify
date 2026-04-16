@@ -697,6 +697,33 @@ sdk/
     app-core/
 ```
 
+## 14.1 Current Bootstrap Landing
+
+The bootstrap refactor is no longer only a target state. The current codebase has already landed these boundaries:
+
+- `apps/server/cmd/server/main.go`
+  - now acts as a thin entrypoint
+  - only keeps startup ordering, fatal error handling, and graceful shutdown trigger
+- `apps/server/internal/app/bootstrap`
+  - owns config discovery
+  - owns startup flag and environment override parsing for the server entrypoint
+  - owns database DSN composition and retry-based database connection
+  - owns event bus construction
+  - owns observability bootstrap hook registration
+  - owns HTTP server construction and runtime attachment
+  - owns worker lifecycle and unified shutdown sequencing
+- `apps/server/internal/app/server/runtime.go`
+  - remains the default HTTP runtime assembly
+  - now exposes a router-facing runtime contract so bootstrap can manage lifecycle without rebuilding router wiring in `main.go`
+- `apps/server/internal/app/worker`
+  - owns default background worker registration for the server runtime instead of leaving that wiring in the entrypoint
+
+This means the current gap is narrower than the original target:
+
+- the entrypoint is already thin
+- bootstrap is already the primary runtime assembly root
+- the remaining work is to keep reducing sequence-level knowledge in `cmd/server/main.go` and avoid reintroducing direct wiring there
+
 ## 15. Migration Strategy
 
 The migration should be incremental.
@@ -707,6 +734,11 @@ The migration should be incremental.
 - split current large services into command and query services
 - introduce provider interfaces for knowledge and LLM
 - define sdk core contracts without breaking the existing web sdk packages
+
+Current landing status:
+
+- server startup override parsing, database retry wiring, worker registration, runtime attach, router/server binding, and unified shutdown sequencing have already moved under `internal/app/bootstrap` and `internal/app/worker`
+- the remaining phase-1 bootstrap work is now mostly refinement, not greenfield extraction
 
 ### Phase 2
 

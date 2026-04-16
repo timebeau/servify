@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"servify/apps/server/internal/config"
 	"servify/apps/server/internal/models"
 )
 
@@ -117,7 +118,7 @@ func (s *AIService) buildPrompt(query string, docs []models.KnowledgeDoc) string
 func (s *AIService) callOpenAI(ctx context.Context, prompt string) (string, error) {
 	tracer := otel.Tracer("servify/ai")
 	ctx, span := tracer.Start(ctx, "AIService.callOpenAI")
-	span.SetAttributes(attribute.String("model", "gpt-3.5-turbo"))
+	span.SetAttributes(attribute.String("model", config.DefaultOpenAIModel))
 	defer span.End()
 
 	if s.openAIAPIKey == "" {
@@ -125,7 +126,7 @@ func (s *AIService) callOpenAI(ctx context.Context, prompt string) (string, erro
 	}
 
 	request := OpenAIRequest{
-		Model: "gpt-3.5-turbo",
+		Model: config.DefaultOpenAIModel,
 		Messages: []Message{
 			{
 				Role:    "user",
@@ -201,11 +202,24 @@ func (s *AIService) getFallbackResponse(query string) string {
 }
 
 func (s *AIService) GetStatus(ctx context.Context) map[string]interface{} {
+	documentCount := 0
+	knowledgeProviderEnabled := false
+	knowledgeProvider := ""
+	knowledgeMode := "stateless"
+	if s.knowledgeBase != nil {
+		documentCount = len(s.knowledgeBase.documents)
+		knowledgeProviderEnabled = true
+		knowledgeProvider = "embedded"
+		knowledgeMode = "embedded"
+	}
+
 	return map[string]interface{}{
-		"type":           "standard",
-		"openai_enabled": s.openAIAPIKey != "",
-		"knowledge_base": "legacy",
-		"document_count": len(s.knowledgeBase.documents),
+		"type":                       "standard",
+		"openai_enabled":             s.openAIAPIKey != "",
+		"knowledge_provider":         knowledgeProvider,
+		"knowledge_provider_enabled": knowledgeProviderEnabled,
+		"knowledge_mode":             knowledgeMode,
+		"document_count":             documentCount,
 	}
 }
 

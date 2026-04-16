@@ -1,9 +1,13 @@
 package bootstrap
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"servify/apps/server/internal/config"
 )
 
 func TestLoadConfigFindsRepoRootConfigFromNestedDir(t *testing.T) {
@@ -41,5 +45,55 @@ func TestLoadConfigFindsRepoRootConfigFromNestedDir(t *testing.T) {
 	}
 	if !cfg.WeKnora.Enabled {
 		t.Fatal("expected weknora.enabled to be loaded from repo-root config")
+	}
+}
+
+func TestResolveRuntimeOverridesUsesFlagsAndEnv(t *testing.T) {
+	t.Setenv("DB_HOST", "env-db")
+	t.Setenv("SERVIFY_PORT", "19091")
+
+	cfg := config.GetDefaultConfig()
+	cfg.Database.Host = "cfg-db"
+	cfg.Database.Port = 5432
+	cfg.Database.User = "cfg-user"
+	cfg.Database.Password = "cfg-pass"
+	cfg.Database.Name = "cfg-name"
+	cfg.Server.Host = "0.0.0.0"
+	cfg.Server.Port = 8080
+
+	overrides, err := ResolveRuntimeOverrides(cfg, []string{
+		"--db-user", "flag-user",
+		"--db-name", "flag-name",
+		"--host", "127.0.0.1",
+	}, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("ResolveRuntimeOverrides() error = %v", err)
+	}
+
+	for _, want := range []string{
+		"host=env-db",
+		"user=flag-user",
+		"password=cfg-pass",
+		"dbname=flag-name",
+		"port=5432",
+		"sslmode=disable",
+		"TimeZone=UTC",
+	} {
+		if !strings.Contains(overrides.Database.DSN, want) {
+			t.Fatalf("dsn missing %q: %s", want, overrides.Database.DSN)
+		}
+	}
+	if overrides.HTTP.Host != "127.0.0.1" {
+		t.Fatalf("http host = %q", overrides.HTTP.Host)
+	}
+	if overrides.HTTP.Port != 19091 {
+		t.Fatalf("http port = %d", overrides.HTTP.Port)
+	}
+}
+
+func TestResolveRuntimeOverridesRejectsInvalidFlag(t *testing.T) {
+	_, err := ResolveRuntimeOverrides(config.GetDefaultConfig(), []string{"--not-a-real-flag"}, &bytes.Buffer{})
+	if err == nil {
+		t.Fatal("expected invalid flag error")
 	}
 }

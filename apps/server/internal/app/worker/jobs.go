@@ -7,8 +7,13 @@ import (
 	"time"
 
 	"servify/apps/server/internal/app/bootstrap"
+	"servify/apps/server/internal/config"
+	auditplatform "servify/apps/server/internal/platform/audit"
+	"servify/apps/server/internal/platform/usersecurity"
+	"servify/apps/server/internal/services"
 
 	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 )
 
 // jitter returns a random duration in [0, fraction*base).
@@ -33,6 +38,34 @@ type StatisticsWorker struct {
 	mu     sync.Mutex
 	cancel context.CancelFunc
 	done   chan struct{}
+}
+
+type RuntimeWorkerDependencies interface {
+	StatisticsServiceForWorker() *services.StatisticsService
+	SLAServiceForWorker() *services.SLAService
+}
+
+// RegisterDefaultWorkers registers the default background workers for the server runtime.
+func RegisterDefaultWorkers(app *bootstrap.App, cfg *config.Config, db *gorm.DB, deps RuntimeWorkerDependencies) {
+	if app == nil || cfg == nil || deps == nil {
+		return
+	}
+
+	app.RegisterWorker(NewStatisticsWorker(deps.StatisticsServiceForWorker(), time.Hour))
+	app.RegisterWorker(NewSLAMonitorWorker(deps.SLAServiceForWorker(), 5*time.Minute))
+
+	if cfg.Security.Audit.Enabled && db != nil {
+		app.RegisterWorker(NewAuditCleanupWorker(
+			auditplatform.NewGormRetentionService(db, cfg.Security.Audit.Retention, cfg.Security.Audit.CleanupBatchSize),
+			cfg.Security.Audit.CleanupInterval,
+		))
+	}
+	if cfg.Security.TokenRevocation.Enabled && db != nil {
+		app.RegisterWorker(NewRevokedTokenCleanupWorker(
+			usersecurity.NewGormRevokedTokenRetentionService(db, cfg.Security.TokenRevocation.CleanupBatchSize),
+			cfg.Security.TokenRevocation.CleanupInterval,
+		))
+	}
 }
 
 func NewStatisticsWorker(service statisticsService, interval time.Duration) bootstrap.Worker {

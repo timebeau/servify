@@ -194,7 +194,14 @@ export class WebSocketManager extends EventEmitter<ServifyEventMap> implements T
 
       switch (message.type) {
       case 'message':
-        this.emit('message', message.data as Message);
+      case 'text-message':
+        this.emit('message', this.normalizeMessage(message, 'customer'));
+        break;
+      case 'agent-message':
+        this.emit('message', this.normalizeMessage(message, 'agent'));
+        break;
+      case 'ai-response':
+        this.emit('message', this.normalizeMessage(message, 'system', true));
         break;
       case 'session_update':
         this.emit('session_updated', message.data as ChatSession);
@@ -363,6 +370,34 @@ export class WebSocketManager extends EventEmitter<ServifyEventMap> implements T
     }
 
     return null;
+  }
+
+  private normalizeMessage(message: WSMessage, senderType: Message['sender_type'], isAIResponse = false): Message {
+    const data = typeof message.data === 'object' && message.data !== null
+      ? message.data as Record<string, unknown>
+      : { content: String(message.data ?? '') };
+
+    const content =
+      typeof data.content === 'string'
+        ? data.content
+        : typeof data.message === 'string'
+          ? data.message
+          : String(message.data ?? '');
+
+    return {
+      id: typeof data.id === 'string' || typeof data.id === 'number'
+        ? data.id
+        : `ws-${Date.now()}`,
+      session_id: typeof data.session_id === 'string' || typeof data.session_id === 'number'
+        ? data.session_id
+        : message.session_id ?? '',
+      sender_type: senderType,
+      content,
+      message_type: 'text',
+      is_ai_response: isAIResponse,
+      metadata: data,
+      created_at: new Date().toISOString(),
+    };
   }
 
   private extractICECandidate(data: unknown): RTCIceCandidateInit {

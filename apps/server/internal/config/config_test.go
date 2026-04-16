@@ -22,6 +22,15 @@ func TestGetDefaultConfig(t *testing.T) {
 	if cfg.Server.Environment != "development" {
 		t.Fatalf("expected default server environment development, got %q", cfg.Server.Environment)
 	}
+	if cfg.EventBus.Provider != "inmemory" {
+		t.Fatalf("expected default event bus provider inmemory, got %q", cfg.EventBus.Provider)
+	}
+	if cfg.Voice.RecordingProvider != "disabled" {
+		t.Fatalf("expected default voice recording provider disabled, got %q", cfg.Voice.RecordingProvider)
+	}
+	if cfg.Voice.TranscriptProvider != "disabled" {
+		t.Fatalf("expected default voice transcript provider disabled, got %q", cfg.Voice.TranscriptProvider)
+	}
 	if cfg.JWT.Secret == "" {
 		t.Error("expected JWT.Secret to be set")
 	}
@@ -141,7 +150,10 @@ func TestLoad_SessionRiskOverrides(t *testing.T) {
 	viper.Set("security.session_risk.multi_public_ip_threshold", 4)
 	viper.Set("security.session_risk.high_risk_score", 6)
 
-	cfg := Load()
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
 
 	if cfg.Security.SessionRisk.HotRefreshWindowMinutes != 7 {
 		t.Fatalf("expected overridden hot refresh window = 7, got %d", cfg.Security.SessionRisk.HotRefreshWindowMinutes)
@@ -160,6 +172,42 @@ func TestLoad_SessionRiskOverrides(t *testing.T) {
 	}
 }
 
+func TestLoad_EventBusOverrides(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+
+	viper.Set("event_bus.provider", "inmemory")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if cfg.EventBus.Provider != "inmemory" {
+		t.Fatalf("expected overridden event bus provider inmemory, got %q", cfg.EventBus.Provider)
+	}
+}
+
+func TestLoad_VoiceProviderOverrides(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+
+	viper.Set("voice.recording_provider", "mock")
+	viper.Set("voice.transcript_provider", "mock")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if cfg.Voice.RecordingProvider != "mock" {
+		t.Fatalf("expected overridden voice recording provider mock, got %q", cfg.Voice.RecordingProvider)
+	}
+	if cfg.Voice.TranscriptProvider != "mock" {
+		t.Fatalf("expected overridden voice transcript provider mock, got %q", cfg.Voice.TranscriptProvider)
+	}
+}
+
 func TestLoad_SessionIPIntelligenceOverrides(t *testing.T) {
 	viper.Reset()
 	t.Cleanup(viper.Reset)
@@ -170,7 +218,10 @@ func TestLoad_SessionIPIntelligenceOverrides(t *testing.T) {
 	viper.Set("security.session_ip_intelligence.auth_header", "X-Geo-Key")
 	viper.Set("security.session_ip_intelligence.timeout_ms", 2200)
 
-	cfg := Load()
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
 
 	if !cfg.Security.SessionIPIntelligence.Enabled {
 		t.Fatal("expected session IP intelligence to be enabled")
@@ -197,7 +248,10 @@ func TestLoad_SessionRiskEnvironmentProfileOverrides(t *testing.T) {
 	viper.Set("security.session_risk_profiles.production.high_risk_score", 7)
 	viper.Set("security.session_risk_profiles.production.rapid_change_window_hours", 8)
 
-	cfg := Load()
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
 
 	if cfg.Server.Environment != "production" {
 		t.Fatalf("expected server environment production, got %q", cfg.Server.Environment)
@@ -213,6 +267,9 @@ func TestLoad_SessionRiskEnvironmentProfileOverrides(t *testing.T) {
 func TestConfig_FallbackSettings(t *testing.T) {
 	cfg := GetDefaultConfig()
 
+	if !cfg.Fallback.KnowledgeBaseEnabled {
+		t.Fatal("expected fallback knowledge base to be enabled by default")
+	}
 	if cfg.Fallback.CircuitBreaker.MaxFailures == 0 {
 		t.Error("expected circuit breaker max failures to be set")
 	}
@@ -227,6 +284,9 @@ func TestConfig_AIConfiguration(t *testing.T) {
 	if cfg.AI.OpenAI.Model == "" {
 		t.Error("expected OpenAI model to be set")
 	}
+	if cfg.AI.OpenAI.Model != DefaultOpenAIModel {
+		t.Fatalf("expected default OpenAI model %q, got %q", DefaultOpenAIModel, cfg.AI.OpenAI.Model)
+	}
 	if cfg.AI.OpenAI.Temperature == 0 {
 		t.Error("expected OpenAI temperature to be set")
 	}
@@ -238,6 +298,72 @@ func TestConfig_AIConfiguration(t *testing.T) {
 	}
 	if cfg.Dify.Search.SearchMethod == "" {
 		t.Error("expected Dify search method to be set")
+	}
+}
+
+func TestLoad_InvalidOverrideReturnsError(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+
+	viper.Set("server.port", "not-a-number")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("expected config load error for invalid override")
+	}
+}
+
+func TestLoad_FallbackKnowledgeBaseEnabledOverride(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+
+	viper.Set("fallback.knowledge_base_enabled", false)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if cfg.Fallback.KnowledgeBaseEnabled {
+		t.Fatal("expected knowledge base fallback to be disabled")
+	}
+	if cfg.Fallback.LegacyKBEnabled {
+		t.Fatal("expected legacy compatibility field to mirror new fallback state")
+	}
+}
+
+func TestLoad_FallbackLegacyKnowledgeBaseCompatibility(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+
+	viper.Set("fallback.legacy_kb_enabled", false)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if cfg.Fallback.KnowledgeBaseEnabled {
+		t.Fatal("expected legacy fallback key to disable knowledge base fallback")
+	}
+}
+
+func TestLoad_FallbackKnowledgeBaseOverrideTakesPrecedence(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+
+	viper.Set("fallback.knowledge_base_enabled", false)
+	viper.Set("fallback.legacy_kb_enabled", true)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if cfg.Fallback.KnowledgeBaseEnabled {
+		t.Fatal("expected new fallback key to take precedence over legacy compatibility key")
+	}
+	if cfg.Fallback.LegacyKBEnabled {
+		t.Fatal("expected legacy compatibility field to be normalized to the new key value")
 	}
 }
 

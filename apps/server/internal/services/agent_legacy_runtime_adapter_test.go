@@ -11,7 +11,9 @@ import (
 	"servify/apps/server/internal/models"
 )
 
-type legacyAdapterRepo struct{}
+type legacyAdapterRepo struct {
+	runtimes map[uint]agentapp.AgentRuntimeDTO
+}
 
 func (r *legacyAdapterRepo) CreateAgent(ctx context.Context, userID uint, department string, skills []string, maxChatConcurrency int) (*agentdomain.AgentProfile, error) {
 	return nil, nil
@@ -23,6 +25,22 @@ func (r *legacyAdapterRepo) GetAgentByUserID(ctx context.Context, userID uint) (
 
 func (r *legacyAdapterRepo) ListAgents(ctx context.Context, limit int) ([]models.Agent, error) {
 	return nil, nil
+}
+
+func (r *legacyAdapterRepo) GetAgentRuntimeByUserID(ctx context.Context, userID uint) (*agentapp.AgentRuntimeDTO, error) {
+	if runtime, ok := r.runtimes[userID]; ok {
+		copy := runtime
+		return &copy, nil
+	}
+	return nil, nil
+}
+
+func (r *legacyAdapterRepo) ListActiveAgentRuntimes(ctx context.Context) ([]agentapp.AgentRuntimeDTO, error) {
+	out := make([]agentapp.AgentRuntimeDTO, 0, len(r.runtimes))
+	for _, runtime := range r.runtimes {
+		out = append(out, runtime)
+	}
+	return out, nil
 }
 
 func (r *legacyAdapterRepo) UpdatePresenceStatus(ctx context.Context, userID uint, status agentdomain.PresenceStatus) error {
@@ -91,7 +109,17 @@ func (r *legacyAdapterRegistry) List() []agentapp.AgentRuntimeDTO {
 func TestAgentLegacyRuntimeAdapter_Sync(t *testing.T) {
 	cache := &agentRuntimeCache{}
 	adapter := newAgentLegacyRuntimeAdapter(cache)
-	module := agentapp.NewService(&legacyAdapterRepo{}, &legacyAdapterRegistry{
+	module := agentapp.NewService(&legacyAdapterRepo{runtimes: map[uint]agentapp.AgentRuntimeDTO{
+		1: {
+			UserID:             1,
+			Username:           "agent1",
+			Name:               "Agent One",
+			Department:         "support",
+			Status:             string(agentdomain.PresenceStatusOnline),
+			MaxChatConcurrency: 3,
+			CurrentChatLoad:    1,
+		},
+	}}, &legacyAdapterRegistry{
 		items: map[uint]agentapp.AgentRuntimeDTO{
 			1: {
 				UserID:             1,

@@ -12,7 +12,7 @@
 
 | 能力/资产 | 位置 | 当前保留原因 | 是否可用于正式部署 | 退出条件 |
 | --- | --- | --- | --- | --- |
-| Demo 页面与 Demo SDK 静态资源 | `apps/demo/` `apps/demo-sdk/` `apps/server/internal/app/server/static.go` `scripts/sync-sdk-to-admin.sh` | 用于销售演示、SDK 嵌入示例、以及生成物漂移校验；当前还承担“最小可见集成样例”职责 | 否。它们是演示与集成示例，不是正式客户门户，也不是多租户发布面 | 当正式嵌入式 SDK 文档站、独立示例仓库或正式客户门户替代当前 demo 面时，可把 demo 资源迁出主运行时或改为单独发布 |
+| Demo 页面与 Demo SDK 静态资源 | `apps/demo/` `apps/demo-sdk/` `apps/server/internal/app/server/static.go` `scripts/sync-sdk-to-demo.sh` | 用于销售演示、SDK 嵌入示例、以及生成物漂移校验；当前还承担“最小可见集成样例”职责 | 否。它们是演示与集成示例，不是正式客户门户，也不是多租户发布面 | 当正式嵌入式 SDK 文档站、独立示例仓库或正式客户门户替代当前 demo 面时，可把 demo 资源迁出主运行时或改为单独发布 |
 | 一键演示与 seed 脚本 | `scripts/demo-setup.sh` `scripts/seed-data.sh` | 用于本地演示、验收准备和快速生成最小业务数据 | 否。默认账号、演示密钥、示例数据都不应进入生产环境 | 当 staging/preview 环境有独立 fixture 流程，且演示数据改为一次性环境初始化任务后，可降级为仅内部工具或迁出仓库主脚本入口 |
 | WeKnora mock 服务 | `infra/compose/weknora-mock/` `infra/compose/docker-compose.weknora.yml` | 为 `G1-2` 和本地协议回归提供可重复的上游依赖，避免每次验收都依赖真实 WeKnora 环境 | 否。它只验证协议连通性与 fallback/上传/同步链路，不代表真实检索质量、容量或稳定性 | 当团队具备可重复创建的真实 WeKnora staging 环境，并把验收脚本默认切到 `WEKNORA_ACCEPTANCE_MODE=real` 后，可把 mock 降为兼容测试专用 |
 | WeKnora 验收脚本的 `mock` 模式 | `scripts/test-weknora-integration.sh` | 用于在 CI 或本地先验证 Servify 对上游协议的调用约定、证据输出和降级策略 | 条件可用。它适合回归脚本，不适合作为“真实知识库可上线”的唯一证据 | 当 `real` 模式已成为 release gate 的强制前置时，`mock` 模式只保留给开发回归 |

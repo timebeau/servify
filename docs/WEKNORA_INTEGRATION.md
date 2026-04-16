@@ -108,6 +108,19 @@ curl http://localhost:9000/api/v1/health
 
 ### 6. 运行 provider 验收脚本
 ```bash
+# Dify 主路径 mock 回归
+DIFY_ACCEPTANCE_MODE=mock \
+EVIDENCE_DIR=./scripts/test-results/dify-acceptance/mock \
+./scripts/test-dify-integration.sh
+
+# Dify 主路径真实环境验收
+DIFY_ACCEPTANCE_MODE=real \
+SERVIFY_URL=http://localhost:8080 \
+DIFY_URL=https://<real-dify-host>/v1 \
+DIFY_DATASET_ID=<real-dataset-id> \
+EVIDENCE_DIR=./scripts/test-results/dify-acceptance/real \
+./scripts/test-dify-integration.sh
+
 # mock / 本地协议回归
 WEKNORA_ACCEPTANCE_MODE=mock \
 EVIDENCE_DIR=./scripts/test-results/weknora-acceptance/mock \
@@ -123,6 +136,16 @@ EVIDENCE_DIR=./scripts/test-results/weknora-acceptance/real \
 
 脚本会输出最小验收证据：
 
+- Dify 主路径：
+  - `summary.txt`
+  - `servify-health.json`
+  - `dify-dataset.json`（可用时）
+  - `ai-status.json`
+  - `ai-query.json`
+  - `knowledge-upload.json`
+  - `knowledge-sync.json`
+  - `ai-metrics.json`
+- WeKnora compatibility 路径：
 - `summary.txt`
 - `servify-health.json`
 - `weknora-health.json`（可用时）
@@ -130,8 +153,21 @@ EVIDENCE_DIR=./scripts/test-results/weknora-acceptance/real \
 - `ai-query.json`
 - `knowledge-upload.json`
 - `knowledge-sync.json`
+- `knowledge-provider-disable.json`
+- `ai-status-after-disable.json`
+- `ai-query-after-disable.json`
+- `ai-metrics-after-fallback.json`
+- `knowledge-provider-enable.json`
+- `ai-status-after-enable.json`
+- `circuit-breaker-reset.json`
 
-其中 `real` 模式针对 WeKnora 兼容路径，不是“尽量通过”，而是严格验收：
+其中 `Dify real` 模式会严格拒绝 `localhost`、`127.0.0.1`、`0.0.0.0`、私网地址和 `.local/.internal` 主机名，避免把本地 mock 或内网临时地址误记为真实主路径证据；同时要求：
+
+- `dify-dataset` 探针成功
+- `knowledge provider` 当前激活为 `dify`
+- `knowledge upload` 和 `knowledge sync` 必须都成功
+
+其中 `WeKnora real` 模式针对兼容路径，不是“尽量通过”，而是严格验收：
 
 - `WEKNORA_URL` 不能是 `localhost`、`127.0.0.1`、`0.0.0.0`、私网地址或 `.local/.internal` 主机名
 - 健康检查返回若标识 `service=weknora-mock`，脚本会直接拒绝作为真实证据
@@ -139,7 +175,9 @@ EVIDENCE_DIR=./scripts/test-results/weknora-acceptance/real \
 - Servify 必须运行在 `enhanced` 模式
 - `knowledge upload` 和 `knowledge sync` 必须都成功
 
-只有满足以上条件，才能把结果回填到 `docs/acceptance-checklist.md` 里，作为 WeKnora compatibility 路径的真实运行证据。
+可以通过 `make dify-acceptance`、`make weknora-acceptance` 作为统一入口运行脚本；其中 `knowledge-provider-acceptance` 目前等价于 `make weknora-acceptance`，用于兼容路径回归。
+
+只有满足以上条件，才能把结果回填到 `docs/acceptance-checklist.md` 里，分别作为 Dify 主路径和 WeKnora compatibility 路径的真实运行证据。
 
 ## 🔧 开发指南
 

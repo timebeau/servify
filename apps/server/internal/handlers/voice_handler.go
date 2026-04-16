@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
+	voiceapp "servify/apps/server/internal/modules/voice/application"
 	voicedelivery "servify/apps/server/internal/modules/voice/delivery"
 	"servify/apps/server/internal/platform/voiceprotocol"
 
@@ -58,7 +60,7 @@ func (h *VoiceHandler) StartRecording(c *gin.Context) {
 		Provider: req.Provider,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		respondVoiceError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": recording})
@@ -77,7 +79,7 @@ func (h *VoiceHandler) StopRecording(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
 	defer cancel()
 	if err := h.coordinator.StopRecording(ctx, voicedelivery.StopRecordingCommand{RecordingID: req.RecordingID}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		respondVoiceError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true})
@@ -97,7 +99,7 @@ func (h *VoiceHandler) GetRecording(c *gin.Context) {
 	defer cancel()
 	recording, err := h.coordinator.GetRecording(ctx, recordingID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		respondVoiceError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": recording})
@@ -122,7 +124,7 @@ func (h *VoiceHandler) AppendTranscript(c *gin.Context) {
 		Finalized: req.Finalized,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		respondVoiceError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": transcript})
@@ -142,10 +144,23 @@ func (h *VoiceHandler) ListTranscripts(c *gin.Context) {
 	defer cancel()
 	items, err := h.coordinator.ListTranscripts(ctx, callID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		respondVoiceError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": items})
+}
+
+func respondVoiceError(c *gin.Context, err error) {
+	status := http.StatusInternalServerError
+	var providerErr *voiceapp.ProviderError
+	if errors.As(err, &providerErr) && providerErr.Code == voiceapp.ProviderErrorUnavailable {
+		status = http.StatusServiceUnavailable
+	}
+	c.JSON(status, ErrorResponse{
+		Error:   "Voice runtime unavailable",
+		Message: err.Error(),
+		Code:    status,
+	})
 }
 
 func (h *VoiceHandler) ListProtocols(c *gin.Context) {

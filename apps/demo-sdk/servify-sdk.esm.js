@@ -233,34 +233,77 @@ class ApiClient {
   }
   // 会话相关 API
   async createSession(sessionData) {
-    return this.request("POST", "/api/sessions", sessionData);
+    return this.unsupported(
+      "REST session creation is not exposed by the current server contract. Use the WebSocket chat flow instead.",
+      sessionData
+    );
   }
   async getSession(sessionId) {
-    return this.request("GET", `/api/sessions/${sessionId}`);
+    return this.request("GET", `/api/omni/sessions/${encodeURIComponent(String(sessionId))}`);
   }
   async endSession(sessionId) {
-    return this.request("PUT", `/api/sessions/${sessionId}/end`);
+    return this.request("POST", `/api/omni/sessions/${encodeURIComponent(String(sessionId))}/close`);
   }
   async getCustomerSessions(customerId) {
     return this.request("GET", `/api/customers/${customerId}/sessions`);
   }
   // 消息相关 API
   async sendMessage(messageData) {
-    return this.request("POST", "/api/messages", messageData);
+    const sessionId = messageData.session_id;
+    if (sessionId === void 0 || sessionId === null || String(sessionId).trim() === "") {
+      return { success: false, error: "session_id is required" };
+    }
+    return this.request(
+      "POST",
+      `/api/omni/sessions/${encodeURIComponent(String(sessionId))}/messages`,
+      { content: messageData.content }
+    );
   }
   async getSessionMessages(sessionId, options) {
     const params = new URLSearchParams();
     if (options == null ? void 0 : options.page) params.append("page", options.page.toString());
     if (options == null ? void 0 : options.limit) params.append("limit", options.limit.toString());
     const query = params.toString() ? `?${params.toString()}` : "";
-    return this.request("GET", `/api/sessions/${sessionId}/messages${query}`);
+    const response = await this.request(
+      "GET",
+      `/api/omni/sessions/${encodeURIComponent(String(sessionId))}/messages${query}`
+    );
+    if (!response.success) {
+      return {
+        success: false,
+        error: response.error,
+        message: response.message
+      };
+    }
+    const messages = Array.isArray(response.data) ? response.data : [];
+    return {
+      success: true,
+      data: {
+        messages,
+        total: messages.length,
+        page: (options == null ? void 0 : options.page) ?? 1
+      },
+      message: response.message
+    };
   }
   // AI 相关 API
   async askAI(question, sessionId) {
-    return this.request("POST", "/api/ai/ask", { question, session_id: sessionId });
+    var _a, _b, _c;
+    const response = await this.request("POST", "/api/v1/ai/query", { query: question, session_id: sessionId ? String(sessionId) : "" });
+    if (!response.success) {
+      return response;
+    }
+    return {
+      success: true,
+      data: {
+        answer: ((_a = response.data) == null ? void 0 : _a.answer) ?? ((_b = response.data) == null ? void 0 : _b.content) ?? "",
+        confidence: ((_c = response.data) == null ? void 0 : _c.confidence) ?? 0
+      },
+      message: response.message
+    };
   }
   async getAIStatus() {
-    return this.request("GET", "/api/ai/status");
+    return this.request("GET", "/api/v1/ai/status");
   }
   // 工单相关 API
   async createTicket(ticketData) {
@@ -273,31 +316,31 @@ class ApiClient {
     return this.request("PUT", `/api/tickets/${ticketId}`, updates);
   }
   async getCustomerTickets(customerId) {
-    return this.request("GET", `/api/customers/${customerId}/tickets`);
+    return this.request("GET", `/api/tickets?customer_id=${encodeURIComponent(String(customerId))}`);
   }
   // 满意度评价 API
   async submitSatisfaction(satisfactionData) {
-    return this.request("POST", "/api/satisfaction", satisfactionData);
+    return this.request("POST", "/api/satisfactions", satisfactionData);
   }
   async getSatisfactionByTicket(ticketId) {
     return this.request("GET", `/api/tickets/${ticketId}/satisfaction`);
   }
   // 队列相关 API
   async joinQueue(queueData) {
-    return this.request("POST", "/api/queue/join", queueData);
+    return this.unsupported("Queue join is not exposed by the current server contract.", queueData);
   }
   async getQueueStatus(customerId) {
-    return this.request("GET", `/api/queue/status/${customerId}`);
+    return this.unsupported("Queue status is not exposed by the current server contract.", customerId);
   }
   async leaveQueue(customerId) {
-    return this.request("DELETE", `/api/queue/leave/${customerId}`);
+    return this.unsupported("Queue leave is not exposed by the current server contract.", customerId);
   }
   // 文件上传 API
   async uploadFile(file, sessionId) {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("session_id", sessionId.toString());
-    const url = `${this.options.baseUrl}/api/upload`;
+    const url = `${this.options.baseUrl}/api/v1/upload`;
     try {
       const response = await fetch(url, {
         method: "POST",
@@ -329,13 +372,16 @@ class ApiClient {
   }
   // WebRTC 相关 API
   async startCall(sessionId, callType) {
-    return this.request("POST", `/api/webrtc/call/start`, { session_id: sessionId, type: callType });
+    return this.unsupported(
+      "WebRTC call REST endpoints are not exposed by the current server contract. Use WebSocket signaling instead.",
+      { session_id: sessionId, type: callType }
+    );
   }
   async endCall(callId) {
-    return this.request("PUT", `/api/webrtc/call/${callId}/end`);
+    return this.unsupported("WebRTC call REST endpoints are not exposed by the current server contract.", callId);
   }
   async getCallStatus(callId) {
-    return this.request("GET", `/api/webrtc/call/${callId}/status`);
+    return this.unsupported("WebRTC call REST endpoints are not exposed by the current server contract.", callId);
   }
   // 设置认证头
   setAuthToken(token) {
@@ -349,6 +395,10 @@ class ApiClient {
     if (this.options.debug) {
       console.warn("[ServifyAPI]", ...args);
     }
+  }
+  unsupported(error, context) {
+    this.log(error, context);
+    return Promise.resolve({ success: false, error });
   }
 }
 class ServifyError extends Error {
@@ -536,7 +586,14 @@ class WebSocketManager extends EventEmitter {
     }
     switch (message.type) {
       case "message":
-        this.emit("message", message.data);
+      case "text-message":
+        this.emit("message", this.normalizeMessage(message, "customer"));
+        break;
+      case "agent-message":
+        this.emit("message", this.normalizeMessage(message, "agent"));
+        break;
+      case "ai-response":
+        this.emit("message", this.normalizeMessage(message, "system", true));
         break;
       case "session_update":
         this.emit("session_updated", message.data);
@@ -671,6 +728,20 @@ class WebSocketManager extends EventEmitter {
     }
     return null;
   }
+  normalizeMessage(message, senderType, isAIResponse = false) {
+    const data = typeof message.data === "object" && message.data !== null ? message.data : { content: String(message.data ?? "") };
+    const content = typeof data.content === "string" ? data.content : typeof data.message === "string" ? data.message : String(message.data ?? "");
+    return {
+      id: typeof data.id === "string" || typeof data.id === "number" ? data.id : `ws-${Date.now()}`,
+      session_id: typeof data.session_id === "string" || typeof data.session_id === "number" ? data.session_id : message.session_id ?? "",
+      sender_type: senderType,
+      content,
+      message_type: "text",
+      is_ai_response: isAIResponse,
+      metadata: data,
+      created_at: (/* @__PURE__ */ new Date()).toISOString()
+    };
+  }
   extractICECandidate(data) {
     if (typeof data === "object" && data !== null && "candidate" in data && typeof data.candidate === "object" && data.candidate !== null) {
       return data.candidate;
@@ -794,7 +865,7 @@ class ServifySDK extends EventEmitter {
     if (!this.currentCustomer) {
       throw new Error("Customer not initialized. Call initialize() first.");
     }
-    const wsUrl = this.config.wsUrl || this.config.apiUrl.replace(/^http/, "ws") + "/ws";
+    const wsUrl = this.config.wsUrl || this.config.apiUrl.replace(/^http/, "ws") + "/api/v1/ws";
     const realtimeSessionID = this.resolveRealtimeSessionID();
     this.ws = new WebSocketManager({
       url: `${wsUrl}?session_id=${encodeURIComponent(realtimeSessionID)}`,
@@ -834,20 +905,24 @@ class ServifySDK extends EventEmitter {
   }
   // 开始聊天会话
   async startChat(options) {
+    var _a, _b;
     if (!this.currentCustomer) {
       throw new Error("Customer not initialized");
     }
     const sessionData = {
+      id: ((_a = this.currentSession) == null ? void 0 : _a.id) ?? this.id,
       customer_id: this.currentCustomer.id,
       status: "active",
       channel: "web",
-      priority: (options == null ? void 0 : options.priority) || "normal"
+      priority: (options == null ? void 0 : options.priority) || "normal",
+      started_at: (/* @__PURE__ */ new Date()).toISOString(),
+      created_at: (/* @__PURE__ */ new Date()).toISOString(),
+      updated_at: (/* @__PURE__ */ new Date()).toISOString()
     };
-    const response = await this.api.createSession(sessionData);
-    if (!response.success || !response.data) {
-      throw new Error(response.error || "Failed to create session");
+    this.currentSession = sessionData;
+    if (!((_b = this.ws) == null ? void 0 : _b.isConnected())) {
+      await this.connect();
     }
-    this.currentSession = response.data;
     this.emit("session_created", this.currentSession);
     if (options == null ? void 0 : options.message) {
       await this.sendMessage(options.message);
@@ -856,30 +931,34 @@ class ServifySDK extends EventEmitter {
   }
   // 发送消息
   async sendMessage(content, options) {
-    var _a, _b;
+    var _a, _b, _c;
     if (!this.currentSession) {
       throw new Error("No active session. Start a chat first.");
     }
     const messageData = {
+      id: `local-${Date.now()}`,
       session_id: this.currentSession.id,
       sender_type: "customer",
       sender_id: (_a = this.currentCustomer) == null ? void 0 : _a.id,
       content,
       message_type: (options == null ? void 0 : options.type) || "text",
       attachments: options == null ? void 0 : options.attachments,
-      metadata: options == null ? void 0 : options.metadata
+      metadata: options == null ? void 0 : options.metadata,
+      created_at: (/* @__PURE__ */ new Date()).toISOString()
     };
-    const response = await this.api.sendMessage(messageData);
-    if (!response.success || !response.data) {
-      throw new Error(response.error || "Failed to send message");
+    if (!((_b = this.ws) == null ? void 0 : _b.isConnected())) {
+      await this.connect();
     }
-    if ((_b = this.ws) == null ? void 0 : _b.isConnected()) {
-      this.ws.send({
-        type: "message",
-        data: response.data
-      });
-    }
-    return response.data;
+    await ((_c = this.ws) == null ? void 0 : _c.send({
+      type: "text-message",
+      data: {
+        content,
+        message_type: (options == null ? void 0 : options.type) || "text",
+        attachments: options == null ? void 0 : options.attachments,
+        metadata: options == null ? void 0 : options.metadata
+      }
+    }));
+    return messageData;
   }
   // 结束会话
   async endSession() {
@@ -887,11 +966,7 @@ class ServifySDK extends EventEmitter {
       return;
     }
     await this.endRemoteAssist();
-    const response = await this.api.endSession(this.currentSession.id);
-    if (!response.success) {
-      throw new Error(response.error || "Failed to end session");
-    }
-    const endedSession = { ...this.currentSession, status: "closed" };
+    const endedSession = { ...this.currentSession, status: "closed", ended_at: (/* @__PURE__ */ new Date()).toISOString() };
     this.currentSession = null;
     this.currentAgent = null;
     this.emit("session_ended", endedSession);
@@ -1089,24 +1164,18 @@ class ServifySDK extends EventEmitter {
   }
   // 私有方法：初始化客户信息
   async initializeCustomer() {
-    if (this.config.customerId) {
-      const response2 = await this.api.getCustomer(parseInt(this.config.customerId));
-      if (response2.success && response2.data) {
-        this.currentCustomer = response2.data;
-        return;
-      }
-    }
-    const customerData = {
+    const customerId = Number.parseInt(this.config.customerId || "0", 10);
+    this.currentCustomer = {
+      id: Number.isFinite(customerId) && customerId > 0 ? customerId : 0,
       name: this.config.customerName || "Anonymous",
       email: this.config.customerEmail || "",
-      status: "active"
+      status: "active",
+      created_at: (/* @__PURE__ */ new Date()).toISOString(),
+      updated_at: (/* @__PURE__ */ new Date()).toISOString()
     };
-    const response = await this.api.createCustomer(customerData);
-    if (!response.success || !response.data) {
-      throw new Error(response.error || "Failed to create customer");
+    if (this.currentCustomer.id > 0) {
+      this.api.setCustomerId(this.currentCustomer.id);
     }
-    this.currentCustomer = response.data;
-    this.api.setCustomerId(this.currentCustomer.id);
   }
   // 私有方法：处理收到的消息
   handleIncomingMessage(message) {

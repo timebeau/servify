@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Servify SDK - 原生 JavaScript 示例</title>
+    <title>Servify SDK - Vanilla Example</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -113,6 +113,8 @@
             background: #e9ecef;
             border-radius: 6px;
             font-size: 14px;
+            gap: 12px;
+            flex-wrap: wrap;
         }
         .status-dot {
             width: 8px;
@@ -173,65 +175,72 @@
             display: none;
             background: #000;
         }
+        code {
+            background: rgba(0, 0, 0, 0.08);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>Servify 客服系统</h1>
-            <p>原生 JavaScript SDK 示例</p>
+            <h1>Servify</h1>
+            <p>Vanilla SDK example aligned with the current WebSocket-first contract.</p>
         </div>
 
         <div class="status">
             <div style="display: flex; align-items: center;">
                 <div id="status-dot" class="status-dot disconnected"></div>
-                <span id="status-text">正在连接...</span>
+                <span id="status-text">Initializing...</span>
             </div>
+            <div><strong>Contract:</strong> <code>ws://localhost:8080/api/v1/ws</code></div>
             <div id="agent-info" style="display: none;">
-                <span>客服代理：<strong id="agent-name"></strong></span>
+                <span>Agent: <strong id="agent-name"></strong></span>
             </div>
         </div>
 
         <div class="chat-area" id="chat-area">
             <div class="message system">
-                欢迎使用 Servify 客服系统！请开始聊天。
+                This example uses the current WebSocket-first chat flow. Session history still reads from
+                <code>/api/omni/sessions/:id/messages</code>.
             </div>
         </div>
 
         <div id="typing-indicator" class="typing-indicator" style="display: none;">
-            客服正在输入...
+            Agent is typing...
         </div>
 
         <div class="controls">
             <div class="input-group">
-                <input type="text" id="message-input" placeholder="输入您的消息..." maxlength="1000">
-                <button class="btn secondary" onclick="selectFile()">📎</button>
-                <button class="btn primary" onclick="sendMessage()" id="send-btn">发送</button>
+                <input type="text" id="message-input" placeholder="Type a message for the realtime channel..." maxlength="1000">
+                <button class="btn secondary" onclick="selectFile()">Upload</button>
+                <button class="btn primary" onclick="sendMessage()" id="send-btn" disabled>Send</button>
             </div>
 
             <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <button class="btn success" onclick="startChat()" id="start-btn">开始聊天</button>
-                <button class="btn danger" onclick="endChat()" id="end-btn" disabled>结束聊天</button>
-                <button class="btn secondary" onclick="askAI()" id="ai-btn">AI 助手</button>
-                <button class="btn secondary" onclick="createTicket()" id="ticket-btn">创建工单</button>
-                <button class="btn secondary" onclick="showRating()" id="rating-btn">评价服务</button>
+                <button class="btn success" onclick="startChat()" id="start-btn">Start chat</button>
+                <button class="btn danger" onclick="endChat()" id="end-btn" disabled>End chat</button>
+                <button class="btn secondary" onclick="askAI()" id="ai-btn">Ask AI</button>
+                <button class="btn secondary" onclick="createTicket()" id="ticket-btn">Create ticket</button>
+                <button class="btn secondary" onclick="showRating()" id="rating-btn">Rate support</button>
             </div>
 
             <div class="assist-panel">
                 <div class="assist-status">
-                    远程协助状态：<strong id="assist-status">idle</strong>
+                    Remote assist state: <strong id="assist-status">idle</strong>
                 </div>
                 <div class="assist-actions">
-                    <button class="btn secondary" onclick="startRemoteAssist()" id="assist-start-btn">开始屏幕协助</button>
-                    <button class="btn danger" onclick="stopRemoteAssist()" id="assist-stop-btn" disabled>结束屏幕协助</button>
+                    <button class="btn secondary" onclick="startRemoteAssist()" id="assist-start-btn">Start remote assist</button>
+                    <button class="btn danger" onclick="stopRemoteAssist()" id="assist-stop-btn" disabled>Stop remote assist</button>
                 </div>
                 <div class="assist-note">
-                    该示例使用 Web SDK 的远程协助基础链路：会话内 WebRTC 信令、可选屏幕采集和状态事件。
-                    如果没有对端返回 <code>webrtc-answer</code>，连接会停留在 offered 或 connecting。
+                    The SDK uses session-level WebRTC signaling over <code>/api/v1/ws</code>. If no peer returns
+                    <code>webrtc-answer</code>, the state will remain at <code>offered</code> or <code>connecting</code>.
                 </div>
                 <div class="assist-preview" id="assist-preview">
                     <video id="assist-video" autoplay playsinline muted></video>
-                    <span id="assist-preview-empty">尚未收到远端媒体流</span>
+                    <span id="assist-preview-empty">No remote media stream yet.</span>
                 </div>
             </div>
 
@@ -239,19 +248,17 @@
         </div>
     </div>
 
-    <!-- 加载 SDK -->
     <script src="../../packages/vanilla/dist/index.js"></script>
 
     <script>
-        // 初始化 SDK
         const servify = new Servify({
             apiUrl: 'http://localhost:8080',
-            customerName: 'JavaScript 用户',
+            wsUrl: 'ws://localhost:8080/api/v1/ws',
+            customerName: 'Vanilla User',
             customerEmail: 'user@example.com',
             debug: true
         });
 
-        // DOM 元素
         const chatArea = document.getElementById('chat-area');
         const messageInput = document.getElementById('message-input');
         const statusDot = document.getElementById('status-dot');
@@ -260,8 +267,6 @@
         const agentName = document.getElementById('agent-name');
         const typingIndicator = document.getElementById('typing-indicator');
         const fileInput = document.getElementById('file-input');
-
-        // 按钮元素
         const startBtn = document.getElementById('start-btn');
         const endBtn = document.getElementById('end-btn');
         const sendBtn = document.getElementById('send-btn');
@@ -271,42 +276,40 @@
         const assistVideo = document.getElementById('assist-video');
         const assistPreviewEmpty = document.getElementById('assist-preview-empty');
 
-        // 初始化 SDK
         async function initSDK() {
             try {
                 await servify.init();
-                console.log('SDK 初始化成功');
+                console.log('SDK initialized');
             } catch (error) {
-                console.error('SDK 初始化失败:', error);
-                addMessage('system', 'SDK 初始化失败，请刷新页面重试');
+                console.error('SDK initialization failed', error);
+                addMessage('system', 'SDK initialization failed. Refresh the page and try again.');
             }
         }
 
-        // 事件监听器
         servify.on('connected', () => {
             statusDot.className = 'status-dot connected';
-            statusText.textContent = '已连接';
+            statusText.textContent = 'Realtime connected';
         });
 
         servify.on('disconnected', (reason) => {
             statusDot.className = 'status-dot disconnected';
-            statusText.textContent = `已断开连接: ${reason}`;
+            statusText.textContent = `Realtime disconnected: ${reason}`;
             agentInfo.style.display = 'none';
         });
 
         servify.on('message', (message) => {
-            addMessage(message.sender_type, message.content);
+            addMessage(message.sender_type || 'system', message.content || '');
         });
 
-        servify.on('sessionCreated', (session) => {
-            addMessage('system', '聊天会话已创建');
+        servify.on('sessionCreated', () => {
+            addMessage('system', 'Chat session created.');
             startBtn.disabled = true;
             endBtn.disabled = false;
             sendBtn.disabled = false;
         });
 
         servify.on('sessionEnded', () => {
-            addMessage('system', '聊天会话已结束');
+            addMessage('system', 'Chat session ended.');
             startBtn.disabled = false;
             endBtn.disabled = true;
             sendBtn.disabled = true;
@@ -316,7 +319,7 @@
         servify.on('agentAssigned', (agent) => {
             agentName.textContent = agent.name;
             agentInfo.style.display = 'block';
-            addMessage('system', `客服 ${agent.name} 已为您服务`);
+            addMessage('system', `Agent ${agent.name} joined the conversation.`);
         });
 
         servify.on('agentTyping', (isTyping) => {
@@ -324,8 +327,8 @@
         });
 
         servify.on('error', (error) => {
-            console.error('SDK 错误:', error);
-            addMessage('system', `错误: ${error.message}`);
+            console.error('SDK error:', error);
+            addMessage('system', `Error: ${error.message}`);
         });
 
         servify.on('webrtc:state', (state) => {
@@ -337,15 +340,15 @@
                 assistVideo.style.display = 'none';
                 assistPreviewEmpty.style.display = 'block';
             }
-            addMessage('system', `远程协助状态: ${state}`);
+            addMessage('system', `Remote assist state: ${state}`);
         });
 
         servify.on('webrtc:answer', async (answer) => {
             try {
                 await servify.acceptRemoteAnswer(answer);
             } catch (error) {
-                console.error('处理远程应答失败:', error);
-                addMessage('system', '处理远程协助应答失败');
+                console.error('Remote answer handling failed:', error);
+                addMessage('system', 'Failed to handle the remote answer.');
             }
         });
 
@@ -353,7 +356,7 @@
             try {
                 await servify.addRemoteIce(candidate);
             } catch (error) {
-                console.error('处理远程 ICE candidate 失败:', error);
+                console.error('Remote ICE handling failed:', error);
             }
         });
 
@@ -365,18 +368,17 @@
             assistVideo.srcObject = stream;
             assistVideo.style.display = 'block';
             assistPreviewEmpty.style.display = 'none';
-            addMessage('system', '已收到远端媒体流');
+            addMessage('system', 'Remote media stream attached.');
         });
 
-        // 功能函数
         async function startChat() {
             try {
                 await servify.startChat({
                     priority: 'normal',
-                    message: '您好，我需要帮助'
+                    message: 'Hello, I need help with my current issue.'
                 });
             } catch (error) {
-                alert('开始聊天失败: ' + error.message);
+                alert(`Start chat failed: ${error.message}`);
             }
         }
 
@@ -386,10 +388,9 @@
 
             try {
                 await servify.sendMessage(content);
-                addMessage('customer', content);
                 messageInput.value = '';
             } catch (error) {
-                alert('发送消息失败: ' + error.message);
+                alert(`Send message failed: ${error.message}`);
             }
         }
 
@@ -398,49 +399,49 @@
                 await servify.endRemoteAssist();
                 await servify.endChat();
             } catch (error) {
-                alert('结束聊天失败: ' + error.message);
+                alert(`End chat failed: ${error.message}`);
             }
         }
 
         async function startRemoteAssist() {
             try {
                 if (!servify.getSession()) {
-                    addMessage('system', '请先开始聊天，再发起远程协助');
+                    addMessage('system', 'Start a chat before opening remote assist.');
                     return;
                 }
                 await servify.startRemoteAssist({ captureScreen: true, audio: false });
-                addMessage('system', '远程协助 offer 已发送，等待对端应答');
+                addMessage('system', 'Remote assist offer sent. Waiting for the peer answer.');
             } catch (error) {
-                alert('发起远程协助失败: ' + error.message);
+                alert(`Start remote assist failed: ${error.message}`);
             }
         }
 
         async function stopRemoteAssist() {
             try {
                 await servify.endRemoteAssist();
-                addMessage('system', '远程协助已结束');
+                addMessage('system', 'Remote assist ended.');
             } catch (error) {
-                alert('结束远程协助失败: ' + error.message);
+                alert(`Stop remote assist failed: ${error.message}`);
             }
         }
 
         async function askAI() {
-            const question = prompt('请输入您的问题：');
+            const question = prompt('Ask the AI assistant:');
             if (!question) return;
 
             try {
                 const response = await servify.askAI(question);
-                addMessage('system', `AI 回答 (置信度: ${(response.confidence * 100).toFixed(1)}%): ${response.answer}`);
+                addMessage('system', `AI answer (${(response.confidence * 100).toFixed(1)}%): ${response.answer}`);
             } catch (error) {
-                alert('AI 问答失败: ' + error.message);
+                alert(`AI request failed: ${error.message}`);
             }
         }
 
         async function createTicket() {
-            const title = prompt('工单标题：');
+            const title = prompt('Ticket title:');
             if (!title) return;
 
-            const description = prompt('问题描述：');
+            const description = prompt('Ticket description:');
             if (!description) return;
 
             try {
@@ -450,27 +451,27 @@
                     category: 'general',
                     priority: 'normal'
                 });
-                addMessage('system', `工单已创建，编号: #${ticket.id}`);
+                addMessage('system', `Ticket created: #${ticket.id}`);
             } catch (error) {
-                alert('创建工单失败: ' + error.message);
+                alert(`Create ticket failed: ${error.message}`);
             }
         }
 
         function showRating() {
-            const rating = prompt('请为服务评分 (1-5)：');
-            const ratingNum = parseInt(rating);
+            const rating = prompt('Rate the support experience (1-5):');
+            const ratingNum = parseInt(rating, 10);
 
             if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
-                alert('请输入有效的评分 (1-5)');
+                alert('Enter an integer from 1 to 5.');
                 return;
             }
 
-            const comment = prompt('请输入评价内容（可选）：') || '';
+            const comment = prompt('Optional comment:') || '';
 
             servify.submitRating(ratingNum, comment).then(() => {
-                addMessage('system', '感谢您的评价！');
+                addMessage('system', 'Thanks for the feedback.');
             }).catch((error) => {
-                alert('提交评价失败: ' + error.message);
+                alert(`Submit rating failed: ${error.message}`);
             });
         }
 
@@ -484,30 +485,30 @@
 
             try {
                 const result = await servify.uploadFile(file);
-                addMessage('customer', `文件已上传: ${result.fileName}`);
-                addMessage('system', `文件大小: ${(result.fileSize / 1024).toFixed(1)} KB`);
+                addMessage('system', `Uploaded ${result.fileName} (${(result.fileSize / 1024).toFixed(1)} KB)`);
             } catch (error) {
-                alert('文件上传失败: ' + error.message);
+                alert(`File upload failed: ${error.message}`);
+            } finally {
+                event.target.value = '';
             }
         }
 
         function addMessage(type, content) {
             const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${type}`;
+            const normalizedType = type === 'agent' || type === 'customer' ? type : 'system';
+            messageDiv.className = `message ${normalizedType}`;
             messageDiv.textContent = content;
 
             chatArea.appendChild(messageDiv);
             chatArea.scrollTop = chatArea.scrollHeight;
         }
 
-        // 回车发送消息
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !sendBtn.disabled) {
+        messageInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter' && !sendBtn.disabled) {
                 sendMessage();
             }
         });
 
-        // 初始化
         initSDK();
     </script>
 </body>

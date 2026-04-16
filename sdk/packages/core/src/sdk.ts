@@ -102,7 +102,7 @@ export class ServifySDK extends EventEmitter<ServifyEventMap> implements ClientS
       throw new Error('Customer not initialized. Call initialize() first.');
     }
 
-    const wsUrl = this.config.wsUrl || this.config.apiUrl.replace(/^http/, 'ws') + '/ws';
+    const wsUrl = this.config.wsUrl || this.config.apiUrl.replace(/^http/, 'ws') + '/api/v1/ws';
     const realtimeSessionID = this.resolveRealtimeSessionID();
 
     this.ws = new WebSocketManager({
@@ -155,19 +155,23 @@ export class ServifySDK extends EventEmitter<ServifyEventMap> implements ClientS
       throw new Error('Customer not initialized');
     }
 
-    const sessionData: Partial<ChatSession> = {
+    const sessionData: ChatSession = {
+      id: this.currentSession?.id ?? this.id,
       customer_id: this.currentCustomer.id,
       status: 'active',
       channel: 'web',
       priority: options?.priority || 'normal',
+      started_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
-    const response = await this.api.createSession(sessionData);
-    if (!response.success || !response.data) {
-      throw new Error(response.error || 'Failed to create session');
+    this.currentSession = sessionData;
+
+    if (!this.ws?.isConnected()) {
+      await this.connect();
     }
 
-    this.currentSession = response.data;
     this.emit('session_created', this.currentSession);
 
     // 如果有初始消息，发送它
@@ -188,7 +192,8 @@ export class ServifySDK extends EventEmitter<ServifyEventMap> implements ClientS
       throw new Error('No active session. Start a chat first.');
     }
 
-    const messageData: Partial<Message> = {
+    const messageData: Message = {
+      id: `local-${Date.now()}`,
       session_id: this.currentSession.id,
       sender_type: 'customer',
       sender_id: this.currentCustomer?.id,
@@ -196,22 +201,24 @@ export class ServifySDK extends EventEmitter<ServifyEventMap> implements ClientS
       message_type: options?.type || 'text',
       attachments: options?.attachments,
       metadata: options?.metadata,
+      created_at: new Date().toISOString(),
     };
 
-    const response = await this.api.sendMessage(messageData);
-    if (!response.success || !response.data) {
-      throw new Error(response.error || 'Failed to send message');
+    if (!this.ws?.isConnected()) {
+      await this.connect();
     }
 
-    // 通过 WebSocket 实时发送（如果连接可用）
-    if (this.ws?.isConnected()) {
-      this.ws.send({
-        type: 'message',
-        data: response.data,
-      });
-    }
+    await this.ws?.send({
+      type: 'text-message',
+      data: {
+        content,
+        message_type: options?.type || 'text',
+        attachments: options?.attachments,
+        metadata: options?.metadata,
+      },
+    });
 
-    return response.data;
+    return messageData;
   }
 
   // 结束会话
@@ -222,12 +229,7 @@ export class ServifySDK extends EventEmitter<ServifyEventMap> implements ClientS
 
     await this.endRemoteAssist();
 
-    const response = await this.api.endSession(this.currentSession.id);
-    if (!response.success) {
-      throw new Error(response.error || 'Failed to end session');
-    }
-
-    const endedSession = { ...this.currentSession, status: 'closed' as const };
+    const endedSession = { ...this.currentSession, status: 'closed' as const, ended_at: new Date().toISOString() };
     this.currentSession = null;
     this.currentAgent = null;
     this.emit('session_ended', endedSession);
@@ -479,29 +481,19 @@ export class ServifySDK extends EventEmitter<ServifyEventMap> implements ClientS
 
   // 私有方法：初始化客户信息
   private async initializeCustomer(): Promise<void> {
-    if (this.config.customerId) {
-      // 获取现有客户
-      const response = await this.api.getCustomer(parseInt(this.config.customerId));
-      if (response.success && response.data) {
-        this.currentCustomer = response.data;
-        return;
-      }
-    }
-
-    // 创建新客户
-    const customerData: Partial<Customer> = {
+    const customerId = Number.parseInt(this.config.customerId || '0', 10);
+    this.currentCustomer = {
+      id: Number.isFinite(customerId) && customerId > 0 ? customerId : 0,
       name: this.config.customerName || 'Anonymous',
       email: this.config.customerEmail || '',
       status: 'active',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
-    const response = await this.api.createCustomer(customerData);
-    if (!response.success || !response.data) {
-      throw new Error(response.error || 'Failed to create customer');
+    if (this.currentCustomer.id > 0) {
+      this.api.setCustomerId(this.currentCustomer.id);
     }
-
-    this.currentCustomer = response.data;
-    this.api.setCustomerId(this.currentCustomer.id);
   }
 
   // 私有方法：处理收到的消息

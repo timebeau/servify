@@ -77,6 +77,34 @@ func (r *GormRepository) ListAgents(ctx context.Context, limit int) ([]models.Ag
 	return agents, nil
 }
 
+func (r *GormRepository) GetAgentRuntimeByUserID(ctx context.Context, userID uint) (*agentapp.AgentRuntimeDTO, error) {
+	var agent models.Agent
+	if err := applyAgentScope(r.db.WithContext(ctx), ctx).
+		Preload("User").
+		Where("user_id = ? AND status <> ?", userID, string(agentdomain.PresenceStatusOffline)).
+		First(&agent).Error; err != nil {
+		return nil, fmt.Errorf("agent runtime not found: %w", err)
+	}
+	runtime := mapRuntime(agent.User, agent)
+	return &runtime, nil
+}
+
+func (r *GormRepository) ListActiveAgentRuntimes(ctx context.Context) ([]agentapp.AgentRuntimeDTO, error) {
+	var agents []models.Agent
+	if err := applyAgentScope(r.db.WithContext(ctx), ctx).
+		Preload("User").
+		Where("status <> ?", string(agentdomain.PresenceStatusOffline)).
+		Order("user_id ASC").
+		Find(&agents).Error; err != nil {
+		return nil, fmt.Errorf("failed to list active agent runtimes: %w", err)
+	}
+	runtimes := make([]agentapp.AgentRuntimeDTO, 0, len(agents))
+	for _, agent := range agents {
+		runtimes = append(runtimes, mapRuntime(agent.User, agent))
+	}
+	return runtimes, nil
+}
+
 func (r *GormRepository) UpdatePresenceStatus(ctx context.Context, userID uint, status agentdomain.PresenceStatus) error {
 	if err := applyAgentScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Where("user_id = ?", userID).Update("status", string(status)).Error; err != nil {
 		return fmt.Errorf("failed to update agent status: %w", err)
@@ -173,6 +201,23 @@ func mapProfile(user models.User, agent models.Agent) *agentdomain.AgentProfile 
 		Rating:              agent.Rating,
 		AvgResponseTime:     agent.AvgResponseTime,
 		TotalTickets:        agent.TotalTickets,
+	}
+}
+
+func mapRuntime(user models.User, agent models.Agent) agentapp.AgentRuntimeDTO {
+	return agentapp.AgentRuntimeDTO{
+		UserID:              agent.UserID,
+		Username:            user.Username,
+		Name:                user.Name,
+		Department:          agent.Department,
+		Skills:              splitSkills(agent.Skills),
+		Status:              agent.Status,
+		MaxChatConcurrency:  agent.MaxConcurrent,
+		MaxVoiceConcurrency: 1,
+		CurrentChatLoad:     agent.CurrentLoad,
+		CurrentVoiceLoad:    0,
+		Rating:              agent.Rating,
+		AvgResponseTime:     agent.AvgResponseTime,
 	}
 }
 

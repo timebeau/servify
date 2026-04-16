@@ -3,6 +3,7 @@ package scripts
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -28,7 +29,7 @@ func TestWeKnoraIntegrationScriptRealModeRejectsLocalHost(t *testing.T) {
 		t.Fatalf("expected real mode to reject local host, output=%s", string(output))
 	}
 
-	if !strings.Contains(string(output), "real 模式拒绝使用本地或私网 WeKnora 地址") {
+	if !strings.Contains(string(output), "real 模式拒绝使用本地或私网 WeKnora compatibility 地址") {
 		t.Fatalf("expected local-host guard message, output=%s", string(output))
 	}
 
@@ -43,17 +44,33 @@ func TestWeKnoraIntegrationScriptRealModeRejectsLocalHost(t *testing.T) {
 }
 
 func TestWeKnoraIntegrationScriptMockModeWritesEvidence(t *testing.T) {
+	knowledgeProviderEnabled := true
+	fallbackUsageCount := 0
+
 	servify := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/health":
 			_, _ = w.Write([]byte(`{"status":"healthy"}`))
 		case "/api/v1/ai/query":
-			_, _ = w.Write([]byte(`{"success":true,"data":{"content":"ok"}}`))
+			if knowledgeProviderEnabled {
+				_, _ = w.Write([]byte(`{"success":true,"data":{"content":"ok","strategy":"weknora"}}`))
+			} else {
+				fallbackUsageCount++
+				_, _ = w.Write([]byte(`{"success":true,"data":{"content":"fallback-ok","strategy":"fallback"}}`))
+			}
 		case "/api/v1/ai/status":
-			_, _ = w.Write([]byte(`{"success":true,"data":{"type":"enhanced","weknora_enabled":true}}`))
+			_, _ = w.Write([]byte(fmt.Sprintf(`{"success":true,"data":{"type":"orchestrated_enhanced","knowledge_provider_enabled":%t,"knowledge_provider":"weknora","knowledge_provider_healthy":%t}}`, knowledgeProviderEnabled, knowledgeProviderEnabled)))
 		case "/api/v1/ai/metrics":
-			_, _ = w.Write([]byte(`{"success":true,"data":{"query_count":3,"weknora_usage_count":2,"fallback_usage_count":1}}`))
+			_, _ = w.Write([]byte(fmt.Sprintf(`{"success":true,"data":{"query_count":3,"weknora_usage_count":2,"fallback_usage_count":%d}}`, fallbackUsageCount)))
+		case "/api/v1/ai/knowledge-provider/disable":
+			knowledgeProviderEnabled = false
+			_, _ = w.Write([]byte(`{"success":true,"message":"knowledge provider disabled"}`))
+		case "/api/v1/ai/knowledge-provider/enable":
+			knowledgeProviderEnabled = true
+			_, _ = w.Write([]byte(`{"success":true,"message":"knowledge provider enabled"}`))
+		case "/api/v1/ai/circuit-breaker/reset":
+			_, _ = w.Write([]byte(`{"success":true,"message":"Circuit breaker reset"}`))
 		case "/api/v1/ai/knowledge/upload":
 			_, _ = w.Write([]byte(`{"success":true,"data":{"document_id":"doc-1"}}`))
 		case "/api/v1/ai/knowledge/sync":
@@ -119,6 +136,13 @@ func TestWeKnoraIntegrationScriptMockModeWritesEvidence(t *testing.T) {
 		"weknora-health.json",
 		"ai-status.json",
 		"ai-query.json",
+		"knowledge-provider-disable.json",
+		"ai-status-after-disable.json",
+		"ai-query-after-disable.json",
+		"ai-metrics-after-fallback.json",
+		"knowledge-provider-enable.json",
+		"ai-status-after-enable.json",
+		"circuit-breaker-reset.json",
 		"knowledge-upload.json",
 		"knowledge-sync.json",
 		"ws-stats.json",
@@ -138,8 +162,17 @@ func TestWeKnoraIntegrationScriptMockModeWritesEvidence(t *testing.T) {
 	for _, want := range []string{
 		"mode=mock",
 		"overall_status=healthy",
-		"service_type=enhanced",
+		"service_type=orchestrated_enhanced",
+		"service_provider_capable=true",
 		"weknora_available=true",
+		"knowledge_provider_disable_ok=true",
+		"knowledge_provider_enable_ok=true",
+		"status_after_disable_enabled=false",
+		"status_after_enable_enabled=true",
+		"circuit_breaker_reset_ok=true",
+		"fallback_query_ok=true",
+		"fallback_query_strategy=fallback",
+		"fallback_usage_count_after_disable=1",
 		"knowledge_upload_ok=true",
 		"knowledge_sync_ok=true",
 	} {

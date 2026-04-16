@@ -30,6 +30,66 @@ append_summary() {
   printf '%s\n' "$1" >> "$EVIDENCE_DIR/summary.txt"
 }
 
+json_get() {
+  local json_input="${1:-}"
+  local python_expr="${2:-}"
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s' "$json_input" | jq -r "$python_expr" 2>/dev/null
+    return $?
+  fi
+
+  JSON_INPUT="$json_input" python3 - "$python_expr" <<'PY'
+import json
+import os
+import sys
+
+expr = sys.argv[1].strip()
+payload = os.environ.get("JSON_INPUT", "")
+
+try:
+    data = json.loads(payload)
+except Exception:
+    print("")
+    sys.exit(1)
+
+def query(obj, path):
+    current = obj
+    for raw_part in path.split("."):
+        part = raw_part.strip()
+        if not part:
+            continue
+        if isinstance(current, dict) and part in current:
+            current = current[part]
+        else:
+            return None
+    return current
+
+fallback = ""
+paths = []
+if "//" in expr:
+    left, right = expr.split("//", 1)
+    expr = left.strip()
+    fallback = right.strip().strip('"')
+
+if expr.startswith("."):
+    paths.append(expr.lstrip("."))
+
+result = None
+for path in paths:
+    candidate = query(data, path)
+    if candidate is not None:
+        result = candidate
+        break
+
+if result is None:
+    print(fallback)
+elif isinstance(result, bool):
+    print("true" if result else "false")
+else:
+    print(result)
+PY
+}
+
 host_from_url() {
   local url="${1:-}"
   url="${url#http://}"
@@ -166,9 +226,7 @@ if [ "${WEKNORA_ENABLED:-false}" = "true" ]; then
     if WEKNORA_HEALTH_BODY=$(curl -fsS "$WEKNORA_URL/api/v1/health"); then
         echo "    ✅ WeKnora compatibility 健康检查通过"
         save_response "weknora-health" "$WEKNORA_HEALTH_BODY"
-        if command -v jq >/dev/null 2>&1; then
-          WEKNORA_HEALTH_SERVICE=$(echo "$WEKNORA_HEALTH_BODY" | jq -r '.service // "unknown"' 2>/dev/null || echo "unknown")
-        fi
+        WEKNORA_HEALTH_SERVICE=$(json_get "$WEKNORA_HEALTH_BODY" '.service // "unknown"' || echo "unknown")
         append_summary "weknora_health_service=$WEKNORA_HEALTH_SERVICE"
     else
         echo "    ⚠️  WeKnora compatibility 健康检查失败，但降级机制可用"
@@ -192,8 +250,9 @@ save_response "ai-query" "$AI_RESPONSE"
 
 if echo "$AI_RESPONSE" | grep -q '"success":true'; then
     echo "    ✅ AI 查询测试通过"
-    if command -v jq >/dev/null 2>&1; then
-      echo "    📝 AI 响应: $(echo "$AI_RESPONSE" | jq -r '.data.content')"
+    AI_CONTENT=$(json_get "$AI_RESPONSE" '.data.content // ""' || true)
+    if [ -n "$AI_CONTENT" ]; then
+      echo "    📝 AI 响应: $AI_CONTENT"
     else
       echo "    📝 AI 原始响应: $AI_RESPONSE"
     fi
@@ -210,26 +269,22 @@ AI_STATUS=$(curl -fsS \
     "$SERVIFY_URL/api/v1/ai/status")
 save_response "ai-status" "$AI_STATUS"
 SERVICE_TYPE="unknown"
+SERVICE_IS_PROVIDER_CAPABLE=false
 
 if echo "$AI_STATUS" | grep -q '"success":true'; then
     echo "    ✅ AI 状态查询通过"
 
-    # 显示服务类型
-    if command -v jq >/dev/null 2>&1; then
-  # 优先读取 type；若缺失则根据 knowledge_provider_enabled 推断
-  SERVICE_TYPE=$(echo "$AI_STATUS" | jq -r '.data.type // ( .data.knowledge_provider_enabled == true and "enhanced" or "standard" )')
-  ACTIVE_PROVIDER=$(echo "$AI_STATUS" | jq -r '.data.knowledge_provider // "unknown"')
-    else
-      SERVICE_TYPE="unknown"
-      ACTIVE_PROVIDER="unknown"
-    fi
+    SERVICE_TYPE=$(json_get "$AI_STATUS" '.data.type // "unknown"' || echo "unknown")
+    ACTIVE_PROVIDER=$(json_get "$AI_STATUS" '.data.knowledge_provider // "unknown"' || echo "unknown")
+    KNOWLEDGE_PROVIDER_ENABLED=$(json_get "$AI_STATUS" '.data.knowledge_provider_enabled // false' || echo "false")
     echo "    📊 服务类型: $SERVICE_TYPE"
     echo "    📊 当前 knowledge provider: $ACTIVE_PROVIDER"
 
-    if [ "$SERVICE_TYPE" = "enhanced" ]; then
-        echo "    🚀 使用增强型 AI 服务 (knowledge provider enabled)"
+    if [ "$KNOWLEDGE_PROVIDER_ENABLED" = "true" ]; then
+        SERVICE_IS_PROVIDER_CAPABLE=true
+        echo "    🚀 使用支持外部 knowledge provider 的 AI 服务"
     else
-        echo "    📚 使用标准 AI 服务 (传统知识库)"
+        echo "    📚 使用内置知识库 / fallback AI 服务"
     fi
 else
     echo "    ❌ AI 状态查询失败"
@@ -240,8 +295,104 @@ fi
 UPLOAD_OK=false
 SYNC_OK=false
 ACTIVE_PROVIDER=${ACTIVE_PROVIDER:-unknown}
-if [ "$SERVICE_TYPE" = "enhanced" ]; then
+KNOWLEDGE_PROVIDER_DISABLE_OK=false
+KNOWLEDGE_PROVIDER_ENABLE_OK=false
+CIRCUIT_BREAKER_RESET_OK=false
+STATUS_AFTER_DISABLE_ENABLED="unknown"
+STATUS_AFTER_ENABLE_ENABLED="unknown"
+FALLBACK_QUERY_OK=false
+FALLBACK_QUERY_STRATEGY="unknown"
+FALLBACK_USAGE_COUNT_AFTER_DISABLE="N/A"
+if [ "$SERVICE_IS_PROVIDER_CAPABLE" = "true" ]; then
   echo "🔧 测试 knowledge provider / WeKnora compatibility 功能..."
+
+    echo "  ✓ 测试 knowledge provider 控制面..."
+    DISABLE_RESPONSE=$(curl -fsS -X PUT "$SERVIFY_URL/api/v1/ai/knowledge-provider/disable" \
+        -H "$AUTH_HEADER" \
+        -H "Content-Type: application/json")
+    save_response "knowledge-provider-disable" "$DISABLE_RESPONSE"
+    if echo "$DISABLE_RESPONSE" | grep -q '"success":true'; then
+        KNOWLEDGE_PROVIDER_DISABLE_OK=true
+        echo "    ✅ knowledge provider disable 成功"
+    else
+        echo "    ❌ knowledge provider disable 失败: $DISABLE_RESPONSE"
+        exit 1
+    fi
+
+    AI_STATUS_AFTER_DISABLE=$(curl -fsS \
+        -H "$AUTH_HEADER" \
+        "$SERVIFY_URL/api/v1/ai/status")
+    save_response "ai-status-after-disable" "$AI_STATUS_AFTER_DISABLE"
+    STATUS_AFTER_DISABLE_ENABLED=$(json_get "$AI_STATUS_AFTER_DISABLE" '.data.knowledge_provider_enabled // "unknown"' || echo "unknown")
+    if [ "$STATUS_AFTER_DISABLE_ENABLED" != "false" ]; then
+        echo "    ❌ disable 后状态未收口，knowledge_provider_enabled=$STATUS_AFTER_DISABLE_ENABLED"
+        exit 1
+    fi
+    echo "    ✅ disable 后状态已反映 knowledge_provider_enabled=false"
+
+    FALLBACK_QUERY_RESPONSE=$(curl -fsS -X POST "$SERVIFY_URL/api/v1/ai/query" \
+        -H "$AUTH_HEADER" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "query": "请在外部 knowledge provider 不可用时走 fallback 响应",
+            "session_id": "fallback_after_disable"
+        }')
+    save_response "ai-query-after-disable" "$FALLBACK_QUERY_RESPONSE"
+    if echo "$FALLBACK_QUERY_RESPONSE" | grep -q '"success":true'; then
+        FALLBACK_QUERY_STRATEGY=$(json_get "$FALLBACK_QUERY_RESPONSE" '.data.strategy // "unknown"' || echo "unknown")
+        if [ "$FALLBACK_QUERY_STRATEGY" = "fallback" ]; then
+            FALLBACK_QUERY_OK=true
+            echo "    ✅ disable 后 fallback 查询成功，strategy=fallback"
+        else
+            echo "    ❌ disable 后未进入 fallback，strategy=$FALLBACK_QUERY_STRATEGY"
+            exit 1
+        fi
+    else
+        echo "    ❌ disable 后 fallback 查询失败: $FALLBACK_QUERY_RESPONSE"
+        exit 1
+    fi
+
+    METRICS_AFTER_FALLBACK=$(curl -fsS \
+        -H "$AUTH_HEADER" \
+        "$SERVIFY_URL/api/v1/ai/metrics")
+    save_response "ai-metrics-after-fallback" "$METRICS_AFTER_FALLBACK"
+    FALLBACK_USAGE_COUNT_AFTER_DISABLE=$(json_get "$METRICS_AFTER_FALLBACK" '.data.fallback_usage_count // "N/A"' || echo "N/A")
+    echo "    📊 disable 后 fallback 使用次数: $FALLBACK_USAGE_COUNT_AFTER_DISABLE"
+
+    ENABLE_RESPONSE=$(curl -fsS -X PUT "$SERVIFY_URL/api/v1/ai/knowledge-provider/enable" \
+        -H "$AUTH_HEADER" \
+        -H "Content-Type: application/json")
+    save_response "knowledge-provider-enable" "$ENABLE_RESPONSE"
+    if echo "$ENABLE_RESPONSE" | grep -q '"success":true'; then
+        KNOWLEDGE_PROVIDER_ENABLE_OK=true
+        echo "    ✅ knowledge provider enable 成功"
+    else
+        echo "    ❌ knowledge provider enable 失败: $ENABLE_RESPONSE"
+        exit 1
+    fi
+
+    AI_STATUS_AFTER_ENABLE=$(curl -fsS \
+        -H "$AUTH_HEADER" \
+        "$SERVIFY_URL/api/v1/ai/status")
+    save_response "ai-status-after-enable" "$AI_STATUS_AFTER_ENABLE"
+    STATUS_AFTER_ENABLE_ENABLED=$(json_get "$AI_STATUS_AFTER_ENABLE" '.data.knowledge_provider_enabled // "unknown"' || echo "unknown")
+    if [ "$STATUS_AFTER_ENABLE_ENABLED" != "true" ]; then
+        echo "    ❌ enable 后状态未收口，knowledge_provider_enabled=$STATUS_AFTER_ENABLE_ENABLED"
+        exit 1
+    fi
+    echo "    ✅ enable 后状态已反映 knowledge_provider_enabled=true"
+
+    RESET_RESPONSE=$(curl -fsS -X POST "$SERVIFY_URL/api/v1/ai/circuit-breaker/reset" \
+        -H "$AUTH_HEADER" \
+        -H "Content-Type: application/json")
+    save_response "circuit-breaker-reset" "$RESET_RESPONSE"
+    if echo "$RESET_RESPONSE" | grep -q '"success":true'; then
+        CIRCUIT_BREAKER_RESET_OK=true
+        echo "    ✅ circuit breaker reset 成功"
+    else
+        echo "    ❌ circuit breaker reset 失败: $RESET_RESPONSE"
+        exit 1
+    fi
 
     # 测试指标查询
     echo "  ✓ 测试服务指标..."
@@ -254,13 +405,9 @@ if [ "$SERVICE_TYPE" = "enhanced" ]; then
         echo "    ✅ 指标查询通过"
 
         # 显示一些关键指标
-        if command -v jq >/dev/null 2>&1; then
-          QUERY_COUNT=$(echo "$METRICS_RESPONSE" | jq -r '.data.query_count')
-          WEKNORA_COUNT=$(echo "$METRICS_RESPONSE" | jq -r '.data.weknora_usage_count')
-          FALLBACK_COUNT=$(echo "$METRICS_RESPONSE" | jq -r '.data.fallback_usage_count')
-        else
-          QUERY_COUNT="N/A"; WEKNORA_COUNT="N/A"; FALLBACK_COUNT="N/A"
-        fi
+        QUERY_COUNT=$(json_get "$METRICS_RESPONSE" '.data.query_count // "N/A"' || echo "N/A")
+        WEKNORA_COUNT=$(json_get "$METRICS_RESPONSE" '.data.weknora_usage_count // "N/A"' || echo "N/A")
+        FALLBACK_COUNT=$(json_get "$METRICS_RESPONSE" '.data.fallback_usage_count // "N/A"' || echo "N/A")
 
         echo "    📊 查询总数: $QUERY_COUNT"
         echo "    📊 WeKnora compatibility 使用次数: $WEKNORA_COUNT"
@@ -317,7 +464,7 @@ save_response "ws-stats" "$WS_STATS"
 if echo "$WS_STATS" | grep -q '"success":true'; then
     echo "    ✅ WebSocket 服务正常"
 
-    CLIENT_COUNT=$(echo "$WS_STATS" | jq -r '.data.client_count' 2>/dev/null || echo "N/A")
+    CLIENT_COUNT=$(json_get "$WS_STATS" '.data.client_count // "N/A"' || echo "N/A")
     echo "    📊 当前连接数: $CLIENT_COUNT"
 else
     echo "    ❌ WebSocket 服务异常: $WS_STATS"
@@ -334,7 +481,7 @@ save_response "webrtc-connections" "$WEBRTC_STATS"
 if echo "$WEBRTC_STATS" | grep -q '"success":true'; then
     echo "    ✅ WebRTC 服务正常"
 
-    CONNECTION_COUNT=$(echo "$WEBRTC_STATS" | jq -r '.data.connection_count' 2>/dev/null || echo "N/A")
+    CONNECTION_COUNT=$(json_get "$WEBRTC_STATS" '.data.connection_count // "N/A"' || echo "N/A")
     echo "    📊 WebRTC 连接数: $CONNECTION_COUNT"
 else
     echo "    ❌ WebRTC 服务异常: $WEBRTC_STATS"
@@ -372,11 +519,7 @@ echo "════════════════════════�
 
 # 检查总体状态
 OVERALL_HEALTH=$(curl -fsS "$SERVIFY_URL/health")
-if command -v jq >/dev/null 2>&1; then
-  OVERALL_STATUS=$(echo "$OVERALL_HEALTH" | jq -r '.status')
-else
-  OVERALL_STATUS="unknown"
-fi
+OVERALL_STATUS=$(json_get "$OVERALL_HEALTH" '.status // "unknown"' || echo "unknown")
 
 case "$OVERALL_STATUS" in
     "healthy")
@@ -396,7 +539,16 @@ esac
 
 append_summary "overall_status=$OVERALL_STATUS"
 append_summary "service_type=$SERVICE_TYPE"
+append_summary "service_provider_capable=$SERVICE_IS_PROVIDER_CAPABLE"
 append_summary "weknora_available=$WEKNORA_AVAILABLE"
+append_summary "knowledge_provider_disable_ok=$KNOWLEDGE_PROVIDER_DISABLE_OK"
+append_summary "knowledge_provider_enable_ok=$KNOWLEDGE_PROVIDER_ENABLE_OK"
+append_summary "status_after_disable_enabled=$STATUS_AFTER_DISABLE_ENABLED"
+append_summary "status_after_enable_enabled=$STATUS_AFTER_ENABLE_ENABLED"
+append_summary "circuit_breaker_reset_ok=$CIRCUIT_BREAKER_RESET_OK"
+append_summary "fallback_query_ok=$FALLBACK_QUERY_OK"
+append_summary "fallback_query_strategy=$FALLBACK_QUERY_STRATEGY"
+append_summary "fallback_usage_count_after_disable=$FALLBACK_USAGE_COUNT_AFTER_DISABLE"
 append_summary "knowledge_upload_ok=$UPLOAD_OK"
 append_summary "knowledge_sync_ok=$SYNC_OK"
 
@@ -412,8 +564,8 @@ if [ "$WEKNORA_ACCEPTANCE_MODE" = "real" ]; then
         echo "❌ real 模式要求真实 WeKnora 兼容服务健康可用"
         exit 1
     fi
-    if [ "$SERVICE_TYPE" != "enhanced" ]; then
-        echo "❌ real 模式要求 Servify 运行在 enhanced AI 模式"
+    if [ "$SERVICE_IS_PROVIDER_CAPABLE" != "true" ]; then
+        echo "❌ real 模式要求 Servify 运行在支持外部 knowledge provider 的 AI 模式"
         exit 1
     fi
     if [ "$UPLOAD_OK" != "true" ] || [ "$SYNC_OK" != "true" ]; then
@@ -443,7 +595,7 @@ echo "   ✅ WebSocket 实时通信"
 echo "   ✅ WebRTC 连接管理"
 echo "   ✅ 并发请求处理"
 
-if [ "$SERVICE_TYPE" = "enhanced" ]; then
+if [ "$SERVICE_IS_PROVIDER_CAPABLE" = "true" ]; then
     echo "   ✅ WeKnora compatibility 知识库集成"
     echo "   ✅ 降级机制和熔断器"
     echo "   ✅ 服务指标监控"
@@ -456,7 +608,7 @@ echo "   1. 在浏览器中访问 $SERVIFY_URL 体验完整功能"
 echo "   2. 使用 WebSocket 客户端测试实时聊天"
 echo "   3. 如需测试远程协助，请使用支持 WebRTC 的浏览器"
 
-if [ "$SERVICE_TYPE" = "enhanced" ]; then
+if [ "$SERVICE_IS_PROVIDER_CAPABLE" = "true" ]; then
     echo "   4. 通过 WeKnora Web UI 管理兼容知识库: $WEKNORA_URL:9001"
     echo "   5. 使用 API 上传更多文档到知识库"
 fi

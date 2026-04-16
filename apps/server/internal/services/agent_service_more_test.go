@@ -5,6 +5,7 @@ package services
 
 import (
 	"context"
+	"strconv"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -84,8 +85,8 @@ func TestAgentService_ListAgents(t *testing.T) {
 	for i := 1; i <= 3; i++ {
 		user := &models.User{
 			ID:       uint(i),
-			Username: "agent",
-			Email:    "agent@example.com",
+			Username: "agent-" + strconv.Itoa(i),
+			Email:    "agent-" + strconv.Itoa(i) + "@example.com",
 			Name:     "Agent",
 			Role:     "agent",
 		}
@@ -152,7 +153,7 @@ func TestAgentService_AgentGoOffline(t *testing.T) {
 	}
 
 	// 验证不在在线列表中
-	if _, ok := svc.GetOnlineAgent(1); ok {
+	if _, ok := svc.GetOnlineAgent(context.Background(), 1); ok {
 		t.Error("agent should not be in online agents list")
 	}
 }
@@ -204,8 +205,8 @@ func TestAgentService_GetOnlineAgents(t *testing.T) {
 	for i := 1; i <= 3; i++ {
 		user := &models.User{
 			ID:       uint(i),
-			Username: "online_agent",
-			Email:    "online@example.com",
+			Username: "online-agent-" + strconv.Itoa(i),
+			Email:    "online-" + strconv.Itoa(i) + "@example.com",
 			Name:     "Online Agent",
 			Role:     "agent",
 		}
@@ -226,6 +227,44 @@ func TestAgentService_GetOnlineAgents(t *testing.T) {
 	agents := svc.GetOnlineAgents(context.Background())
 	if len(agents) != 3 {
 		t.Errorf("expected 3 online agents, got %d", len(agents))
+	}
+}
+
+func TestAgentService_GetOnlineAgent_UsesDatabaseStateAfterRestart(t *testing.T) {
+	db := newAgentServiceTestDB(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.ErrorLevel)
+
+	user := &models.User{
+		ID:       21,
+		Username: "restart_agent",
+		Email:    "restart@example.com",
+		Name:     "Restart Agent",
+		Role:     "agent",
+	}
+	if err := db.Create(user).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	agent := &models.Agent{
+		UserID:        user.ID,
+		Status:        "online",
+		CurrentLoad:   2,
+		MaxConcurrent: 5,
+	}
+	if err := db.Create(agent).Error; err != nil {
+		t.Fatalf("create agent: %v", err)
+	}
+
+	svc := NewAgentService(db, logger)
+	agentInfo, ok := svc.GetOnlineAgent(context.Background(), user.ID)
+	if !ok {
+		t.Fatal("expected online agent from database state")
+	}
+	if agentInfo.CurrentLoad != 2 {
+		t.Fatalf("expected CurrentLoad 2, got %d", agentInfo.CurrentLoad)
+	}
+	if !agentInfo.LastActivity.IsZero() {
+		t.Fatalf("expected zero LastActivity without runtime metadata, got %v", agentInfo.LastActivity)
 	}
 }
 

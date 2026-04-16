@@ -23,7 +23,7 @@ type AISessionService interface {
 
 type agentRuntime interface {
 	FindAvailableAgent(ctx context.Context, skills []string, priority string) (*agentdelivery.AgentInfo, error)
-	GetOnlineAgent(userID uint) (*agentdelivery.AgentInfo, bool)
+	GetOnlineAgent(ctx context.Context, userID uint) (*agentdelivery.AgentInfo, bool)
 	ApplySessionTransfer(ctx context.Context, sessionID string, fromAgentID *uint, toAgentID uint)
 }
 
@@ -113,7 +113,7 @@ func (s *HandlerServiceAdapter) TransferToAgent(ctx context.Context, sessionID s
 	if err != nil {
 		return nil, fmt.Errorf("session not found: %w", err)
 	}
-	agentInfo, ok := s.agentService.GetOnlineAgent(targetAgentID)
+	agentInfo, ok := s.agentService.GetOnlineAgent(ctx, targetAgentID)
 	if !ok {
 		return nil, fmt.Errorf("target agent is not online")
 	}

@@ -48,6 +48,24 @@ func NewHTTPServer(cfg *config.Config, handler http.Handler, opts HTTPServerOpti
 	}
 }
 
+// NewHTTPServerForApp creates the HTTP server from App dependencies and records the router.
+func NewHTTPServerForApp(app *App, handler http.Handler, opts HTTPServerOptions) *http.Server {
+	if app != nil {
+		app.Router = handler
+		app.Server = NewHTTPServer(app.Config, handler, opts)
+		return app.Server
+	}
+	return NewHTTPServer(nil, handler, opts)
+}
+
+// BuildHTTPServer builds an HTTP server from the app's current router.
+func BuildHTTPServer(app *App, opts HTTPServerOptions) *http.Server {
+	if app == nil {
+		return NewHTTPServer(nil, nil, opts)
+	}
+	return NewHTTPServerForApp(app, app.Router, opts)
+}
+
 // StartHTTPServer launches ListenAndServe in a goroutine.
 func StartHTTPServer(server *http.Server, logger *logrus.Logger, message string) {
 	if logger == nil {

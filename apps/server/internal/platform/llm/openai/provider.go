@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"servify/apps/server/internal/config"
 	"servify/apps/server/internal/platform/llm"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -150,7 +151,7 @@ func (p *Provider) chatOnce(ctx context.Context, req llm.ChatRequest) (llm.ChatR
 		Tools:       make([]requestTool, 0, len(req.Tools)),
 	}
 	if payload.Model == "" {
-		payload.Model = "gpt-3.5-turbo"
+		payload.Model = config.DefaultOpenAIModel
 	}
 	for _, msg := range req.Messages {
 		payload.Messages = append(payload.Messages, requestMessage{

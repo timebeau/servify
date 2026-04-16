@@ -10,16 +10,14 @@ import (
 )
 
 type agentRuntimeMaintenance struct {
-	logger   *logrus.Logger
-	module   *agentapp.Service
-	onSynced func(context.Context)
+	logger *logrus.Logger
+	module *agentapp.Service
 }
 
-func newAgentRuntimeMaintenance(logger *logrus.Logger, module *agentapp.Service, onSynced func(context.Context)) *agentRuntimeMaintenance {
+func newAgentRuntimeMaintenance(logger *logrus.Logger, module *agentapp.Service) *agentRuntimeMaintenance {
 	return &agentRuntimeMaintenance{
-		logger:   logger,
-		module:   module,
-		onSynced: onSynced,
+		logger: logger,
+		module: module,
 	}
 }
 
@@ -36,13 +34,13 @@ func (m *agentRuntimeMaintenance) Start() {
 func (m *agentRuntimeMaintenance) cleanupInactiveAgents(ctx context.Context, timeout time.Duration) {
 	runtimes := m.module.GetOnlineAgents(ctx)
 	for _, item := range runtimes {
+		if item.LastActivity.IsZero() {
+			continue
+		}
 		if time.Since(item.LastActivity) > timeout {
 			m.logger.Warnf("Agent %d appears inactive, marking as away", item.UserID)
 			_ = m.module.MarkAway(ctx, item.UserID)
 		}
-	}
-	if m.onSynced != nil {
-		m.onSynced(ctx)
 	}
 }
 

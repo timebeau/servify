@@ -66,10 +66,24 @@
 - 验收标准：
   - 明确 dev/demo 与 prod 的事件总线策略
   - 至少一条异步链路可证明重启后不会静默丢失关键业务结果，或明确声明当前不承诺 durability 并落实监控/告警/死信审计
-- 状态：`[-]`
-- 最近进展：已确认启动入口和 bootstrap 默认都走 `InMemoryBus`
-- 下一步：梳理当前 event bus 使用面，决定是“先文档化边界并强化告警”还是“直接实现持久化总线适配层”
-- 阻塞项：暂无
+- 状态：`[x]`
+- 最近进展：已新增显式 `event_bus.provider` 配置，统一由 bootstrap 工厂产出 event bus，并在 production + `inmemory` 时输出 durability 风险告警
+- 完成证据：
+  - 代码文件：
+    - `apps/server/internal/config/config.go`
+    - `apps/server/internal/config/config_test.go`
+    - `apps/server/internal/app/bootstrap/eventbus.go`
+    - `apps/server/internal/app/bootstrap/app.go`
+    - `apps/server/internal/app/bootstrap/app_test.go`
+    - `apps/server/cmd/server/main.go`
+    - `apps/server/cmd/cli/run.go`
+    - `apps/server/cmd/cli/run_enhanced.go`
+    - `config.yml`
+    - `config.staging.example.yml`
+    - `config.production.secure.example.yml`
+  - 验证命令：
+    - `go test ./internal/app/bootstrap ./internal/config`
+    - `go test ./cmd/server ./cmd/cli`
 
 ### [!] P0-2 Voice 运行时仍依赖 mock provider
 
@@ -88,10 +102,23 @@
   - 默认生产配置下不再隐式使用 mock provider
   - dev/test 配置与 prod 配置边界清晰
   - voice 基础链路至少有一条真实 provider 或明确的 no-op/disabled product boundary
-- 状态：`[ ]`
-- 最近进展：已确认 runtime 默认 wiring 仍注入 mock provider
-- 下一步：检查 voice provider 抽象是否足够支撑真实实现接入
-- 阻塞项：真实外部 voice provider 选型尚未确认
+- 状态：`[x]`
+- 最近进展：已将 voice 录音/转写 provider 改为显式配置，默认值收口为 `disabled`，开发样例配置显式使用 `mock`，并阻止 `production` 环境继续装配 mock provider
+- 完成证据：
+  - 代码文件：
+    - `apps/server/internal/config/config.go`
+    - `apps/server/internal/config/config_test.go`
+    - `apps/server/internal/modules/voice/provider/disabled/provider.go`
+    - `apps/server/internal/app/server/voice_runtime.go`
+    - `apps/server/internal/app/server/voice_runtime_test.go`
+    - `apps/server/internal/app/server/runtime.go`
+    - `apps/server/internal/handlers/voice_handler.go`
+    - `apps/server/internal/handlers/voice_handler_test.go`
+    - `config.yml`
+    - `config.staging.example.yml`
+    - `config.production.secure.example.yml`
+  - 验证命令：
+    - `go test ./internal/config ./internal/app/server ./internal/handlers ./internal/modules/voice/...`
 
 ### [!] P0-3 Agent 运行态仍依赖内存注册表与 legacy runtime 适配层
 
@@ -111,10 +138,25 @@
 - 验收标准：
   - 客服上下线、负载、会话接管在重启后行为明确
   - 文档与实现对齐，不再让内存态伪装成企业能力
-- 状态：`[ ]`
-- 最近进展：已确认 assembly 默认 wiring 仍依赖内存 registry
-- 下一步：梳理 admin/transfer/session assignment 依赖哪些 runtime 状态
-- 阻塞项：多实例策略未定
+- 状态：`[x]`
+- 最近进展：已将 agent 在线态/负载读取收口到数据库主真相，移除 service facade 默认 legacy runtime 读路径，保留内存 registry 仅承载瞬时 metadata
+- 完成证据：
+  - 代码文件：
+    - `apps/server/internal/modules/agent/application/repositories.go`
+    - `apps/server/internal/modules/agent/application/service.go`
+    - `apps/server/internal/modules/agent/infra/gorm_repository.go`
+    - `apps/server/internal/services/agent_service.go`
+    - `apps/server/internal/services/agent_service_assembly.go`
+    - `apps/server/internal/services/agent_runtime_maintenance.go`
+    - `apps/server/internal/modules/routing/delivery/handler_adapter.go`
+    - `apps/server/internal/modules/agent/application/service_test.go`
+    - `apps/server/internal/services/agent_service_assignment_test.go`
+    - `apps/server/internal/services/agent_service_more_test.go`
+    - `apps/server/internal/services/agent_runtime_maintenance_test.go`
+    - `apps/server/internal/services/agent_legacy_runtime_adapter_test.go`
+  - 验证命令：
+    - `go test ./internal/modules/agent/... ./internal/services ./internal/modules/routing/delivery`
+    - `go test -tags integration -run "TestAgentService|TestAgentRuntimeMaintenance" ./internal/services`
 
 ### [!] P0-4 配置加载仍存在直接 `panic`，且默认模型配置偏旧
 
@@ -132,10 +174,21 @@
 - 验收标准：
   - 配置解析错误可被测试覆盖、日志可读
   - 默认 AI 配置与 README / docs / 实际 provider 策略一致
-- 状态：`[ ]`
-- 最近进展：已确认存在 `panic(err)` 路径
-- 下一步：梳理 `LoadConfig` 调用链，设计非 panic 返回路径
-- 阻塞项：需确认是否有依赖旧签名的调用方
+- 状态：`[x]`
+- 最近进展：已将 `config.Load()` 改为显式错误返回，`LoadConfig`/CLI 调用链同步收口，并统一默认 OpenAI 模型常量为 `gpt-4.1-mini`
+- 完成证据：
+  - 代码文件：
+    - `apps/server/internal/config/config.go`
+    - `apps/server/internal/config/config_test.go`
+    - `apps/server/internal/app/bootstrap/config.go`
+    - `apps/server/cmd/cli/token.go`
+    - `apps/server/cmd/cli/token_decode.go`
+    - `apps/server/internal/platform/llm/openai/provider.go`
+    - `apps/server/internal/services/ai.go`
+    - `config.yml`
+    - `config.weknora.yml`
+  - 验证命令：
+    - `go test ./internal/config ./internal/app/bootstrap ./cmd/cli`
 
 ### [!] P0-5 Fallback 配置仍暴露 `legacy_kb_enabled`，兼容语义未完全收口
 
@@ -156,10 +209,23 @@
 - 验收标准：
   - 面向用户/运维的配置与状态接口不再以 `legacy` 作为核心能力命名
   - compatibility 路径只保留在内部实现或迁移文档中
-- 状态：`[ ]`
-- 最近进展：已确认 `legacy_kb_enabled` 仍在配置主结构中
-- 下一步：盘点哪些 API/文档/测试仍依赖 legacy 命名
-- 阻塞项：需兼容已有配置文件
+- 状态：`[x]`
+- 最近进展：已将 fallback 公共配置收口到 `knowledge_base_enabled`，保留 `legacy_kb_enabled` 仅作兼容输入，并同步收口 AI/Enhanced/Orchestrated 状态输出中的 legacy/weknora 核心命名
+- 完成证据：
+  - 代码文件：
+    - `apps/server/internal/config/config.go`
+    - `apps/server/internal/config/config_test.go`
+    - `apps/server/internal/services/ai.go`
+    - `apps/server/internal/services/ai_interface_test.go`
+    - `apps/server/internal/services/ai_enhanced.go`
+    - `apps/server/internal/services/ai_enhanced_unit_test.go`
+    - `apps/server/internal/services/orchestrated_ai_enhanced.go`
+    - `apps/server/internal/services/orchestrated_ai_enhanced_test.go`
+    - `config.weknora.yml`
+    - `WEKNORA_IMPLEMENTATION_COMPLETE.md`
+  - 验证命令：
+    - `go test ./internal/config ./internal/services ./internal/handlers`
+    - `go test -tags integration -run "TestOrchestratedEnhancedAIService" ./internal/services`
 
 ---
 
@@ -182,8 +248,8 @@
   - 至少一条真实文档上传、同步、查询命中成功
   - fallback 有实际日志、响应、状态三类证据
 - 状态：`[-]`
-- 最近进展：现有验收已覆盖本地 provider mock 和部分控制面接口
-- 下一步：以 `docs/acceptance-checklist.md` 为准把 G1-2 补成“通过”
+- 最近进展：已把 Dify/WeKnora 验收脚本接入 `Makefile` 统一入口、CI 脚本门禁和本地开发文档入口；当前 `make dify-acceptance` / `make weknora-acceptance` / `make knowledge-provider-acceptance` 已成为稳定执行口径
+- 下一步：以 `docs/acceptance-checklist.md` 为准补齐真实 provider 场景的运行证据，把 `upload` / `sync` 从“部分通过”推进到“通过”，并在有真实凭证时回填验收结果
 - 阻塞项：外部 provider 环境与凭证
 
 ### [!] P1-2 Auth 自助 session 链路补齐真实验收
@@ -456,10 +522,259 @@
 
 ## 当前恢复点
 
-- 当前优先恢复任务：`P0-1 事件总线仍默认使用进程内 InMemoryBus`
-- 原因：这是当前运行时企业级边界最明确、最基础的短板，且会影响自动化、统计、审计等多个后续能力判断
+- 当前优先恢复任务：`P1-1 AI / Knowledge 验收闭环`
+- 原因：P0 级公开配置和状态命名已完成收口，下一阶段应优先把 AI / Knowledge 主链路从“部分通过”推进到可交付的真实验收闭环
 - 如果本轮无法推进实现，至少先补：
   - 真实边界文档
   - 默认 prod 策略
   - 风险说明
   - 告警/死信/恢复规则
+
+---
+
+## 2026-04-16 全库审查补充
+
+本节补充的是“全仓级”问题，不只覆盖 server，也覆盖 SDK、demo-sdk、管理端文本质量、启动脚本和架构收口情况。
+
+### [!] P0-6 SDK 与后端协议漂移收口
+
+- 现状：
+  - `sdk/packages/core/src/api.ts` 仍在调用旧接口：`/api/sessions`、`/api/messages`、`/api/ai/ask`、`/api/ai/status`、`/api/upload`、`/api/webrtc/call/*`、`/api/satisfaction`、`/api/queue/*`、`/api/customers/:id/tickets`
+  - 服务端当前公开路由已收口到 `/api/omni/*`、`/api/v1/ai/*`、`/api/v1/upload`、`/api/satisfactions`、`/api/v1/ws`
+  - `sdk/packages/core/src/sdk.ts` 的默认 WebSocket 地址仍是 `this.config.apiUrl.replace(/^http/, 'ws') + '/ws'`
+- 风险：
+  - SDK 默认调用路径与后端真实 contract 不一致，集成方按 SDK 接入会直接失败或进入伪成功状态
+  - WebSocket 默认地址错误会让实时会话链路在默认配置下失效
+  - demo、文档、前端接入层会继续围绕错误 contract 叠加兼容逻辑
+- 代码证据：
+  - `sdk/packages/core/src/api.ts`
+  - `sdk/packages/core/src/sdk.ts`
+  - `apps/server/internal/app/server/router.go`
+- 执行要求：
+  - 先明确“SDK 公开 contract 是否继续兼容旧 REST 语义”，不要边实现边漂移
+  - 如果以后端当前路由为准，需要统一修正 SDK path、WebSocket path、测试样例和文档
+  - 如果保留兼容层，必须把兼容入口显式落到服务端而不是留给调用方猜测
+- 验收标准：
+  - SDK 默认 HTTP / WebSocket 配置可直接连通当前 server
+  - SDK contract、server router、demo-sdk、README 对外口径一致
+  - 至少有一条 SDK smoke test 覆盖会话创建、消息发送、WebSocket 建连
+- 状态：`[x]`
+- 最近进展：已把 README、React/Vue/Vanilla 示例、`apps/demo-sdk` 文档与预构建 bundle 全部收口到当前 WebSocket-first contract，并通过脚本完成 demo-sdk 产物回归同步
+- 完成证据：
+  - `sdk/packages/core/src/sdk.ts`
+  - `sdk/packages/core/src/api.ts`
+  - `sdk/packages/core/src/websocket.ts`
+  - `sdk/packages/core/README.md`
+  - `sdk/examples/react/src/App.tsx`
+  - `sdk/examples/react/src/components/ChatDemo.tsx`
+  - `sdk/examples/vue/src/main.ts`
+  - `sdk/examples/vue/src/App.vue`
+  - `sdk/examples/vanilla/index.html`
+  - `apps/demo-sdk/README.md`
+  - `apps/demo-sdk/servify-sdk.esm.js`
+  - `apps/demo-sdk/servify-sdk.umd.js`
+  - `scripts/sync-sdk-to-admin.sh`
+  - 验证命令：`bash ./scripts/sync-sdk-to-admin.sh`
+  - 验证命令：`npm -C sdk run typecheck`
+  - 验证命令：`npm -C sdk run test:core`
+  - 验证命令：`npm -C sdk run test:examples`
+
+### [!] P0-7 SDK 工程门禁失效修复
+
+- 现状：
+  - `sdk/package.json` 聚合了多个 workspace 的 `typecheck`
+  - `sdk/packages/core/package.json`、`sdk/packages/transport-http/package.json`、`sdk/packages/transport-websocket/package.json` 仍使用 `npx tsc --noEmit`
+  - 实际执行 `npm -C sdk run typecheck` 失败，说明当前门禁不能稳定反映 SDK 是否健康
+- 风险：
+  - SDK 改动无法通过稳定的类型检查门禁
+  - CI / 本地环境对 `tsc` 解析结果不一致，会让错误被环境噪音掩盖
+  - 在 contract 已漂移的情况下，缺少可靠门禁会放大回归风险
+- 代码证据：
+  - `sdk/package.json`
+  - `sdk/packages/core/package.json`
+  - `sdk/packages/transport-http/package.json`
+  - `sdk/packages/transport-websocket/package.json`
+- 执行要求：
+  - 把 `typecheck` 明确绑定到 workspace 内的 TypeScript 编译器，不要依赖不稳定的 `npx` 解析
+  - 补一条 SDK 根目录可复现的本地门禁命令，并纳入 CI
+  - 修复后再补跑 SDK 主要包的构建与测试
+- 验收标准：
+  - `npm -C sdk run typecheck` 稳定通过或给出真实类型错误
+  - CI 与本地使用相同门禁入口
+  - SDK 各包不再因为错误的 `tsc` 解析导致假失败
+- 状态：`[x]`
+- 最近进展：已把所有 workspace 的 `typecheck` 改为显式调用根目录 `typescript` 编译器，并把 `sdk/package.json` 的根级门禁扩展到 `api-client`、`app-core`、`transport-http`、`transport-websocket`
+- 完成证据：
+  - `sdk/package.json`
+  - `sdk/packages/core/package.json`
+  - `sdk/packages/react/package.json`
+  - `sdk/packages/vue/package.json`
+  - `sdk/packages/vanilla/package.json`
+  - `sdk/packages/api-client/package.json`
+  - `sdk/packages/app-core/package.json`
+  - `sdk/packages/transport-http/package.json`
+  - `sdk/packages/transport-websocket/package.json`
+  - 测试命令：`npm -C sdk run typecheck`
+
+### [!] P0-8 网站与部署脚本路径失配
+
+- 现状：
+  - `Makefile` 的 `website-dev`、`website-deploy` 仍指向 `apps/website-worker`
+  - 仓库实际存在的是 `apps/website`
+  - `website-pages-deploy` 与 `apps/website/README.md` 才和当前目录结构一致
+- 风险：
+  - 官网本地启动和部署命令会直接失败
+  - 新同事或 CI 按 `Makefile` 操作会得到错误路径，影响交付和演示
+  - 这类基础脚本失配会降低仓库可信度
+- 代码证据：
+  - `Makefile`
+  - `apps/website/README.md`
+- 执行要求：
+  - 统一网站开发、部署、README 的目录口径
+  - 删除失效脚本，或补回缺失目录，二者必须二选一
+  - 顺手检查其他 `Makefile` 入口是否还有同类陈旧路径
+- 验收标准：
+  - `website-dev`、`website-deploy`、`website-pages-deploy` 与实际目录一致
+  - README、Makefile、部署配置使用同一套路径
+  - 新环境按文档执行可直接跑通
+- 状态：`[x]`
+- 最近进展：已把 `website-dev`、`website-deploy` 改到真实目录 `apps/website`，并将 deploy 配置切换到现有 `apps/website/wrangler.jsonc`
+- 完成证据：
+  - `Makefile`
+  - `apps/website/README.md`
+  - 验证命令：`rg -n "website-dev:|website-deploy:|website-pages-deploy:|apps/website/wrangler.jsonc" Makefile`
+
+### [ ] P1-6 Bootstrap 落地与入口 wiring 收口
+
+- 现状：
+  - `apps/server/internal/app/bootstrap/app.go` 仍是骨架，只收集最小运行时依赖
+  - 注释中明确写明后续再把 config、logging、db、router、worker wiring 迁移进来
+  - 实际启动 wiring 仍大量堆在 `apps/server/cmd/server/main.go`
+  - `ARCHITECTURE.md` 已写到 bootstrap / app wiring 抽取目标，但实现成熟度还没跟上
+- 风险：
+  - 架构文档与真实入口不一致，增加维护和排障成本
+  - 新能力继续接入时，会把 `main.go` 变成长期的装配垃圾场
+  - 测试和复用入口难以围绕统一 bootstrap 构建
+- 代码证据：
+  - `apps/server/internal/app/bootstrap/app.go`
+  - `apps/server/cmd/server/main.go`
+  - `ARCHITECTURE.md`
+- 执行要求：
+  - 明确 bootstrap 的职责边界，避免继续出现“双入口装配”
+  - 把 logging、db、router、workers、shutdown 逐步迁入 bootstrap
+  - 文档只描述已经落地的结构，不提前透支成熟度
+- 验收标准：
+  - `cmd/server/main.go` 只保留薄入口职责
+  - bootstrap 成为唯一可信的运行时装配根
+  - `ARCHITECTURE.md` 与实际目录、责任划分一致
+- 状态：`[-]`
+- 最近进展：已把 server 启动的 flag/env 覆盖解析、数据库重试连接、默认 worker 注册、runtime attach、router/server 绑定以及统一 shutdown 生命周期收口到 `bootstrap` / `app` 层，并已同步回写 `ARCHITECTURE.md` 的当前落地边界；`cmd/server/main.go` 现已压缩为以启动顺序为主的薄入口
+- 下一步：继续把剩余 server 启动装配点收口为更明确的 bootstrap 入口，避免后续能力再次回流到 `cmd/server/main.go`
+- 阻塞项：暂无
+
+### [ ] P1-7 Modules 与 legacy services/models 的边界收口
+
+- 现状：
+  - 多个 `internal/modules/*` 仍直接依赖 `internal/models`
+  - 部分 delivery adapter / contract 仍直接依赖 `internal/services`
+  - 典型位置包括 `apps/server/internal/modules/ai/delivery/handler_adapter.go`、`apps/server/internal/modules/knowledge/delivery/handler_contract.go`、`apps/server/internal/modules/customer/delivery/handler_contract.go`
+- 风险：
+  - modules 只是目录拆分，不是真正的边界拆分
+  - 新老架构长期并存会让依赖方向持续失控
+  - 未来做测试替身、模块复用、职责下沉时成本会越来越高
+- 代码证据：
+  - `apps/server/internal/modules/ai/delivery/handler_adapter.go`
+  - `apps/server/internal/modules/knowledge/delivery/handler_contract.go`
+  - `apps/server/internal/modules/customer/delivery/handler_contract.go`
+  - `apps/server/internal/modules/*`
+- 执行要求：
+  - 先定义哪些 `internal/models` 属于共享领域模型，哪些只是 legacy GORM model
+  - delivery 层不要继续直接耦合 legacy services，改为依赖明确的 application contract
+  - 避免为了“看起来模块化”继续新增 adapter 叠层
+- 验收标准：
+  - modules 对 `internal/services` 的直接依赖显著收缩
+  - 共享模型、持久化模型、对外 DTO 三者边界清晰
+  - 新增模块不再默认引用 legacy services/models
+- 状态：`[ ]`
+- 最近进展：已确认 `internal/modules` 下存在大量直连 `internal/models`，且部分 delivery 仍直连 `internal/services`
+- 下一步：先输出依赖地图，找出最值得先切的模块边界
+- 阻塞项：共享领域模型与持久化模型的拆分策略尚未定稿
+
+### [ ] P1-8 文本编码、对外文案与仓库可读性修复
+
+- 现状：
+  - 仓库存在多处乱码或编码异常，包括 `todo.md`、`README.md`、`apps/admin/config/routes.ts`、`apps/admin/src/pages/Login/index.tsx`、`apps/admin/src/app.tsx`
+  - 当前 `pnpm -C apps/admin typecheck` 虽然通过，但这只能说明 TS 语法可过，不代表文本可交付
+- 风险：
+  - README、管理端页面、待办文档会直接影响对外可读性和团队协作
+  - 乱码文件会让评审、交接、验收和后续补丁变得脆弱
+  - 继续在异常编码文件上叠加修改，后续修复成本会更高
+- 代码证据：
+  - `todo.md`
+  - `README.md`
+  - `apps/admin/config/routes.ts`
+  - `apps/admin/src/pages/Login/index.tsx`
+  - `apps/admin/src/app.tsx`
+- 执行要求：
+  - 统一仓库文本编码策略，优先收口为 UTF-8
+  - 先修对外文档、主导航、登录页这类高可见文件
+  - 修复时避免语义漂移，先保真再润色
+- 验收标准：
+  - 高可见文档和管理端核心页面不再出现乱码
+  - 新提交文本文件编码策略明确且可检查
+  - 评审、编辑、补丁工具可稳定处理这些文件
+- 状态：`[ ]`
+- 最近进展：已确认管理端类型检查可过，但多个高可见文件存在文本质量问题
+- 下一步：先按“README -> todo.md -> admin 核心页面”顺序处理编码与文案
+- 阻塞项：需确认历史文件是编码损坏还是终端显示问题
+
+### [ ] P1-9 demo-sdk 生成链路与源码一致性回归
+
+- 现状：
+  - `apps/demo-sdk` 目录内存在 `servify-sdk.esm.js`、`servify-sdk.umd.js`、`widget.js` 等产物
+  - 当前无法从目录结构直接证明这些产物是否由 `sdk/packages/*` 自动生成，还是手工同步
+  - 在 SDK contract 已漂移的前提下，这些产物极可能继续放大不一致
+- 风险：
+  - demo 展示的能力与真实 SDK 源码不一致
+  - 调试时可能误以为问题在 server，实际是 demo 引用陈旧 bundle
+  - 发布链路不清晰会让回归验证失真
+- 代码证据：
+  - `apps/demo-sdk/servify-sdk.esm.js`
+  - `apps/demo-sdk/servify-sdk.umd.js`
+  - `apps/demo-sdk/widget.js`
+  - `sdk/packages/*`
+- 执行要求：
+  - 明确 demo-sdk 产物来源、生成命令、更新时间和发布责任
+  - 如果是构建产物，补可复现脚本，不要手工维护 bundle
+  - 如果是快照产物，至少要建立与 SDK 源码版本的对应关系
+- 验收标准：
+  - demo-sdk 的 bundle 来源可追溯、可重建
+  - SDK 变更后能一键回归 demo 产物
+  - demo 展示行为与当前 SDK contract 一致
+- 状态：`[x]`
+- 最近进展：已把 demo-sdk 产物同步入口显式收口到 `scripts/sync-sdk-to-demo.sh`，保留 `sync-sdk-to-admin.sh` 兼容包装，并同步更新 Makefile、CI、生成物文档和 demo/mock 边界文档；当前 `apps/demo-sdk` 三个受控产物已具备“源码来源 -> 一键同步 -> 漂移校验”的闭环
+- 完成证据：
+  - 代码文件：
+    - `scripts/sync-sdk-to-demo.sh`
+    - `scripts/sync-sdk-to-admin.sh`
+    - `scripts/regenerate-generated-assets.sh`
+    - `Makefile`
+    - `.github/workflows/ci.yml`
+    - `docs/generated-assets.md`
+    - `docs/demo-and-mock-boundaries.md`
+    - `apps/demo-sdk/README.md`
+  - 验证命令：
+    - `bash -n scripts/sync-sdk-to-demo.sh scripts/sync-sdk-to-admin.sh`
+    - `bash ./scripts/sync-sdk-to-demo.sh`
+    - `./scripts/check-generated-drift.sh "Demo SDK generated assets" "sh scripts/sync-sdk-to-demo.sh" apps/demo-sdk`
+
+---
+
+## 本轮全库审查结论
+
+- 当前最优先恢复项已经不是单点功能缺失，而是 contract、工程门禁和装配边界三类基础问题
+- 如果只继续补功能而不先收口 `P0-6`、`P0-7`、`P0-8`，后续新增能力会继续建立在漂移的 SDK、失效的脚本和不稳定的门禁之上
+- 下一轮执行建议优先级：
+  - `P0-6 SDK 与后端协议漂移收口`
+  - `P0-7 SDK 工程门禁失效修复`
+  - `P0-8 网站与部署脚本路径失配`

@@ -11,6 +11,7 @@ import (
 	voiceapp "servify/apps/server/internal/modules/voice/application"
 	voicedelivery "servify/apps/server/internal/modules/voice/delivery"
 	voiceinfra "servify/apps/server/internal/modules/voice/infra"
+	voiceproviderdisabled "servify/apps/server/internal/modules/voice/provider/disabled"
 	voiceprovidermock "servify/apps/server/internal/modules/voice/provider/mock"
 	"servify/apps/server/internal/platform/eventbus"
 	"servify/apps/server/internal/platform/pstnprovider"
@@ -26,6 +27,14 @@ func newVoiceCoordinatorForTest() *voicedelivery.Coordinator {
 	callService := voiceapp.NewService(voiceinfra.NewInMemoryRepository(), bus)
 	recordingService := voiceapp.NewRecordingService(voiceprovidermock.NewRecordingProvider(), voiceinfra.NewInMemoryRecordingRepository(), bus)
 	transcriptService := voiceapp.NewTranscriptService(voiceprovidermock.NewTranscriptProvider(), voiceinfra.NewInMemoryTranscriptRepository(), bus)
+	return voicedelivery.NewCoordinator(callService, recordingService, transcriptService)
+}
+
+func newDisabledVoiceCoordinatorForTest() *voicedelivery.Coordinator {
+	bus := &voiceTestBus{}
+	callService := voiceapp.NewService(voiceinfra.NewInMemoryRepository(), bus)
+	recordingService := voiceapp.NewRecordingService(voiceproviderdisabled.NewRecordingProvider(), voiceinfra.NewInMemoryRecordingRepository(), bus)
+	transcriptService := voiceapp.NewTranscriptService(voiceproviderdisabled.NewTranscriptProvider(), voiceinfra.NewInMemoryTranscriptRepository(), bus)
 	return voicedelivery.NewCoordinator(callService, recordingService, transcriptService)
 }
 
@@ -122,5 +131,39 @@ func TestVoiceHandlerListProtocols(t *testing.T) {
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("list protocols expected 200, got %d, body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestVoiceHandlerStartRecordingReturns503WhenProviderDisabled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	handler := NewVoiceHandler(newDisabledVoiceCoordinatorForTest(), newVoiceRegistryForTest())
+	r := gin.New()
+	r.POST("/voice/recordings/start", handler.StartRecording)
+
+	body, _ := json.Marshal(map[string]string{"call_id": "call-1"})
+	req := httptest.NewRequest(http.MethodPost, "/voice/recordings/start", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d, body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestVoiceHandlerAppendTranscriptReturns503WhenProviderDisabled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	handler := NewVoiceHandler(newDisabledVoiceCoordinatorForTest(), newVoiceRegistryForTest())
+	r := gin.New()
+	r.POST("/voice/transcripts", handler.AppendTranscript)
+
+	body, _ := json.Marshal(map[string]interface{}{"call_id": "call-1", "content": "hello", "language": "en", "finalized": true})
+	req := httptest.NewRequest(http.MethodPost, "/voice/transcripts", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d, body=%s", w.Code, w.Body.String())
 	}
 }

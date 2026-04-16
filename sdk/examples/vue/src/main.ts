@@ -8,16 +8,17 @@ const app = createApp(App);
 app.use(ServifyPlugin, {
   config: {
     apiUrl: 'http://localhost:8080',
-    customerName: 'Vue 用户',
+    wsUrl: 'ws://localhost:8080/api/v1/ws',
+    customerName: 'Vue User',
     customerEmail: 'vue@example.com',
     debug: true,
   },
   onInitialized: () => {
-    console.log('Servify Vue SDK 初始化成功');
+    console.log('Servify Vue SDK initialized');
   },
   onError: (error: Error) => {
-    console.error('Servify Vue SDK 错误:', error);
-    alert(`SDK 错误: ${error.message}`);
+    console.error('Servify Vue SDK error:', error);
+    window.alert(`SDK error: ${error.message}`);
   },
 });
 

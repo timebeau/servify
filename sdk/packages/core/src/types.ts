@@ -44,10 +44,10 @@ export interface Agent {
 }
 
 export interface ChatSession {
-  id: number;
+  id: string | number;
   customer_id: number;
   agent_id?: number;
-  status: 'active' | 'closed' | 'transferred';
+  status: 'active' | 'closed' | 'ended' | 'transferred' | 'waiting_human';
   channel: 'web' | 'mobile' | 'email' | 'phone';
   priority: 'low' | 'normal' | 'high' | 'urgent';
   queue_id?: number;
@@ -58,8 +58,8 @@ export interface ChatSession {
 }
 
 export interface Message {
-  id: number;
-  session_id: number;
+  id: string | number;
+  session_id: string | number;
   sender_type: 'customer' | 'agent' | 'system';
   sender_id?: number;
   content: string;
@@ -101,6 +101,9 @@ export interface CustomerSatisfaction {
 export interface WSMessage {
   type:
     | 'message'
+    | 'text-message'
+    | 'agent-message'
+    | 'ai-response'
     | 'session_update'
     | 'agent_status'
     | 'typing'
@@ -111,6 +114,7 @@ export interface WSMessage {
     | 'webrtc-candidate'
     | 'webrtc-state-change';
   data: unknown;
+  session_id?: string;
   timestamp?: string;
 }
 

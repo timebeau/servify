@@ -328,7 +328,7 @@ func (s *EnhancedAIService) GetStatus(ctx context.Context) map[string]interface{
 		"type":                       "enhanced",
 		"knowledge_provider":         s.activeKnowledgeProviderID(),
 		"knowledge_provider_enabled": s.weKnoraEnabled,
-		"weknora_enabled":            s.weKnoraEnabled,
+		"knowledge_mode":             "provider_fallback",
 		"fallback_enabled":           s.fallbackEnabled,
 		"metrics":                    s.metrics,
 	}
@@ -338,16 +338,12 @@ func (s *EnhancedAIService) GetStatus(ctx context.Context) map[string]interface{
 		if s.weKnoraClient != nil {
 			err := s.weKnoraClient.HealthCheck(ctx)
 			status["knowledge_provider_healthy"] = err == nil
-			status["weknora_healthy"] = err == nil
 			if err != nil {
 				status["knowledge_provider_error"] = err.Error()
-				status["weknora_error"] = err.Error()
 			}
 		} else {
 			status["knowledge_provider_healthy"] = false
 			status["knowledge_provider_error"] = "knowledge provider client not initialized"
-			status["weknora_healthy"] = false
-			status["weknora_error"] = "weknora client not initialized"
 		}
 	}
 

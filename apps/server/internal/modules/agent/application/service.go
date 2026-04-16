@@ -85,21 +85,26 @@ func (s *Service) MarkAway(ctx context.Context, userID uint) error {
 }
 
 func (s *Service) AssignSession(ctx context.Context, sessionID string, agentUserID uint) error {
-	if _, ok := s.registry.Get(agentUserID); !ok {
+	runtime, err := s.repo.GetAgentRuntimeByUserID(ctx, agentUserID)
+	if err != nil {
 		return fmt.Errorf("agent %d is not online", agentUserID)
+	}
+	if runtime.CurrentChatLoad >= runtime.MaxChatConcurrency {
+		return fmt.Errorf("agent %d is at maximum capacity", agentUserID)
 	}
 	session, err := s.repo.GetSessionByID(ctx, sessionID)
 	if err != nil {
 		return err
 	}
-	runtime, err := s.registry.AssignSession(agentUserID, session)
+	updatedRuntime, err := s.registry.AssignSession(agentUserID, session)
 	if err != nil {
-		return err
+		updatedRuntime = *runtime
+		updatedRuntime.CurrentChatLoad++
 	}
 	if err := s.repo.AssignSession(ctx, sessionID, agentUserID); err != nil {
 		return err
 	}
-	return s.repo.UpdateChatLoad(ctx, agentUserID, runtime.CurrentChatLoad)
+	return s.repo.UpdateChatLoad(ctx, agentUserID, updatedRuntime.CurrentChatLoad)
 }
 
 func (s *Service) ReleaseSession(ctx context.Context, sessionID string, agentUserID uint) error {
@@ -110,15 +115,26 @@ func (s *Service) ReleaseSession(ctx context.Context, sessionID string, agentUse
 	if ok {
 		return s.repo.UpdateChatLoad(ctx, agentUserID, runtime.CurrentChatLoad)
 	}
-	return nil
+	currentRuntime, err := s.repo.GetAgentRuntimeByUserID(ctx, agentUserID)
+	if err != nil {
+		return nil
+	}
+	nextLoad := currentRuntime.CurrentChatLoad - 1
+	if nextLoad < 0 {
+		nextLoad = 0
+	}
+	return s.repo.UpdateChatLoad(ctx, agentUserID, nextLoad)
 }
 
 func (s *Service) FindAvailableAgent(ctx context.Context, skills []string, priority string) (*AgentRuntimeDTO, error) {
-	_ = ctx
 	requiredSkills := sanitizeSkills(skills)
+	runtimes, err := s.repo.ListActiveAgentRuntimes(ctx)
+	if err != nil {
+		return nil, err
+	}
 	var best *AgentRuntimeDTO
 	bestScore := -1.0
-	for _, candidate := range s.registry.List() {
+	for _, candidate := range s.mergeRuntimeMetadata(runtimes) {
 		if candidate.Status != string(agentdomain.PresenceStatusOnline) {
 			continue
 		}
@@ -139,8 +155,23 @@ func (s *Service) FindAvailableAgent(ctx context.Context, skills []string, prior
 }
 
 func (s *Service) GetOnlineAgents(ctx context.Context) []AgentRuntimeDTO {
-	_ = ctx
-	return s.registry.List()
+	runtimes, err := s.repo.ListActiveAgentRuntimes(ctx)
+	if err != nil {
+		return nil
+	}
+	return s.mergeRuntimeMetadata(runtimes)
+}
+
+func (s *Service) GetOnlineAgent(ctx context.Context, userID uint) (*AgentRuntimeDTO, error) {
+	runtime, err := s.repo.GetAgentRuntimeByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	merged := s.mergeRuntimeMetadata([]AgentRuntimeDTO{*runtime})
+	if len(merged) == 0 {
+		return nil, fmt.Errorf("agent %d runtime not found", userID)
+	}
+	return &merged[0], nil
 }
 
 func (s *Service) GetStats(ctx context.Context, agentUserID *uint) (*AgentStatsDTO, error) {
@@ -148,7 +179,11 @@ func (s *Service) GetStats(ctx context.Context, agentUserID *uint) (*AgentStatsD
 	if err != nil {
 		return nil, err
 	}
-	for _, candidate := range s.registry.List() {
+	runtimes, err := s.repo.ListActiveAgentRuntimes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, candidate := range runtimes {
 		stats.Online++
 		if candidate.Status == string(agentdomain.PresenceStatusBusy) || candidate.CurrentChatLoad >= candidate.MaxChatConcurrency {
 			stats.Busy++
@@ -168,7 +203,6 @@ func (s *Service) RevokeUserTokens(ctx context.Context, userID uint, revokeAt ti
 }
 
 func (s *Service) ApplySessionTransfer(ctx context.Context, sessionID string, fromAgentID *uint, toAgentID uint) error {
-	_ = ctx
 	s.registry.ApplyTransfer(sessionID, fromAgentID, toAgentID)
 	if runtime, ok := s.registry.Get(toAgentID); ok {
 		if err := s.repo.UpdateChatLoad(ctx, toAgentID, runtime.CurrentChatLoad); err != nil {
@@ -183,6 +217,25 @@ func (s *Service) ApplySessionTransfer(ctx context.Context, sessionID string, fr
 		}
 	}
 	return nil
+}
+
+func (s *Service) mergeRuntimeMetadata(runtimes []AgentRuntimeDTO) []AgentRuntimeDTO {
+	if len(runtimes) == 0 {
+		return runtimes
+	}
+	metadata := make(map[uint]AgentRuntimeDTO, len(runtimes))
+	for _, runtime := range s.registry.List() {
+		metadata[runtime.UserID] = runtime
+	}
+	for i := range runtimes {
+		item, ok := metadata[runtimes[i].UserID]
+		if !ok {
+			continue
+		}
+		runtimes[i].LastActivity = item.LastActivity
+		runtimes[i].ConnectedAt = item.ConnectedAt
+	}
+	return runtimes
 }
 
 func sanitizeSkills(skills []string) []string {

@@ -11,6 +11,8 @@ import (
 type Repository interface {
 	CreateAgent(ctx context.Context, userID uint, department string, skills []string, maxChatConcurrency int) (*agentdomain.AgentProfile, error)
 	GetAgentByUserID(ctx context.Context, userID uint) (*agentdomain.AgentProfile, *models.Agent, error)
+	GetAgentRuntimeByUserID(ctx context.Context, userID uint) (*AgentRuntimeDTO, error)
+	ListActiveAgentRuntimes(ctx context.Context) ([]AgentRuntimeDTO, error)
 	ListAgents(ctx context.Context, limit int) ([]models.Agent, error)
 	UpdatePresenceStatus(ctx context.Context, userID uint, status agentdomain.PresenceStatus) error
 	UpdateChatLoad(ctx context.Context, userID uint, currentLoad int) error

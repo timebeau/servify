@@ -28,7 +28,10 @@ var tokenCmd = &cobra.Command{
 	Use:   "token",
 	Short: "Generate a JWT (HS256) for API authentication",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg := config.Load()
+		cfg, err := config.Load()
+		if err != nil {
+			return fmt.Errorf("load config: %w", err)
+		}
 		secret := cfg.JWT.Secret
 		if secret == "" {
 			return fmt.Errorf("jwt.secret is empty; set it in config")
