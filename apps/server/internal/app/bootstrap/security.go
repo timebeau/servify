@@ -58,9 +58,10 @@ func SecurityWarnings(cfg *config.Config) []string {
 	if cfg.Dify.Enabled && strings.TrimSpace(cfg.Dify.DatasetID) == "" {
 		warnings = append(warnings, "dify is enabled but dify.dataset_id is empty")
 	}
-	if !cfg.Dify.Enabled && !cfg.WeKnora.Enabled {
-		warnings = append(warnings, "no external knowledge provider is enabled; ai will rely on fallback mode only")
-	}
+	// 移除知识provider未启用的警告（v0.1.0允许fallback模式）
+	// if !cfg.Dify.Enabled && !cfg.WeKnora.Enabled {
+	// 	warnings = append(warnings, "no external knowledge provider is enabled; ai will rely on fallback mode only")
+	// }
 	if cfg.WeKnora.Enabled && strings.TrimSpace(cfg.WeKnora.APIKey) == "" {
 		warnings = append(warnings, "weknora is enabled but weknora.api_key is empty")
 	}

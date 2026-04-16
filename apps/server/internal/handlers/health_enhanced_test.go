@@ -26,7 +26,7 @@ func TestEnhancedHealthHandler_Health_And_Ready(t *testing.T) {
 	ai := services.NewAIService("", "")
 	ai.InitializeKnowledgeBase()
 
-	h := NewEnhancedHealthHandler(cfg, aidelivery.NewHandlerServiceAdapter(ai))
+	h := NewEnhancedHealthHandler(cfg, aidelivery.NewHandlerServiceAdapter(ai), nil)
 
 	r := gin.New()
 	r.GET("/health", h.Health)
@@ -60,7 +60,7 @@ func TestEnhancedHealthHandler_Health_WithDatabaseCheck(t *testing.T) {
 	ai := services.NewAIService("", "")
 	ai.InitializeKnowledgeBase()
 
-	h := NewEnhancedHealthHandler(cfg, aidelivery.NewHandlerServiceAdapter(ai))
+	h := NewEnhancedHealthHandler(cfg, aidelivery.NewHandlerServiceAdapter(ai), nil)
 
 	r := gin.New()
 	r.GET("/health", h.Health)
@@ -88,7 +88,7 @@ func TestEnhancedHealthHandler_Health_WithRedisCheck(t *testing.T) {
 	ai := services.NewAIService("", "")
 	ai.InitializeKnowledgeBase()
 
-	h := NewEnhancedHealthHandler(cfg, aidelivery.NewHandlerServiceAdapter(ai))
+	h := NewEnhancedHealthHandler(cfg, aidelivery.NewHandlerServiceAdapter(ai), nil)
 
 	r := gin.New()
 	r.GET("/health", h.Health)
@@ -117,7 +117,7 @@ func TestEnhancedHealthHandler_Health_WithKnowledgeProviderCheck(t *testing.T) {
 	ai := services.NewAIService("", "")
 	ai.InitializeKnowledgeBase()
 
-	h := NewEnhancedHealthHandler(cfg, aidelivery.NewHandlerServiceAdapter(ai))
+	h := NewEnhancedHealthHandler(cfg, aidelivery.NewHandlerServiceAdapter(ai), nil)
 
 	r := gin.New()
 	r.GET("/health", h.Health)

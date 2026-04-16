@@ -11,20 +11,23 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 )
 
 // EnhancedHealthHandler 增强的健康检查处理器
 type EnhancedHealthHandler struct {
 	config    *config.Config
 	aiService aidelivery.HandlerService
+	db        *gorm.DB
 	logger    *logrus.Logger
 }
 
 // NewEnhancedHealthHandler 创建增强的健康检查处理器
-func NewEnhancedHealthHandler(cfg *config.Config, aiService aidelivery.HandlerService) *EnhancedHealthHandler {
+func NewEnhancedHealthHandler(cfg *config.Config, aiService aidelivery.HandlerService, db *gorm.DB) *EnhancedHealthHandler {
 	return &EnhancedHealthHandler{
 		config:    cfg,
 		aiService: aiService,
+		db:        db,
 		logger:    logrus.StandardLogger(),
 	}
 }
@@ -126,6 +129,25 @@ func (h *EnhancedHealthHandler) Ready(c *gin.Context) {
 		ready = false
 	}
 
+	// 检查数据库连接（如果配置了）
+	if h.db != nil {
+		sqlDB, err := h.db.DB()
+		if err == nil {
+			if err := sqlDB.PingContext(ctx); err != nil {
+				services["database"] = "not_ready"
+				ready = false
+			} else {
+				services["database"] = "ready"
+			}
+		} else {
+			services["database"] = "not_ready"
+			ready = false
+		}
+	} else {
+		// DB 未配置（测试环境），不影响就绪状态
+		services["database"] = "disabled"
+	}
+
 	// 基础的就绪响应
 	response := map[string]interface{}{
 		"ready":     ready,
@@ -177,26 +199,25 @@ func (h *EnhancedHealthHandler) checkAIService(ctx context.Context, response *He
 func (h *EnhancedHealthHandler) checkDatabase(ctx context.Context, response *HealthResponse, allHealthy *bool) {
 	start := time.Now()
 
-	// 实际的数据库连接检查
-	// 这里需要实际的数据库连接来检查
-
-	// 模拟数据库连接检查
 	dbHealthy := true
 	var dbError string
 
-	// 简单的连接测试（当前模拟实现）
-	// 实际实现应该执行 SELECT 1 查询或类似的健康检查
-	/*
-		if db != nil {
-			if err := db.PingContext(ctx); err != nil {
+	// 真实的数据库连接检查
+	if h.db != nil {
+		sqlDB, err := h.db.DB()
+		if err != nil {
+			dbHealthy = false
+			dbError = "failed to get database connection: " + err.Error()
+		} else {
+			if err := sqlDB.PingContext(ctx); err != nil {
 				dbHealthy = false
 				dbError = err.Error()
 			}
-		} else {
-			dbHealthy = false
-			dbError = "database connection not initialized"
 		}
-	*/
+	} else {
+		dbHealthy = false
+		dbError = "database connection not initialized"
+	}
 
 	serviceInfo := ServiceInfo{
 		Latency: time.Since(start).String(),
@@ -219,41 +240,26 @@ func (h *EnhancedHealthHandler) checkDatabase(ctx context.Context, response *Hea
 }
 
 // checkRedis 检查 Redis 状态
+// 注意：当前版本 Redis 检查为配置验证，不进行实际连接测试
+// 如果项目中添加了 Redis 客户端，应更新此函数进行实际连接检查
 func (h *EnhancedHealthHandler) checkRedis(ctx context.Context, response *HealthResponse, allHealthy *bool) {
 	start := time.Now()
 
-	// 实际的 Redis 连接检查
-	redisHealthy := true
-	var redisError string
-
-	// 简单的连接测试（当前模拟实现）
-	// 实际实现应该执行 PING 命令或类似的健康检查
-	/*
-		if redisClient != nil {
-			if err := redisClient.Ping(ctx).Err(); err != nil {
-				redisHealthy = false
-				redisError = err.Error()
-			}
-		} else {
-			redisHealthy = false
-			redisError = "redis connection not initialized"
-		}
-	*/
-
+	// 当前版本只验证配置存在，不进行实际连接检查
+	// 当 Redis 被实际使用时，应添加 redisClient 并执行 Ping()
 	serviceInfo := ServiceInfo{
+		Status:  "disabled",  // 当前 Redis 未被实际使用
 		Latency: time.Since(start).String(),
 		Details: map[string]interface{}{
-			"host": h.config.Redis.Host,
-			"port": h.config.Redis.Port,
+			"host":           h.config.Redis.Host,
+			"port":           h.config.Redis.Port,
+			"connection_type": "configuration_only",
 		},
 	}
 
-	if redisHealthy {
-		serviceInfo.Status = "healthy"
-	} else {
-		serviceInfo.Status = "unhealthy"
-		serviceInfo.Error = redisError
-		*allHealthy = false
+	// 如果配置的 Redis 不是默认值，标记为配置可用
+	if h.config.Redis.Host != "" && h.config.Redis.Port > 0 {
+		serviceInfo.Status = "configured"
 	}
 
 	response.Services["redis"] = serviceInfo

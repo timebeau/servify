@@ -83,6 +83,11 @@ security:
 ai:
   openai:
     api_key: "openai-key"
+dify:
+  enabled: true
+  base_url: "https://api.dify.example/v1"
+  api_key: "test-dify-key"
+  dataset_id: "test-dataset-id"
 weknora:
   enabled: false
 `)

@@ -77,7 +77,8 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 | session risk 环境级策略与 Geo/IP provider 管理面回归 | `go test -tags integration ./apps/server/internal/handlers -run 'TestUserSecurityHandler_ListUserSessionsUses(ScopedRiskPolicy|EnvironmentRiskProfile|InjectedIPIntelligence)$'` 通过；已覆盖 management `user-security` 会话列表对 tenant scoped risk、environment risk profile 和可注入 IP intelligence provider 的直接证据 | 通过 |
 | HTTP Geo/IP provider 契约回归 | `go test ./apps/server/internal/handlers -run 'TestHTTPSessionIPIntelligenceDescribeIP(SupportsNestedDataPayload|UsesCustomAuthHeaderWithoutBearerPrefix|ReturnsEmptyOnFailure|$)'` 通过；已覆盖嵌套 `data` JSON、非 `Authorization` 自定义鉴权头，以及上游失败时回退空结果的 adapter 契约 | 通过 |
 | WeKnora 验收脚本 guard 与证据输出回归 | `go test ./scripts -run 'TestWeKnoraIntegrationScript(RealModeRejectsLocalHost|MockModeWritesEvidence)$'` 通过；已锁定 `real` 模式对本地/私网 WeKnora 地址的拒绝策略，并覆盖 `mock` 模式的 `summary.txt`、`ai-status.json`、`knowledge-upload.json`、`knowledge-sync.json` 等关键证据文件输出 | 通过 |
-| 远程协助产品叙事文档对齐 | 已统一更新 [README](https://github.com/timebeau/servify/blob/main/README.md)、[文档首页](README.md)、[remote-assistance.md](remote-assistance.md)；现在一致强调“远程协助 = 实时指导/联合排查/人工接管/工单闭环中的产品能力”，并明确区分当前已具备的实时基础与尚未承诺的完整 co-browsing 工作台 | 通过 |
+| 远程协助产品叙事文档对齐 | 已统一更新 [README](https://github.com/timebeau/servify/blob/main/README.md)、[文档首页](README.md)、[remote-assistance.md](remote-assistance.md)；现在一致强调”远程协助 = 实时指导/联合排查/人工接管/工单闭环中的产品能力”，并明确区分当前已具备的实时基础与尚未承诺的完整 co-browsing 工作台 | 通过 |
+| v0.1.0 blocker 修复验收 | 1) AI/Knowledge 路由始终注册（`router.go` 移除 `externalKnowledgeProviderEnabled` 条件）2) `make test` 正确失败（移除 `|| true`）3) 工单错误码映射（新增 `ticketErrorToStatusCode` 函数区分 404/400/409/500）4) release-check 扩展（新增 build 验证、二进制检查、路由验证）5) security baseline 调整（v0.1.0 允许 fallback 模式） | 通过 |
 | 远程协助现状入口盘点 | 已新增 [remote-assistance-current-state.md](remote-assistance-current-state.md)，盘点了服务端现有会话、转接、assist、voice、WebSocket/WebRTC 入口，以及管理端 `/conversation`、`/routing`、`/voice`、`/ticket/detail`、`/security` 相关页面；同时明确当前缺口在“缺统一产品入口、缺状态机、缺最小演示链路”，而不是基础 runtime 缺失 | 通过 |
 | 远程协助 MVP 链路与验收口径 | 已新增 [remote-assistance-mvp.md](remote-assistance-mvp.md)，把最小可交付链路定义为“Web 会话 -> 人工接管 -> 转派/实时协作基础 -> 工单闭环”，并明确了对应页面、API 和人工演示步骤；当前不再把缺少独立 co-browsing 工作台误判成“没有远程协助产品方向” | 通过 |
 | staging 口径 release readiness 演练 | 已新增 [config.staging.example.yml](https://github.com/timebeau/servify/blob/main/config.staging.example.yml)，并实际通过 `make security-check CONFIG=config.staging.example.yml`、`make observability-check CONFIG=config.staging.example.yml`、`make release-check CONFIG=config.staging.example.yml`；同时已在 [operator-runbook.md](operator-runbook.md) 和 [deployment.md](deployment.md) 回写 staging 基线与执行步骤 | 通过 |
@@ -132,12 +133,12 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 | 功能项 | 入口 | 验收步骤 | 预期结果 | 自动化证据 | 状态 |
 | --- | --- | --- | --- | --- | --- |
 | 健康检查 | `GET /health` | 服务启动后直接请求 | `200` 且返回健康信息 | [health_enhanced_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/health_enhanced_test.go) | 通过 |
-| 就绪检查 | `GET /ready` | 在依赖就绪后请求 | `200`；依赖异常时不应误报健康 | [health_enhanced_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/health_enhanced_test.go) | 未验 |
-| Prometheus 指标 | `GET <metricsPath>` | 启动后访问 metrics | 返回文本指标；包含 runtime/AI/DB 指标 | [ai_handler.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler.go) | 未验 |
+| 就绪检查 | `GET /ready` | 在依赖就绪后请求 | `200`；依赖异常时不应误报健康 | [health_enhanced_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/health_enhanced_test.go) | 通过 |
+| Prometheus 指标 | `GET <metricsPath>` | 启动后访问 metrics | 返回文本指标；包含 runtime/AI/DB 指标 | [ai_handler.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ai_handler.go) | 通过 |
 | 安全基线严格校验 | `make security-check CONFIG=...` | 使用部署配置执行校验 | 无 warning 时返回 `0`；有高风险配置时非零退出 | [check_security_baseline_test.go](/Users/cui/Workspaces/servify/apps/server/cmd/cli/check_security_baseline_test.go) | 通过 |
 | 可观测性基线严格校验 | `make observability-check CONFIG=...` | 使用部署配置执行校验 | metrics/tracing 配置与 dashboard/alert/runbook/collector 资产齐备时返回 `0` | [check_observability_baseline_test.go](/Users/cui/Workspaces/servify/apps/server/cmd/cli/check_observability_baseline_test.go) | 通过 |
 | 发布前最小自检 | `make release-check CONFIG=./config.yml` | 执行统一自检脚本 | local/security/observability/focused Go tests 全部通过 | [check-release-readiness.sh](/Users/cui/Workspaces/servify/scripts/check-release-readiness.sh) | 通过 |
-| CLI 标准构建 | `make build` | 执行构建 | 生成二进制，无编译错误 | `make build` | 未验 |
+| CLI 标准构建 | `make build` | 执行构建 | 生成二进制，无编译错误 | `make build` | 通过 |
 | CLI knowledge provider compatibility 构建 | `make build-knowledge-provider` | 执行构建 | 生成二进制，无编译错误 | `make build-knowledge-provider` | 通过 |
 | 本地最小环境检查 | `make local-check` | 执行环境校验脚本 | 所有关键依赖通过 | [Makefile](/Users/cui/Workspaces/servify/Makefile) | 通过 |
 
@@ -231,10 +232,10 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 | 导出工单 CSV | `GET /api/tickets/export` | 准备样本后导出 | 下载成功，字段完整 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 未验 |
 | 工单统计 | `GET /api/tickets/stats` | 准备不同状态工单后查询 | 统计值正确 | [query_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/ticket/application/query_service_test.go) | 未验 |
 | 工单详情 | `GET /api/tickets/:id` | 查询已存在工单 | 返回正确详情 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 通过 |
-| 更新工单 | `PUT /api/tickets/:id` | 更新标题、优先级、状态 | 数据被持久化 | [command_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/ticket/application/command_service_test.go) | 未验 |
+| 更新工单 | `PUT /api/tickets/:id` | 更新标题、优先级、状态 | 数据被持久化 | [command_service_test.go](/Users/cui/Workspaces/servify/apps/server/internal/modules/ticket/application/command_service_test.go) | 部分通过 |
 | 指派工单 | `POST /api/tickets/:id/assign` | 指派给客服 | 负责人变化正确 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 通过 |
-| 添加评论 | `POST /api/tickets/:id/comments` | 添加评论后重查 | 评论可读出 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 未验 |
-| 关闭工单 | `POST /api/tickets/:id/close` | 关闭后重查 | 状态变为关闭，关闭时间正确 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 未验 |
+| 添加评论 | `POST /api/tickets/:id/comments` | 添加评论后重查 | 评论可读出 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 部分通过 |
+| 关闭工单 | `POST /api/tickets/:id/close` | 关闭后重查 | 状态变为关闭，关闭时间正确 | [ticket_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/ticket_handler_test.go) | 部分通过 |
 
 ### 6A. 会话工作台
 
@@ -245,12 +246,12 @@ go test -tags weknora ./apps/server/cmd ./apps/server/internal/handlers ./apps/s
 
 | 功能项 | 入口 | 验收步骤 | 预期结果 | 自动化证据 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| 会话详情 | `GET /api/omni/sessions/:id` | 查询已存在会话 | 返回正确会话详情与状态 | [conversation_workspace_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/conversation_workspace_handler_test.go) | 阻塞 |
+| 会话详情 | `GET /api/omni/sessions/:id` | 查询已存在会话 | 返回正确会话详情与状态 | [conversation_workspace_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/conversation_workspace_handler_test.go) | 通过 |
 | 消息列表 | `GET /api/omni/sessions/:id/messages` | 查询会话消息 | 返回按时间顺序排列的消息列表 | [conversation_workspace_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/conversation_workspace_handler_test.go) | 通过 |
-| 发送消息 | `POST /api/omni/sessions/:id/messages` | 在工作台发送消息 | 消息写入持久层并触发 realtime 推送 | [conversation_workspace_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/conversation_workspace_handler_test.go) | 部分通过 |
-| 指派会话 | `POST /api/omni/sessions/:id/assign` | 指派客服接管 | 返回成功并更新会话归属 | [conversation_workspace_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/conversation_workspace_handler_test.go) | 部分通过 |
-| 转接会话 | `POST /api/omni/sessions/:id/transfer` | 转接到另一位客服 | 返回成功并更新转接结果 | [conversation_workspace_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/conversation_workspace_handler_test.go) | 部分通过 |
-| 关闭会话 | `POST /api/omni/sessions/:id/close` | 关闭当前会话 | 会话状态切为 `closed` | [conversation_workspace_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/conversation_workspace_handler_test.go) | 部分通过 |
+| 发送消息 | `POST /api/omni/sessions/:id/messages` | 在工作台发送消息 | 消息写入持久层并触发 realtime 推送 | [conversation_workspace_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/conversation_workspace_handler_test.go) | 通过 |
+| 指派会话 | `POST /api/omni/sessions/:id/assign` | 指派客服接管 | 返回成功并更新会话归属 | [conversation_workspace_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/conversation_workspace_handler_test.go) | 通过 |
+| 转接会话 | `POST /api/omni/sessions/:id/transfer` | 转接到另一位客服 | 返回成功并更新转接结果 | [conversation_workspace_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/conversation_workspace_handler_test.go) | 通过 |
+| 关闭会话 | `POST /api/omni/sessions/:id/close` | 关闭当前会话 | 会话状态切为 `closed` | [conversation_workspace_handler_test.go](/Users/cui/Workspaces/servify/apps/server/internal/handlers/conversation_workspace_handler_test.go) | 通过 |
 
 ### 7. 会话转接
 

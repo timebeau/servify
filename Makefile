@@ -85,7 +85,7 @@ migrate-seed:
 # Run tests
 test:
 	@echo "Running tests via scripts/run-tests.sh..."
-	./scripts/run-tests.sh || true
+	./scripts/run-tests.sh
 
 # Clean build artifacts
 clean:

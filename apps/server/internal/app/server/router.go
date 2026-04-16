@@ -260,13 +260,12 @@ func registerRealtimeRoutes(r *gin.Engine, deps Dependencies) {
 	aiAPI.POST("/query", aiHandler.ProcessQuery)
 	aiAPI.GET("/status", aiHandler.GetStatus)
 	aiAPI.GET("/metrics", aiHandler.GetMetrics)
-	if externalKnowledgeProviderEnabled(deps.Config) {
-		aiAPI.POST("/knowledge/upload", aiHandler.UploadDocument)
-		aiAPI.POST("/knowledge/sync", aiHandler.SyncKnowledgeBase)
-		aiAPI.PUT("/knowledge-provider/enable", aiHandler.EnableKnowledgeProvider)
-		aiAPI.PUT("/knowledge-provider/disable", aiHandler.DisableKnowledgeProvider)
-		aiAPI.POST("/circuit-breaker/reset", aiHandler.ResetCircuitBreaker)
-	}
+	// 知识管理路由始终注册，handler内部处理未配置状态
+	aiAPI.POST("/knowledge/upload", aiHandler.UploadDocument)
+	aiAPI.POST("/knowledge/sync", aiHandler.SyncKnowledgeBase)
+	aiAPI.PUT("/knowledge-provider/enable", aiHandler.EnableKnowledgeProvider)
+	aiAPI.PUT("/knowledge-provider/disable", aiHandler.DisableKnowledgeProvider)
+	aiAPI.POST("/circuit-breaker/reset", aiHandler.ResetCircuitBreaker)
 
 	ingest := handlers.NewMetricsIngestHandler(handlers.NewMetricsAggregator())
 	serviceV1 := r.Group("/api/v1")
@@ -274,8 +273,4 @@ func registerRealtimeRoutes(r *gin.Engine, deps Dependencies) {
 	serviceV1.Use(middleware.EnforceRequestScope())
 	serviceV1.Use(middleware.RequirePrincipalKinds("service"))
 	serviceV1.POST("/metrics/ingest", ingest.Ingest)
-}
-
-func externalKnowledgeProviderEnabled(cfg *config.Config) bool {
-	return cfg != nil && (cfg.Dify.Enabled || cfg.WeKnora.Enabled)
 }

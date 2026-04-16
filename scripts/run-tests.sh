@@ -51,7 +51,8 @@ echo ""
 echo "🎯 Coverage Target: ${TARGET}%"
 echo "📊 Actual Coverage: ${COVERAGE}%"
 
-if (( $(echo "$COVERAGE >= $TARGET" | bc -l) )); then
+# 使用awk进行浮点数比较（避免bc依赖）
+if awk "BEGIN {exit !($COVERAGE >= $TARGET)}"; then
     echo "✅ Coverage target achieved!"
     exit 0
 else

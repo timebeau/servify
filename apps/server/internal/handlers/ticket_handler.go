@@ -253,7 +253,8 @@ func (h *TicketHandler) UpdateTicket(c *gin.Context) {
 	ticket, err := h.ticketService.UpdateTicket(c.Request.Context(), uint(id), &req, userID.(uint))
 	if err != nil {
 		h.logger.Errorf("Failed to update ticket %d: %v", id, err)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
+		statusCode := ticketErrorToStatusCode(err)
+		c.JSON(statusCode, ErrorResponse{
 			Error:   "Failed to update ticket",
 			Message: err.Error(),
 		})
@@ -461,7 +462,8 @@ func (h *TicketHandler) AssignTicket(c *gin.Context) {
 
 	if err := h.ticketService.AssignTicket(c.Request.Context(), uint(id), req.AgentID, assignerID.(uint)); err != nil {
 		h.logger.Errorf("Failed to assign ticket %d to agent %d: %v", id, req.AgentID, err)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
+		statusCode := ticketErrorToStatusCode(err)
+		c.JSON(statusCode, ErrorResponse{
 			Error:   "Failed to assign ticket",
 			Message: err.Error(),
 		})
@@ -526,7 +528,8 @@ func (h *TicketHandler) AddComment(c *gin.Context) {
 	comment, err := h.ticketService.AddComment(c.Request.Context(), uint(id), userID.(uint), req.Content, req.Type)
 	if err != nil {
 		h.logger.Errorf("Failed to add comment to ticket %d: %v", id, err)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
+		statusCode := ticketErrorToStatusCode(err)
+		c.JSON(statusCode, ErrorResponse{
 			Error:   "Failed to add comment",
 			Message: err.Error(),
 		})
@@ -587,7 +590,8 @@ func (h *TicketHandler) CloseTicket(c *gin.Context) {
 
 	if err := h.ticketService.CloseTicket(c.Request.Context(), uint(id), userID.(uint), req.Reason); err != nil {
 		h.logger.Errorf("Failed to close ticket %d: %v", id, err)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
+		statusCode := ticketErrorToStatusCode(err)
+		c.JSON(statusCode, ErrorResponse{
 			Error:   "Failed to close ticket",
 			Message: err.Error(),
 		})
@@ -737,4 +741,44 @@ func extractCustomFieldFilters(c *gin.Context) map[string]string {
 		out[key] = val
 	}
 	return out
+}
+
+// ticketErrorToStatusCode 根据错误内容映射HTTP状态码
+func ticketErrorToStatusCode(err error) int {
+	if err == nil {
+		return http.StatusOK
+	}
+	errMsg := strings.ToLower(err.Error())
+
+	// 404 Not Found
+	if strings.Contains(errMsg, "not found") ||
+		strings.Contains(errMsg, "record not found") {
+		return http.StatusNotFound
+	}
+
+	// 400 Bad Request - 验证错误
+	if strings.Contains(errMsg, "required") ||
+		strings.Contains(errMsg, "invalid") ||
+		strings.Contains(errMsg, "must be") ||
+		strings.Contains(errMsg, "validation") {
+		return http.StatusBadRequest
+	}
+
+	// 409 Conflict - 状态冲突、资源不可用
+	if strings.Contains(errMsg, "already") ||
+		strings.Contains(errMsg, "conflict") ||
+		strings.Contains(errMsg, "not available") ||
+		strings.Contains(errMsg, "status transition") {
+		return http.StatusConflict
+	}
+
+	// 403 Forbidden - 权限不足
+	if strings.Contains(errMsg, "permission") ||
+		strings.Contains(errMsg, "forbidden") ||
+		strings.Contains(errMsg, "unauthorized") {
+		return http.StatusForbidden
+	}
+
+	// 默认500
+	return http.StatusInternalServerError
 }

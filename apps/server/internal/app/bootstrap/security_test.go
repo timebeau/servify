@@ -58,9 +58,10 @@ func TestSecurityWarnings_NoExternalKnowledgeProviderEnabled(t *testing.T) {
 	cfg.Dify.Enabled = false
 	cfg.WeKnora.Enabled = false
 
-	warnings := strings.Join(SecurityWarnings(cfg), "\n")
-	if !strings.Contains(warnings, "no external knowledge provider is enabled; ai will rely on fallback mode only") {
-		t.Fatalf("expected knowledge provider fallback warning, got %q", warnings)
+	// v0.1.0允许fallback模式，不应对无知识provider产生警告
+	warnings := SecurityWarnings(cfg)
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings for v0.1.0 fallback mode, got %d: %q", len(warnings), warnings)
 	}
 }
 
