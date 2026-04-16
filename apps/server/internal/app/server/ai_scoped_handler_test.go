@@ -3,8 +3,10 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -141,6 +143,56 @@ func TestRuntimeServiceFromResolvedConfigWithWeKnoraScopedKnowledgeBase(t *testi
 	}
 	if provider, _ := status["knowledge_provider"].(string); provider != "weknora" {
 		t.Fatalf("expected weknora knowledge provider, got %+v", status)
+	}
+}
+
+func TestScopedAIHandlerServiceSetKnowledgeProviderEnabledAppliesToFutureRequests(t *testing.T) {
+	handler := NewScopedAIHandlerService(config.GetDefaultConfig(), logrus.New(), openScopedAITestDB(t), stubFallbackAIHandler{})
+
+	if !handler.SetKnowledgeProviderEnabled(true) {
+		t.Fatal("expected enable to succeed")
+	}
+
+	status := handler.GetStatus(context.Background())
+	if enabled, _ := status["knowledge_provider_enabled"].(bool); !enabled {
+		t.Fatalf("expected runtime override to enable knowledge provider, got %+v", status)
+	}
+
+	if !handler.SetKnowledgeProviderEnabled(false) {
+		t.Fatal("expected disable to succeed")
+	}
+
+	status = handler.GetStatus(context.Background())
+	if enabled, _ := status["knowledge_provider_enabled"].(bool); enabled {
+		t.Fatalf("expected runtime override to disable knowledge provider, got %+v", status)
+	}
+}
+
+func TestScopedAIHandlerServiceUploadUsesRuntimeKnowledgeProviderOverride(t *testing.T) {
+	db := openScopedAITestDB(t)
+	if err := db.Create(&models.WorkspaceConfig{
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-1",
+		WeKnoraJSON: "enabled: true\nbase_url: http://127.0.0.1:1\napi_key: scoped-key\ntenant_id: tenant-a\nknowledge_base_id: kb-scoped\ntimeout: 1s\nmax_retries: 0\n",
+	}).Error; err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	handler := NewScopedAIHandlerService(config.GetDefaultConfig(), logrus.New(), db, stubFallbackAIHandler{})
+	if !handler.SetKnowledgeProviderEnabled(true) {
+		t.Fatal("expected enable to succeed")
+	}
+
+	ctx := platformauth.ContextWithScope(context.Background(), "tenant-a", "workspace-1")
+	err := handler.UploadKnowledgeDocument(ctx, "doc-1", "content", []string{"tag"})
+	if err == nil {
+		t.Fatal("expected provider call to fail against unreachable weknora")
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("unexpected deadline error without entering provider path: %v", err)
+	}
+	if strings.Contains(err.Error(), "knowledge provider is not enabled") {
+		t.Fatalf("expected runtime override to reach provider path, got %v", err)
 	}
 }
 

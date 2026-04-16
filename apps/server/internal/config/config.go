@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"os"
+	"reflect"
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
@@ -298,6 +300,8 @@ func Load() (*Config, error) {
 }
 
 func normalizeConfig(cfg *Config) {
+	expandEnvPlaceholders(reflect.ValueOf(cfg))
+
 	knowledgeBaseConfigured := viper.IsSet("fallback.knowledge_base_enabled")
 	legacyConfigured := viper.IsSet("fallback.legacy_kb_enabled")
 
@@ -308,6 +312,46 @@ func normalizeConfig(cfg *Config) {
 		cfg.Fallback.KnowledgeBaseEnabled = cfg.Fallback.LegacyKBEnabled
 	default:
 		cfg.Fallback.LegacyKBEnabled = cfg.Fallback.KnowledgeBaseEnabled
+	}
+}
+
+func expandEnvPlaceholders(value reflect.Value) {
+	if !value.IsValid() {
+		return
+	}
+
+	switch value.Kind() {
+	case reflect.Pointer:
+		if value.IsNil() {
+			return
+		}
+		expandEnvPlaceholders(value.Elem())
+	case reflect.Interface:
+		if value.IsNil() {
+			return
+		}
+		expandEnvPlaceholders(value.Elem())
+	case reflect.Struct:
+		for i := 0; i < value.NumField(); i++ {
+			expandEnvPlaceholders(value.Field(i))
+		}
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < value.Len(); i++ {
+			expandEnvPlaceholders(value.Index(i))
+		}
+	case reflect.Map:
+		iter := value.MapRange()
+		for iter.Next() {
+			entry := iter.Value()
+			updated := reflect.New(entry.Type()).Elem()
+			updated.Set(entry)
+			expandEnvPlaceholders(updated)
+			value.SetMapIndex(iter.Key(), updated)
+		}
+	case reflect.String:
+		if value.CanSet() {
+			value.SetString(os.ExpandEnv(value.String()))
+		}
 	}
 }
 

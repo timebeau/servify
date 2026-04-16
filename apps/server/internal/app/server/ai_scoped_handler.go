@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"sync"
 
 	"servify/apps/server/internal/config"
 	aidelivery "servify/apps/server/internal/modules/ai/delivery"
@@ -22,6 +23,9 @@ type scopedAIHandlerService struct {
 	logger   *logrus.Logger
 	resolver *configscope.Resolver
 	fallback aidelivery.HandlerService
+
+	mu                       sync.RWMutex
+	knowledgeProviderEnabled *bool
 }
 
 func NewScopedAIHandlerService(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, fallback aidelivery.HandlerService) aidelivery.HandlerService {
@@ -68,8 +72,14 @@ func (s *scopedAIHandlerService) SyncKnowledgeBase(ctx context.Context) error {
 }
 
 func (s *scopedAIHandlerService) SetKnowledgeProviderEnabled(enabled bool) bool {
-	if s == nil || s.fallback == nil {
+	if s == nil {
 		return false
+	}
+	s.mu.Lock()
+	s.knowledgeProviderEnabled = &enabled
+	s.mu.Unlock()
+	if s.fallback == nil {
+		return true
 	}
 	return s.fallback.SetKnowledgeProviderEnabled(enabled)
 }
@@ -86,12 +96,12 @@ func (s *scopedAIHandlerService) buildService(ctx context.Context) aidelivery.Ru
 		return nil
 	}
 	if s.resolver == nil {
-		return runtimeServiceFromResolvedConfig(config.OpenAIConfig{}, config.DifyConfig{}, config.WeKnoraConfig{}, s.logger)
+		return s.applyRuntimeOverrides(runtimeServiceFromResolvedConfig(config.OpenAIConfig{}, config.DifyConfig{}, config.WeKnoraConfig{}, s.logger))
 	}
 	openAIConfig := s.resolver.ResolveOpenAI(ctx, nil)
 	difyConfig := s.resolver.ResolveDify(ctx, nil)
 	weKnoraConfig := s.resolver.ResolveWeKnora(ctx, nil)
-	return runtimeServiceFromResolvedConfig(openAIConfig, difyConfig, weKnoraConfig, s.logger)
+	return s.applyRuntimeOverrides(runtimeServiceFromResolvedConfig(openAIConfig, difyConfig, weKnoraConfig, s.logger))
 }
 
 func runtimeServiceFromResolvedConfig(openAIConfig config.OpenAIConfig, difyConfig config.DifyConfig, weKnoraConfig config.WeKnoraConfig, logger *logrus.Logger) aidelivery.RuntimeService {
@@ -149,4 +159,21 @@ func runtimeServiceFromResolvedConfig(openAIConfig config.OpenAIConfig, difyConf
 		weKnoraConfig.KnowledgeBaseID,
 		logger,
 	)
+}
+
+func (s *scopedAIHandlerService) applyRuntimeOverrides(service aidelivery.RuntimeService) aidelivery.RuntimeService {
+	if s == nil || service == nil {
+		return service
+	}
+	enhanced, ok := service.(aidelivery.EnhancedRuntimeService)
+	if !ok {
+		return service
+	}
+	s.mu.RLock()
+	enabled := s.knowledgeProviderEnabled
+	s.mu.RUnlock()
+	if enabled != nil {
+		enhanced.SetKnowledgeProviderEnabled(*enabled)
+	}
+	return service
 }
