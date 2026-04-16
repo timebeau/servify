@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"time"
 
@@ -11,19 +12,23 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"gorm.io/gorm"
 )
+
+// DatabasePing 数据库ping接口
+type DatabasePing interface {
+	DB() (*sql.DB, error)
+}
 
 // EnhancedHealthHandler 增强的健康检查处理器
 type EnhancedHealthHandler struct {
 	config    *config.Config
 	aiService aidelivery.HandlerService
-	db        *gorm.DB
+	db        DatabasePing
 	logger    *logrus.Logger
 }
 
 // NewEnhancedHealthHandler 创建增强的健康检查处理器
-func NewEnhancedHealthHandler(cfg *config.Config, aiService aidelivery.HandlerService, db *gorm.DB) *EnhancedHealthHandler {
+func NewEnhancedHealthHandler(cfg *config.Config, aiService aidelivery.HandlerService, db DatabasePing) *EnhancedHealthHandler {
 	return &EnhancedHealthHandler{
 		config:    cfg,
 		aiService: aiService,
@@ -248,11 +253,11 @@ func (h *EnhancedHealthHandler) checkRedis(ctx context.Context, response *Health
 	// 当前版本只验证配置存在，不进行实际连接检查
 	// 当 Redis 被实际使用时，应添加 redisClient 并执行 Ping()
 	serviceInfo := ServiceInfo{
-		Status:  "disabled",  // 当前 Redis 未被实际使用
+		Status:  "disabled", // 当前 Redis 未被实际使用
 		Latency: time.Since(start).String(),
 		Details: map[string]interface{}{
-			"host":           h.config.Redis.Host,
-			"port":           h.config.Redis.Port,
+			"host":            h.config.Redis.Host,
+			"port":            h.config.Redis.Port,
 			"connection_type": "configuration_only",
 		},
 	}
