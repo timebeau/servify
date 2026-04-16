@@ -184,7 +184,7 @@ func setupEnhancedRouter(
 	})
 
 	// 健康检查
-	healthHandler := handlers.NewEnhancedHealthHandler(cfg, runtime.AIHandlerService)
+	healthHandler := handlers.NewEnhancedHealthHandler(cfg, runtime.AIHandlerService, db)
 	router.GET("/health", healthHandler.Health)
 	router.GET("/ready", healthHandler.Ready)
 
