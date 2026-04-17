@@ -34,7 +34,7 @@ jobs:
 
       - name: Setup Go
         timeout-minutes: 3
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: apps/server/go.mod
           cache-dependency-path: |
@@ -76,7 +76,7 @@ jobs:
 
       - name: Upload release bundle
         timeout-minutes: 3
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-${{ inputs.version }}
           path: |
