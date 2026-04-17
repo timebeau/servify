@@ -40,6 +40,7 @@ func (s *Service) CreateDocument(ctx context.Context, req CreateDocumentRequest)
 		Content:   content,
 		Category:  strings.TrimSpace(req.Category),
 		Tags:      compact(req.Tags),
+		IsPublic:  req.IsPublic,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -65,6 +66,9 @@ func (s *Service) UpdateDocument(ctx context.Context, id string, req UpdateDocum
 	}
 	if req.Tags != nil {
 		doc.Tags = compact(*req.Tags)
+	}
+	if req.IsPublic != nil {
+		doc.IsPublic = *req.IsPublic
 	}
 	if doc.Title == "" {
 		return nil, fmt.Errorf("title required")

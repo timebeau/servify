@@ -32,6 +32,7 @@ func (r *GormDocumentRepository) Create(ctx context.Context, doc *domain.Documen
 		Content:     doc.Content,
 		Category:    doc.Category,
 		Tags:        strings.Join(doc.Tags, ","),
+		IsPublic:    doc.IsPublic,
 		CreatedAt:   doc.CreatedAt,
 		UpdatedAt:   doc.UpdatedAt,
 	}
@@ -52,6 +53,7 @@ func (r *GormDocumentRepository) Update(ctx context.Context, doc *domain.Documen
 		"content":    doc.Content,
 		"category":   doc.Category,
 		"tags":       strings.Join(doc.Tags, ","),
+		"is_public":  doc.IsPublic,
 		"updated_at": doc.UpdatedAt,
 	})
 	if result.Error != nil {
@@ -92,6 +94,9 @@ func (r *GormDocumentRepository) Get(ctx context.Context, id string) (*domain.Do
 
 func (r *GormDocumentRepository) List(ctx context.Context, filter knowledgeapp.ListDocumentsFilter) ([]domain.Document, int64, error) {
 	q := applyKnowledgeScope(r.db.WithContext(ctx).Model(&models.KnowledgeDoc{}), ctx)
+	if filter.PublicOnly {
+		q = q.Where("is_public = ?", true)
+	}
 	if c := strings.TrimSpace(filter.Category); c != "" {
 		q = q.Where("category = ?", c)
 	}
@@ -204,6 +209,7 @@ func documentFromModel(model models.KnowledgeDoc) *domain.Document {
 		Content:   model.Content,
 		Category:  model.Category,
 		Tags:      splitTags(model.Tags),
+		IsPublic:  model.IsPublic,
 		CreatedAt: model.CreatedAt,
 		UpdatedAt: model.UpdatedAt,
 	}

@@ -8,6 +8,7 @@ type Document struct {
 	Content   string
 	Category  string
 	Tags      []string
+	IsPublic  bool
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }

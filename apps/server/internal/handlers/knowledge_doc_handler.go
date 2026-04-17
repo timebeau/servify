@@ -11,11 +11,16 @@ import (
 )
 
 type KnowledgeDocHandler struct {
-	service knowledgedelivery.HandlerService
+	service    knowledgedelivery.HandlerService
+	publicOnly bool
 }
 
 func NewKnowledgeDocHandler(service knowledgedelivery.HandlerService) *KnowledgeDocHandler {
 	return &KnowledgeDocHandler{service: service}
+}
+
+func NewPublicKnowledgeDocHandler(service knowledgedelivery.HandlerService) *KnowledgeDocHandler {
+	return &KnowledgeDocHandler{service: service, publicOnly: true}
 }
 
 func (h *KnowledgeDocHandler) List(c *gin.Context) {
@@ -23,6 +28,9 @@ func (h *KnowledgeDocHandler) List(c *gin.Context) {
 	if err := c.ShouldBindQuery(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid query parameters", Message: err.Error()})
 		return
+	}
+	if h.publicOnly {
+		req.PublicOnly = true
 	}
 	docs, total, err := h.service.List(c.Request.Context(), &req)
 	if err != nil {
@@ -54,6 +62,10 @@ func (h *KnowledgeDocHandler) Get(c *gin.Context) {
 	doc, err := h.service.Get(c.Request.Context(), uint(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, ErrorResponse{Error: "Knowledge doc not found", Message: err.Error()})
+		return
+	}
+	if h.publicOnly && !doc.IsPublic {
+		c.JSON(http.StatusNotFound, ErrorResponse{Error: "Knowledge doc not found", Message: "document is not public"})
 		return
 	}
 	c.JSON(http.StatusOK, doc)
@@ -117,6 +129,9 @@ func RegisterKnowledgeDocRoutes(r *gin.RouterGroup, handler *KnowledgeDocHandler
 }
 
 func RegisterPublicKnowledgeBaseRoutes(r *gin.RouterGroup, handler *KnowledgeDocHandler) {
+	if !handler.publicOnly {
+		handler = NewPublicKnowledgeDocHandler(handler.service)
+	}
 	kb := r.Group("/kb")
 	{
 		kb.GET("/docs", handler.List)

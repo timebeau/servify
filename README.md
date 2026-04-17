@@ -136,6 +136,7 @@ Servify 当前更适合这样理解：
 
 - [远程协助产品说明](./docs/remote-assistance.md)
 - [文档站首页](./docs/README.md)
+- [v0.1.0 Release Notes](./docs/release-notes-v0.1.0.md)
 
 当前不会把“平台化租户能力”作为产品中心持续扩张，而是先把独立部署客服产品做扎实。
 
@@ -356,6 +357,7 @@ Jaeger 默认地址：`http://localhost:16686`
 - [docs/generated-assets.md](./docs/generated-assets.md) - 受控生成物、重建入口与校验规则
 - [docs/local-development.md](./docs/local-development.md) - Windows / WSL / Linux 本地开发约定
 - [docs/contributing.md](./docs/contributing.md) - 提交前自检与协作约定
+- [docs/release-notes-v0.1.0.md](./docs/release-notes-v0.1.0.md) - v0.1.0 发布说明、已知限制与非目标
 
 ### 📋 实施 backlog
 

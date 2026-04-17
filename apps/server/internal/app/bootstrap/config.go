@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"servify/apps/server/internal/config"
 
@@ -52,6 +53,7 @@ func ResolveRuntimeOverrides(cfg *config.Config, args []string, output io.Writer
 	}
 
 	var (
+		dbDriver string
 		flagDSN   string
 		dbHost    string
 		dbPortStr string
@@ -70,7 +72,12 @@ func ResolveRuntimeOverrides(cfg *config.Config, args []string, output io.Writer
 	} else {
 		flagSet.SetOutput(io.Discard)
 	}
-	flagSet.StringVar(&flagDSN, "dsn", os.Getenv("DB_DSN"), "Postgres DSN, if set overrides other DB flags")
+	flagSet.StringVar(&dbDriver, "db-driver", getenvDefault("DB_DRIVER", "postgres"), "database driver (postgres or sqlite)")
+	defaultDSN := ""
+	if strings.EqualFold(getenvDefault("DB_DRIVER", "postgres"), "sqlite") {
+		defaultDSN = os.Getenv("DB_DSN")
+	}
+	flagSet.StringVar(&flagDSN, "dsn", defaultDSN, "database DSN; when db-driver=sqlite this should be a sqlite file path or DSN")
 	flagSet.StringVar(&dbHost, "db-host", getenvDefault("DB_HOST", cfg.Database.Host), "database host")
 	flagSet.StringVar(&dbPortStr, "db-port", getenvDefault("DB_PORT", fmt.Sprintf("%d", cfg.Database.Port)), "database port")
 	flagSet.StringVar(&dbUser, "db-user", getenvDefault("DB_USER", cfg.Database.User), "database user")
@@ -85,6 +92,7 @@ func ResolveRuntimeOverrides(cfg *config.Config, args []string, output io.Writer
 	}
 
 	dbOpts := DatabaseOptions{
+		Driver:   dbDriver,
 		DSN:      flagDSN,
 		Host:     dbHost,
 		Port:     dbPortStr,
@@ -94,7 +102,9 @@ func ResolveRuntimeOverrides(cfg *config.Config, args []string, output io.Writer
 		SSLMode:  dbSSLMode,
 		TimeZone: dbTZ,
 	}
-	dbOpts.DSN = BuildPostgresDSN(cfg, dbOpts)
+	if dbOpts.DSN == "" && normalizedDatabaseDriver(dbOpts) != "sqlite" {
+		dbOpts.DSN = BuildPostgresDSN(cfg, dbOpts)
+	}
 
 	return RuntimeOverrides{
 		Database: dbOpts,

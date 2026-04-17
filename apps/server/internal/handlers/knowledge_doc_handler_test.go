@@ -48,13 +48,14 @@ func TestKnowledgeDocHandler_AdminCRUD_And_PublicList(t *testing.T) {
 	public := r.Group("/public")
 	RegisterPublicKnowledgeBaseRoutes(public, h)
 
-	// create
+	// create public doc
 	w := httptest.NewRecorder()
 	body, _ := json.Marshal(map[string]interface{}{
-		"title":    "Hello",
-		"content":  "World",
-		"category": "getting-started",
-		"tags":     []string{"a", "b"},
+		"title":     "Hello",
+		"content":   "World",
+		"category":  "getting-started",
+		"tags":      []string{"a", "b"},
+		"is_public": true,
 	})
 	req, _ := http.NewRequest(http.MethodPost, "/api/knowledge-docs", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -68,6 +69,30 @@ func TestKnowledgeDocHandler_AdminCRUD_And_PublicList(t *testing.T) {
 	}
 	if created.ID == 0 || created.Title != "Hello" {
 		t.Fatalf("unexpected created doc: %#v", created)
+	}
+	if !created.IsPublic {
+		t.Fatalf("expected created doc to be public: %#v", created)
+	}
+
+	// create internal doc
+	wInternal := httptest.NewRecorder()
+	internalBody, _ := json.Marshal(map[string]interface{}{
+		"title":    "Hello internal",
+		"content":  "Internal content",
+		"category": "getting-started",
+	})
+	reqInternal, _ := http.NewRequest(http.MethodPost, "/api/knowledge-docs", bytes.NewReader(internalBody))
+	reqInternal.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(wInternal, reqInternal)
+	if wInternal.Code != http.StatusCreated {
+		t.Fatalf("create internal status=%d body=%s", wInternal.Code, wInternal.Body.String())
+	}
+	var internalDoc models.KnowledgeDoc
+	if err := json.Unmarshal(wInternal.Body.Bytes(), &internalDoc); err != nil {
+		t.Fatalf("unmarshal internal doc: %v body=%s", err, wInternal.Body.String())
+	}
+	if internalDoc.IsPublic {
+		t.Fatalf("expected internal doc to default to non-public: %#v", internalDoc)
 	}
 
 	// update
@@ -102,6 +127,29 @@ func TestKnowledgeDocHandler_AdminCRUD_And_PublicList(t *testing.T) {
 	r.ServeHTTP(w4, req4)
 	if w4.Code != http.StatusOK {
 		t.Fatalf("public get status=%d body=%s", w4.Code, w4.Body.String())
+	}
+
+	// get internal doc from public route -> 404
+	wInternalGet := httptest.NewRecorder()
+	reqInternalGet, _ := http.NewRequest(http.MethodGet, "/public/kb/docs/"+itoa(internalDoc.ID), nil)
+	r.ServeHTTP(wInternalGet, reqInternalGet)
+	if wInternalGet.Code != http.StatusNotFound {
+		t.Fatalf("public get internal expected 404 got %d body=%s", wInternalGet.Code, wInternalGet.Body.String())
+	}
+
+	// admin list still includes both docs
+	wAdminList := httptest.NewRecorder()
+	reqAdminList, _ := http.NewRequest(http.MethodGet, "/api/knowledge-docs?search=Hello&page=1&page_size=10", nil)
+	r.ServeHTTP(wAdminList, reqAdminList)
+	if wAdminList.Code != http.StatusOK {
+		t.Fatalf("admin list status=%d body=%s", wAdminList.Code, wAdminList.Body.String())
+	}
+	var adminListResp PaginatedResponse
+	if err := json.Unmarshal(wAdminList.Body.Bytes(), &adminListResp); err != nil {
+		t.Fatalf("unmarshal admin list: %v body=%s", err, wAdminList.Body.String())
+	}
+	if adminListResp.Total != 2 {
+		t.Fatalf("expected admin total=2 got %d", adminListResp.Total)
 	}
 
 	// delete

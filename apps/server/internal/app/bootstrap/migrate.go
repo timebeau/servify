@@ -51,7 +51,15 @@ func MigrationModels() []interface{} {
 
 // AutoMigrate runs the canonical application migration set.
 func AutoMigrate(db *gorm.DB) error {
-	return db.AutoMigrate(MigrationModels()...)
+	if err := db.AutoMigrate(MigrationModels()...); err != nil {
+		return err
+	}
+	if !db.Migrator().HasColumn(&models.KnowledgeDoc{}, "is_public") {
+		if err := db.Migrator().AddColumn(&models.KnowledgeDoc{}, "IsPublic"); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // AutoMigrateEnabled preserves current default behavior while allowing explicit opt-out.

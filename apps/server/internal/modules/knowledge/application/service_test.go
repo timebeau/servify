@@ -50,6 +50,9 @@ func (r *memDocRepo) List(ctx context.Context, filter ListDocumentsFilter) ([]do
 		if filter.Category != "" && doc.Category != filter.Category {
 			continue
 		}
+		if filter.PublicOnly && !doc.IsPublic {
+			continue
+		}
 		if filter.Search != "" && !strings.Contains(strings.ToLower(doc.Title+doc.Content), strings.ToLower(filter.Search)) {
 			continue
 		}
@@ -90,9 +93,10 @@ func (r *memJobRepo) Get(ctx context.Context, id string) (*domain.IndexJob, erro
 func TestServiceCreateDocument(t *testing.T) {
 	svc := NewService(&memDocRepo{}, &memJobRepo{}, nil)
 	doc, err := svc.CreateDocument(context.Background(), CreateDocumentRequest{
-		Title:   " KB Title ",
-		Content: " KB Content ",
-		Tags:    []string{" a ", "", "b"},
+		Title:    " KB Title ",
+		Content:  " KB Content ",
+		Tags:     []string{" a ", "", "b"},
+		IsPublic: true,
 	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -102,6 +106,9 @@ func TestServiceCreateDocument(t *testing.T) {
 	}
 	if len(doc.Tags) != 2 {
 		t.Fatalf("unexpected tags: %+v", doc.Tags)
+	}
+	if !doc.IsPublic {
+		t.Fatal("expected document to keep public flag")
 	}
 }
 
@@ -142,7 +149,7 @@ func TestServiceListDocuments(t *testing.T) {
 	docRepo := &memDocRepo{}
 	svc := NewService(docRepo, &memJobRepo{}, nil)
 	_, _ = svc.CreateDocument(context.Background(), CreateDocumentRequest{ID: "doc-1", Title: "Billing", Content: "billing content", Category: "faq"})
-	_, _ = svc.CreateDocument(context.Background(), CreateDocumentRequest{ID: "doc-2", Title: "Support", Content: "support content", Category: "guide"})
+	_, _ = svc.CreateDocument(context.Background(), CreateDocumentRequest{ID: "doc-2", Title: "Support", Content: "support content", Category: "guide", IsPublic: true})
 
 	docs, total, err := svc.ListDocuments(context.Background(), ListDocumentsFilter{
 		Category: "faq",
@@ -152,6 +159,16 @@ func TestServiceListDocuments(t *testing.T) {
 	}
 	if total != 1 || len(docs) != 1 {
 		t.Fatalf("unexpected docs: total=%d docs=%d", total, len(docs))
+	}
+
+	docs, total, err = svc.ListDocuments(context.Background(), ListDocumentsFilter{
+		PublicOnly: true,
+	})
+	if err != nil {
+		t.Fatalf("list public docs: %v", err)
+	}
+	if total != 1 || len(docs) != 1 || docs[0].ID != "doc-2" {
+		t.Fatalf("unexpected public docs: total=%d docs=%+v", total, docs)
 	}
 }
 

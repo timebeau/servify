@@ -34,6 +34,7 @@ type KnowledgeDocCreateRequest struct {
 	Content  string   `json:"content" binding:"required"`
 	Category string   `json:"category"`
 	Tags     []string `json:"tags"`
+	IsPublic bool     `json:"is_public"`
 }
 
 type KnowledgeDocUpdateRequest struct {
@@ -41,13 +42,15 @@ type KnowledgeDocUpdateRequest struct {
 	Content  *string   `json:"content"`
 	Category *string   `json:"category"`
 	Tags     *[]string `json:"tags"`
+	IsPublic *bool     `json:"is_public"`
 }
 
 type KnowledgeDocListRequest struct {
-	Page     int    `form:"page"`
-	PageSize int    `form:"page_size"`
-	Category string `form:"category"`
-	Search   string `form:"search"`
+	Page       int    `form:"page"`
+	PageSize   int    `form:"page_size"`
+	Category   string `form:"category"`
+	Search     string `form:"search"`
+	PublicOnly bool   `form:"public_only"`
 }
 
 func (s *KnowledgeDocService) Create(ctx context.Context, req *KnowledgeDocCreateRequest) (*models.KnowledgeDoc, error) {
@@ -59,6 +62,7 @@ func (s *KnowledgeDocService) Create(ctx context.Context, req *KnowledgeDocCreat
 		Content:  req.Content,
 		Category: req.Category,
 		Tags:     req.Tags,
+		IsPublic: req.IsPublic,
 	})
 	if err != nil {
 		return nil, err
@@ -81,6 +85,7 @@ func (s *KnowledgeDocService) List(ctx context.Context, req *KnowledgeDocListReq
 		filter.PageSize = req.PageSize
 		filter.Category = req.Category
 		filter.Search = req.Search
+		filter.PublicOnly = req.PublicOnly
 	}
 	docs, total, err := s.module.ListDocuments(ctx, filter)
 	if err != nil {
@@ -106,6 +111,7 @@ func (s *KnowledgeDocService) Update(ctx context.Context, id uint, req *Knowledg
 		Content:  req.Content,
 		Category: req.Category,
 		Tags:     req.Tags,
+		IsPublic: req.IsPublic,
 	})
 	if err != nil {
 		return nil, err
@@ -146,6 +152,7 @@ func knowledgeDocFromDomain(doc *knowledgedomain.Document) (*models.KnowledgeDoc
 		Content:   doc.Content,
 		Category:  doc.Category,
 		Tags:      joinTagsCSV(doc.Tags),
+		IsPublic:  doc.IsPublic,
 		CreatedAt: doc.CreatedAt,
 		UpdatedAt: doc.UpdatedAt,
 	}, nil

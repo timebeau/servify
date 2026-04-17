@@ -17,6 +17,18 @@ if [[ ! -f "$CONFIG_PATH" ]]; then
   exit 1
 fi
 
+if [[ "$(realpath "$CONFIG_PATH")" == "$(realpath "$ROOT_DIR/config.yml")" ]]; then
+  RELEASE_CHECK_JWT_SECRET="${SERVIFY_JWT_SECRET:-release-check-dev-secret}"
+  RELEASE_CHECK_OPENAI_API_KEY="${OPENAI_API_KEY:-release-check-dev-openai-key}"
+  RELEASE_CHECK_DB_DRIVER="${DB_DRIVER:-sqlite}"
+  RELEASE_CHECK_DB_DSN="${DB_DSN:-$ROOT_DIR/.runtime/release-check.sqlite}"
+else
+  RELEASE_CHECK_JWT_SECRET="${SERVIFY_JWT_SECRET:-}"
+  RELEASE_CHECK_OPENAI_API_KEY="${OPENAI_API_KEY:-}"
+  RELEASE_CHECK_DB_DRIVER="${DB_DRIVER:-}"
+  RELEASE_CHECK_DB_DSN="${DB_DSN:-}"
+fi
+
 RUNTIME_DIR="$ROOT_DIR/.runtime"
 mkdir -p "$RUNTIME_DIR"
 
@@ -25,7 +37,8 @@ sh "$ROOT_DIR/scripts/check-local-environment.sh"
 
 echo
 echo "==> Security baseline"
-sh "$ROOT_DIR/scripts/check-security-baseline.sh" "$CONFIG_PATH"
+SERVIFY_JWT_SECRET="$RELEASE_CHECK_JWT_SECRET" OPENAI_API_KEY="$RELEASE_CHECK_OPENAI_API_KEY" \
+  sh "$ROOT_DIR/scripts/check-security-baseline.sh" "$CONFIG_PATH"
 
 echo
 echo "==> Observability baseline"
@@ -33,11 +46,13 @@ sh "$ROOT_DIR/scripts/check-observability-baseline.sh" "$CONFIG_PATH"
 
 echo
 echo "==> Focused Go regression tests"
-go -C apps/server test ./cmd/cli ./internal/app/bootstrap ./internal/handlers
+SERVIFY_JWT_SECRET="$RELEASE_CHECK_JWT_SECRET" OPENAI_API_KEY="$RELEASE_CHECK_OPENAI_API_KEY" \
+  go -C apps/server test ./cmd/cli ./internal/app/bootstrap ./internal/handlers
 
 echo
 echo "==> Build verification"
-make build >/dev/null
+SERVIFY_JWT_SECRET="$RELEASE_CHECK_JWT_SECRET" OPENAI_API_KEY="$RELEASE_CHECK_OPENAI_API_KEY" \
+  make build >/dev/null
 echo "[ok] build succeeded"
 
 for binary in servify migrate servify-cli; do
@@ -57,7 +72,8 @@ echo "==> Route registration verification"
 if ! go -C apps/server test -run TestConversationWorkspaceHandler_GetSession ./internal/handlers/ >/dev/null 2>&1; then
   echo "[warn] conversation workspace route test failed (may require DB)"
 fi
-if ! go -C apps/server test -run "TestAIHandler_(GetMetrics|UploadDocument_StandardService|SyncKnowledgeBase_StandardService|EnableKnowledgeProvider_StandardService|DisableKnowledgeProvider_StandardService|ResetCircuitBreaker_StandardService)$" ./internal/handlers/ >/dev/null 2>&1; then
+if ! SERVIFY_JWT_SECRET="$RELEASE_CHECK_JWT_SECRET" OPENAI_API_KEY="$RELEASE_CHECK_OPENAI_API_KEY" \
+  go -C apps/server test -run "TestAIHandler_(GetMetrics|UploadDocument_StandardService|SyncKnowledgeBase_StandardService|EnableKnowledgeProvider_StandardService|DisableKnowledgeProvider_StandardService|ResetCircuitBreaker_StandardService)$" ./internal/handlers/ >/dev/null 2>&1; then
   echo "[fail] AI handler route test failed" >&2
   exit 1
 fi
@@ -65,7 +81,9 @@ echo "[ok] critical routes verified"
 
 echo
 echo "==> Database migration smoke"
-"$ROOT_DIR/bin/migrate" --config "$CONFIG_PATH" >/dev/null
+SERVIFY_JWT_SECRET="$RELEASE_CHECK_JWT_SECRET" OPENAI_API_KEY="$RELEASE_CHECK_OPENAI_API_KEY" \
+DB_DRIVER="$RELEASE_CHECK_DB_DRIVER" DB_DSN="$RELEASE_CHECK_DB_DSN" \
+  "$ROOT_DIR/bin/migrate" --config "$CONFIG_PATH" >/dev/null
 echo "[ok] migration succeeded"
 
 echo
@@ -85,6 +103,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
+SERVIFY_JWT_SECRET="$RELEASE_CHECK_JWT_SECRET" OPENAI_API_KEY="$RELEASE_CHECK_OPENAI_API_KEY" \
+DB_DRIVER="$RELEASE_CHECK_DB_DRIVER" DB_DSN="$RELEASE_CHECK_DB_DSN" \
 SERVIFY_HOST="127.0.0.1" SERVIFY_PORT="$PORT" "$ROOT_DIR/bin/servify" >"$SERVER_LOG" 2>&1 &
 SERVER_PID=$!
 

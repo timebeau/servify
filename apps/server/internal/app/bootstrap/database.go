@@ -2,10 +2,12 @@ package bootstrap
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"servify/apps/server/internal/config"
 
+	"gorm.io/driver/sqlite"
 	"github.com/sirupsen/logrus"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -14,6 +16,7 @@ import (
 )
 
 type DatabaseOptions struct {
+	Driver        string
 	DSN           string
 	Host          string
 	Port          string
@@ -30,6 +33,16 @@ type DatabaseRetryOptions struct {
 	MaxRetries int
 	RetryDelay time.Duration
 	Logger     *logrus.Logger
+}
+
+func normalizedDatabaseDriver(opts DatabaseOptions) string {
+	driver := strings.TrimSpace(strings.ToLower(opts.Driver))
+	switch driver {
+	case "sqlite", "sqlite3":
+		return "sqlite"
+	default:
+		return "postgres"
+	}
 }
 
 // BuildPostgresDSN composes a DSN from explicit options and config defaults.
@@ -60,7 +73,21 @@ func OpenDatabase(cfg *config.Config, opts DatabaseOptions) (*gorm.DB, error) {
 	if level == 0 {
 		level = logger.Warn
 	}
-	db, err := gorm.Open(postgres.Open(BuildPostgresDSN(cfg, opts)), &gorm.Config{
+	driver := normalizedDatabaseDriver(opts)
+	dsn := opts.DSN
+	if dsn == "" {
+		dsn = BuildPostgresDSN(cfg, opts)
+	}
+
+	var dialector gorm.Dialector
+	switch driver {
+	case "sqlite":
+		dialector = sqlite.Open(dsn)
+	default:
+		dialector = postgres.Open(dsn)
+	}
+
+	db, err := gorm.Open(dialector, &gorm.Config{
 		Logger:                                   logger.Default.LogMode(level),
 		DisableForeignKeyConstraintWhenMigrating: true,
 	})

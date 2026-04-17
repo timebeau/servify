@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ProDescriptions } from '@ant-design/pro-components';
 import { ProCard } from '@ant-design/pro-components';
-import { Button, Space, Spin } from 'antd';
+import { Button, Space, Spin, Tag } from 'antd';
 import { goBack, useDetailParams } from '@/lib/navigation';
 import { getDoc } from '@/services/knowledge';
 
@@ -68,6 +68,15 @@ const KnowledgeDetailPage: React.FC = () => {
             { title: '标题', dataIndex: 'title' },
             { title: '分类', dataIndex: 'category' },
             { title: '状态', dataIndex: 'status' },
+            {
+              title: '公开',
+              dataIndex: 'is_public',
+              render: (_, record) => (
+                <Tag color={record.is_public ? 'green' : 'default'}>
+                  {record.is_public ? '公开' : '内部'}
+                </Tag>
+              ),
+            },
             { title: '创建时间', dataIndex: 'created_at' },
             { title: '更新时间', dataIndex: 'updated_at' },
           ]}

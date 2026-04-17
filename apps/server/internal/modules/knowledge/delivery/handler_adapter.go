@@ -48,6 +48,7 @@ func (a *HandlerServiceAdapter) List(ctx context.Context, req *services.Knowledg
 		filter.PageSize = req.PageSize
 		filter.Category = req.Category
 		filter.Search = req.Search
+		filter.PublicOnly = req.PublicOnly
 	}
 	docs, total, err := a.service.ListDocuments(ctx, filter)
 	if err != nil {
@@ -81,6 +82,7 @@ func (a *HandlerServiceAdapter) Create(ctx context.Context, req *services.Knowle
 		Content:  req.Content,
 		Category: req.Category,
 		Tags:     req.Tags,
+		IsPublic: req.IsPublic,
 	})
 	if err != nil {
 		return nil, err
@@ -97,6 +99,7 @@ func (a *HandlerServiceAdapter) Update(ctx context.Context, id uint, req *servic
 		Content:  req.Content,
 		Category: req.Category,
 		Tags:     req.Tags,
+		IsPublic: req.IsPublic,
 	})
 	if err != nil {
 		return nil, err
@@ -122,6 +125,7 @@ func knowledgeDocFromDomain(doc *knowledgedomain.Document) (*models.KnowledgeDoc
 		Content:   doc.Content,
 		Category:  doc.Category,
 		Tags:      joinTagsCSV(doc.Tags),
+		IsPublic:  doc.IsPublic,
 		CreatedAt: doc.CreatedAt,
 		UpdatedAt: doc.UpdatedAt,
 	}, nil

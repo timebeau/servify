@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"servify/apps/server/internal/platform/realtime"
 	"servify/apps/server/internal/services"
+	"strings"
 )
 
 type WebSocketHandler struct {
@@ -45,11 +46,15 @@ func NewWebRTCHandler(webrtcService realtime.RTCGateway) *WebRTCHandler {
 }
 
 func (h *WebRTCHandler) GetStats(c *gin.Context) {
-	sessionID := c.Query("session_id")
+	sessionID := strings.TrimSpace(c.Query("session_id"))
 	if sessionID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "session_id is required",
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data": map[string]interface{}{
+				"connection_count": h.webrtcService.ConnectionCount(),
+				"scope":            "all",
+				"status":           "running",
+			},
 		})
 		return
 	}

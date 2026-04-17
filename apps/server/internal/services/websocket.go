@@ -144,15 +144,19 @@ func (h *WebSocketHub) Run() {
 }
 
 func (h *WebSocketHub) HandleWebSocket(c *gin.Context) {
+	sessionID := strings.TrimSpace(c.Query("session_id"))
+	if sessionID == "" {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+			"error":   "BadRequest",
+			"message": "session_id is required",
+		})
+		return
+	}
+
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		logrus.Error("WebSocket upgrade failed:", err)
 		return
-	}
-
-	sessionID := c.Query("session_id")
-	if sessionID == "" {
-		sessionID = fmt.Sprintf("session_%d", time.Now().UnixNano())
 	}
 
 	client := &WebSocketClient{

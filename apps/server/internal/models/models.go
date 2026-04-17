@@ -287,6 +287,7 @@ type KnowledgeDoc struct {
 	Content     string    `gorm:"type:text" json:"content"`
 	Category    string    `json:"category"`
 	Tags        string    `json:"tags"`
+	IsPublic    bool      `gorm:"default:false;index" json:"is_public"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }

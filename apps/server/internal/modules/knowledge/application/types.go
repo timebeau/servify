@@ -8,6 +8,7 @@ type CreateDocumentRequest struct {
 	Content  string
 	Category string
 	Tags     []string
+	IsPublic bool
 }
 
 type UpdateDocumentRequest struct {
@@ -15,13 +16,15 @@ type UpdateDocumentRequest struct {
 	Content  *string
 	Category *string
 	Tags     *[]string
+	IsPublic *bool
 }
 
 type ListDocumentsFilter struct {
-	Page     int
-	PageSize int
-	Category string
-	Search   string
+	Page       int
+	PageSize   int
+	Category   string
+	Search     string
+	PublicOnly bool
 }
 
 type QueueIndexJobRequest struct {

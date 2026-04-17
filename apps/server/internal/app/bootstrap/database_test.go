@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -81,5 +82,28 @@ func TestOpenDatabaseWithRetryFailsAfterAttempts(t *testing.T) {
 	}
 	if time.Since(start) > 5*time.Second {
 		t.Fatal("retry test took too long")
+	}
+}
+
+func TestOpenDatabaseSupportsSQLite(t *testing.T) {
+	cfg := config.GetDefaultConfig()
+	dsn := filepath.Join(t.TempDir(), "servify.sqlite")
+
+	db, err := OpenDatabase(cfg, DatabaseOptions{
+		Driver: "sqlite",
+		DSN:    dsn,
+	})
+	if err != nil {
+		t.Fatalf("OpenDatabase(sqlite) error = %v", err)
+	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("db.DB() error = %v", err)
+	}
+	defer sqlDB.Close()
+
+	if err := sqlDB.Ping(); err != nil {
+		t.Fatalf("Ping() error = %v", err)
 	}
 }

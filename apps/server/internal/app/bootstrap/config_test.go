@@ -49,6 +49,8 @@ func TestLoadConfigFindsRepoRootConfigFromNestedDir(t *testing.T) {
 }
 
 func TestResolveRuntimeOverridesUsesFlagsAndEnv(t *testing.T) {
+	t.Setenv("DB_DRIVER", "")
+	t.Setenv("DB_DSN", "")
 	t.Setenv("DB_HOST", "env-db")
 	t.Setenv("SERVIFY_PORT", "19091")
 
@@ -95,5 +97,26 @@ func TestResolveRuntimeOverridesRejectsInvalidFlag(t *testing.T) {
 	_, err := ResolveRuntimeOverrides(config.GetDefaultConfig(), []string{"--not-a-real-flag"}, &bytes.Buffer{})
 	if err == nil {
 		t.Fatal("expected invalid flag error")
+	}
+}
+
+func TestResolveRuntimeOverridesSupportsSQLiteDriver(t *testing.T) {
+	t.Setenv("DB_DRIVER", "")
+	t.Setenv("DB_DSN", "")
+	cfg := config.GetDefaultConfig()
+
+	overrides, err := ResolveRuntimeOverrides(cfg, []string{
+		"--db-driver", "sqlite",
+		"--dsn", "file:test-release-check.sqlite?cache=shared",
+	}, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("ResolveRuntimeOverrides() error = %v", err)
+	}
+
+	if overrides.Database.Driver != "sqlite" {
+		t.Fatalf("database driver = %q, want sqlite", overrides.Database.Driver)
+	}
+	if overrides.Database.DSN != "file:test-release-check.sqlite?cache=shared" {
+		t.Fatalf("database dsn = %q", overrides.Database.DSN)
 	}
 }

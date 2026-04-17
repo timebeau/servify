@@ -50,6 +50,7 @@ func TestKnowledgeDocService_Create(t *testing.T) {
 				Content:  "Content with tags",
 				Category: "Technical",
 				Tags:     []string{"api", "guide"},
+				IsPublic: true,
 			},
 			wantErr: false,
 		},
@@ -106,6 +107,9 @@ func TestKnowledgeDocService_Create(t *testing.T) {
 				}
 				if doc.CreatedAt.IsZero() {
 					t.Error("expected CreatedAt to be set")
+				}
+				if tt.req != nil && doc.IsPublic != tt.req.IsPublic {
+					t.Errorf("expected IsPublic=%v, got %v", tt.req.IsPublic, doc.IsPublic)
 				}
 			}
 		})
@@ -170,6 +174,7 @@ func TestKnowledgeDocService_List(t *testing.T) {
 		Content:  "Content 1",
 		Category: "Technical",
 		Tags:     []string{"api"},
+		IsPublic: true,
 	})
 	svc.Create(context.Background(), &KnowledgeDocCreateRequest{
 		Title:    "Doc 2",
@@ -242,6 +247,17 @@ func TestKnowledgeDocService_List(t *testing.T) {
 			req:     nil,
 			wantMin: 2,
 			wantMax: 2,
+			wantErr: false,
+		},
+		{
+			name: "public only",
+			req: &KnowledgeDocListRequest{
+				Page:       1,
+				PageSize:   10,
+				PublicOnly: true,
+			},
+			wantMin: 1,
+			wantMax: 1,
 			wantErr: false,
 		},
 	}

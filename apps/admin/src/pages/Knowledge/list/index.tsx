@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns, ActionType } from '@ant-design/pro-components';
-import { Tag, Button, Space, message, Modal, Form, Input, Select } from 'antd';
+import { Tag, Button, Space, message, Modal, Form, Input, Select, Switch } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { navigateTo } from '@/lib/navigation';
 import { listDocs, deleteDoc, createDoc, updateDoc } from '@/services/knowledge';
@@ -31,6 +31,7 @@ const KnowledgeListPage: React.FC = () => {
       category: record.category,
       content: record.content,
       tags: record.tags?.join(', '),
+      is_public: record.is_public ?? false,
     });
     setModalOpen(true);
   };
@@ -44,10 +45,22 @@ const KnowledgeListPage: React.FC = () => {
         : [];
 
       if (modalType === 'create') {
-        await createDoc({ title: values.title, content: values.content || '', category: values.category, tags });
+        await createDoc({
+          title: values.title,
+          content: values.content || '',
+          category: values.category,
+          tags,
+          is_public: values.is_public ?? false,
+        });
         message.success('文档创建成功');
       } else if (editingDoc) {
-        await updateDoc(editingDoc.id, { title: values.title, content: values.content, category: values.category, tags });
+        await updateDoc(editingDoc.id, {
+          title: values.title,
+          content: values.content,
+          category: values.category,
+          tags,
+          is_public: values.is_public ?? false,
+        });
         message.success('文档已更新');
       }
 
@@ -104,6 +117,17 @@ const KnowledgeListPage: React.FC = () => {
       dataIndex: 'status',
       width: 100,
       render: (_, record) => <Tag>{record.status}</Tag>,
+    },
+    {
+      title: '公开',
+      dataIndex: 'is_public',
+      width: 100,
+      search: false,
+      render: (_, record) => (
+        <Tag color={record.is_public ? 'green' : 'default'}>
+          {record.is_public ? '公开' : '内部'}
+        </Tag>
+      ),
     },
     {
       title: '标签',
@@ -185,6 +209,14 @@ const KnowledgeListPage: React.FC = () => {
           </Form.Item>
           <Form.Item name="tags" label="标签（逗号分隔）">
             <Input placeholder="如: 入门, API, 常见问题" />
+          </Form.Item>
+          <Form.Item
+            name="is_public"
+            label="公开到公共知识库"
+            valuePropName="checked"
+            initialValue={false}
+          >
+            <Switch checkedChildren="公开" unCheckedChildren="内部" />
           </Form.Item>
           <Form.Item name="content" label="内容" rules={[{ required: true, message: '请输入内容' }]}>
             <Input.TextArea rows={8} placeholder="文档内容（支持 Markdown）" />

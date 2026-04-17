@@ -21,6 +21,7 @@ export async function createDoc(data: {
   content: string;
   category?: string;
   tags?: string[];
+  is_public?: boolean;
 }) {
   return request<API.KnowledgeDoc>(API, { method: 'POST', data });
 }
@@ -30,6 +31,7 @@ export async function updateDoc(id: number, data: {
   content?: string;
   category?: string;
   tags?: string[];
+  is_public?: boolean;
 }) {
   return request<API.KnowledgeDoc>(`${API}/${id}`, { method: 'PUT', data });
 }

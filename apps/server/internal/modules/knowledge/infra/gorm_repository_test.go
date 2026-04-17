@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"servify/apps/server/internal/models"
+	knowledgeapp "servify/apps/server/internal/modules/knowledge/application"
 	"servify/apps/server/internal/modules/knowledge/domain"
 
 	"gorm.io/driver/sqlite"
@@ -73,5 +74,47 @@ func TestGormIndexJobRepositoryRoundTrip(t *testing.T) {
 	}
 	if got.CompletedAt == nil {
 		t.Fatal("expected completed_at to be persisted")
+	}
+}
+
+func TestGormDocumentRepository_PublicFilter(t *testing.T) {
+	db := newKnowledgeInfraTestDB(t)
+	repo := NewGormDocumentRepository(db)
+
+	publicDoc := &domain.Document{
+		Title:     "Public Billing",
+		Content:   "Public details",
+		IsPublic:  true,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	internalDoc := &domain.Document{
+		Title:     "Internal Billing",
+		Content:   "Internal details",
+		IsPublic:  false,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	if err := repo.Create(context.Background(), publicDoc); err != nil {
+		t.Fatalf("create public doc: %v", err)
+	}
+	if err := repo.Create(context.Background(), internalDoc); err != nil {
+		t.Fatalf("create internal doc: %v", err)
+	}
+
+	docs, total, err := repo.List(context.Background(), knowledgeapp.ListDocumentsFilter{
+		Page:       1,
+		PageSize:   10,
+		PublicOnly: true,
+	})
+	if err != nil {
+		t.Fatalf("list public docs: %v", err)
+	}
+	if total != 1 || len(docs) != 1 {
+		t.Fatalf("unexpected public docs total=%d len=%d docs=%+v", total, len(docs), docs)
+	}
+	if docs[0].Title != "Public Billing" || !docs[0].IsPublic {
+		t.Fatalf("unexpected public doc %+v", docs[0])
 	}
 }

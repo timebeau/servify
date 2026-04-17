@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	appbootstrap "servify/apps/server/internal/app/bootstrap"
@@ -41,6 +42,7 @@ func main() {
 	// CLI flags / env 覆盖
 	var (
 		flagConfig string
+		dbDriver   string
 		flagDSN    string
 		dbHost     string
 		dbPortStr  string
@@ -52,8 +54,14 @@ func main() {
 		withSeed   bool
 	)
 
+	defaultDSN := ""
+	if strings.EqualFold(getenvDefault("DB_DRIVER", "postgres"), "sqlite") {
+		defaultDSN = os.Getenv("DB_DSN")
+	}
+
 	flag.StringVar(&flagConfig, "config", "", "path to config file (default: ./config.yml)")
-	flag.StringVar(&flagDSN, "dsn", os.Getenv("DB_DSN"), "Postgres DSN, if set overrides other DB flags")
+	flag.StringVar(&dbDriver, "db-driver", getenvDefault("DB_DRIVER", "postgres"), "database driver (postgres or sqlite)")
+	flag.StringVar(&flagDSN, "dsn", defaultDSN, "database DSN; when db-driver=sqlite this should be a sqlite file path or DSN")
 	flag.StringVar(&dbHost, "db-host", getenvDefault("DB_HOST", cfg.Database.Host), "database host")
 	flag.StringVar(&dbPortStr, "db-port", getenvDefault("DB_PORT", fmt.Sprintf("%d", cfg.Database.Port)), "database port")
 	flag.StringVar(&dbUser, "db-user", getenvDefault("DB_USER", cfg.Database.User), "database user")
@@ -80,7 +88,7 @@ func main() {
 
 	// 组装 DSN（优先级：--dsn > 单项 DB flags/env > 配置文件）
 	dsn := flagDSN
-	if dsn == "" {
+	if dsn == "" && dbDriver != "sqlite" {
 		host := firstNonEmpty(dbHost, cfg.Database.Host)
 		user := firstNonEmpty(dbUser, cfg.Database.User)
 		pass := firstNonEmpty(dbPass, cfg.Database.Password)
@@ -96,6 +104,7 @@ func main() {
 
 	// 连接数据库
 	db, err := appbootstrap.OpenDatabase(cfg, appbootstrap.DatabaseOptions{
+		Driver:   dbDriver,
 		DSN:      dsn,
 		LogLevel: logger.Info,
 	})

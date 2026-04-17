@@ -312,6 +312,29 @@ func TestWebSocketHub_HandleWebSocketUpgrade(t *testing.T) {
 	assert.Equal(t, 1, hub.GetClientCount())
 }
 
+func TestWebSocketHub_HandleWebSocketRequiresSessionID(t *testing.T) {
+	hub := NewWebSocketHub()
+	go hub.Run()
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/ws", hub.HandleWebSocket)
+
+	req := httptest.NewRequest(http.MethodGet, "/ws", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "session_id is required") {
+		t.Fatalf("expected missing session_id error, body=%s", w.Body.String())
+	}
+	if hub.GetClientCount() != 0 {
+		t.Fatalf("expected no websocket clients to be registered, got %d", hub.GetClientCount())
+	}
+}
+
 // canBindLocal 尝试绑定本地临时端口，判断运行环境是否允许本地监听
 func canBindLocal() bool {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
