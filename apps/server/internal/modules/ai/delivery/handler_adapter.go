@@ -129,3 +129,8 @@ func (e unsupportedEnhancedFeatureError) Error() string {
 func errUnsupportedEnhancedFeature(feature string) error {
 	return unsupportedEnhancedFeatureError(feature + " not available for standard AI service")
 }
+
+func IsUnsupportedEnhancedFeature(err error) bool {
+	_, ok := err.(unsupportedEnhancedFeatureError)
+	return ok
+}

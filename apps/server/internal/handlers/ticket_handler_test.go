@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -19,6 +20,7 @@ import (
 	"gorm.io/gorm"
 
 	"servify/apps/server/internal/models"
+	ticketcontract "servify/apps/server/internal/modules/ticket/contract"
 	ticketdelivery "servify/apps/server/internal/modules/ticket/delivery"
 	auditplatform "servify/apps/server/internal/platform/audit"
 )
@@ -27,9 +29,60 @@ type ticketAuditRecorder struct {
 	entries []auditplatform.Entry
 }
 
+type stubTicketHandlerService struct {
+	updateErr error
+	assignErr error
+	commentErr error
+	closeErr error
+}
+
 func (r *ticketAuditRecorder) Record(_ context.Context, entry auditplatform.Entry) error {
 	r.entries = append(r.entries, entry)
 	return nil
+}
+
+func (s stubTicketHandlerService) CreateTicket(ctx context.Context, req *ticketcontract.CreateTicketRequest) (*models.Ticket, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s stubTicketHandlerService) GetTicketByID(ctx context.Context, ticketID uint) (*models.Ticket, error) {
+	return nil, errors.New("record not found")
+}
+
+func (s stubTicketHandlerService) UpdateTicket(ctx context.Context, ticketID uint, req *ticketcontract.UpdateTicketRequest, userID uint) (*models.Ticket, error) {
+	return nil, s.updateErr
+}
+
+func (s stubTicketHandlerService) ListTickets(ctx context.Context, req *ticketcontract.ListTicketRequest) ([]models.Ticket, int64, error) {
+	return nil, 0, errors.New("not implemented")
+}
+
+func (s stubTicketHandlerService) ListTicketCustomFields(ctx context.Context, activeOnly bool) ([]models.CustomField, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s stubTicketHandlerService) AssignTicket(ctx context.Context, ticketID uint, agentID uint, assignerID uint) error {
+	return s.assignErr
+}
+
+func (s stubTicketHandlerService) AddComment(ctx context.Context, ticketID uint, userID uint, content string, commentType string) (*models.TicketComment, error) {
+	return nil, s.commentErr
+}
+
+func (s stubTicketHandlerService) CloseTicket(ctx context.Context, ticketID uint, userID uint, reason string) error {
+	return s.closeErr
+}
+
+func (s stubTicketHandlerService) GetTicketStats(ctx context.Context, agentID *uint) (*ticketcontract.TicketStats, error) {
+	return &ticketcontract.TicketStats{}, nil
+}
+
+func (s stubTicketHandlerService) BulkUpdateTickets(ctx context.Context, req *ticketcontract.BulkUpdateTicketRequest, userID uint) (*ticketcontract.BulkUpdateResult, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s stubTicketHandlerService) GetRelatedConversations(ctx context.Context, ticketID uint) ([]models.Session, error) {
+	return nil, nil
 }
 
 func newTestDBForTickets(t *testing.T) *gorm.DB {
@@ -760,5 +813,80 @@ func TestTicketHandler_AddComment(t *testing.T) {
 	}
 	if persisted.Content != "follow-up note" {
 		t.Fatalf("persisted content=%q want follow-up note", persisted.Content)
+	}
+}
+
+func TestTicketErrorToStatusCode(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want int
+	}{
+		{name: "not found", err: errors.New("ticket not found"), want: http.StatusNotFound},
+		{name: "validation", err: errors.New("agent_id is required"), want: http.StatusBadRequest},
+		{name: "conflict", err: errors.New("agent not available"), want: http.StatusConflict},
+		{name: "unknown", err: errors.New("database exploded"), want: http.StatusInternalServerError},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ticketErrorToStatusCode(tc.err); got != tc.want {
+				t.Fatalf("ticketErrorToStatusCode(%q) = %d, want %d", tc.err, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestTicketHandler_ErrorStatusMapping(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := NewTicketHandler(stubTicketHandlerService{
+		updateErr:  errors.New("ticket not found"),
+		assignErr:  errors.New("agent not available"),
+		commentErr: errors.New("content is required"),
+		closeErr:   errors.New("status transition not allowed"),
+	}, logrus.New())
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("user_id", uint(1))
+		c.Next()
+	})
+	router.PUT("/api/tickets/:id", handler.UpdateTicket)
+	router.POST("/api/tickets/:id/assign", handler.AssignTicket)
+	router.POST("/api/tickets/:id/comments", handler.AddComment)
+	router.POST("/api/tickets/:id/close", handler.CloseTicket)
+
+	updateBody := bytes.NewBufferString(`{"title":"updated"}`)
+	updateReq := httptest.NewRequest(http.MethodPut, "/api/tickets/12", updateBody)
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateResp := httptest.NewRecorder()
+	router.ServeHTTP(updateResp, updateReq)
+	if updateResp.Code != http.StatusNotFound {
+		t.Fatalf("update status=%d body=%s", updateResp.Code, updateResp.Body.String())
+	}
+
+	assignReq := httptest.NewRequest(http.MethodPost, "/api/tickets/12/assign", bytes.NewBufferString(`{"agent_id":2}`))
+	assignReq.Header.Set("Content-Type", "application/json")
+	assignResp := httptest.NewRecorder()
+	router.ServeHTTP(assignResp, assignReq)
+	if assignResp.Code != http.StatusConflict {
+		t.Fatalf("assign status=%d body=%s", assignResp.Code, assignResp.Body.String())
+	}
+
+	commentReq := httptest.NewRequest(http.MethodPost, "/api/tickets/12/comments", bytes.NewBufferString(`{"content":"x"}`))
+	commentReq.Header.Set("Content-Type", "application/json")
+	commentResp := httptest.NewRecorder()
+	router.ServeHTTP(commentResp, commentReq)
+	if commentResp.Code != http.StatusBadRequest {
+		t.Fatalf("comment status=%d body=%s", commentResp.Code, commentResp.Body.String())
+	}
+
+	closeReq := httptest.NewRequest(http.MethodPost, "/api/tickets/12/close", bytes.NewBufferString(`{"reason":"done"}`))
+	closeReq.Header.Set("Content-Type", "application/json")
+	closeResp := httptest.NewRecorder()
+	router.ServeHTTP(closeResp, closeReq)
+	if closeResp.Code != http.StatusConflict {
+		t.Fatalf("close status=%d body=%s", closeResp.Code, closeResp.Body.String())
 	}
 }

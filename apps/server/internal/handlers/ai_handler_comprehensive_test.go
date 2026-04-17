@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -19,6 +20,8 @@ type MockEnhancedAIService struct {
 	*services.AIService
 	weKnoraEnabled bool
 	metrics        *services.AIMetrics
+	uploadErr      error
+	syncErr        error
 }
 
 func (m *MockEnhancedAIService) ProcessQueryEnhanced(ctx context.Context, query, sessionID string) (*services.EnhancedAIResponse, error) {
@@ -32,10 +35,16 @@ func (m *MockEnhancedAIService) ProcessQueryEnhanced(ctx context.Context, query,
 }
 
 func (m *MockEnhancedAIService) UploadKnowledgeDocument(ctx context.Context, title, content string, tags []string) error {
+	if m.uploadErr != nil {
+		return m.uploadErr
+	}
 	return nil
 }
 
 func (m *MockEnhancedAIService) SyncKnowledgeBase(ctx context.Context) error {
+	if m.syncErr != nil {
+		return m.syncErr
+	}
 	return nil
 }
 
@@ -114,8 +123,8 @@ func TestAIHandler_GetMetrics_StandardService(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != http.StatusNotFound {
-		t.Errorf("expected status 404, got %d", w.Code)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected status 503, got %d", w.Code)
 	}
 }
 
@@ -202,8 +211,8 @@ func TestAIHandler_UploadDocument_StandardService(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != http.StatusNotFound {
-		t.Errorf("expected status 404, got %d", w.Code)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected status 503, got %d", w.Code)
 	}
 }
 
@@ -245,8 +254,8 @@ func TestAIHandler_SyncKnowledgeBase_StandardService(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != http.StatusNotFound {
-		t.Errorf("expected status 404, got %d", w.Code)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected status 503, got %d", w.Code)
 	}
 }
 
@@ -292,8 +301,8 @@ func TestAIHandler_EnableKnowledgeProvider_StandardService(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != http.StatusNotFound {
-		t.Errorf("expected status 404, got %d", w.Code)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected status 503, got %d", w.Code)
 	}
 }
 
@@ -339,8 +348,38 @@ func TestAIHandler_DisableKnowledgeProvider_StandardService(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != http.StatusNotFound {
-		t.Errorf("expected status 404, got %d", w.Code)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected status 503, got %d", w.Code)
+	}
+}
+
+func TestAIHandler_UploadDocument_KnowledgeProviderDisabled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockService := &MockEnhancedAIService{
+		AIService: services.NewAIService("", ""),
+		uploadErr: errors.New("knowledge provider is not enabled"),
+	}
+	mockService.InitializeKnowledgeBase()
+	handler := NewAIHandler(aidelivery.NewHandlerServiceAdapter(mockService))
+
+	router := gin.New()
+	router.POST("/api/v1/ai/upload", handler.UploadDocument)
+
+	payload := map[string]interface{}{
+		"title":   "Test Document",
+		"content": "This is test content",
+	}
+	body, _ := json.Marshal(payload)
+
+	req := httptest.NewRequest("POST", "/api/v1/ai/upload", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected status 503, got %d body=%s", w.Code, w.Body.String())
 	}
 }
 
@@ -382,8 +421,8 @@ func TestAIHandler_ResetCircuitBreaker_StandardService(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	if w.Code != http.StatusNotFound {
-		t.Errorf("expected status 404, got %d", w.Code)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected status 503, got %d", w.Code)
 	}
 }
 

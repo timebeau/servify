@@ -225,15 +225,11 @@ func setupEnhancedRouter(
 			aiAPI.POST("/query", aiHandler.ProcessQuery)
 			aiAPI.GET("/status", aiHandler.GetStatus)
 			aiAPI.GET("/metrics", aiHandler.GetMetrics)
-
-			// WeKnora 特定功能
-			if cfg.WeKnora.Enabled {
-				aiAPI.POST("/knowledge/upload", aiHandler.UploadDocument)
-				aiAPI.POST("/knowledge/sync", aiHandler.SyncKnowledgeBase)
-				aiAPI.PUT("/weknora/enable", aiHandler.EnableWeKnora)
-				aiAPI.PUT("/weknora/disable", aiHandler.DisableWeKnora)
-				aiAPI.POST("/circuit-breaker/reset", aiHandler.ResetCircuitBreaker)
-			}
+			aiAPI.POST("/knowledge/upload", aiHandler.UploadDocument)
+			aiAPI.POST("/knowledge/sync", aiHandler.SyncKnowledgeBase)
+			aiAPI.PUT("/knowledge-provider/enable", aiHandler.EnableKnowledgeProvider)
+			aiAPI.PUT("/knowledge-provider/disable", aiHandler.DisableKnowledgeProvider)
+			aiAPI.POST("/circuit-breaker/reset", aiHandler.ResetCircuitBreaker)
 		}
 
 		// 轻量指标上报（客户端/前端）

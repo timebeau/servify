@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -107,9 +108,9 @@ func (h *AIHandler) GetStatus(c *gin.Context) {
 func (h *AIHandler) GetMetrics(c *gin.Context) {
 	metrics, ok := h.aiService.GetMetrics()
 	if !ok {
-		c.JSON(http.StatusNotFound, gin.H{
+		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"success": false,
-			"error":   "Metrics not available for standard AI service",
+			"error":   "metrics are not available for the current AI service",
 		})
 		return
 	}
@@ -143,7 +144,7 @@ func (h *AIHandler) UploadDocument(c *gin.Context) {
 	defer cancel()
 
 	if err := h.aiService.UploadKnowledgeDocument(ctx, req.Title, req.Content, req.Tags); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
+		c.JSON(aiCapabilityStatusCode(err), gin.H{
 			"success": false,
 			"error":   err.Error(),
 		})
@@ -166,7 +167,7 @@ func (h *AIHandler) SyncKnowledgeBase(c *gin.Context) {
 	defer cancel()
 
 	if err := h.aiService.SyncKnowledgeBase(ctx); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
+		c.JSON(aiCapabilityStatusCode(err), gin.H{
 			"success": false,
 			"error":   err.Error(),
 		})
@@ -182,9 +183,9 @@ func (h *AIHandler) SyncKnowledgeBase(c *gin.Context) {
 // EnableKnowledgeProvider 启用外部知识库 provider
 func (h *AIHandler) EnableKnowledgeProvider(c *gin.Context) {
 	if !h.aiService.SetKnowledgeProviderEnabled(true) {
-		c.JSON(http.StatusNotFound, gin.H{
+		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"success": false,
-			"error":   "knowledge provider control not available for standard AI service",
+			"error":   "knowledge provider control is not available for the current AI service",
 		})
 		return
 	}
@@ -198,9 +199,9 @@ func (h *AIHandler) EnableKnowledgeProvider(c *gin.Context) {
 // DisableKnowledgeProvider 禁用外部知识库 provider
 func (h *AIHandler) DisableKnowledgeProvider(c *gin.Context) {
 	if !h.aiService.SetKnowledgeProviderEnabled(false) {
-		c.JSON(http.StatusNotFound, gin.H{
+		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"success": false,
-			"error":   "knowledge provider control not available for standard AI service",
+			"error":   "knowledge provider control is not available for the current AI service",
 		})
 		return
 	}
@@ -224,9 +225,9 @@ func (h *AIHandler) DisableWeKnora(c *gin.Context) {
 // ResetCircuitBreaker 重置熔断器
 func (h *AIHandler) ResetCircuitBreaker(c *gin.Context) {
 	if !h.aiService.ResetCircuitBreaker() {
-		c.JSON(http.StatusNotFound, gin.H{
+		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"success": false,
-			"error":   "Circuit breaker control not available for standard AI service",
+			"error":   "circuit breaker control is not available for the current AI service",
 		})
 		return
 	}
@@ -624,4 +625,23 @@ func (h *UploadHandler) GetUploadStatus(c *gin.Context) {
 		"success": true,
 		"data":    status,
 	})
+}
+
+func aiCapabilityStatusCode(err error) int {
+	if err == nil {
+		return http.StatusOK
+	}
+	if aidelivery.IsUnsupportedEnhancedFeature(err) {
+		return http.StatusServiceUnavailable
+	}
+	errMsg := strings.ToLower(err.Error())
+	if strings.Contains(errMsg, "not enabled") ||
+		strings.Contains(errMsg, "not initialized") ||
+		strings.Contains(errMsg, "unavailable") {
+		return http.StatusServiceUnavailable
+	}
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return http.StatusGatewayTimeout
+	}
+	return http.StatusBadGateway
 }
