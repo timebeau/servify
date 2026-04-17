@@ -39,9 +39,13 @@ func LoadConfig(configPath string) (*config.Config, error) {
 			return nil, err
 		}
 	}
-	cfg, err := config.Load()
+	cfg, result, err := config.LoadWithResult()
 	if err != nil {
 		return nil, err
+	}
+	// Log security warnings for development environments
+	if len(result.Warnings) > 0 && cfg.Server.Environment != "production" {
+		LogSecurityWarnings(nil, cfg)
 	}
 	return cfg, nil
 }

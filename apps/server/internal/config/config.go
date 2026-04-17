@@ -320,10 +320,8 @@ func Load() (*Config, error) {
 	if !result.Valid {
 		return nil, fmt.Errorf("config validation failed: %v", result.Warnings)
 	}
-	// Log warnings if any (caller can also access these via LoadWithResult)
-	if len(result.Warnings) > 0 {
-		fmt.Fprintf(os.Stderr, "WARNING: Configuration has insecure defaults: %v\n", result.Warnings)
-	}
+	// Warnings are available via InsecureDefaults() or LoadWithResult()
+	// Caller is responsible for logging if needed
 	return config, nil
 }
 

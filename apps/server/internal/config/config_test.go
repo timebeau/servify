@@ -653,3 +653,80 @@ func TestConfig_TokenRevocationDefaults(t *testing.T) {
 		t.Fatalf("expected positive token revocation cleanup batch size, got %d", cfg.Security.TokenRevocation.CleanupBatchSize)
 	}
 }
+
+func TestValidate_ProductionRejectsInsecureDefaults(t *testing.T) {
+	tests := []struct {
+		name      string
+		modifyCfg func(*Config)
+		wantValid bool
+	}{
+		{
+			name: "production with default JWT secret is invalid",
+			modifyCfg: func(cfg *Config) {
+				cfg.Server.Environment = "production"
+				cfg.JWT.Secret = "dev-secret-key-change-in-production"
+			},
+			wantValid: false,
+		},
+		{
+			name: "production with default database password is invalid",
+			modifyCfg: func(cfg *Config) {
+				cfg.Server.Environment = "production"
+				cfg.JWT.Secret = "secure-production-secret"
+				cfg.Database.Password = "dev-password-change-in-production"
+			},
+			wantValid: false,
+		},
+		{
+			name: "production with empty database password is invalid",
+			modifyCfg: func(cfg *Config) {
+				cfg.Server.Environment = "production"
+				cfg.JWT.Secret = "secure-production-secret"
+				cfg.Database.Password = ""
+			},
+			wantValid: false,
+		},
+		{
+			name: "production with default WeKnora API key is invalid",
+			modifyCfg: func(cfg *Config) {
+				cfg.Server.Environment = "production"
+				cfg.JWT.Secret = "secure-production-secret"
+				cfg.Database.Password = "secure-production-password"
+				cfg.WeKnora.Enabled = true
+				cfg.WeKnora.APIKey = "default-api-key"
+			},
+			wantValid: false,
+		},
+		{
+			name: "production with secure defaults is valid",
+			modifyCfg: func(cfg *Config) {
+				cfg.Server.Environment = "production"
+				cfg.JWT.Secret = "secure-production-secret"
+				cfg.Database.Password = "secure-production-password"
+				cfg.WeKnora.Enabled = true
+				cfg.WeKnora.APIKey = "secure-production-key"
+			},
+			wantValid: true,
+		},
+		{
+			name: "development allows insecure defaults with warning",
+			modifyCfg: func(cfg *Config) {
+				cfg.Server.Environment = "development"
+				// Keep all defaults which are insecure
+			},
+			wantValid: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := GetDefaultConfig()
+			tt.modifyCfg(cfg)
+
+			result := Validate(cfg)
+			if result.Valid != tt.wantValid {
+				t.Errorf("Validate() Valid = %v, want %v. Warnings: %v", result.Valid, tt.wantValid, result.Warnings)
+			}
+		})
+	}
+}
