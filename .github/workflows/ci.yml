@@ -27,7 +27,7 @@ jobs:
     steps:
       - name: Checkout
         timeout-minutes: 3
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Go
         timeout-minutes: 3
@@ -101,7 +101,7 @@ jobs:
     steps:
       - name: Checkout
         timeout-minutes: 3
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Go
         timeout-minutes: 3
@@ -140,11 +140,11 @@ jobs:
     steps:
       - name: Checkout
         timeout-minutes: 3
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node
         timeout-minutes: 3
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'
@@ -201,7 +201,7 @@ jobs:
     steps:
       - name: Checkout
         timeout-minutes: 3
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Go
         timeout-minutes: 3
@@ -214,7 +214,7 @@ jobs:
 
       - name: Setup Node
         timeout-minutes: 3
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'
@@ -270,7 +270,7 @@ jobs:
     steps:
       - name: Checkout
         timeout-minutes: 3
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Validate shell syntax
         timeout-minutes: 2
@@ -312,7 +312,7 @@ jobs:
     steps:
       - name: Checkout
         timeout-minutes: 3
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Go
         timeout-minutes: 3
@@ -325,7 +325,7 @@ jobs:
 
       - name: Setup Node
         timeout-minutes: 3
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'
@@ -351,17 +351,17 @@ jobs:
     steps:
       - name: Checkout
         timeout-minutes: 3
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node
         timeout-minutes: 3
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
 
       - name: Setup pnpm
         timeout-minutes: 3
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
         with:
           version: 10
 
@@ -413,7 +413,7 @@ jobs:
     steps:
       - name: Checkout
         timeout-minutes: 3
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Compose version
         timeout-minutes: 1
