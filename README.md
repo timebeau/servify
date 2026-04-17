@@ -306,7 +306,7 @@ flowchart LR
 
 - **Go** 1.25.0（toolchain go1.25.7）- 项目使用 Go workspace 模式
 - **PostgreSQL** 12+ 或 SQLite（开发/测试）
-- **Node.js** 18+（仅 Web/管理端/文档相关任务需要）
+- **Node.js** 22+（仅 Web/管理端/文档相关任务需要）
   - 管理端使用 **pnpm** 10+ 作为包管理器
 - 可选：**Docker** / **Docker Compose**
 
