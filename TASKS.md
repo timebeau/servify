@@ -86,16 +86,30 @@ go test -count=1 -tags=integration ./apps/server/internal/handlers ./apps/server
 
 5. **默认配置安全问题** - 加强生产环境配置验证
    - 添加 `Validate()` 函数，检测生产环境中的不安全默认值
-   - 更新 `config.yml` 数据库密码使用环境变量占位符
+   - 更新 `config.yml` 数据库密码为明显的占位符
    - 更新 CORS `allowed_headers` 从 `["*"]` 改为具体 header 列表
    - 更新默认 JWT secret 为更明显的占位符
    - 更新安全检查以识别所有已知不安全的默认值
+
+6. **安全默认值清单统一** - 消除重复维护
+   - 导出 `InsecureJWTSecrets`, `InsecureDatabasePasswords`, `InsecureWeKnoraAPIKeys` 为包级变量
+   - `bootstrap.SecurityWarnings()` 使用 config 包的共享清单
+   - 单一数据源，避免未来添加新默认值时漏一边
+
+7. **配置验证返回结构化警告** - 改进 API 设计
+   - `Validate()` 返回 `ValidateResult` 结构体，包含 warnings 和 valid 字段
+   - 添加 `LoadWithResult()` 函数供调用方获取结构化警告
+   - 不再直接往 stderr 打印，由调用方决定如何处理警告
+
+8. **MacroService.List 注释改进** - 使用业务语义
+   - 注释从"测试味"改为描述排序规则的业务含义
 
 ---
 
 ## 测试验证结果
 
 ```bash
+# Commit: 67b1fb9
 # 验证时间: 2026-04-18
 # 命令: go test -count=1 -tags=integration ./apps/server/internal/handlers ./apps/server/internal/services
 
@@ -104,10 +118,36 @@ ok      servify/apps/server/internal/services    1.721s
 ```
 
 ```bash
+# Commit: 67b1fb9
 # 全量测试（禁用缓存）
 # 命令: go test -count=1 ./apps/server/...
+# 57 个包测试通过
 
-ok      servify/apps/server/internal/...         (all packages passed)
+ok      servify/apps/server/internal/observability/metrics         0.184s
+ok      servify/apps/server/internal/observability/telemetry        0.935s
+ok      servify/apps/server/internal/platform/aiprovider            0.490s
+ok      servify/apps/server/internal/platform/audit                0.193s
+ok      servify/apps/server/internal/platform/auth                 0.234s
+ok      servify/apps/server/internal/platform/channel              0.506s
+ok      servify/apps/server/internal/platform/configscope          0.196s
+ok      servify/apps/server/internal/platform/eventbus             0.558s
+ok      servify/apps/server/internal/platform/knowledgeprovider    0.489s
+ok      servify/apps/server/internal/platform/knowledgeprovider/dify 0.782s
+ok      servify/apps/server/internal/platform/knowledgeprovider/memory 0.512s
+ok      servify/apps/server/internal/platform/knowledgeprovider/weknora 0.768s
+ok      servify/apps/server/internal/platform/llm                   0.631s
+ok      servify/apps/server/internal/platform/llm/anthropic        1.052s
+ok      servify/apps/server/internal/platform/llm/openai            1.051s
+ok      servify/apps/server/internal/platform/pstnprovider          0.527s
+ok      servify/apps/server/internal/platform/sip                   0.513s
+ok      servify/apps/server/internal/platform/sipws                 0.505s
+ok      servify/apps/server/internal/platform/storage               0.481s
+ok      servify/apps/server/internal/platform/usersecurity         0.226s
+ok      servify/apps/server/internal/services                       0.329s
+ok      servify/apps/server/pkg/dify                                0.781s
+ok      servify/apps/server/pkg/utils                               0.290s
+ok      servify/apps/server/pkg/weknora                             0.804s
+# ... (共 57 个包，全部通过)
 ```
 
 ---

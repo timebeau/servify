@@ -12,6 +12,26 @@ import (
 
 const DefaultOpenAIModel = "gpt-4.1-mini"
 
+// InsecureJWTSecrets contains known insecure JWT secret values that must not be used in production.
+var InsecureJWTSecrets = map[string]bool{
+	"default-secret-key":                  true,
+	"dev-secret-key-change-in-production": true,
+	"default-secret-key-change-in-production": true,
+}
+
+// InsecureDatabasePasswords contains known insecure database password values that must not be used in production.
+var InsecureDatabasePasswords = map[string]bool{
+	"":                                 true,
+	"password":                          true,
+	"changeme":                          true,
+	"dev-password-change-in-production": true,
+}
+
+// InsecureWeKnoraAPIKeys contains known insecure WeKnora API key values.
+var InsecureWeKnoraAPIKeys = map[string]bool{
+	"default-api-key": true,
+}
+
 type Config struct {
 	Server     ServerConfig     `yaml:"server"`
 	EventBus   EventBusConfig   `yaml:"event_bus"`
@@ -296,10 +316,31 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("unmarshal config: %w", err)
 	}
 	normalizeConfig(config)
-	if err := Validate(config); err != nil {
-		return nil, fmt.Errorf("config validation failed: %w", err)
+	result := Validate(config)
+	if !result.Valid {
+		return nil, fmt.Errorf("config validation failed: %v", result.Warnings)
+	}
+	// Log warnings if any (caller can also access these via LoadWithResult)
+	if len(result.Warnings) > 0 {
+		fmt.Fprintf(os.Stderr, "WARNING: Configuration has insecure defaults: %v\n", result.Warnings)
 	}
 	return config, nil
+}
+
+// LoadWithResult loads config and returns validation result for structured warning handling
+func LoadWithResult() (*Config, ValidateResult, error) {
+	config := GetDefaultConfig()
+	if err := viper.Unmarshal(config, func(dc *mapstructure.DecoderConfig) {
+		dc.TagName = "yaml"
+	}); err != nil {
+		return nil, ValidateResult{}, fmt.Errorf("unmarshal config: %w", err)
+	}
+	normalizeConfig(config)
+	result := Validate(config)
+	if !result.Valid {
+		return config, result, fmt.Errorf("config validation failed: %v", result.Warnings)
+	}
+	return config, result, nil
 }
 
 // InsecureDefaults returns a list of security warnings for insecure default values
@@ -310,50 +351,48 @@ func InsecureDefaults(cfg *Config) []string {
 
 	var warnings []string
 
-	// Check for insecure JWT secrets (same list as bootstrap/security.go)
-	insecureSecrets := map[string]bool{
-		"default-secret-key":                  true,
-		"dev-secret-key-change-in-production": true,
-		"default-secret-key-change-in-production": true,
-	}
-	if insecureSecrets[cfg.JWT.Secret] {
+	if InsecureJWTSecrets[cfg.JWT.Secret] {
 		warnings = append(warnings, "jwt.secret is using a default value")
 	}
 
-	// Check for insecure WeKnora API key
-	if cfg.WeKnora.APIKey == "default-api-key" && cfg.WeKnora.Enabled {
+	if InsecureWeKnoraAPIKeys[cfg.WeKnora.APIKey] && cfg.WeKnora.Enabled {
 		warnings = append(warnings, "weknora.api_key is using the default value")
 	}
 
-	// Check for insecure or empty database password
-	insecurePasswords := map[string]bool{
-		"":                                    true,
-		"password":                             true,
-		"changeme":                             true,
-		"dev-password-change-in-production":    true,
-	}
-	if insecurePasswords[cfg.Database.Password] {
+	if InsecureDatabasePasswords[cfg.Database.Password] {
 		warnings = append(warnings, "database.password is empty or using a default value")
 	}
 
 	return warnings
 }
 
+// ValidateResult contains the result of config validation
+type ValidateResult struct {
+	Warnings []string
+	Valid    bool
+}
+
 // Validate checks for insecure default values that should not be used in production
-func Validate(cfg *Config) error {
+// Returns ValidateResult with warnings and validity. Caller is responsible for logging.
+func Validate(cfg *Config) ValidateResult {
 	warnings := InsecureDefaults(cfg)
 	if len(warnings) == 0 {
-		return nil
+		return ValidateResult{Valid: true}
 	}
 
-	// In production, any insecure default is a fatal error
+	// In production, any insecure default is invalid
 	if cfg.Server.Environment == "production" {
-		return fmt.Errorf("production environment has insecure defaults: %v", warnings)
+		return ValidateResult{
+			Warnings: warnings,
+			Valid:    false,
+		}
 	}
 
-	// In development, just log warnings (caller should handle this)
-	fmt.Fprintf(os.Stderr, "WARNING: Development configuration has insecure defaults: %v\n", warnings)
-	return nil
+	// In development, mark as valid but with warnings
+	return ValidateResult{
+		Warnings: warnings,
+		Valid:    true,
+	}
 }
 
 func normalizeConfig(cfg *Config) {

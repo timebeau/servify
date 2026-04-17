@@ -9,22 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const defaultJWTSecret = "default-secret-key"
-
-// Known insecure JWT secrets that should not be used in production
-var insecureJWTSecrets = map[string]bool{
-	"default-secret-key":                  true,
-	"dev-secret-key-change-in-production": true,
-	"default-secret-key-change-in-production": true,
-}
-
-// Known insecure database passwords
-var insecureDBPasswords = map[string]bool{
-	"":                                 true,
-	"password":                          true,
-	"changeme":                          true,
-	"dev-password-change-in-production": true,
-}
+// Use shared insecure defaults lists from config package to avoid duplication
 
 type requiredRateLimitPath struct {
 	prefix string
@@ -49,11 +34,13 @@ func SecurityWarnings(cfg *config.Config) []string {
 
 	var warnings []string
 
+	// Check for insecure JWT secret (empty or known insecure default)
 	secret := strings.TrimSpace(cfg.JWT.Secret)
-	if secret == "" || insecureJWTSecrets[secret] {
+	if secret == "" || config.InsecureJWTSecrets[secret] {
 		warnings = append(warnings, "jwt.secret is empty or using the default value")
 	}
-	if insecureDBPasswords[cfg.Database.Password] {
+	// Check for insecure database password (using shared list from config)
+	if config.InsecureDatabasePasswords[cfg.Database.Password] {
 		warnings = append(warnings, "database.password is empty or using a default value")
 	}
 	if cfg.Security.CORS.Enabled && len(cfg.Security.CORS.AllowedOrigins) == 1 && strings.TrimSpace(cfg.Security.CORS.AllowedOrigins[0]) == "*" {
@@ -83,7 +70,7 @@ func SecurityWarnings(cfg *config.Config) []string {
 	// }
 	if cfg.WeKnora.Enabled {
 		apiKey := strings.TrimSpace(cfg.WeKnora.APIKey)
-		if apiKey == "" || apiKey == "default-api-key" {
+		if apiKey == "" || config.InsecureWeKnoraAPIKeys[apiKey] {
 			warnings = append(warnings, "weknora is enabled but weknora.api_key is empty or using default value")
 		}
 	}

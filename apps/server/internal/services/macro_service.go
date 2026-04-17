@@ -38,7 +38,7 @@ type MacroUpdateRequest struct {
 
 func (s *MacroService) List(ctx context.Context) ([]models.Macro, error) {
 	var macros []models.Macro
-	// Use id DESC as tie-breaker for stable sorting when updated_at is the same
+	// Sort by most recently updated first; use ID as deterministic tie-breaker for same timestamp
 	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).Order("updated_at DESC, id DESC").Find(&macros).Error; err != nil {
 		return nil, err
 	}
