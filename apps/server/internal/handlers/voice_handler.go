@@ -2,12 +2,10 @@ package handlers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
-	voiceapp "servify/apps/server/internal/modules/voice/application"
 	voicedelivery "servify/apps/server/internal/modules/voice/delivery"
 	"servify/apps/server/internal/platform/voiceprotocol"
 
@@ -152,10 +150,6 @@ func (h *VoiceHandler) ListTranscripts(c *gin.Context) {
 
 func respondVoiceError(c *gin.Context, err error) {
 	status := http.StatusInternalServerError
-	var providerErr *voiceapp.ProviderError
-	if errors.As(err, &providerErr) && providerErr.Code == voiceapp.ProviderErrorUnavailable {
-		status = http.StatusServiceUnavailable
-	}
 	c.JSON(status, ErrorResponse{
 		Error:   "Voice runtime unavailable",
 		Message: err.Error(),

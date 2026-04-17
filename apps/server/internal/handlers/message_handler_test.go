@@ -49,7 +49,7 @@ func TestMessageHandlerGetPlatformStats(t *testing.T) {
 	var got struct {
 		Success bool `json:"success"`
 		Data    struct {
-			TotalPlatforms int      `json:"total_platforms"`
+			TotalPlatforms  int      `json:"total_platforms"`
 			ActivePlatforms []string `json:"active_platforms"`
 		} `json:"data"`
 	}

@@ -53,7 +53,7 @@ func ResolveRuntimeOverrides(cfg *config.Config, args []string, output io.Writer
 	}
 
 	var (
-		dbDriver string
+		dbDriver  string
 		flagDSN   string
 		dbHost    string
 		dbPortStr string

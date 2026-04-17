@@ -30,10 +30,10 @@ type ticketAuditRecorder struct {
 }
 
 type stubTicketHandlerService struct {
-	updateErr error
-	assignErr error
+	updateErr  error
+	assignErr  error
 	commentErr error
-	closeErr error
+	closeErr   error
 }
 
 func (r *ticketAuditRecorder) Record(_ context.Context, entry auditplatform.Entry) error {
