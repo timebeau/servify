@@ -38,6 +38,8 @@ func TestRunCheckSecurityBaseline_Pass(t *testing.T) {
 	configPath := writeTempConfig(t, `
 jwt:
   secret: "prod-secret"
+database:
+  password: "secure-test-db-password"
 security:
   cors:
     enabled: true

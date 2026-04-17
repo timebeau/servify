@@ -245,6 +245,8 @@ func TestLoad_SessionRiskEnvironmentProfileOverrides(t *testing.T) {
 	t.Cleanup(viper.Reset)
 
 	viper.Set("server.environment", "production")
+	viper.Set("jwt.secret", "secure-test-jwt-secret") // Must override default in production
+	viper.Set("database.password", "secure-test-password") // Must override default in production
 	viper.Set("security.session_risk_profiles.production.high_risk_score", 7)
 	viper.Set("security.session_risk_profiles.production.rapid_change_window_hours", 8)
 

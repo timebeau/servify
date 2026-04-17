@@ -11,6 +11,21 @@ import (
 
 const defaultJWTSecret = "default-secret-key"
 
+// Known insecure JWT secrets that should not be used in production
+var insecureJWTSecrets = map[string]bool{
+	"default-secret-key":                  true,
+	"dev-secret-key-change-in-production": true,
+	"default-secret-key-change-in-production": true,
+}
+
+// Known insecure database passwords
+var insecureDBPasswords = map[string]bool{
+	"":                                 true,
+	"password":                          true,
+	"changeme":                          true,
+	"dev-password-change-in-production": true,
+}
+
 type requiredRateLimitPath struct {
 	prefix string
 	reason string
@@ -34,8 +49,12 @@ func SecurityWarnings(cfg *config.Config) []string {
 
 	var warnings []string
 
-	if strings.TrimSpace(cfg.JWT.Secret) == "" || strings.TrimSpace(cfg.JWT.Secret) == defaultJWTSecret {
+	secret := strings.TrimSpace(cfg.JWT.Secret)
+	if secret == "" || insecureJWTSecrets[secret] {
 		warnings = append(warnings, "jwt.secret is empty or using the default value")
+	}
+	if insecureDBPasswords[cfg.Database.Password] {
+		warnings = append(warnings, "database.password is empty or using a default value")
 	}
 	if cfg.Security.CORS.Enabled && len(cfg.Security.CORS.AllowedOrigins) == 1 && strings.TrimSpace(cfg.Security.CORS.AllowedOrigins[0]) == "*" {
 		warnings = append(warnings, "security.cors.allowed_origins allows all origins")
@@ -62,8 +81,11 @@ func SecurityWarnings(cfg *config.Config) []string {
 	// if !cfg.Dify.Enabled && !cfg.WeKnora.Enabled {
 	// 	warnings = append(warnings, "no external knowledge provider is enabled; ai will rely on fallback mode only")
 	// }
-	if cfg.WeKnora.Enabled && strings.TrimSpace(cfg.WeKnora.APIKey) == "" {
-		warnings = append(warnings, "weknora is enabled but weknora.api_key is empty")
+	if cfg.WeKnora.Enabled {
+		apiKey := strings.TrimSpace(cfg.WeKnora.APIKey)
+		if apiKey == "" || apiKey == "default-api-key" {
+			warnings = append(warnings, "weknora is enabled but weknora.api_key is empty or using default value")
+		}
 	}
 
 	return warnings

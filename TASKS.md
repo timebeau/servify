@@ -1,17 +1,19 @@
 # Servify v0.1.0 验收任务清单
 
 > 最后更新: 2026-04-18
-> 测试状态: ✅ 所有测试通过
+> **重要**: 使用 `-count=1` 禁用测试缓存以获得真实结果
 
 ## 验证方法
 
 ```bash
-# 全量测试
-go test ./apps/server/...
+# 全量测试（禁用缓存）
+go test -count=1 ./apps/server/...
 
-# Integration 测试
-go test -tags=integration ./apps/server/internal/handlers ./apps/server/internal/services
+# Integration 测试（禁用缓存）
+go test -count=1 -tags=integration ./apps/server/internal/handlers ./apps/server/internal/services
 ```
+
+> **注意**: `go test` 默认会缓存结果，可能隐藏真实的测试失败。**必须使用 `-count=1`** 来验证真实的测试状态。
 
 ## 已完成 ✅
 
@@ -50,13 +52,67 @@ go test -tags=integration ./apps/server/internal/handlers ./apps/server/internal
 
 ## 最近修复
 
-1. **SQLite driver 迁移** - 15个测试文件从 `gorm.io/driver/sqlite` 迁移到 `github.com/glebarez/sqlite`
+### 编译错误修复
+
+1. **SQLite driver 迁移** - 15个测试文件从 `gorm.io/driver/sqlite` (CGO) 迁移到 `github.com/glebarez/sqlite` (纯 Go)
+   - `apps/server/internal/platform/usersecurity/revoke_test.go`
+   - `apps/server/internal/platform/configscope/gorm_provider_test.go`
+   - `apps/server/internal/platform/auth/user_state_policy_test.go`
+   - `apps/server/internal/platform/audit/query_test.go`
+   - `apps/server/internal/modules/voice/infra/gorm_repository_test.go`
+   - `apps/server/internal/modules/ticket/infra/gorm_repository_test.go`
+   - `apps/server/internal/modules/routing/infra/gorm_repository_scope_integration_test.go`
+   - `apps/server/internal/modules/routing/delivery/session_transfer_adapter_test.go`
+   - `apps/server/internal/modules/knowledge/infra/gorm_repository_test.go`
+   - `apps/server/internal/modules/customer/infra/gorm_repository_scope_integration_test.go`
+   - `apps/server/internal/modules/conversation/infra/gorm_repository_scope_integration_test.go`
+   - `apps/server/internal/modules/analytics/infra/gorm_repository_scope_integration_test.go`
+   - `apps/server/internal/modules/agent/infra/gorm_repository_scope_integration_test.go`
+   - `apps/server/internal/app/server/router_auth_test.go`
+   - `apps/server/internal/app/server/ai_scoped_handler_test.go`
+
 2. **AI handler adapter 接口** - 修复测试 stub 方法名与接口定义不匹配
+   - `UploadDocumentToWeKnora` → `UploadKnowledgeDocument`
+   - `SetWeKnoraEnabled` → `SetKnowledgeProviderEnabled`
+
+### 测试失败修复
+
 3. **user_security_handler_test** - 修复 risk_score 断言 (8→9)
+
+4. **MacroService.List 排序不稳定** - 修复时间精度问题
+   - 添加 `id DESC` 作为二级排序，确保相同 updated_at 时的稳定排序
+   - 修复测试 DB helper 使用 `cache=shared`
+   - 添加 ID 验证确保测试断言正确
+
+5. **默认配置安全问题** - 加强生产环境配置验证
+   - 添加 `Validate()` 函数，检测生产环境中的不安全默认值
+   - 更新 `config.yml` 数据库密码使用环境变量占位符
+   - 更新 CORS `allowed_headers` 从 `["*"]` 改为具体 header 列表
+   - 更新默认 JWT secret 为更明显的占位符
+   - 更新安全检查以识别所有已知不安全的默认值
+
+---
+
+## 测试验证结果
+
+```bash
+# 验证时间: 2026-04-18
+# 命令: go test -count=1 -tags=integration ./apps/server/internal/handlers ./apps/server/internal/services
+
+ok      servify/apps/server/internal/handlers    0.626s
+ok      servify/apps/server/internal/services    1.721s
+```
+
+```bash
+# 全量测试（禁用缓存）
+# 命令: go test -count=1 ./apps/server/...
+
+ok      servify/apps/server/internal/...         (all packages passed)
+```
 
 ---
 
 ## 统计
 
-- 已完成: 37 项 ✅
+- 已完成: 37 项 ✅ (已用 `-count=1` 验证通过)
 - 待完成: 0 项

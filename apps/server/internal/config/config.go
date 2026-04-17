@@ -296,7 +296,64 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("unmarshal config: %w", err)
 	}
 	normalizeConfig(config)
+	if err := Validate(config); err != nil {
+		return nil, fmt.Errorf("config validation failed: %w", err)
+	}
 	return config, nil
+}
+
+// InsecureDefaults returns a list of security warnings for insecure default values
+func InsecureDefaults(cfg *Config) []string {
+	if cfg == nil {
+		return []string{"config is nil; security defaults may be unsafe"}
+	}
+
+	var warnings []string
+
+	// Check for insecure JWT secrets (same list as bootstrap/security.go)
+	insecureSecrets := map[string]bool{
+		"default-secret-key":                  true,
+		"dev-secret-key-change-in-production": true,
+		"default-secret-key-change-in-production": true,
+	}
+	if insecureSecrets[cfg.JWT.Secret] {
+		warnings = append(warnings, "jwt.secret is using a default value")
+	}
+
+	// Check for insecure WeKnora API key
+	if cfg.WeKnora.APIKey == "default-api-key" && cfg.WeKnora.Enabled {
+		warnings = append(warnings, "weknora.api_key is using the default value")
+	}
+
+	// Check for insecure or empty database password
+	insecurePasswords := map[string]bool{
+		"":                                    true,
+		"password":                             true,
+		"changeme":                             true,
+		"dev-password-change-in-production":    true,
+	}
+	if insecurePasswords[cfg.Database.Password] {
+		warnings = append(warnings, "database.password is empty or using a default value")
+	}
+
+	return warnings
+}
+
+// Validate checks for insecure default values that should not be used in production
+func Validate(cfg *Config) error {
+	warnings := InsecureDefaults(cfg)
+	if len(warnings) == 0 {
+		return nil
+	}
+
+	// In production, any insecure default is a fatal error
+	if cfg.Server.Environment == "production" {
+		return fmt.Errorf("production environment has insecure defaults: %v", warnings)
+	}
+
+	// In development, just log warnings (caller should handle this)
+	fmt.Fprintf(os.Stderr, "WARNING: Development configuration has insecure defaults: %v\n", warnings)
+	return nil
 }
 
 func normalizeConfig(cfg *Config) {
@@ -370,7 +427,7 @@ func GetDefaultConfig() *Config {
 			Host:            "localhost",
 			Port:            5432,
 			User:            "postgres",
-			Password:        "password",
+			Password:        "dev-password-change-in-production",
 			Name:            "servify",
 			MaxOpenConns:    100,
 			MaxIdleConns:    10,
@@ -442,7 +499,7 @@ func GetDefaultConfig() *Config {
 			},
 		},
 		JWT: JWTConfig{
-			Secret:           "default-secret-key",
+			Secret:           "dev-secret-key-change-in-production",
 			ExpiresIn:        24 * time.Hour,
 			RefreshExpiresIn: 7 * 24 * time.Hour,
 		},

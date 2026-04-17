@@ -26,12 +26,13 @@ func TestSecurityWarnings(t *testing.T) {
 
 	for _, want := range []string{
 		"jwt.secret is empty or using the default value",
+		"database.password is empty or using a default value",
 		"security.cors.allowed_origins allows all origins",
 		"security.rate_limiting is disabled",
 		"ai.openai.api_key is empty",
 		"dify is enabled but dify.api_key is empty",
 		"dify is enabled but dify.dataset_id is empty",
-		"weknora is enabled but weknora.api_key is empty",
+		"weknora is enabled but weknora.api_key is empty or using default value",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("missing warning %q in %q", want, joined)
@@ -42,6 +43,7 @@ func TestSecurityWarnings(t *testing.T) {
 func TestSecurityWarnings_NoExternalKnowledgeProviderEnabled(t *testing.T) {
 	cfg := config.GetDefaultConfig()
 	cfg.JWT.Secret = "prod-secret"
+	cfg.Database.Password = "secure-db-password" // Override default
 	cfg.Security.RateLimiting.Enabled = true
 	cfg.Security.CORS.AllowedOrigins = []string{"https://app.example.com"}
 	cfg.Security.RateLimiting.Paths = []config.PathRateLimitConfig{
@@ -68,6 +70,7 @@ func TestSecurityWarnings_NoExternalKnowledgeProviderEnabled(t *testing.T) {
 func TestSecurityWarnings_PublicSurfaceRateLimitCoverage(t *testing.T) {
 	cfg := config.GetDefaultConfig()
 	cfg.JWT.Secret = "prod-secret"
+	cfg.Database.Password = "secure-db-password"
 	cfg.Security.CORS.AllowedOrigins = []string{"https://app.example.com"}
 	cfg.Security.RateLimiting.Enabled = true
 	cfg.Security.RateLimiting.Paths = []config.PathRateLimitConfig{
@@ -101,6 +104,7 @@ func TestSecurityWarnings_PublicSurfaceRateLimitCoverage(t *testing.T) {
 func TestSecurityWarnings_PublicSurfaceRateLimitCoverageSatisfied(t *testing.T) {
 	cfg := config.GetDefaultConfig()
 	cfg.JWT.Secret = "prod-secret"
+	cfg.Database.Password = "secure-db-password"
 	cfg.Security.CORS.AllowedOrigins = []string{"https://app.example.com"}
 	cfg.Security.RateLimiting.Enabled = true
 	cfg.Security.RateLimiting.Paths = []config.PathRateLimitConfig{
@@ -166,6 +170,7 @@ func TestSecurityWarnings_PublicSurfaceRateLimitCoverageSatisfied(t *testing.T) 
 func TestSecurityWarnings_PublicSurfaceInheritedLimitDoesNotCountAsDedicated(t *testing.T) {
 	cfg := config.GetDefaultConfig()
 	cfg.JWT.Secret = "prod-secret"
+	cfg.Database.Password = "secure-db-password"
 	cfg.Security.CORS.AllowedOrigins = []string{"https://app.example.com"}
 	cfg.Security.RateLimiting.Enabled = true
 	cfg.Security.RateLimiting.Paths = []config.PathRateLimitConfig{
@@ -229,5 +234,8 @@ func TestLogSecurityWarnings(t *testing.T) {
 	}
 	if !strings.Contains(output, "jwt.secret is empty or using the default value") {
 		t.Fatalf("expected jwt warning in %q", output)
+	}
+	if !strings.Contains(output, "database.password is empty or using a default value") {
+		t.Fatalf("expected database password warning in %q", output)
 	}
 }

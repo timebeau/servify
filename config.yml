@@ -9,7 +9,9 @@ database:
   host: localhost
   port: 5432
   user: postgres
-  password: password
+  # IMPORTANT: Set DATABASE_PASSWORD environment variable in production!
+  # The default value below is for development only
+  password: "dev-password-change-in-production"
   name: servify
   max_open_conns: 100
   max_idle_conns: 10
@@ -77,9 +79,11 @@ log:
 security:
   cors:
     enabled: true
+    # IMPORTANT: Restrict origins in production
     allowed_origins: ["http://localhost:3000", "http://localhost:8000"]
-    allowed_methods: ["GET","POST","PUT","DELETE"]
-    allowed_headers: ["*"]
+    allowed_methods: ["GET","POST","PUT","DELETE","OPTIONS"]
+    # Be specific with headers instead of wildcard
+    allowed_headers: ["Content-Type","Authorization","X-Session-ID","X-Request-ID"]
   rbac:
     enabled: true
     roles:

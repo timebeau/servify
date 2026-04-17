@@ -38,7 +38,8 @@ type MacroUpdateRequest struct {
 
 func (s *MacroService) List(ctx context.Context) ([]models.Macro, error) {
 	var macros []models.Macro
-	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).Order("updated_at DESC").Find(&macros).Error; err != nil {
+	// Use id DESC as tie-breaker for stable sorting when updated_at is the same
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).Order("updated_at DESC, id DESC").Find(&macros).Error; err != nil {
 		return nil, err
 	}
 	return macros, nil

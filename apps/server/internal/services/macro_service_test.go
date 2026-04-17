@@ -14,7 +14,9 @@ import (
 )
 
 func newMacroTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	t.Helper()
+	dsn := "file:macro_service_" + t.Name() + "?mode=memory&cache=shared"
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
@@ -28,8 +30,8 @@ func TestMacroService_List(t *testing.T) {
 	db := newMacroTestDB(t)
 	svc := NewMacroService(db)
 
-	// 创建测试数据
-	_, _ = svc.Create(context.Background(), &MacroCreateRequest{
+	// 创建测试数据 - note: second macro should sort first due to later id
+	macro1, _ := svc.Create(context.Background(), &MacroCreateRequest{
 		Name:    "欢迎消息",
 		Content: "您好，感谢联系我们的客服！",
 	})
@@ -37,6 +39,10 @@ func TestMacroService_List(t *testing.T) {
 		Name:    "关闭消息",
 		Content: "工单已关闭",
 	})
+	// Ensure macro2 was created after macro1 (has higher id)
+	if macro2.ID <= macro1.ID {
+		t.Fatalf("macro2.ID (%d) should be > macro1.ID (%d)", macro2.ID, macro1.ID)
+	}
 
 	list, err := svc.List(context.Background())
 	if err != nil {
