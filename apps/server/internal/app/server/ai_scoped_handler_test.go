@@ -16,8 +16,8 @@ import (
 	platformauth "servify/apps/server/internal/platform/auth"
 	"servify/apps/server/internal/services"
 
-	"github.com/sirupsen/logrus"
 	"github.com/glebarez/sqlite"
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 

@@ -14,14 +14,14 @@ const DefaultOpenAIModel = "gpt-4.1-mini"
 
 // InsecureJWTSecrets contains known insecure JWT secret values that must not be used in production.
 var InsecureJWTSecrets = map[string]bool{
-	"default-secret-key":                  true,
-	"dev-secret-key-change-in-production": true,
+	"default-secret-key":                      true,
+	"dev-secret-key-change-in-production":     true,
 	"default-secret-key-change-in-production": true,
 }
 
 // InsecureDatabasePasswords contains known insecure database password values that must not be used in production.
 var InsecureDatabasePasswords = map[string]bool{
-	"":                                 true,
+	"":                                  true,
 	"password":                          true,
 	"changeme":                          true,
 	"dev-password-change-in-production": true,

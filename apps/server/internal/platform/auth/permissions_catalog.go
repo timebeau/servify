@@ -33,4 +33,3 @@ var fallbackAgentPermissions = []string{
 	ResourcePermission(ResourceMacros, "GET"),
 	ResourcePermission(ResourceIntegrations, "GET"),
 }
-

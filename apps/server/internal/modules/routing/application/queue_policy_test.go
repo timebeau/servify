@@ -16,4 +16,3 @@ func TestIsActiveWaitingStatus(t *testing.T) {
 		t.Fatal("did not expect transferred to be active")
 	}
 }
-

@@ -23,9 +23,9 @@ import (
 
 type stubRealtimeGateway struct{}
 
-func (stubRealtimeGateway) HandleWebSocket(*gin.Context) {}
+func (stubRealtimeGateway) HandleWebSocket(*gin.Context)                   {}
 func (stubRealtimeGateway) SendToSession(string, realtimeplatform.Message) {}
-func (stubRealtimeGateway) ClientCount() int { return 0 }
+func (stubRealtimeGateway) ClientCount() int                               { return 0 }
 
 type stubRTCGateway struct{}
 
@@ -44,14 +44,14 @@ func (stubRTCGateway) ConnectionCount() int { return 1 }
 func (stubRTCGateway) HandleOffer(string, webrtc.SessionDescription) (*webrtc.SessionDescription, error) {
 	return nil, nil
 }
-func (stubRTCGateway) HandleAnswer(string, webrtc.SessionDescription) error { return nil }
+func (stubRTCGateway) HandleAnswer(string, webrtc.SessionDescription) error     { return nil }
 func (stubRTCGateway) HandleICECandidate(string, webrtc.ICECandidateInit) error { return nil }
-func (stubRTCGateway) CloseConnection(string) error { return nil }
+func (stubRTCGateway) CloseConnection(string) error                             { return nil }
 
 type stubMessageRouter struct{}
 
-func (stubMessageRouter) Start() error { return nil }
-func (stubMessageRouter) Stop() error { return nil }
+func (stubMessageRouter) Start() error                                 { return nil }
+func (stubMessageRouter) Stop() error                                  { return nil }
 func (stubMessageRouter) RouteMessage(string, *services.Message) error { return nil }
 func (stubMessageRouter) GetPlatformStats() map[string]interface{} {
 	return map[string]interface{}{"web": 2, "whatsapp": 1}

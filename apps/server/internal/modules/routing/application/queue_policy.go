@@ -7,4 +7,3 @@ import "strings"
 func IsActiveWaitingStatus(status string) bool {
 	return strings.EqualFold(strings.TrimSpace(status), "waiting")
 }
-

@@ -10,8 +10,8 @@ import (
 	"servify/apps/server/internal/models"
 	platformauth "servify/apps/server/internal/platform/auth"
 
-	"golang.org/x/crypto/bcrypt"
 	"github.com/glebarez/sqlite"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 

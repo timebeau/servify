@@ -64,4 +64,3 @@ func TestNewSessionTransferNotifierNilSink(t *testing.T) {
 		t.Fatalf("expected nil notifier, got %#v", got)
 	}
 }
-

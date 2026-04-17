@@ -42,4 +42,3 @@ func (n *websocketSessionTransferNotifier) NotifyWaiting(sessionID string, messa
 		},
 	})
 }
-

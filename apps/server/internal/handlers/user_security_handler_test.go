@@ -22,8 +22,8 @@ import (
 	"servify/apps/server/internal/platform/usersecurity"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 	"github.com/glebarez/sqlite"
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 

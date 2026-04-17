@@ -27,4 +27,3 @@ func TestBuildTransferAssignmentUpdatePreservesNonOpenStatus(t *testing.T) {
 		t.Fatalf("did not expect status update, got %+v", updates)
 	}
 }
-

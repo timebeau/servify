@@ -12,4 +12,3 @@ func BuildTransferAssignmentUpdate(targetAgentID uint, currentStatus string) (ma
 	}
 	return updates, fromStatus, toStatus
 }
-

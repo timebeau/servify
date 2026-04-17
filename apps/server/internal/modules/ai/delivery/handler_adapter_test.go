@@ -10,18 +10,18 @@ import (
 )
 
 type stubLegacyAIHandlerService struct {
-	processQuery            func(ctx context.Context, query string, sessionID string) (*services.AIResponse, error)
-	getStatus               func(ctx context.Context) map[string]interface{}
+	processQuery func(ctx context.Context, query string, sessionID string) (*services.AIResponse, error)
+	getStatus    func(ctx context.Context) map[string]interface{}
 }
 
 type stubEnhancedAIHandlerService struct {
 	stubLegacyAIHandlerService
-	processQueryEnhanced         func(ctx context.Context, query string, sessionID string) (*services.EnhancedAIResponse, error)
-	uploadKnowledgeDocument      func(ctx context.Context, title, content string, tags []string) error
-	getMetrics                   func() *services.AIMetrics
-	setKnowledgeProviderEnabled  func(enabled bool)
-	resetCircuitBreaker          func()
-	syncKnowledgeBase            func(ctx context.Context) error
+	processQueryEnhanced        func(ctx context.Context, query string, sessionID string) (*services.EnhancedAIResponse, error)
+	uploadKnowledgeDocument     func(ctx context.Context, title, content string, tags []string) error
+	getMetrics                  func() *services.AIMetrics
+	setKnowledgeProviderEnabled func(enabled bool)
+	resetCircuitBreaker         func()
+	syncKnowledgeBase           func(ctx context.Context) error
 }
 
 func (s stubLegacyAIHandlerService) ProcessQuery(ctx context.Context, query string, sessionID string) (*services.AIResponse, error) {
@@ -90,11 +90,11 @@ func TestHandlerServiceAdapter_UsesEnhancedSurfaceWhenAvailable(t *testing.T) {
 				Strategy:   "weknora",
 			}, nil
 		},
-		uploadKnowledgeDocument: func(ctx context.Context, title, content string, tags []string) error { return nil },
-		getMetrics: func() *services.AIMetrics { return &services.AIMetrics{SuccessCount: 3} },
+		uploadKnowledgeDocument:     func(ctx context.Context, title, content string, tags []string) error { return nil },
+		getMetrics:                  func() *services.AIMetrics { return &services.AIMetrics{SuccessCount: 3} },
 		setKnowledgeProviderEnabled: func(v bool) { enabled = v },
-		resetCircuitBreaker: func() { reset = true },
-		syncKnowledgeBase: func(ctx context.Context) error { return nil },
+		resetCircuitBreaker:         func() { reset = true },
+		syncKnowledgeBase:           func(ctx context.Context) error { return nil },
 	})
 
 	got, err := adapter.ProcessQuery(context.Background(), "hi", "s1")
@@ -188,11 +188,11 @@ func TestHandlerServiceAdapter_PropagatesEnhancedErrors(t *testing.T) {
 		processQueryEnhanced: func(ctx context.Context, query string, sessionID string) (*services.EnhancedAIResponse, error) {
 			return nil, expectedErr
 		},
-		getMetrics: func() *services.AIMetrics { return nil },
-		uploadKnowledgeDocument: func(ctx context.Context, title, content string, tags []string) error { return expectedErr },
+		getMetrics:                  func() *services.AIMetrics { return nil },
+		uploadKnowledgeDocument:     func(ctx context.Context, title, content string, tags []string) error { return expectedErr },
 		setKnowledgeProviderEnabled: func(enabled bool) {},
-		resetCircuitBreaker: func() {},
-		syncKnowledgeBase: func(ctx context.Context) error { return expectedErr },
+		resetCircuitBreaker:         func() {},
+		syncKnowledgeBase:           func(ctx context.Context) error { return expectedErr },
 	})
 
 	if _, err := adapter.ProcessQuery(context.Background(), "hi", "s1"); !errors.Is(err, expectedErr) {
