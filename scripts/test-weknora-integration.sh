@@ -435,14 +435,14 @@ if [ "$SERVICE_IS_PROVIDER_CAPABLE" = "true" ]; then
 
     # 测试文档上传
     echo "  ✓ 测试文档上传..."
-    UPLOAD_RESPONSE=$(curl -fsS -X POST "$SERVIFY_URL/api/v1/ai/knowledge/upload" \
+    UPLOAD_RESPONSE=$(curl -sS -X POST "$SERVIFY_URL/api/v1/ai/knowledge/upload" \
         -H "$AUTH_HEADER" \
         -H "Content-Type: application/json" \
         -d '{
             "title": "测试文档",
             "content": "这是一个测试文档，用于验证外部 knowledge provider 集成功能。包含远程协助、智能客服等功能介绍。",
             "tags": ["测试", "集成", "验证"]
-        }')
+        }') || echo '{"success":false,"error":"curl failed"}'
 
     if echo "$UPLOAD_RESPONSE" | grep -q '"success":true'; then
         echo "    ✅ 文档上传测试通过"
@@ -456,10 +456,10 @@ if [ "$SERVICE_IS_PROVIDER_CAPABLE" = "true" ]; then
     save_response "knowledge-upload" "$UPLOAD_RESPONSE"
 
     echo "  ✓ 测试知识同步..."
-    SYNC_RESPONSE=$(curl -fsS -X POST "$SERVIFY_URL/api/v1/ai/knowledge/sync" \
+    SYNC_RESPONSE=$(curl -sS -X POST "$SERVIFY_URL/api/v1/ai/knowledge/sync" \
         -H "$AUTH_HEADER" \
         -H "Content-Type: application/json" \
-        -d '{}')
+        -d '{}') || echo '{"success":false,"error":"curl failed"}'
     save_response "knowledge-sync" "$SYNC_RESPONSE"
     if echo "$SYNC_RESPONSE" | grep -q '"success":true'; then
         echo "    ✅ 知识同步测试通过"
