@@ -73,13 +73,16 @@ Servify 当前更适合这样理解：
 .
 |-- apps/
 |   |-- server/              # Go 服务端
-|   |-- admin/               # Admin 管理面板
+|   |-- admin/               # Admin 管理面板（UmiJS + Ant Design Pro）
+|   |-- admin-legacy/        # 旧版静态管理面板（保留用于演示/兼容）
+|   |-- demo/                # 产品演示站点
+|   |-- demo-sdk/            # SDK 预构建产物与示例
 |   `-- website/             # 官网静态站点
 |-- docs/
 |   `-- implementation/      # 分主题实施 backlog
 |-- infra/                   # compose、部署辅助
 |-- internal/                # 共用内部包
-`-- sdk/                     # SDK 工作区
+`-- sdk/                     # SDK 工作区（源码）
 ```
 
 ## 🧪 常用校验入口
@@ -95,12 +98,19 @@ Servify 当前更适合这样理解：
 
 | 目录/文件 | 说明 |
 |-----------|------|
-| `apps/` | 应用入口与可运行表面，例如服务端、demo、官网 |
+| `apps/` | 应用入口与可运行表面，包括服务端、管理端、演示站点等 |
+| `apps/server/` | Go 服务端（模块化单体架构） |
+| `apps/admin/` | Admin 管理面板（UmiJS + Ant Design Pro） |
+| `apps/admin-legacy/` | 旧版静态管理面板（保留用于演示/兼容） |
+| `apps/demo/` | 产品演示站点与示例 |
+| `apps/demo-sdk/` | SDK 预构建产物（UMD/ESM）与集成示例 |
+| `apps/website/` | 官网静态站点 |
 | `docs/` | 说明文档、实施 backlog、发布与协作规则 |
 | `infra/` | 本地或部署环境相关的 compose、可观测性与辅助配置 |
 | `scripts/` | CI、本地开发、生成物与检查脚本 |
-| `sdk/` | SDK workspace 与示例 |
-| `config.yml`、`config.weknora.yml` | 本地运行配置样例，其中 AI/knowledge 默认推荐使用 Dify |
+| `sdk/` | SDK workspace 源码（TypeScript） |
+| `config.yml`、`config.weknora.yml` | 本地运行配置样例，AI/knowledge 默认推荐使用 Dify |
+| `config.production.secure.example.yml` | 生产环境安全配置模板 |
 | `generated-assets.manifest` | 必须提交的生成物清单 |
 | `Makefile`、`build.sh` | 常用构建与开发入口 |
 
@@ -294,34 +304,49 @@ flowchart LR
 
 ### 📋 环境要求
 
-- **Go** 1.25+（项目要求）- 本地开发使用 go1.25.7
-- **PostgreSQL** 12+
-- **Node.js** 20+（仅 Web/文档/站点相关任务需要）
+- **Go** 1.25.0（toolchain go1.25.7）- 项目使用 Go workspace 模式
+- **PostgreSQL** 12+ 或 SQLite（开发/测试）
+- **Node.js** 18+（仅 Web/管理端/文档相关任务需要）
+  - 管理端使用 **pnpm** 10+ 作为包管理器
 - 可选：**Docker** / **Docker Compose**
 
 ### 💻 常用命令
 
 ```bash
+# 构建与运行
 make build
-make run-cli CONFIG=./config.yml
-make run-knowledge-provider CONFIG=./config.weknora.yml
-# `run-knowledge-provider` 是 `run-weknora` 的通用 alias；主要用于 WeKnora compatibility / mock 回归
-make migrate DB_HOST=localhost DB_PORT=5432 DB_USER=postgres DB_PASSWORD=password DB_NAME=servify
-make repo-hygiene
-make local-check
-make release-changelog FROM=<previous-tag-or-commit> TO=HEAD
-make clean-runtime
+make run                               # 启动服务端
+make migrate                           # 数据库迁移
+
+# 开发验证
+make local-check                       # 本地环境检查
+make security-check CONFIG=./config.yml
+make observability-check CONFIG=./config.yml
+make release-check CONFIG=./config.yml
+
+# 仓库卫生
+make repo-hygiene                      # 验证生成物未被跟踪
+make generated-assets                  # 重新生成并验证提交的生成物
+
+# 其他
+make clean-runtime                     # 清理运行时输出
+make release-changelog FROM=<tag> TO=HEAD
 ```
 
 ### 🔗 常用入口
 
 - 健康检查：`GET /health`
+- 就绪检查：`GET /ready`
+- 指标端点：`GET /metrics`
 - WebSocket：`GET /api/v1/ws?session_id=...`
 - AI 查询：`POST /api/v1/ai/query`
 - 语音协议列表：`GET /api/voice/protocols`
-- 语音协议信令事件：`POST /api/voice/protocols/:protocol/call-events/:event`
 - 管理后台：`/admin/`
-- 知识库 Portal：`/kb.html`
+- 公开知识库：`/public/kb/docs`
+
+**数据库配置：**
+- 默认使用 PostgreSQL，可通过 `DB_DRIVER=sqlite` 切换到 SQLite（开发/测试）
+- 发布检查脚本在默认配置下使用临时 SQLite 库完成自检
 
 ### 📈 可观测性
 
@@ -379,29 +404,25 @@ Jaeger 默认地址：`http://localhost:16686`
 
 ## 📈 当前实施进度
 
-- `docs/implementation/01-platform-and-runtime.md`：已清零
-- `docs/implementation/02-ai-and-knowledge.md`：已清零
-- `docs/implementation/03-business-modules.md`：已清零
-- `docs/implementation/04-sdk-and-channel-adapters.md`：已清零
-- `docs/implementation/05-engineering-hardening.md`：已清零
-- `docs/implementation/06-voice-and-protocol-expansion.md`：已清零
-- `docs/implementation/07-sdk-multi-surface.md`：已清零
-- `docs/implementation/08-ai-provider-expansion.md`：已清零
-- `docs/implementation/09-runtime-and-repo-hygiene.md`：进行中
-- `docs/implementation/10-service-to-module-migration.md`：待开始
-- `docs/implementation/11-tenant-auth-and-audit.md`：进行中
+- `docs/implementation/01-08`：已清零（平台、AI、业务模块、SDK、工程化、语音、多端、AI 扩展）
+- `docs/implementation/09-runtime-and-repo-hygiene.md`：**基本完成**
+  - 运行时产物清理、ignore 策略、跨平台开发环境收敛
+- `docs/implementation/10-service-to-module-migration.md`：**进行中**
+  - `ticket`、`agent`、`analytics` 已收口到模块化链路
+  - 详见 `10-migration-scorecard.md` 当前状态
+- `docs/implementation/11-tenant-auth-and-audit.md`：**进行中**
+  - 核心模型已补 `tenant_id`/`workspace_id` 字段与索引
+  - 请求 scope 守卫已接入管理面
 - `docs/implementation/12-operator-observability.md`：待开始
 
 当前代码状态说明：
 
-- 服务端已从“大 service 直连 handler”收敛到模块化单体结构
-- `agent`、`customer` 管理面已收口到模块化链路，不再只依赖旧 service 直连 handler
+- 服务端已从”大 service 直连 handler”收敛到模块化单体结构
+- `ticket`、`agent`、`analytics` 模块已收口到 `delivery -> application -> domain -> infra` 链路
 - AI 已统一到 `QueryOrchestrator + LLMProvider + KnowledgeProvider`
-- Dify 已作为默认优先知识源接入，WeKnora 已降级为 `KnowledgeProvider` 兼容适配器，不再是内核依赖
-- Web SDK 已按 `core + transport + binding` 方向收口
-- API/App SDK 当前只预留 contract 和目录，不做伪实现
-- 管理面安全基线已接入首轮能力：scope、RBAC、audit、token policy、统一 user security 入口
-- SIP/渠道接入已建立平台层骨架，后续在 `voice` 模块上继续补业务语义
+- Dify 已作为默认优先知识源接入，WeKnora 已降级为 `KnowledgeProvider` 兼容适配器
+- 管理面安全基线已接入首轮能力：scope、RBAC、audit、token policy
+- 数据库层支持 PostgreSQL 与 SQLite（开发/测试回退）
 
 ---
 

@@ -63,11 +63,13 @@
 
 | 组件 | 版本 | 说明 |
 |------|------|------|
-| Go | 1.25+ | 服务端编译 |
-| Node.js | 20+ | SDK 构建、网站 |
-| Docker | 24+ | 容器化部署 |
-| Docker Compose | v2+ | 编排 |
-| PostgreSQL | 15+ | 需 pgvector 扩展 |
+| Go | 1.25.0 (toolchain go1.25.7) | 服务端编译 |
+| Node.js | 18+ | SDK 构建、管理端、网站 |
+| pnpm | 10+ | 管理端包管理器 |
+| Docker | 24+ | 容器化部署（可选） |
+| Docker Compose | v2+ | 编排（可选） |
+| PostgreSQL | 12+ | 主数据库（生产必需） |
+| SQLite | 3+ | 开发/测试回退选项 |
 | Redis | 6+ | 缓存 |
 
 ### 推荐 production 配置
@@ -102,15 +104,22 @@ docker compose -f infra/compose/docker-compose.yml up postgres redis -d
 ### 3.3 配置
 
 ```bash
-# 复制配置模板
-cp .env.example config.yml
+# 使用默认配置（SQLite 开发模式）
+cp config.yml config.local.yml
 
+# 或使用 PostgreSQL
+cp config.yml config.local.yml
 # 编辑数据库连接和 AI 配置
 # 必填项：
-#   database.password — PostgreSQL 密码
-#   ai.openai.api_key — OpenAI API Key
 #   jwt.secret — JWT 签名密钥
+#   ai.openai.api_key — OpenAI API Key
+#   database.* — PostgreSQL 连接参数（使用 PostgreSQL 时）
 ```
+
+**数据库选项：**
+
+- **开发/测试**：默认配置支持 SQLite 回退（`DB_DRIVER=sqlite`），无需本地 PostgreSQL
+- **生产**：必须使用 PostgreSQL
 
 ### 3.4 运行服务
 
@@ -137,6 +146,9 @@ curl http://localhost:8080/ready
 
 # Prometheus 指标
 curl http://localhost:8080/metrics
+
+# 发布前自检（默认配置使用临时 SQLite）
+make release-check CONFIG=./config.yml
 ```
 
 ---
