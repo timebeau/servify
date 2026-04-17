@@ -150,6 +150,14 @@ func (h *VoiceHandler) ListTranscripts(c *gin.Context) {
 
 func respondVoiceError(c *gin.Context, err error) {
 	status := http.StatusInternalServerError
+	// Check for provider disabled/unavailable errors by message
+	// This avoids importing the application layer's ProviderError type
+	msg := err.Error()
+	if msg == "voice recording provider is disabled" ||
+		msg == "voice transcript provider is disabled" ||
+		msg == "voice call provider is disabled" {
+		status = http.StatusServiceUnavailable
+	}
 	c.JSON(status, ErrorResponse{
 		Error:   "Voice runtime unavailable",
 		Message: err.Error(),
