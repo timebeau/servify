@@ -16,7 +16,7 @@ import (
 	"servify/apps/server/internal/models"
 	"servify/apps/server/internal/services"
 
-	"gorm.io/driver/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 

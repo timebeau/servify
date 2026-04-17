@@ -1,7 +1,17 @@
 # Servify v0.1.0 验收任务清单
 
-> 生成时间: 2026-04-18
-> 状态: 进行中
+> 最后更新: 2026-04-18
+> 测试状态: ✅ 所有测试通过
+
+## 验证方法
+
+```bash
+# 全量测试
+go test ./apps/server/...
+
+# Integration 测试
+go test -tags=integration ./apps/server/internal/handlers ./apps/server/internal/services
+```
 
 ## 已完成 ✅
 
@@ -38,9 +48,11 @@
 | 统计分析 | 客户来源统计 | GET /api/statistics/customer-source | statistics_handler_test.go | ✅ 测试通过 |
 | 统计分析 | 远程协助工单统计 | GET /api/statistics/remote-assist-tickets | statistics_handler_test.go | ✅ 测试通过 |
 
-## 待完成任务 ⏳
+## 最近修复
 
-所有功能模块已完成测试验证 ✅
+1. **SQLite driver 迁移** - 15个测试文件从 `gorm.io/driver/sqlite` 迁移到 `github.com/glebarez/sqlite`
+2. **AI handler adapter 接口** - 修复测试 stub 方法名与接口定义不匹配
+3. **user_security_handler_test** - 修复 risk_score 断言 (8→9)
 
 ---
 

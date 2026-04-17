@@ -12,7 +12,7 @@ import (
 	knowledgeapp "servify/apps/server/internal/modules/knowledge/application"
 	"servify/apps/server/internal/modules/knowledge/domain"
 
-	"gorm.io/driver/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 

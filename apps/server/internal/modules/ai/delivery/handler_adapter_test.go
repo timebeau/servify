@@ -16,12 +16,12 @@ type stubLegacyAIHandlerService struct {
 
 type stubEnhancedAIHandlerService struct {
 	stubLegacyAIHandlerService
-	processQueryEnhanced    func(ctx context.Context, query string, sessionID string) (*services.EnhancedAIResponse, error)
-	uploadDocumentToWeKnora func(ctx context.Context, title, content string, tags []string) error
-	getMetrics              func() *services.AIMetrics
-	setWeKnoraEnabled       func(enabled bool)
-	resetCircuitBreaker     func()
-	syncKnowledgeBase       func(ctx context.Context) error
+	processQueryEnhanced         func(ctx context.Context, query string, sessionID string) (*services.EnhancedAIResponse, error)
+	uploadKnowledgeDocument      func(ctx context.Context, title, content string, tags []string) error
+	getMetrics                   func() *services.AIMetrics
+	setKnowledgeProviderEnabled  func(enabled bool)
+	resetCircuitBreaker          func()
+	syncKnowledgeBase            func(ctx context.Context) error
 }
 
 func (s stubLegacyAIHandlerService) ProcessQuery(ctx context.Context, query string, sessionID string) (*services.AIResponse, error) {
@@ -49,16 +49,16 @@ func (s stubEnhancedAIHandlerService) ProcessQueryEnhanced(ctx context.Context, 
 	return s.processQueryEnhanced(ctx, query, sessionID)
 }
 
-func (s stubEnhancedAIHandlerService) UploadDocumentToWeKnora(ctx context.Context, title, content string, tags []string) error {
-	return s.uploadDocumentToWeKnora(ctx, title, content, tags)
+func (s stubEnhancedAIHandlerService) UploadKnowledgeDocument(ctx context.Context, title, content string, tags []string) error {
+	return s.uploadKnowledgeDocument(ctx, title, content, tags)
 }
 
 func (s stubEnhancedAIHandlerService) GetMetrics() *services.AIMetrics {
 	return s.getMetrics()
 }
 
-func (s stubEnhancedAIHandlerService) SetWeKnoraEnabled(enabled bool) {
-	s.setWeKnoraEnabled(enabled)
+func (s stubEnhancedAIHandlerService) SetKnowledgeProviderEnabled(enabled bool) {
+	s.setKnowledgeProviderEnabled(enabled)
 }
 
 func (s stubEnhancedAIHandlerService) SetFallbackEnabled(enabled bool) {}
@@ -90,9 +90,9 @@ func TestHandlerServiceAdapter_UsesEnhancedSurfaceWhenAvailable(t *testing.T) {
 				Strategy:   "weknora",
 			}, nil
 		},
-		uploadDocumentToWeKnora: func(ctx context.Context, title, content string, tags []string) error { return nil },
+		uploadKnowledgeDocument: func(ctx context.Context, title, content string, tags []string) error { return nil },
 		getMetrics: func() *services.AIMetrics { return &services.AIMetrics{SuccessCount: 3} },
-		setWeKnoraEnabled: func(v bool) { enabled = v },
+		setKnowledgeProviderEnabled: func(v bool) { enabled = v },
 		resetCircuitBreaker: func() { reset = true },
 		syncKnowledgeBase: func(ctx context.Context) error { return nil },
 	})
@@ -114,14 +114,14 @@ func TestHandlerServiceAdapter_UsesEnhancedSurfaceWhenAvailable(t *testing.T) {
 		t.Fatalf("GetMetrics() = %+v, %v", metrics, ok)
 	}
 
-	if err := adapter.UploadDocumentToWeKnora(context.Background(), "t", "c", []string{"tag"}); err != nil {
-		t.Fatalf("UploadDocumentToWeKnora() err=%v", err)
+	if err := adapter.UploadKnowledgeDocument(context.Background(), "t", "c", []string{"tag"}); err != nil {
+		t.Fatalf("UploadKnowledgeDocument() err=%v", err)
 	}
 	if err := adapter.SyncKnowledgeBase(context.Background()); err != nil {
 		t.Fatalf("SyncKnowledgeBase() err=%v", err)
 	}
-	if !adapter.SetWeKnoraEnabled(true) || !enabled {
-		t.Fatal("SetWeKnoraEnabled() did not delegate")
+	if !adapter.SetKnowledgeProviderEnabled(true) || !enabled {
+		t.Fatal("SetKnowledgeProviderEnabled() did not delegate")
 	}
 	if !adapter.ResetCircuitBreaker() || !reset {
 		t.Fatal("ResetCircuitBreaker() did not delegate")
@@ -150,14 +150,14 @@ func TestHandlerServiceAdapter_UsesBaseSurfaceForStandardService(t *testing.T) {
 	if metrics, ok := adapter.GetMetrics(); ok || metrics != nil {
 		t.Fatalf("GetMetrics() = %+v, %v", metrics, ok)
 	}
-	if err := adapter.UploadDocumentToWeKnora(context.Background(), "t", "c", nil); err == nil {
-		t.Fatal("UploadDocumentToWeKnora() expected error")
+	if err := adapter.UploadKnowledgeDocument(context.Background(), "t", "c", nil); err == nil {
+		t.Fatal("UploadKnowledgeDocument() expected error")
 	}
 	if err := adapter.SyncKnowledgeBase(context.Background()); err == nil {
 		t.Fatal("SyncKnowledgeBase() expected error")
 	}
-	if adapter.SetWeKnoraEnabled(true) {
-		t.Fatal("SetWeKnoraEnabled() = true, want false")
+	if adapter.SetKnowledgeProviderEnabled(true) {
+		t.Fatal("SetKnowledgeProviderEnabled() = true, want false")
 	}
 	if adapter.ResetCircuitBreaker() {
 		t.Fatal("ResetCircuitBreaker() = true, want false")
@@ -169,8 +169,8 @@ func TestHandlerServiceAdapter_ReturnsConfiguredErrorForNilService(t *testing.T)
 	if _, err := adapter.ProcessQuery(context.Background(), "hi", "s1"); err == nil {
 		t.Fatal("ProcessQuery() expected error")
 	}
-	if err := adapter.UploadDocumentToWeKnora(context.Background(), "t", "c", nil); err == nil {
-		t.Fatal("UploadDocumentToWeKnora() expected error")
+	if err := adapter.UploadKnowledgeDocument(context.Background(), "t", "c", nil); err == nil {
+		t.Fatal("UploadKnowledgeDocument() expected error")
 	}
 	if err := adapter.SyncKnowledgeBase(context.Background()); err == nil {
 		t.Fatal("SyncKnowledgeBase() expected error")
@@ -189,8 +189,8 @@ func TestHandlerServiceAdapter_PropagatesEnhancedErrors(t *testing.T) {
 			return nil, expectedErr
 		},
 		getMetrics: func() *services.AIMetrics { return nil },
-		uploadDocumentToWeKnora: func(ctx context.Context, title, content string, tags []string) error { return expectedErr },
-		setWeKnoraEnabled: func(enabled bool) {},
+		uploadKnowledgeDocument: func(ctx context.Context, title, content string, tags []string) error { return expectedErr },
+		setKnowledgeProviderEnabled: func(enabled bool) {},
 		resetCircuitBreaker: func() {},
 		syncKnowledgeBase: func(ctx context.Context) error { return expectedErr },
 	})
@@ -198,8 +198,8 @@ func TestHandlerServiceAdapter_PropagatesEnhancedErrors(t *testing.T) {
 	if _, err := adapter.ProcessQuery(context.Background(), "hi", "s1"); !errors.Is(err, expectedErr) {
 		t.Fatalf("ProcessQuery() err=%v", err)
 	}
-	if err := adapter.UploadDocumentToWeKnora(context.Background(), "t", "c", nil); !errors.Is(err, expectedErr) {
-		t.Fatalf("UploadDocumentToWeKnora() err=%v", err)
+	if err := adapter.UploadKnowledgeDocument(context.Background(), "t", "c", nil); !errors.Is(err, expectedErr) {
+		t.Fatalf("UploadKnowledgeDocument() err=%v", err)
 	}
 	if err := adapter.SyncKnowledgeBase(context.Background()); !errors.Is(err, expectedErr) {
 		t.Fatalf("SyncKnowledgeBase() err=%v", err)

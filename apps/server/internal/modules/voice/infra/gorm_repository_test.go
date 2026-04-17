@@ -7,7 +7,7 @@ import (
 	"servify/apps/server/internal/models"
 	voiceapp "servify/apps/server/internal/modules/voice/application"
 
-	"gorm.io/driver/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 

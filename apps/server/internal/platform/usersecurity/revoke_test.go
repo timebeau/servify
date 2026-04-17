@@ -12,7 +12,7 @@ import (
 	"servify/apps/server/internal/models"
 	platformauth "servify/apps/server/internal/platform/auth"
 
-	"gorm.io/driver/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
