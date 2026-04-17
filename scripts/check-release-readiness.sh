@@ -47,7 +47,7 @@ sh "$ROOT_DIR/scripts/check-observability-baseline.sh" "$CONFIG_PATH"
 echo
 echo "==> Focused Go regression tests"
 SERVIFY_JWT_SECRET="$RELEASE_CHECK_JWT_SECRET" OPENAI_API_KEY="$RELEASE_CHECK_OPENAI_API_KEY" \
-  go -C apps/server test ./cmd/cli ./internal/app/bootstrap ./internal/handlers
+  go -C apps/server test ./cmd/cli ./internal/app/bootstrap ./internal/releasecheck
 
 echo
 echo "==> Build verification"
@@ -69,12 +69,9 @@ echo "==> Binary version check"
 
 echo
 echo "==> Route registration verification"
-if ! go -C apps/server test -run TestConversationWorkspaceHandler_GetSession ./internal/handlers/ >/dev/null 2>&1; then
-  echo "[warn] conversation workspace route test failed (may require DB)"
-fi
 if ! SERVIFY_JWT_SECRET="$RELEASE_CHECK_JWT_SECRET" OPENAI_API_KEY="$RELEASE_CHECK_OPENAI_API_KEY" \
-  go -C apps/server test -run "TestAIHandler_(GetMetrics|UploadDocument_StandardService|SyncKnowledgeBase_StandardService|EnableKnowledgeProvider_StandardService|DisableKnowledgeProvider_StandardService|ResetCircuitBreaker_StandardService)$" ./internal/handlers/ >/dev/null 2>&1; then
-  echo "[fail] AI handler route test failed" >&2
+  go -C apps/server test -run "TestReleaseCheck(AIHandlerStandardRoutes|RealtimeReadHandlers|PortalConfig)$" ./internal/releasecheck >/dev/null 2>&1; then
+  echo "[fail] release route verification failed" >&2
   exit 1
 fi
 echo "[ok] critical routes verified"
