@@ -7,9 +7,9 @@ import (
 
 	"servify/apps/server/internal/config"
 
+	"github.com/glebarez/sqlite"
 	"github.com/sirupsen/logrus"
 	"gorm.io/driver/postgres"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	gormtracing "gorm.io/plugin/opentelemetry/tracing"
