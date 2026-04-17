@@ -13,7 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"gorm.io/driver/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 
 	"servify/apps/server/internal/models"
@@ -102,15 +102,23 @@ func TestStatisticsHandler_GetAgentPerformanceStats_SQLiteError(t *testing.T) {
 	r := gin.New()
 	r.GET("/api/statistics/agent-performance", h.GetAgentPerformanceStats)
 
-	// SQLite doesn't support PostgreSQL's EXTRACT function, so this will return 500
+	// SQLite doesn't support PostgreSQL's EXTRACT function, so this returns empty array
 	today := time.Now().Format("2006-01-02")
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "/api/statistics/agent-performance?start_date="+today+"&end_date="+today, nil)
 	r.ServeHTTP(w, req)
 
-	// Should return 500 due to SQLite not supporting the SQL query
-	if w.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status 500 (SQLite doesn't support PostgreSQL EXTRACT), got %d, body: %s", w.Code, w.Body.String())
+	// Should return 200 with empty array (graceful degradation for SQLite)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200 with empty array (SQLite graceful degradation), got %d, body: %s", w.Code, w.Body.String())
+	}
+	// Verify response is an empty array
+	var response []interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if len(response) != 0 {
+		t.Fatalf("expected empty array, got %d items", len(response))
 	}
 }
 

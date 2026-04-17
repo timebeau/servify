@@ -14,7 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"gorm.io/driver/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 
 	"servify/apps/server/internal/models"
@@ -35,6 +35,7 @@ func newSatisfactionHandlerTestDB(t *testing.T) *gorm.DB {
 		&models.Ticket{},
 		&models.User{},
 		&models.Agent{},
+		&models.Customer{},
 	); err != nil {
 		t.Fatalf("auto migrate: %v", err)
 	}
@@ -56,19 +57,22 @@ func TestSatisfactionHandler_CreateSatisfaction_Success(t *testing.T) {
 
 	// Create ticket and users
 	now := time.Now()
-	customer := &models.User{ID: 1, Username: "customer", Name: "Customer", Email: "customer@example.com", Role: "customer"}
-	agentID := uint(1)
-	agent := &models.Agent{ID: 1, UserID: 2, Status: "online", MaxConcurrent: 5, CurrentLoad: 0}
-	ticket := &models.Ticket{ID: 1, CustomerID: 1, AgentID: &agentID, Status: "closed", CreatedAt: now, UpdatedAt: now}
+	customerUser := &models.User{ID: 1, Username: "customer", Name: "Customer", Email: "customer@example.com", Role: "customer"}
+	customer := &models.Customer{UserID: 1, Company: "TestCo"}
+	agentUser := &models.User{ID: 2, Username: "agent", Name: "Agent", Email: "agent@example.com", Role: "agent"}
+	agent := &models.Agent{UserID: 2, Status: "online", MaxConcurrent: 5, CurrentLoad: 0}
+	ticket := &models.Ticket{ID: 1, CustomerID: 1, AgentID: &agent.ID, Status: "closed", CreatedAt: now, UpdatedAt: now}
 
+	db.Create(customerUser)
 	db.Create(customer)
+	db.Create(agentUser)
 	db.Create(agent)
 	db.Create(ticket)
 
 	payload := map[string]interface{}{
 		"ticket_id":   1,
 		"customer_id": 1,
-		"agent_id":    1,
+		"agent_id":    2,
 		"rating":      5,
 		"comment":     "Great service!",
 		"category":    "quality",
