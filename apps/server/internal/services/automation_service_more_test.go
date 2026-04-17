@@ -10,7 +10,7 @@ import (
 	"servify/apps/server/internal/models"
 
 	"github.com/sirupsen/logrus"
-	"gorm.io/driver/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -156,8 +156,18 @@ func TestAutomationService_CreateTrigger(t *testing.T) {
 				if trigger.CreatedAt.IsZero() {
 					t.Error("expected CreatedAt to be set")
 				}
-				if trigger.Event != tt.req.Event {
-					t.Errorf("expected Event=%s, got %s", tt.req.Event, trigger.Event)
+				// normalizeEvent converts ticket_created -> ticket.created
+				expectedEvent := tt.req.Event
+				switch expectedEvent {
+				case "ticket_created":
+					expectedEvent = "ticket.created"
+				case "ticket_updated":
+					expectedEvent = "ticket.updated"
+				case "sla_violation":
+					expectedEvent = "sla.violation"
+				}
+				if trigger.Event != expectedEvent {
+					t.Errorf("expected Event=%s, got %s", expectedEvent, trigger.Event)
 				}
 			}
 		})

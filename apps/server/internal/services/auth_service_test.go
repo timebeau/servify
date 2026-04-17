@@ -11,7 +11,7 @@ import (
 	platformauth "servify/apps/server/internal/platform/auth"
 
 	"golang.org/x/crypto/bcrypt"
-	"gorm.io/driver/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
