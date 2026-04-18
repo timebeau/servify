@@ -24,7 +24,7 @@ COPY . .
 # Copy admin dist from previous stage
 COPY --from=admin-builder /app/apps/admin/dist ./apps/admin/dist
 # Build server binary by default (apps/server)
-RUN CGO_ENABLED=0 GOOS=linux go build -o servify ./apps/server/cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -tags weknora -o servify ./apps/server/cmd/server
 
 # Stage 3: Runtime
 FROM alpine:latest
