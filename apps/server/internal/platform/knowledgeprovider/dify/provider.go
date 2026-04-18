@@ -80,19 +80,19 @@ func (p *Provider) Search(ctx context.Context, req knowledgeprovider.SearchReque
 	return hits, nil
 }
 
-func (p *Provider) UpsertDocument(ctx context.Context, doc knowledgeprovider.KnowledgeDocument) error {
+func (p *Provider) UpsertDocument(ctx context.Context, doc knowledgeprovider.KnowledgeDocument) (string, error) {
 	if p.client == nil {
-		return fmt.Errorf("dify client is not configured")
+		return "", fmt.Errorf("dify client is not configured")
 	}
 	datasetID := doc.KnowledgeID
 	if datasetID == "" {
 		datasetID = p.datasetID
 	}
 	if datasetID == "" {
-		return fmt.Errorf("dify dataset id is not configured")
+		return "", fmt.Errorf("dify dataset id is not configured")
 	}
 
-	_, err := p.client.CreateDocumentFromText(ctx, datasetID, &base.CreateDocumentRequest{
+	created, err := p.client.CreateDocumentFromText(ctx, datasetID, &base.CreateDocumentRequest{
 		Name:              doc.Title,
 		Text:              doc.Content,
 		IndexingTechnique: "high_quality",
@@ -104,17 +104,14 @@ func (p *Provider) UpsertDocument(ctx context.Context, doc knowledgeprovider.Kno
 			ScoreThreshold:  p.search.ScoreThreshold,
 		},
 	})
-	return err
+	if err != nil {
+		return "", err
+	}
+	return created.ID, nil
 }
 
 func (p *Provider) DeleteDocument(ctx context.Context, id string) error {
-	if p.client == nil {
-		return fmt.Errorf("dify client is not configured")
-	}
-	if p.datasetID == "" {
-		return fmt.Errorf("dify dataset id is not configured")
-	}
-	return p.client.DeleteDocument(ctx, p.datasetID, id)
+	return knowledgeprovider.ErrOperationNotSupported
 }
 
 func (p *Provider) HealthCheck(ctx context.Context) error {

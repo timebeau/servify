@@ -54,26 +54,29 @@ func (p *Provider) Search(ctx context.Context, req knowledgeprovider.SearchReque
 	return hits, nil
 }
 
-func (p *Provider) UpsertDocument(ctx context.Context, doc knowledgeprovider.KnowledgeDocument) error {
+func (p *Provider) UpsertDocument(ctx context.Context, doc knowledgeprovider.KnowledgeDocument) (string, error) {
 	if p.client == nil {
-		return fmt.Errorf("weknora client is not configured")
+		return "", fmt.Errorf("weknora client is not configured")
 	}
 	namespace := knowledgeprovider.ResolveNamespace("", p.knowledgeID, doc.TenantID, doc.KnowledgeID)
 	if namespace.KnowledgeID == "" {
-		return fmt.Errorf("knowledge base id is not configured")
+		return "", fmt.Errorf("knowledge base id is not configured")
 	}
-	_, err := p.client.UploadDocument(ctx, namespace.KnowledgeID, &base.Document{
+	info, err := p.client.UploadDocument(ctx, namespace.KnowledgeID, &base.Document{
 		Type:     "text",
 		Title:    doc.Title,
 		Content:  doc.Content,
 		Tags:     doc.Tags,
 		Metadata: doc.Metadata,
 	})
-	return err
+	if err != nil {
+		return "", err
+	}
+	return info.ID, nil
 }
 
 func (p *Provider) DeleteDocument(ctx context.Context, id string) error {
-	return fmt.Errorf("weknora delete document is not implemented yet")
+	return knowledgeprovider.ErrOperationNotSupported
 }
 
 func (p *Provider) RebuildIndex(ctx context.Context, req knowledgeprovider.RebuildRequest) error {

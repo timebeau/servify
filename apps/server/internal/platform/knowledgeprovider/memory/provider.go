@@ -58,7 +58,7 @@ func (p *Provider) Search(ctx context.Context, req knowledgeprovider.SearchReque
 	return hits, nil
 }
 
-func (p *Provider) UpsertDocument(ctx context.Context, doc knowledgeprovider.KnowledgeDocument) error {
+func (p *Provider) UpsertDocument(ctx context.Context, doc knowledgeprovider.KnowledgeDocument) (string, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -68,8 +68,11 @@ func (p *Provider) UpsertDocument(ctx context.Context, doc knowledgeprovider.Kno
 	if strings.TrimSpace(doc.ID) == "" {
 		doc.ID = strings.TrimSpace(doc.Title)
 	}
+	if strings.TrimSpace(doc.ExternalID) == "" {
+		doc.ExternalID = doc.ID
+	}
 	p.documents[doc.ID] = doc
-	return nil
+	return doc.ExternalID, nil
 }
 
 func (p *Provider) DeleteDocument(ctx context.Context, id string) error {

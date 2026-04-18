@@ -40,7 +40,7 @@ func (p *Provider) Search(ctx context.Context, req knowledgeprovider.SearchReque
 	return result, nil
 }
 
-func (p *Provider) UpsertDocument(ctx context.Context, doc knowledgeprovider.KnowledgeDocument) error {
+func (p *Provider) UpsertDocument(ctx context.Context, doc knowledgeprovider.KnowledgeDocument) (string, error) {
 	if p.Documents == nil {
 		p.Documents = make(map[string]knowledgeprovider.KnowledgeDocument)
 	}
@@ -48,8 +48,11 @@ func (p *Provider) UpsertDocument(ctx context.Context, doc knowledgeprovider.Kno
 	if key == "" {
 		key = doc.Title
 	}
+	if strings.TrimSpace(doc.ExternalID) == "" {
+		doc.ExternalID = key
+	}
 	p.Documents[key] = doc
-	return nil
+	return doc.ExternalID, nil
 }
 
 func (p *Provider) DeleteDocument(ctx context.Context, id string) error {

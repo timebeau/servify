@@ -4,6 +4,8 @@ import "time"
 
 type Document struct {
 	ID        string
+	ProviderID string
+	ExternalID string
 	Title     string
 	Content   string
 	Category  string

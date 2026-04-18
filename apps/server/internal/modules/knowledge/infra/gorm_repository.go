@@ -28,6 +28,8 @@ func (r *GormDocumentRepository) Create(ctx context.Context, doc *domain.Documen
 	model := &models.KnowledgeDoc{
 		TenantID:    tenantID,
 		WorkspaceID: workspaceID,
+		ProviderID:  doc.ProviderID,
+		ExternalID:  doc.ExternalID,
 		Title:       doc.Title,
 		Content:     doc.Content,
 		Category:    doc.Category,
@@ -49,6 +51,8 @@ func (r *GormDocumentRepository) Update(ctx context.Context, doc *domain.Documen
 		return err
 	}
 	result := applyKnowledgeScope(r.db.WithContext(ctx).Model(&models.KnowledgeDoc{}), ctx).Where("id = ?", id).Updates(map[string]interface{}{
+		"provider_id": doc.ProviderID,
+		"external_id": doc.ExternalID,
 		"title":      doc.Title,
 		"content":    doc.Content,
 		"category":   doc.Category,
@@ -204,14 +208,16 @@ func (r *NoopIndexJobRepository) Get(ctx context.Context, id string) (*domain.In
 
 func documentFromModel(model models.KnowledgeDoc) *domain.Document {
 	return &domain.Document{
-		ID:        strconv.FormatUint(uint64(model.ID), 10),
-		Title:     model.Title,
-		Content:   model.Content,
-		Category:  model.Category,
-		Tags:      splitTags(model.Tags),
-		IsPublic:  model.IsPublic,
-		CreatedAt: model.CreatedAt,
-		UpdatedAt: model.UpdatedAt,
+		ID:         strconv.FormatUint(uint64(model.ID), 10),
+		ProviderID: model.ProviderID,
+		ExternalID: model.ExternalID,
+		Title:      model.Title,
+		Content:    model.Content,
+		Category:   model.Category,
+		Tags:       splitTags(model.Tags),
+		IsPublic:   model.IsPublic,
+		CreatedAt:  model.CreatedAt,
+		UpdatedAt:  model.UpdatedAt,
 	}
 }
 

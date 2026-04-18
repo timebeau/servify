@@ -132,6 +132,33 @@ func TestOrchestratedEnhancedAIServiceUploadAndSyncWithDifyProvider(t *testing.T
 	}
 }
 
+func TestOrchestratedEnhancedAIServiceSyncKnowledgeBaseDisabled(t *testing.T) {
+	base := NewAIService("", "")
+	base.InitializeKnowledgeBase()
+	base.knowledgeBase.AddDocument(models.KnowledgeDoc{
+		Title:   "Billing FAQ",
+		Content: "Billing answer",
+	})
+
+	svc := NewOrchestratedEnhancedAIService(
+		base,
+		&mockllm.Provider{},
+		nil,
+		"",
+		nil,
+		"",
+		nil,
+	)
+
+	err := svc.SyncKnowledgeBase(context.Background())
+	if err == nil {
+		t.Fatal("expected error when knowledge provider is disabled, got nil")
+	}
+	if err.Error() != "knowledge provider is not enabled" {
+		t.Fatalf("expected provider disabled error, got %v", err)
+	}
+}
+
 func TestOrchestratedEnhancedAIServiceFallbackAndReset(t *testing.T) {
 	base := NewAIService("", "")
 	base.InitializeKnowledgeBase()

@@ -9,13 +9,17 @@ import (
 
 func TestProviderSearchAndNamespaceMapping(t *testing.T) {
 	provider := NewProvider("tenant-default", "kb-default")
-	if err := provider.UpsertDocument(context.Background(), knowledgeprovider.KnowledgeDocument{
+	externalID, err := provider.UpsertDocument(context.Background(), knowledgeprovider.KnowledgeDocument{
 		ID:       "doc-1",
 		TenantID: "tenant-a",
 		Title:    "Billing",
 		Content:  "Billing details",
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("upsert: %v", err)
+	}
+	if externalID != "doc-1" {
+		t.Fatalf("unexpected external id: %q", externalID)
 	}
 
 	hits, err := provider.Search(context.Background(), knowledgeprovider.SearchRequest{

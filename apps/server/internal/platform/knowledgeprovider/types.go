@@ -31,6 +31,8 @@ type KnowledgeHit struct {
 // KnowledgeDocument is the shared document input model for indexing providers.
 type KnowledgeDocument struct {
 	ID          string                 `json:"id,omitempty"`
+	ProviderID  string                 `json:"provider_id,omitempty"`
+	ExternalID  string                 `json:"external_id,omitempty"`
 	TenantID    string                 `json:"tenant_id,omitempty"`
 	KnowledgeID string                 `json:"knowledge_id,omitempty"`
 	Title       string                 `json:"title"`

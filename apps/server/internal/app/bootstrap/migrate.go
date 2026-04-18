@@ -59,6 +59,16 @@ func AutoMigrate(db *gorm.DB) error {
 			return err
 		}
 	}
+	if !db.Migrator().HasColumn(&models.KnowledgeDoc{}, "provider_id") {
+		if err := db.Migrator().AddColumn(&models.KnowledgeDoc{}, "ProviderID"); err != nil {
+			return err
+		}
+	}
+	if !db.Migrator().HasColumn(&models.KnowledgeDoc{}, "external_id") {
+		if err := db.Migrator().AddColumn(&models.KnowledgeDoc{}, "ExternalID"); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

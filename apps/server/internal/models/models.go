@@ -283,6 +283,8 @@ type KnowledgeDoc struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
 	TenantID    string    `gorm:"index" json:"tenant_id"`
 	WorkspaceID string    `gorm:"index" json:"workspace_id"`
+	ProviderID  string    `gorm:"index" json:"provider_id"`
+	ExternalID  string    `gorm:"index" json:"external_id"`
 	Title       string    `json:"title"`
 	Content     string    `gorm:"type:text" json:"content"`
 	Category    string    `json:"category"`

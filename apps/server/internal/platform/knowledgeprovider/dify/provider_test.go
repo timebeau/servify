@@ -2,6 +2,7 @@ package dify
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"servify/apps/server/internal/platform/knowledgeprovider"
@@ -57,9 +58,41 @@ func TestProviderSearch(t *testing.T) {
 	}
 }
 
+func TestProviderUpsertDocumentReturnsExternalID(t *testing.T) {
+	provider := NewProvider(&mockClient{}, "dataset-1", SearchConfig{})
+	id, err := provider.UpsertDocument(context.Background(), knowledgeprovider.KnowledgeDocument{
+		ID:      "doc-1",
+		Title:   "Refund",
+		Content: "7 day refund",
+	})
+	if err != nil {
+		t.Fatalf("UpsertDocument() error = %v", err)
+	}
+	if id != "doc-1" {
+		t.Fatalf("external id = %q", id)
+	}
+}
+
 func TestProviderHealthCheck(t *testing.T) {
 	provider := NewProvider(&mockClient{}, "dataset-1", SearchConfig{})
 	if err := provider.HealthCheck(context.Background()); err != nil {
 		t.Fatalf("HealthCheck() error = %v", err)
+	}
+}
+
+func TestProviderDeleteDocumentUnsupported(t *testing.T) {
+	provider := NewProvider(&mockClient{}, "dataset-1", SearchConfig{})
+	err := provider.DeleteDocument(context.Background(), "doc-1")
+	if !errors.Is(err, knowledgeprovider.ErrOperationNotSupported) {
+		t.Fatalf("expected unsupported operation error, got %v", err)
+	}
+}
+
+func TestDifyDescriptorDoesNotClaimDeletionSupport(t *testing.T) {
+	desc := knowledgeprovider.DifyDescriptor(true, "dataset-1")
+	for _, capability := range desc.Capabilities {
+		if capability.Name == "deletion" && capability.Enabled {
+			t.Fatalf("expected dify deletion capability to be disabled, got %+v", desc)
+		}
 	}
 }

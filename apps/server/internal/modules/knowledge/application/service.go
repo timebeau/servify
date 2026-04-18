@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -47,6 +48,12 @@ func (s *Service) CreateDocument(ctx context.Context, req CreateDocumentRequest)
 	if err := s.documents.Create(ctx, doc); err != nil {
 		return nil, err
 	}
+	if err := s.syncDocument(ctx, doc); err != nil {
+		return nil, err
+	}
+	if err := s.documents.Update(ctx, doc); err != nil {
+		return nil, err
+	}
 	return doc, nil
 }
 
@@ -80,10 +87,32 @@ func (s *Service) UpdateDocument(ctx context.Context, id string, req UpdateDocum
 	if err := s.documents.Update(ctx, doc); err != nil {
 		return nil, err
 	}
+	if err := s.syncDocument(ctx, doc); err != nil {
+		return nil, err
+	}
+	if err := s.documents.Update(ctx, doc); err != nil {
+		return nil, err
+	}
 	return doc, nil
 }
 
 func (s *Service) DeleteDocument(ctx context.Context, id string) error {
+	doc, err := s.documents.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	if s.provider != nil {
+		externalID := strings.TrimSpace(doc.ExternalID)
+		if externalID == "" {
+			return fmt.Errorf("knowledge provider deletion is not supported: missing external document id")
+		}
+		if err := s.provider.DeleteDocument(ctx, externalID); err != nil {
+			if errors.Is(err, knowledgeprovider.ErrOperationNotSupported) {
+				return fmt.Errorf("knowledge provider deletion is not supported: %w", err)
+			}
+			return err
+		}
+	}
 	return s.documents.Delete(ctx, id)
 }
 
@@ -139,12 +168,14 @@ func (s *Service) RunIndexJob(ctx context.Context, req RunIndexJobRequest) (*Ind
 	}
 
 	if s.provider != nil {
-		err = s.provider.UpsertDocument(ctx, knowledgeprovider.KnowledgeDocument{
-			ID:       doc.ID,
-			Title:    doc.Title,
-			Content:  doc.Content,
-			Tags:     doc.Tags,
-			Metadata: map[string]interface{}{"category": doc.Category},
+		externalID, err := s.provider.UpsertDocument(ctx, knowledgeprovider.KnowledgeDocument{
+			ID:         doc.ID,
+			ProviderID: doc.ProviderID,
+			ExternalID: doc.ExternalID,
+			Title:      doc.Title,
+			Content:    doc.Content,
+			Tags:       doc.Tags,
+			Metadata:   map[string]interface{}{"category": doc.Category},
 		})
 		if err != nil {
 			job.Status = domain.IndexJobFailed
@@ -157,6 +188,9 @@ func (s *Service) RunIndexJob(ctx context.Context, req RunIndexJobRequest) (*Ind
 				Status:     string(job.Status),
 				Error:      job.Error,
 			}, err
+		}
+		if strings.TrimSpace(externalID) != "" {
+			doc.ExternalID = strings.TrimSpace(externalID)
 		}
 	}
 
@@ -186,4 +220,40 @@ func compact(tags []string) []string {
 		out = append(out, t)
 	}
 	return out
+}
+
+func (s *Service) syncDocument(ctx context.Context, doc *domain.Document) error {
+	if s.provider == nil || doc == nil {
+		return nil
+	}
+	externalID, err := s.provider.UpsertDocument(ctx, knowledgeprovider.KnowledgeDocument{
+		ID:         doc.ID,
+		ProviderID: doc.ProviderID,
+		ExternalID: doc.ExternalID,
+		Title:      doc.Title,
+		Content:    doc.Content,
+		Tags:       doc.Tags,
+		Metadata:   map[string]interface{}{"category": doc.Category},
+	})
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(externalID) != "" {
+		doc.ExternalID = strings.TrimSpace(externalID)
+	}
+	if doc.ProviderID == "" {
+		doc.ProviderID = providerIdentity(s.provider)
+	}
+	return nil
+}
+
+func providerIdentity(provider knowledgeprovider.KnowledgeProvider) string {
+	switch provider.(type) {
+	case nil:
+		return ""
+	default:
+		t := fmt.Sprintf("%T", provider)
+		t = strings.TrimPrefix(t, "*")
+		return strings.TrimSpace(t)
+	}
 }

@@ -2,9 +2,11 @@ package weknora
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
+	"servify/apps/server/internal/platform/aiprovider"
 	"servify/apps/server/internal/platform/knowledgeprovider"
 	base "servify/apps/server/pkg/weknora"
 )
@@ -66,5 +68,37 @@ func TestProviderHealthCheck(t *testing.T) {
 	provider := NewProvider(&mockClient{}, "kb-1")
 	if err := provider.HealthCheck(context.Background()); err != nil {
 		t.Fatalf("expected no error, got %v", err)
+	}
+}
+
+func TestProviderUpsertDocumentReturnsExternalID(t *testing.T) {
+	provider := NewProvider(&mockClient{}, "kb-1")
+	id, err := provider.UpsertDocument(context.Background(), knowledgeprovider.KnowledgeDocument{
+		ID:      "doc-1",
+		Title:   "Billing",
+		Content: "Billing content",
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if id != "doc-1" {
+		t.Fatalf("expected returned external id, got %q", id)
+	}
+}
+
+func TestWeKnoraDescriptorDoesNotClaimDeletionSupport(t *testing.T) {
+	desc := knowledgeprovider.WeKnoraDescriptor(true, "kb-1")
+	for _, capability := range desc.Capabilities {
+		if capability.Name == aiprovider.CapabilityDeletion && capability.Enabled {
+			t.Fatalf("expected weknora deletion capability to be disabled, got %+v", desc)
+		}
+	}
+}
+
+func TestProviderDeleteDocumentUnsupported(t *testing.T) {
+	provider := NewProvider(&mockClient{}, "kb-1")
+	err := provider.DeleteDocument(context.Background(), "doc-1")
+	if !errors.Is(err, knowledgeprovider.ErrOperationNotSupported) {
+		t.Fatalf("expected unsupported operation error, got %v", err)
 	}
 }

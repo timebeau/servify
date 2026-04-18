@@ -244,11 +244,12 @@
   - 补真实 provider 场景下的运行证据
   - 区分 Dify 主路径与 WeKnora compatibility 路径
   - 为失败、超时、fallback 生成可留档证据
+  - 收口 `knowledge-docs` 与外部 knowledge provider 的索引一致性边界，避免管理端 CRUD 与 AI 检索链路继续脱节
 - 验收标准：
   - 至少一条真实文档上传、同步、查询命中成功
   - fallback 有实际日志、响应、状态三类证据
 - 状态：`[-]`
-- 最近进展：已把 Dify/WeKnora 验收脚本接入 `Makefile` 统一入口、CI 脚本门禁和本地开发文档入口；当前 `make dify-acceptance` / `make weknora-acceptance` / `make knowledge-provider-acceptance` 已成为稳定执行口径
+- 最近进展：已把 Dify/WeKnora 验收脚本接入 `Makefile` 统一入口、CI 脚本门禁和本地开发文档入口；当前 `make dify-acceptance` / `make weknora-acceptance` / `make knowledge-provider-acceptance` 已成为稳定执行口径；同时已修正 `OrchestratedEnhancedAIService.SyncKnowledgeBase()` 在 provider 未启用时返回假成功的问题，避免把“未配置/不可用”误记成“同步完成”；另外已把 `knowledge-docs` 的 `Create/Update` 接到当前 provider `UpsertDocument`，并把外部 `document_id` 映射持久化到 `KnowledgeDoc.provider_id/external_id`，删除链路也开始优先使用外部 ID；当前剩余缺口不再是“没有映射”，而是 Dify/WeKnora 这两条 provider 删除能力本身还没有恢复到可宣称闭环的程度
 - 下一步：以 `docs/acceptance-checklist.md` 为准补齐真实 provider 场景的运行证据，把 `upload` / `sync` 从“部分通过”推进到“通过”，并在有真实凭证时回填验收结果
 - 阻塞项：外部 provider 环境与凭证
 
@@ -267,7 +268,7 @@
   - 旧 refresh token 复用失败
   - 当前会话与其它会话退出都能看到状态变化
 - 状态：`[ ]`
-- 最近进展：自动化存在，但验收矩阵仍为 `部分通过`
+- 最近进展：自动化与基础运行验证已覆盖 `login` / `refresh` / `sessions` / `logout-current` / `logout-others`；当前已确认代码与自动化存在，但 `acceptance-checklist` 已按发布口径回调为 `部分通过`，因为真实请求证据与反例留档仍不完整
 - 下一步：补真实请求证据和至少一条反例证据
 - 阻塞项：暂无
 
@@ -282,12 +283,12 @@
 - 风险：
   - 客服主链路不能长期停留在“整体通过、分项阻塞”
 - 验收标准：
-  - `GET /api/omni/sessions/:id` 不再阻塞
-  - 每个操作有请求结果与状态变化证据
+  - 每个操作都有可回溯的真实请求结果与状态变化证据
+  - 发布口径下不再仅依赖自动化通过
 - 状态：`[ ]`
-- 最近进展：验收矩阵中 `会话详情` 仍为 `阻塞`
-- 下一步：定位 `conversation_workspace_handler` 当前剩余阻塞原因
-- 阻塞项：需结合当前 seed 数据与读模型一致性排查
+- 最近进展：当前已确认 `会话详情`、`消息列表`、`发送消息`、`指派会话`、`转接会话`、`关闭会话` 都有代码与自动化覆盖；`acceptance-checklist` 已按发布口径统一回调为 `部分通过`，因为剩余问题不再是“路由阻塞”，而是发布证据、异常路径和运行留档仍不足
+- 下一步：补齐工作台主操作的真实请求留档，并补至少一条失败/拒绝路径证据
+- 阻塞项：暂无
 
 ### [!] P1-4 运行基线最小事实补齐
 

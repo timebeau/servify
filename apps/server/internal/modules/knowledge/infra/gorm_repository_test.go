@@ -118,3 +118,28 @@ func TestGormDocumentRepository_PublicFilter(t *testing.T) {
 		t.Fatalf("unexpected public doc %+v", docs[0])
 	}
 }
+
+func TestGormDocumentRepository_PersistsExternalMapping(t *testing.T) {
+	db := newKnowledgeInfraTestDB(t)
+	repo := NewGormDocumentRepository(db)
+
+	doc := &domain.Document{
+		ProviderID: "dify",
+		ExternalID: "ext-123",
+		Title:      "Billing",
+		Content:    "Billing details",
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+	if err := repo.Create(context.Background(), doc); err != nil {
+		t.Fatalf("create doc: %v", err)
+	}
+
+	got, err := repo.Get(context.Background(), doc.ID)
+	if err != nil {
+		t.Fatalf("get doc: %v", err)
+	}
+	if got.ProviderID != "dify" || got.ExternalID != "ext-123" {
+		t.Fatalf("unexpected provider mapping: %+v", got)
+	}
+}

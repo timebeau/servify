@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -91,7 +92,8 @@ func (r *memJobRepo) Get(ctx context.Context, id string) (*domain.IndexJob, erro
 }
 
 func TestServiceCreateDocument(t *testing.T) {
-	svc := NewService(&memDocRepo{}, &memJobRepo{}, nil)
+	provider := &mockkp.Provider{}
+	svc := NewService(&memDocRepo{}, &memJobRepo{}, provider)
 	doc, err := svc.CreateDocument(context.Background(), CreateDocumentRequest{
 		Title:    " KB Title ",
 		Content:  " KB Content ",
@@ -109,6 +111,100 @@ func TestServiceCreateDocument(t *testing.T) {
 	}
 	if !doc.IsPublic {
 		t.Fatal("expected document to keep public flag")
+	}
+	if provider.Documents[doc.ID].Title != "KB Title" {
+		t.Fatalf("expected provider sync on create, got %+v", provider.Documents)
+	}
+	if doc.ExternalID == "" {
+		t.Fatalf("expected external id to be recorded, got %+v", doc)
+	}
+}
+
+func TestServiceUpdateDocumentSyncsProvider(t *testing.T) {
+	provider := &mockkp.Provider{}
+	svc := NewService(&memDocRepo{}, &memJobRepo{}, provider)
+
+	doc, err := svc.CreateDocument(context.Background(), CreateDocumentRequest{
+		ID:      "doc-1",
+		Title:   "Billing",
+		Content: "Old content",
+	})
+	if err != nil {
+		t.Fatalf("create doc: %v", err)
+	}
+
+	newTitle := "Billing Updated"
+	newContent := "New content"
+	newTags := []string{"faq", "billing"}
+	updated, err := svc.UpdateDocument(context.Background(), doc.ID, UpdateDocumentRequest{
+		Title:   &newTitle,
+		Content: &newContent,
+		Tags:    &newTags,
+	})
+	if err != nil {
+		t.Fatalf("update doc: %v", err)
+	}
+
+	if updated.Title != newTitle || updated.Content != newContent {
+		t.Fatalf("unexpected updated doc: %+v", updated)
+	}
+	if provider.Documents[doc.ID].Title != newTitle || provider.Documents[doc.ID].Content != newContent {
+		t.Fatalf("expected provider sync on update, got %+v", provider.Documents)
+	}
+	if updated.ExternalID == "" {
+		t.Fatalf("expected external id to remain populated, got %+v", updated)
+	}
+}
+
+func TestServiceDeleteDocumentSyncsProvider(t *testing.T) {
+	provider := &trackingDeleteProvider{}
+	svc := NewService(&memDocRepo{}, &memJobRepo{}, provider)
+
+	doc, err := svc.CreateDocument(context.Background(), CreateDocumentRequest{
+		ID:      "doc-1",
+		Title:   "Billing",
+		Content: "Billing details",
+	})
+	if err != nil {
+		t.Fatalf("create doc: %v", err)
+	}
+
+	if err := svc.DeleteDocument(context.Background(), doc.ID); err != nil {
+		t.Fatalf("delete doc: %v", err)
+	}
+	if provider.deletedID != doc.ExternalID {
+		t.Fatalf("expected provider delete to use external id %q, got %q", doc.ExternalID, provider.deletedID)
+	}
+	if _, ok := provider.Documents[doc.ID]; ok {
+		t.Fatalf("expected provider delete, got %+v", provider.Documents)
+	}
+	if _, err := svc.GetDocument(context.Background(), doc.ID); err == nil {
+		t.Fatal("expected repository delete")
+	}
+}
+
+func TestServiceDeleteDocumentFailsWhenProviderDeletionUnsupported(t *testing.T) {
+	provider := &unsupportedDeleteProvider{}
+	svc := NewService(&memDocRepo{}, &memJobRepo{}, provider)
+
+	doc, err := svc.CreateDocument(context.Background(), CreateDocumentRequest{
+		ID:      "doc-1",
+		Title:   "Billing",
+		Content: "Billing details",
+	})
+	if err != nil {
+		t.Fatalf("create doc: %v", err)
+	}
+
+	err = svc.DeleteDocument(context.Background(), doc.ID)
+	if err == nil {
+		t.Fatal("expected delete error when provider deletion unsupported")
+	}
+	if !errors.Is(err, knowledgeprovider.ErrOperationNotSupported) {
+		t.Fatalf("expected unsupported operation error, got %v", err)
+	}
+	if _, err := svc.GetDocument(context.Background(), doc.ID); err != nil {
+		t.Fatalf("expected repository document to remain after failed delete, got %v", err)
 	}
 }
 
@@ -211,3 +307,21 @@ func TestServiceRunIndexJobProviderSwitchRegression(t *testing.T) {
 }
 
 var _ knowledgeprovider.KnowledgeProvider = (*mockkp.Provider)(nil)
+
+type unsupportedDeleteProvider struct {
+	mockkp.Provider
+}
+
+func (p *unsupportedDeleteProvider) DeleteDocument(ctx context.Context, id string) error {
+	return knowledgeprovider.ErrOperationNotSupported
+}
+
+type trackingDeleteProvider struct {
+	mockkp.Provider
+	deletedID string
+}
+
+func (p *trackingDeleteProvider) DeleteDocument(ctx context.Context, id string) error {
+	p.deletedID = id
+	return p.Provider.DeleteDocument(ctx, id)
+}

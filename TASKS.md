@@ -1,158 +1,81 @@
-# Servify v0.1.0 验收任务清单
+# Servify v0.1.0 真实状态审计
 
 > 最后更新: 2026-04-18
-> **重要**: 使用 `-count=1` 禁用测试缓存以获得真实结果
+> 这份文件不再把“测试通过”直接等同于“发版完成”。
 
-## 验证方法
+## 当前结论
+
+`v0.1.0` 现在不适合发布。
+
+原因不是“核心功能完全没写”，而是以下三类问题同时存在：
+
+1. `TASKS.md`、`todo.md`、`docs/acceptance-checklist.md`、`docs/release-notes-v0.1.0.md` 的完成口径不一致。
+2. 仓库里有一批“接口存在 + 测试通过”，但离“真实发布闭环”还有差距的能力。
+3. `0.1.0` blocker 里仍有 `部分通过`、`未验` 或实现语义不够稳定的项。
+
+## 目前可以确认的最小事实
+
+这些能力可以保留“已具备基础能力”表述：
+
+- `make build`、`make release-check CONFIG=./config.yml`、`GET /health`、`GET /ready`、`GET /metrics` 已有明确证据。
+- 核心客服主链路已具备可演示性：工作台、会话详情、消息收发、指派、转接、关闭至少已有自动化与部分人工运行证据。
+- 工单主闭环具备基础可用性：创建、列表、详情、更新、指派、评论、关闭、统计、导出都已有实现和自动化覆盖。
+- Auth session 基础链路不是空壳：登录、refresh、sessions、logout-current、logout-others 已有实现和自动化覆盖。
+- 实时基础能力已具备：WebSocket、WebRTC stats / connections、平台消息路由统计有入口和验证。
+
+## 当前不能再写成“已完成”的部分
+
+这些项不是“没有代码”，但不能再按“完成验收”描述：
+
+- AI / Knowledge
+  - `upload`、`sync` 在验收矩阵里仍是 `部分通过`
+  - fallback 仍主要依赖内存态知识库与规则回复
+  - provider 抽象存在未实现空壳与成功语义过宽的问题
+  - `knowledge-docs` 已开始持久化 `provider_id/external_id`，`Create/Update` 会同步当前外部 knowledge provider，`Delete` 也会优先使用外部 `document_id`
+  - 但当前 provider 删除能力仍未闭环：Dify / WeKnora 仍未恢复为“支持精准删除”，现阶段依然只能按“能力不支持则显式失败并保留本地文档”的保守策略处理
+- 后台基础运营面
+  - customer、macro、custom-field、statistics、satisfaction、automation 等模块大多只有基础 CRUD / 查询面
+  - handler 普遍较薄，错误分类粗，不适合按“高可信完成”描述
+- 会话转接运营面
+  - 验收矩阵中仍为 `未验`
+  - 队列处理与取消等链路存在“部分失败仍返回成功”的风险
+- 满意度后台全量运营面
+  - 验收矩阵中仍为 `未验`
+  - 错误处理仍依赖字符串匹配，稳定性一般
+- 宏 / 自动化 / 排班 / 自定义字段
+  - 这些能力可以继续留在 backlog，不应再在这个文件里写成“全部完成”
+
+## 当前 blocker
+
+按 `docs/release-0.1.0-acceptance.md` 与 `todo.md`，当前至少还有以下 blocker 未闭环：
+
+1. AI / Knowledge 至少 1 条真实 provider 主路径达到 `通过`
+2. Auth 自助 session 链路补齐真实发布证据
+3. 会话工作台主操作补齐到 `通过`
+4. 运行基线最小事实全部回填
+5. Ticket 主闭环高频操作按发布口径补齐证据
+
+## 不可信的旧结论
+
+以下旧结论已不再成立：
+
+- “已完成 37 项”
+- “待完成 0 项”
+- “测试通过即可视为功能完成”
+
+这些说法会误导后续发布判断，现废止。
+
+## 后续维护规则
+
+1. 以 `todo.md` 和 `docs/acceptance-checklist.md` 作为真实状态源。
+2. 只有同时具备代码、自动化、运行、数据四类证据的功能，才允许标记为 `通过`。
+3. `TASKS.md` 不再维护“全部完成”式总表，只记录当前真实发布判断。
+
+## 参考验证命令
 
 ```bash
-# 全量测试（禁用缓存）
 go test -count=1 ./apps/server/...
-
-# Integration 测试（禁用缓存）
 go test -count=1 -tags=integration ./apps/server/internal/handlers ./apps/server/internal/services
+make build
+make release-check CONFIG=./config.yml
 ```
-
-> **注意**: `go test` 默认会缓存结果，可能隐藏真实的测试失败。**必须使用 `-count=1`** 来验证真实的测试状态。
-
-## 已完成 ✅
-
-| 模块 | 功能 | API | 测试文件 | 状态 |
-|------|------|-----|----------|------|
-| 客户管理 | 客户列表 | GET /api/customers | customer_handler_test.go | ✅ 测试通过 |
-| 客户管理 | 活动轨迹 | GET /api/customers/:id/activity | customer_handler_test.go | ✅ 测试通过 |
-| 客服管理 | 创建客服 | POST /api/agents | agent_handler_test.go | ✅ 测试通过 |
-| 客服管理 | 查找可用客服 | GET /api/agents/find-available | agent_handler_test.go | ✅ 测试通过 |
-| 客服管理 | 会话分配/释放 | POST /api/agents/:id/assign-session | agent_handler_test.go | ✅ 测试通过 |
-| 会话转接 | 转人工 | POST /api/session-transfer/to-human | session_transfer_handler_test.go | ✅ 测试通过 |
-| 会话转接 | 指定客服转接 | POST /api/session-transfer/to-agent | session_transfer_handler_test.go | ✅ 测试通过 |
-| 会话转接 | 查询转接历史 | GET /api/session-transfer/history/:session_id | session_transfer_handler_test.go | ✅ 测试通过 |
-| 会话转接 | 查询等待队列 | GET /api/session-transfer/waiting | session_transfer_handler_test.go | ✅ 测试通过 |
-| 会话转接 | 取消等待 | POST /api/session-transfer/cancel | session_transfer_handler_test.go | ✅ 测试通过 |
-| 会话转接 | 处理排队 | POST /api/session-transfer/process-queue | session_transfer_handler_test.go | ✅ 测试通过 |
-| 会话转接 | 自动转接检查 | POST /api/session-transfer/check-auto | session_transfer_handler_test.go | ✅ 测试通过 |
-| 满意度 | 创建满意度记录 | POST /api/satisfactions | satisfaction_handler_test.go | ✅ 测试通过 |
-| 满意度 | 满意度列表 | GET /api/satisfactions | satisfaction_handler_test.go | ✅ 测试通过 |
-| 满意度 | 满意度统计 | GET /api/satisfactions/stats | satisfaction_handler_test.go | ✅ 测试通过 |
-| 满意度 | 调查列表 | GET /api/satisfactions/surveys | satisfaction_handler_test.go | ✅ 测试通过 |
-| 满意度 | 重发调查 | POST /api/satisfactions/surveys/:id/resend | satisfaction_handler_test.go | ✅ 测试通过 |
-| 满意度 | 查看满意度详情 | GET /api/satisfactions/:id | satisfaction_handler_test.go | ✅ 测试通过 |
-| 满意度 | 更新满意度 | PUT /api/satisfactions/:id | satisfaction_handler_test.go | ✅ 测试通过 |
-| 满意度 | 删除满意度 | DELETE /api/satisfactions/:id | satisfaction_handler_test.go | ✅ 测试通过 |
-| 满意度 | 按工单查询满意度 | GET /api/tickets/:id/satisfaction | satisfaction_handler_test.go | ✅ 测试通过 |
-| 宏管理 | CRUD+应用 | /api/macros 系列 | macro_handler_test.go | ✅ 测试通过 |
-| 应用集成 | CRUD | /api/apps/integrations 系列 | app_market_handler_test.go | ✅ 测试通过 |
-| 自定义字段 | CRUD | /api/custom-fields 系列 | custom_field_handler_test.go | ✅ 测试通过 |
-| 统计分析 | Dashboard | GET /api/statistics/dashboard | statistics_handler_test.go | ✅ 测试通过 |
-| 统计分析 | 客服绩效统计 | GET /api/statistics/agent-performance | statistics_handler_test.go | ✅ 测试通过 |
-| 统计分析 | 工单分类统计 | GET /api/statistics/ticket-category | statistics_handler_test.go | ✅ 测试通过 |
-| 统计分析 | 工单优先级统计 | GET /api/statistics/ticket-priority | statistics_handler_test.go | ✅ 测试通过 |
-| 统计分析 | 客户来源统计 | GET /api/statistics/customer-source | statistics_handler_test.go | ✅ 测试通过 |
-| 统计分析 | 远程协助工单统计 | GET /api/statistics/remote-assist-tickets | statistics_handler_test.go | ✅ 测试通过 |
-
-## 最近修复
-
-### 编译错误修复
-
-1. **SQLite driver 迁移** - 15个测试文件从 `gorm.io/driver/sqlite` (CGO) 迁移到 `github.com/glebarez/sqlite` (纯 Go)
-   - `apps/server/internal/platform/usersecurity/revoke_test.go`
-   - `apps/server/internal/platform/configscope/gorm_provider_test.go`
-   - `apps/server/internal/platform/auth/user_state_policy_test.go`
-   - `apps/server/internal/platform/audit/query_test.go`
-   - `apps/server/internal/modules/voice/infra/gorm_repository_test.go`
-   - `apps/server/internal/modules/ticket/infra/gorm_repository_test.go`
-   - `apps/server/internal/modules/routing/infra/gorm_repository_scope_integration_test.go`
-   - `apps/server/internal/modules/routing/delivery/session_transfer_adapter_test.go`
-   - `apps/server/internal/modules/knowledge/infra/gorm_repository_test.go`
-   - `apps/server/internal/modules/customer/infra/gorm_repository_scope_integration_test.go`
-   - `apps/server/internal/modules/conversation/infra/gorm_repository_scope_integration_test.go`
-   - `apps/server/internal/modules/analytics/infra/gorm_repository_scope_integration_test.go`
-   - `apps/server/internal/modules/agent/infra/gorm_repository_scope_integration_test.go`
-   - `apps/server/internal/app/server/router_auth_test.go`
-   - `apps/server/internal/app/server/ai_scoped_handler_test.go`
-
-2. **AI handler adapter 接口** - 修复测试 stub 方法名与接口定义不匹配
-   - `UploadDocumentToWeKnora` → `UploadKnowledgeDocument`
-   - `SetWeKnoraEnabled` → `SetKnowledgeProviderEnabled`
-
-### 测试失败修复
-
-3. **user_security_handler_test** - 修复 risk_score 断言 (8→9)
-
-4. **MacroService.List 排序不稳定** - 修复时间精度问题
-   - 添加 `id DESC` 作为二级排序，确保相同 updated_at 时的稳定排序
-   - 修复测试 DB helper 使用 `cache=shared`
-   - 添加 ID 验证确保测试断言正确
-
-5. **默认配置安全问题** - 加强生产环境配置验证
-   - 添加 `Validate()` 函数，检测生产环境中的不安全默认值
-   - 更新 `config.yml` 数据库密码为明显的占位符
-   - 更新 CORS `allowed_headers` 从 `["*"]` 改为具体 header 列表
-   - 更新默认 JWT secret 为更明显的占位符
-   - 更新安全检查以识别所有已知不安全的默认值
-
-6. **安全默认值清单统一** - 消除重复维护
-   - 导出 `InsecureJWTSecrets`, `InsecureDatabasePasswords`, `InsecureWeKnoraAPIKeys` 为包级变量
-   - `bootstrap.SecurityWarnings()` 使用 config 包的共享清单
-   - 单一数据源，避免未来添加新默认值时漏一边
-
-7. **配置验证返回结构化警告** - 改进 API 设计
-   - `Validate()` 返回 `ValidateResult` 结构体，包含 warnings 和 valid 字段
-   - 添加 `LoadWithResult()` 函数供调用方获取结构化警告
-   - 不再直接往 stderr 打印，由调用方决定如何处理警告
-
-8. **MacroService.List 注释改进** - 使用业务语义
-   - 注释从"测试味"改为描述排序规则的业务含义
-
----
-
-## 测试验证结果
-
-```bash
-# Commit: 67b1fb9
-# 验证时间: 2026-04-18
-# 命令: go test -count=1 -tags=integration ./apps/server/internal/handlers ./apps/server/internal/services
-
-ok      servify/apps/server/internal/handlers    0.626s
-ok      servify/apps/server/internal/services    1.721s
-```
-
-```bash
-# Commit: 67b1fb9
-# 全量测试（禁用缓存）
-# 命令: go test -count=1 ./apps/server/...
-# 57 个包测试通过
-
-ok      servify/apps/server/internal/observability/metrics         0.184s
-ok      servify/apps/server/internal/observability/telemetry        0.935s
-ok      servify/apps/server/internal/platform/aiprovider            0.490s
-ok      servify/apps/server/internal/platform/audit                0.193s
-ok      servify/apps/server/internal/platform/auth                 0.234s
-ok      servify/apps/server/internal/platform/channel              0.506s
-ok      servify/apps/server/internal/platform/configscope          0.196s
-ok      servify/apps/server/internal/platform/eventbus             0.558s
-ok      servify/apps/server/internal/platform/knowledgeprovider    0.489s
-ok      servify/apps/server/internal/platform/knowledgeprovider/dify 0.782s
-ok      servify/apps/server/internal/platform/knowledgeprovider/memory 0.512s
-ok      servify/apps/server/internal/platform/knowledgeprovider/weknora 0.768s
-ok      servify/apps/server/internal/platform/llm                   0.631s
-ok      servify/apps/server/internal/platform/llm/anthropic        1.052s
-ok      servify/apps/server/internal/platform/llm/openai            1.051s
-ok      servify/apps/server/internal/platform/pstnprovider          0.527s
-ok      servify/apps/server/internal/platform/sip                   0.513s
-ok      servify/apps/server/internal/platform/sipws                 0.505s
-ok      servify/apps/server/internal/platform/storage               0.481s
-ok      servify/apps/server/internal/platform/usersecurity         0.226s
-ok      servify/apps/server/internal/services                       0.329s
-ok      servify/apps/server/pkg/dify                                0.781s
-ok      servify/apps/server/pkg/utils                               0.290s
-ok      servify/apps/server/pkg/weknora                             0.804s
-# ... (共 57 个包，全部通过)
-```
-
----
-
-## 统计
-
-- 已完成: 37 项 ✅ (已用 `-count=1` 验证通过)
-- 待完成: 0 项

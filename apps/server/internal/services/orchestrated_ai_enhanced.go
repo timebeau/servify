@@ -200,13 +200,14 @@ func (s *OrchestratedEnhancedAIService) UploadKnowledgeDocument(ctx context.Cont
 	if !s.knowledgeProviderEnabled || s.knowledgeProvider == nil {
 		return fmt.Errorf("knowledge provider is not enabled")
 	}
-	return s.knowledgeProvider.UpsertDocument(ctx, knowledgeprovider.KnowledgeDocument{
+	_, err := s.knowledgeProvider.UpsertDocument(ctx, knowledgeprovider.KnowledgeDocument{
 		ID:       title,
 		Title:    title,
 		Content:  content,
 		Tags:     tags,
 		Metadata: map[string]interface{}{"source": "manual_upload"},
 	})
+	return err
 }
 
 func (s *OrchestratedEnhancedAIService) GetMetrics() *AIMetrics {
@@ -228,10 +229,10 @@ func (s *OrchestratedEnhancedAIService) ResetCircuitBreaker() {
 
 func (s *OrchestratedEnhancedAIService) SyncKnowledgeBase(ctx context.Context) error {
 	if !s.knowledgeProviderEnabled || s.knowledgeProvider == nil {
-		return nil
+		return fmt.Errorf("knowledge provider is not enabled")
 	}
 	for _, doc := range s.base.knowledgeBase.documents {
-		if err := s.knowledgeProvider.UpsertDocument(ctx, knowledgeprovider.KnowledgeDocument{
+		if _, err := s.knowledgeProvider.UpsertDocument(ctx, knowledgeprovider.KnowledgeDocument{
 			ID:       strings.TrimSpace(doc.Title),
 			Title:    doc.Title,
 			Content:  doc.Content,
