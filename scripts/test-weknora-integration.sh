@@ -14,7 +14,7 @@ echo "🧪 WeKnora compatibility 集成测试开始..."
 SERVIFY_URL=${SERVIFY_URL:-"http://localhost:8080"}
 WEKNORA_URL=${WEKNORA_URL:-"http://localhost:9000"}
 WEKNORA_ENABLED=${WEKNORA_ENABLED:-true}
-JWT_SECRET=${JWT_SECRET:-"default-secret-key"}
+JWT_SECRET=${JWT_SECRET:-"dev-secret-key-change-in-production"}
 WEKNORA_ACCEPTANCE_MODE=${WEKNORA_ACCEPTANCE_MODE:-"mock"}
 EVIDENCE_DIR=${EVIDENCE_DIR:-"$PROJECT_ROOT/scripts/test-results/weknora-acceptance"}
 
@@ -642,7 +642,7 @@ base64url() {
 
 # Generate HS256 JWT with custom claims (must match server config/jwt.secret)
 issue_jwt() {
-  local secret="${1:-default-secret-key}"
+  local secret="${1:-$JWT_SECRET}"
   local token_type="${2:-service}"
   local principal_kind="${3:-service}"
   local roles="${4:-[\"service\"]}"
@@ -659,7 +659,7 @@ issue_jwt() {
   printf '%s.%s' "$signing_input" "$sig"
 }
 
-AUTH_TEST_TOKEN=$(issue_jwt "default-secret-key" "service" "service" "[\"service\"]" "[\"customers.read\"]")
+AUTH_TEST_TOKEN=$(issue_jwt "$JWT_SECRET" "service" "service" "[\"service\"]" "[\"customers.read\"]")
 
 echo "  ✓ 无 token 访问应被拒绝..."
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$SERVIFY_URL/api/customers/stats" || true)
@@ -689,7 +689,7 @@ echo ""
 echo "🛡️ 管理员专属接口测试（/api/statistics/...）..."
 
 # 仅 agent 角色访问 admin-only 接口应 403
-AGENT_TOKEN=$(issue_jwt "default-secret-key" "service" "agent" "[\"agent\"]" "[]")
+AGENT_TOKEN=$(issue_jwt "$JWT_SECRET" "service" "agent" "[\"agent\"]" "[]")
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $AGENT_TOKEN" "$SERVIFY_URL/api/statistics/dashboard" || true)
 if [ "$HTTP_CODE" = "403" ]; then
   echo "    ✅ agent 访问 admin-only 接口被拒绝 (403)"
@@ -701,7 +701,7 @@ else
 fi
 
 # admin 访问应 200
-ADMIN_TOKEN=$(issue_jwt "default-secret-key" "service" "service" "[\"service\"]" "[\"statistics.read\"]")
+ADMIN_TOKEN=$(issue_jwt "$JWT_SECRET" "service" "service" "[\"service\"]" "[\"statistics.read\"]")
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $ADMIN_TOKEN" "$SERVIFY_URL/api/statistics/dashboard" || true)
 if [ "$HTTP_CODE" = "200" ]; then
   echo "    ✅ admin 访问 admin-only 接口成功 (200)"

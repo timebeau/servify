@@ -13,7 +13,7 @@ echo "🧪 Dify primary integration 测试开始..."
 SERVIFY_URL=${SERVIFY_URL:-"http://localhost:8080"}
 DIFY_URL=${DIFY_URL:-"http://localhost:5001/v1"}
 DIFY_DATASET_ID=${DIFY_DATASET_ID:-"dataset-1"}
-JWT_SECRET=${JWT_SECRET:-"default-secret-key"}
+JWT_SECRET=${JWT_SECRET:-"dev-secret-key-change-in-production"}
 DIFY_ACCEPTANCE_MODE=${DIFY_ACCEPTANCE_MODE:-"mock"}
 EVIDENCE_DIR=${EVIDENCE_DIR:-"$PROJECT_ROOT/scripts/test-results/dify-acceptance"}
 
