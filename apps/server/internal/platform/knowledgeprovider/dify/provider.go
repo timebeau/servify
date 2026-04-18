@@ -3,6 +3,7 @@ package dify
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"servify/apps/server/internal/platform/knowledgeprovider"
 	base "servify/apps/server/pkg/dify"
@@ -111,7 +112,16 @@ func (p *Provider) UpsertDocument(ctx context.Context, doc knowledgeprovider.Kno
 }
 
 func (p *Provider) DeleteDocument(ctx context.Context, id string) error {
-	return knowledgeprovider.ErrOperationNotSupported
+	if p.client == nil {
+		return fmt.Errorf("dify client is not configured")
+	}
+	if p.datasetID == "" {
+		return fmt.Errorf("dify dataset id is not configured")
+	}
+	if id = docID(id); id == "" {
+		return fmt.Errorf("dify document id is not configured")
+	}
+	return p.client.DeleteDocument(ctx, p.datasetID, id)
 }
 
 func (p *Provider) HealthCheck(ctx context.Context) error {
@@ -122,4 +132,8 @@ func (p *Provider) HealthCheck(ctx context.Context) error {
 		return fmt.Errorf("dify dataset id is not configured")
 	}
 	return p.client.HealthCheck(ctx, p.datasetID)
+}
+
+func docID(id string) string {
+	return strings.TrimSpace(id)
 }

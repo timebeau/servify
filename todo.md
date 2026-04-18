@@ -249,7 +249,7 @@
   - 至少一条真实文档上传、同步、查询命中成功
   - fallback 有实际日志、响应、状态三类证据
 - 状态：`[-]`
-- 最近进展：已把 Dify/WeKnora 验收脚本接入 `Makefile` 统一入口、CI 脚本门禁和本地开发文档入口；当前 `make dify-acceptance` / `make weknora-acceptance` / `make knowledge-provider-acceptance` 已成为稳定执行口径；同时已修正 `OrchestratedEnhancedAIService.SyncKnowledgeBase()` 在 provider 未启用时返回假成功的问题，避免把“未配置/不可用”误记成“同步完成”；另外已把 `knowledge-docs` 的 `Create/Update` 接到当前 provider `UpsertDocument`，并把外部 `document_id` 映射持久化到 `KnowledgeDoc.provider_id/external_id`，删除链路也开始优先使用外部 ID；当前剩余缺口不再是“没有映射”，而是 Dify/WeKnora 这两条 provider 删除能力本身还没有恢复到可宣称闭环的程度
+- 最近进展：已把 Dify/WeKnora 验收脚本接入 `Makefile` 统一入口、CI 脚本门禁和本地开发文档入口；当前 `make dify-acceptance` / `make weknora-acceptance` / `make knowledge-provider-acceptance` 已成为稳定执行口径；同时已修正 `OrchestratedEnhancedAIService.SyncKnowledgeBase()` 在 provider 未启用时返回假成功的问题，避免把“未配置/不可用”误记成“同步完成”；另外已把 `knowledge-docs` 的 `Create/Update` 接到当前 provider `UpsertDocument`，并把外部 `document_id` 映射持久化到 `KnowledgeDoc.provider_id/external_id`，删除链路也开始优先使用外部 ID；当前 Dify 删除能力已恢复到可用状态，但 WeKnora 仍缺真实删除实现，因此 provider 删除闭环还没有全量完成
 - 下一步：以 `docs/acceptance-checklist.md` 为准补齐真实 provider 场景的运行证据，把 `upload` / `sync` 从“部分通过”推进到“通过”，并在有真实凭证时回填验收结果
 - 阻塞项：外部 provider 环境与凭证
 

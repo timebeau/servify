@@ -32,7 +32,8 @@
   - fallback 仍主要依赖内存态知识库与规则回复
   - provider 抽象存在未实现空壳与成功语义过宽的问题
   - `knowledge-docs` 已开始持久化 `provider_id/external_id`，`Create/Update` 会同步当前外部 knowledge provider，`Delete` 也会优先使用外部 `document_id`
-  - 但当前 provider 删除能力仍未闭环：Dify / WeKnora 仍未恢复为“支持精准删除”，现阶段依然只能按“能力不支持则显式失败并保留本地文档”的保守策略处理
+  - Dify 删除路径已恢复为真实能力，当前能基于持久化的外部 `document_id` 精准删除对应 dataset 文档
+  - WeKnora 删除能力仍未闭环，现阶段依然只能按“能力不支持则显式失败并保留本地文档”的保守策略处理
 - 后台基础运营面
   - customer、macro、custom-field、statistics、satisfaction、automation 等模块大多只有基础 CRUD / 查询面
   - handler 普遍较薄，错误分类粗，不适合按“高可信完成”描述
