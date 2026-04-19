@@ -53,12 +53,12 @@ func (r *GormDocumentRepository) Update(ctx context.Context, doc *domain.Documen
 	result := applyKnowledgeScope(r.db.WithContext(ctx).Model(&models.KnowledgeDoc{}), ctx).Where("id = ?", id).Updates(map[string]interface{}{
 		"provider_id": doc.ProviderID,
 		"external_id": doc.ExternalID,
-		"title":      doc.Title,
-		"content":    doc.Content,
-		"category":   doc.Category,
-		"tags":       strings.Join(doc.Tags, ","),
-		"is_public":  doc.IsPublic,
-		"updated_at": doc.UpdatedAt,
+		"title":       doc.Title,
+		"content":     doc.Content,
+		"category":    doc.Category,
+		"tags":        strings.Join(doc.Tags, ","),
+		"is_public":   doc.IsPublic,
+		"updated_at":  doc.UpdatedAt,
 	})
 	if result.Error != nil {
 		return result.Error

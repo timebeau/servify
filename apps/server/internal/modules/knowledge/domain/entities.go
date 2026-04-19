@@ -3,16 +3,16 @@ package domain
 import "time"
 
 type Document struct {
-	ID        string
+	ID         string
 	ProviderID string
 	ExternalID string
-	Title     string
-	Content   string
-	Category  string
-	Tags      []string
-	IsPublic  bool
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	Title      string
+	Content    string
+	Category   string
+	Tags       []string
+	IsPublic   bool
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
 type IndexJobStatus string
