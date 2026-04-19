@@ -7,7 +7,7 @@ import {
   ProFormSwitch,
 } from '@ant-design/pro-components';
 import { ProCard } from '@ant-design/pro-components';
-import { message, Spin } from 'antd';
+import { Alert, Spin } from 'antd';
 import { getPortalConfig } from '@/services/portalConfig';
 import { getWorkspaceOverview } from '@/services/workspace';
 
@@ -49,14 +49,25 @@ const SettingsPage: React.FC = () => {
 
   return (
     <ProCard title="系统设置">
+      <Alert
+        message="设置页面功能未完成"
+        description="当前设置页面仅用于演示 UI。实际的配置保存/加载 API 尚未实现，修改设置不会持久化。如需修改配置，请直接编辑 config.yml 文件并重启服务。"
+        type="warning"
+        showIcon
+        style={{ marginBottom: 24 }}
+      />
       <ProForm
         onFinish={async (values) => {
-          try {
-            console.log('Settings saved:', values);
-            message.success('设置已保存');
-          } catch (error) {
-            message.error('保存设置失败');
-          }
+          // TODO: Implement actual settings persistence API
+          console.log('Settings saved (NOT IMPLEMENTED):', values);
+          // This is a placeholder - the real implementation requires:
+          // 1. Backend API endpoint(s) for updating workspace/portal config
+          // 2. Config write-back with validation and hot-reload
+          // 3. Proper error handling and user feedback
+        }}
+        disabled
+        submitter={{
+          render: () => null, // Hide submit button since it's not implemented
         }}
         initialValues={{
           workspace_name: '',
@@ -71,11 +82,12 @@ const SettingsPage: React.FC = () => {
           name="workspace_name"
           label="工作空间名称"
           placeholder="请输入工作空间名称"
-          rules={[{ required: true, message: '请输入工作空间名称' }]}
+          disabled
         />
         <ProFormSelect
           name="timezone"
           label="时区"
+          disabled
           options={[
             { label: 'UTC+8 北京时间', value: 'Asia/Shanghai' },
             { label: 'UTC+9 东京时间', value: 'Asia/Tokyo' },
@@ -86,18 +98,20 @@ const SettingsPage: React.FC = () => {
         <ProFormSelect
           name="language"
           label="语言"
+          disabled
           options={[
             { label: '简体中文', value: 'zh-CN' },
             { label: 'English', value: 'en-US' },
           ]}
         />
-        <ProFormSwitch name="auto_assignment" label="自动分配工单" />
-        <ProFormSwitch name="notification_enabled" label="启用通知" />
+        <ProFormSwitch name="auto_assignment" label="自动分配工单" disabled />
+        <ProFormSwitch name="notification_enabled" label="启用通知" disabled />
         <ProFormTextArea
           name="welcome_message"
           label="欢迎语"
           placeholder="设置客户首次联系的欢迎语"
           fieldProps={{ rows: 3 }}
+          disabled
         />
       </ProForm>
     </ProCard>

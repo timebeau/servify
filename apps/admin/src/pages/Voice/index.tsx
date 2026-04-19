@@ -1,7 +1,7 @@
 import React from 'react';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
-import { Tag, Button } from 'antd';
+import { Alert, Tag, Button } from 'antd';
 import { listProtocols, listTranscripts } from '@/services/voice';
 
 const VoicePage: React.FC = () => {
@@ -55,12 +55,23 @@ const VoicePage: React.FC = () => {
 
   return (
     <div>
+      <Alert
+        message="语音管理页面功能未完成"
+        description="当前语音管理页面存在前后端契约不匹配问题：
+        1. 协议列表：后端返回结构不支持分页，前端期待分页数据
+        2. 转写记录：后端要求 call_id 参数，但前端未发送
+        Voice provider 当前仅支持 disabled，无真实录音/转写实现。
+        此页面仅用于 UI 演示，不具备实际功能。"
+        type="warning"
+        showIcon
+        style={{ marginBottom: 16 }}
+      />
       <ProTable<API.VoiceProtocol>
         headerTitle="语音协议"
         rowKey="id"
         columns={protocolColumns}
         toolBarRender={() => [
-          <Button key="add" type="primary">
+          <Button key="add" type="primary" disabled>
             添加协议
           </Button>,
         ]}
@@ -70,9 +81,11 @@ const VoicePage: React.FC = () => {
               page: params.current,
               page_size: params.pageSize,
             });
+            // Backend returns { success, data } without pagination total
+            // This is a contract mismatch - returning static data for UI demo
             return {
               data: result?.data || [],
-              total: result?.total || 0,
+              total: (result?.data || []).length, // Fake total for demo
               success: true,
             };
           } catch (error) {
@@ -91,9 +104,12 @@ const VoicePage: React.FC = () => {
         style={{ marginTop: 16 }}
         request={async (params) => {
           try {
+            // Backend requires call_id but frontend doesn't send it
+            // This will return 400 - contract mismatch
             const result = await listTranscripts({
               page: params.current,
               page_size: params.pageSize,
+              // call_id: '' // TODO: Fix backend API to support listing without call_id
             });
             return {
               data: result?.data || [],
@@ -102,6 +118,7 @@ const VoicePage: React.FC = () => {
             };
           } catch (error) {
             console.error('获取转写记录失败:', error);
+            // Return empty instead of showing error
             return { data: [], total: 0, success: true };
           }
         }}
