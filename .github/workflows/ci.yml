@@ -439,6 +439,7 @@ jobs:
         env:
           SERVIFY_URL: http://localhost:8080
           WEKNORA_URL: http://localhost:9000
+          JWT_SECRET: dev-secret-key-change-in-production
         run: |
           chmod +x scripts/test-weknora-integration.sh
           ./scripts/test-weknora-integration.sh
