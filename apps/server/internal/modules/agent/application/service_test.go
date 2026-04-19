@@ -138,6 +138,19 @@ func (s *stubRepo) RevokeUserTokens(ctx context.Context, userID uint, revokeAt t
 	return s.tokenVersion, nil
 }
 
+// New persisted runtime metadata methods
+func (s *stubRepo) UpdateLastActivity(ctx context.Context, userID uint) error {
+	return nil
+}
+
+func (s *stubRepo) SetConnectedTime(ctx context.Context, userID uint) error {
+	return nil
+}
+
+func (s *stubRepo) ClearConnectedTime(ctx context.Context, userID uint) error {
+	return nil
+}
+
 func TestServiceGoOnlineAndAssignSession(t *testing.T) {
 	repo := &stubRepo{
 		profile: &agentdomain.AgentProfile{

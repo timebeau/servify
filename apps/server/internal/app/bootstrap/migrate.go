@@ -69,6 +69,17 @@ func AutoMigrate(db *gorm.DB) error {
 			return err
 		}
 	}
+	// Agent runtime metadata persistence (migrate from in-memory registry)
+	if !db.Migrator().HasColumn(&models.Agent{}, "LastActivityAt") {
+		if err := db.Migrator().AddColumn(&models.Agent{}, "LastActivityAt"); err != nil {
+			return err
+		}
+	}
+	if !db.Migrator().HasColumn(&models.Agent{}, "ConnectedAt") {
+		if err := db.Migrator().AddColumn(&models.Agent{}, "ConnectedAt"); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

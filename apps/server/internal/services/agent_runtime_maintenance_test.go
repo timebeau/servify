@@ -86,6 +86,18 @@ func (r *maintenanceRepo) RevokeUserTokens(ctx context.Context, userID uint, rev
 	return 0, nil
 }
 
+func (r *maintenanceRepo) UpdateLastActivity(ctx context.Context, userID uint) error {
+	return nil
+}
+
+func (r *maintenanceRepo) SetConnectedTime(ctx context.Context, userID uint) error {
+	return nil
+}
+
+func (r *maintenanceRepo) ClearConnectedTime(ctx context.Context, userID uint) error {
+	return nil
+}
+
 type maintenanceRegistry struct {
 	items map[uint]agentapp.AgentRuntimeDTO
 }

@@ -16,6 +16,10 @@ type Repository interface {
 	ListAgents(ctx context.Context, limit int) ([]models.Agent, error)
 	UpdatePresenceStatus(ctx context.Context, userID uint, status agentdomain.PresenceStatus) error
 	UpdateChatLoad(ctx context.Context, userID uint, currentLoad int) error
+	// Persisted runtime metadata methods (replace in-memory registry)
+	UpdateLastActivity(ctx context.Context, userID uint) error
+	SetConnectedTime(ctx context.Context, userID uint) error
+	ClearConnectedTime(ctx context.Context, userID uint) error
 	GetSessionByID(ctx context.Context, sessionID string) (*models.Session, error)
 	AssignSession(ctx context.Context, sessionID string, agentUserID uint) error
 	ReleaseSession(ctx context.Context, sessionID string, agentUserID uint) error

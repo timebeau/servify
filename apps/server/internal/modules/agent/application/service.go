@@ -52,6 +52,10 @@ func (s *Service) GoOnline(ctx context.Context, userID uint) error {
 	if err := s.repo.UpdatePresenceStatus(ctx, userID, agentdomain.PresenceStatusOnline); err != nil {
 		return err
 	}
+	// Persist connection time and last activity
+	_ = s.repo.SetConnectedTime(ctx, userID)
+	_ = s.repo.UpdateLastActivity(ctx, userID)
+	// Still update in-memory registry for transient metadata (session cache)
 	_, err = s.registry.GoOnline(*profile)
 	return err
 }
@@ -60,6 +64,9 @@ func (s *Service) GoOffline(ctx context.Context, userID uint) error {
 	if err := s.repo.UpdatePresenceStatus(ctx, userID, agentdomain.PresenceStatusOffline); err != nil {
 		return err
 	}
+	// Clear persisted connection time
+	_ = s.repo.ClearConnectedTime(ctx, userID)
+	// Clear in-memory registry
 	s.registry.GoOffline(userID)
 	return nil
 }
@@ -72,6 +79,8 @@ func (s *Service) UpdateStatus(ctx context.Context, userID uint, status string) 
 	if err := s.repo.UpdatePresenceStatus(ctx, userID, next); err != nil {
 		return err
 	}
+	// Persist last activity
+	_ = s.repo.UpdateLastActivity(ctx, userID)
 	s.registry.UpdateStatus(userID, next)
 	return nil
 }
@@ -223,6 +232,10 @@ func (s *Service) mergeRuntimeMetadata(runtimes []AgentRuntimeDTO) []AgentRuntim
 	if len(runtimes) == 0 {
 		return runtimes
 	}
+	// In-memory registry provides transient metadata (e.g., cached sessions).
+	// LastActivity/ConnectedAt are now persisted in the database, so they will
+	// be available even after restart. The in-memory values only override if
+	// more recent (e.g., during active session without DB flush).
 	metadata := make(map[uint]AgentRuntimeDTO, len(runtimes))
 	for _, runtime := range s.registry.List() {
 		metadata[runtime.UserID] = runtime
@@ -232,8 +245,13 @@ func (s *Service) mergeRuntimeMetadata(runtimes []AgentRuntimeDTO) []AgentRuntim
 		if !ok {
 			continue
 		}
-		runtimes[i].LastActivity = item.LastActivity
-		runtimes[i].ConnectedAt = item.ConnectedAt
+		// Only override if in-memory value is more recent than persisted value
+		if item.LastActivity.IsZero() || item.LastActivity.After(runtimes[i].LastActivity) {
+			runtimes[i].LastActivity = item.LastActivity
+		}
+		if item.ConnectedAt.IsZero() || (!runtimes[i].ConnectedAt.IsZero() && item.ConnectedAt.Before(runtimes[i].ConnectedAt)) {
+			runtimes[i].ConnectedAt = item.ConnectedAt
+		}
 	}
 	return runtimes
 }

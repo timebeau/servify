@@ -71,6 +71,18 @@ func (r *legacyAdapterRepo) RevokeUserTokens(ctx context.Context, userID uint, r
 	return 0, nil
 }
 
+func (r *legacyAdapterRepo) UpdateLastActivity(ctx context.Context, userID uint) error {
+	return nil
+}
+
+func (r *legacyAdapterRepo) SetConnectedTime(ctx context.Context, userID uint) error {
+	return nil
+}
+
+func (r *legacyAdapterRepo) ClearConnectedTime(ctx context.Context, userID uint) error {
+	return nil
+}
+
 type legacyAdapterRegistry struct {
 	items map[uint]agentapp.AgentRuntimeDTO
 }

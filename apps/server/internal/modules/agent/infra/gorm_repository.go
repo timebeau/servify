@@ -112,6 +112,23 @@ func (r *GormRepository) UpdatePresenceStatus(ctx context.Context, userID uint, 
 	return nil
 }
 
+// UpdateLastActivity updates the agent's last activity timestamp (persisted).
+func (r *GormRepository) UpdateLastActivity(ctx context.Context, userID uint) error {
+	now := time.Now()
+	return applyAgentScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Where("user_id = ?", userID).Update("last_activity_at", now).Error
+}
+
+// SetConnectedTime sets the agent's connected timestamp (persisted).
+func (r *GormRepository) SetConnectedTime(ctx context.Context, userID uint) error {
+	now := time.Now()
+	return applyAgentScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Where("user_id = ?", userID).Update("connected_at", now).Error
+}
+
+// ClearConnectedTime clears the agent's connected timestamp when going offline.
+func (r *GormRepository) ClearConnectedTime(ctx context.Context, userID uint) error {
+	return applyAgentScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Where("user_id = ?", userID).Update("connected_at", nil).Error
+}
+
 func (r *GormRepository) UpdateChatLoad(ctx context.Context, userID uint, currentLoad int) error {
 	return applyAgentScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Where("user_id = ?", userID).Update("current_load", currentLoad).Error
 }
@@ -205,7 +222,7 @@ func mapProfile(user models.User, agent models.Agent) *agentdomain.AgentProfile 
 }
 
 func mapRuntime(user models.User, agent models.Agent) agentapp.AgentRuntimeDTO {
-	return agentapp.AgentRuntimeDTO{
+	runtime := agentapp.AgentRuntimeDTO{
 		UserID:              agent.UserID,
 		Username:            user.Username,
 		Name:                user.Name,
@@ -219,6 +236,14 @@ func mapRuntime(user models.User, agent models.Agent) agentapp.AgentRuntimeDTO {
 		Rating:              agent.Rating,
 		AvgResponseTime:     agent.AvgResponseTime,
 	}
+	// Use persisted LastActivityAt/ConnectedAt if available
+	if agent.LastActivityAt != nil {
+		runtime.LastActivity = *agent.LastActivityAt
+	}
+	if agent.ConnectedAt != nil {
+		runtime.ConnectedAt = *agent.ConnectedAt
+	}
+	return runtime
 }
 
 func splitSkills(raw string) []string {
