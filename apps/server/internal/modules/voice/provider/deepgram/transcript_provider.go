@@ -14,7 +14,7 @@ import (
 
 // Config holds Deepgram configuration.
 type Config struct {
-	APIKey string
+	APIKey  string
 	BaseURL string // Optional override, defaults to https://api.deepgram.com/v1
 }
 

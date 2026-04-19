@@ -6,10 +6,10 @@ import (
 
 	"servify/apps/server/internal/config"
 	voiceapp "servify/apps/server/internal/modules/voice/application"
+	providerdeepgram "servify/apps/server/internal/modules/voice/provider/deepgram"
 	voiceproviderdisabled "servify/apps/server/internal/modules/voice/provider/disabled"
 	voiceprovidermock "servify/apps/server/internal/modules/voice/provider/mock"
 	providertwilio "servify/apps/server/internal/modules/voice/provider/twilio"
-	providerdeepgram "servify/apps/server/internal/modules/voice/provider/deepgram"
 
 	"github.com/sirupsen/logrus"
 )

@@ -96,8 +96,8 @@ type Agent struct {
 	Rating          float64        `gorm:"default:5.0" json:"rating"`          // 评分
 	TotalTickets    int            `gorm:"default:0" json:"total_tickets"`     // 总处理工单数
 	AvgResponseTime int            `gorm:"default:0" json:"avg_response_time"` // 平均响应时间(秒)
-	LastActivityAt  *time.Time     `json:"last_activity_at,omitempty"`            // 最后活动时间(持久化，替代内存registry)
-	ConnectedAt     *time.Time     `json:"connected_at,omitempty"`                // 上线时间(持久化，替代内存registry)
+	LastActivityAt  *time.Time     `json:"last_activity_at,omitempty"`         // 最后活动时间(持久化，替代内存registry)
+	ConnectedAt     *time.Time     `json:"connected_at,omitempty"`             // 上线时间(持久化，替代内存registry)
 	CreatedAt       time.Time      `json:"created_at"`
 	UpdatedAt       time.Time      `json:"updated_at"`
 	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`

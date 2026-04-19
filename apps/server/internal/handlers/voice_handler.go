@@ -156,10 +156,10 @@ func (h *VoiceHandler) ListTranscripts(c *gin.Context) {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{
-			"success": true,
-			"data":    items,
-			"total":   len(items),
-			"page":    page,
+			"success":   true,
+			"data":      items,
+			"total":     len(items),
+			"page":      page,
 			"page_size": pageSize,
 		})
 		return
@@ -172,10 +172,10 @@ func (h *VoiceHandler) ListTranscripts(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    items,
-		"total":   total,
-		"page":    page,
+		"success":   true,
+		"data":      items,
+		"total":     total,
+		"page":      page,
 		"page_size": pageSize,
 	})
 }
@@ -229,10 +229,10 @@ func (h *VoiceHandler) ListProtocols(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"data":       data,
-			"total":      len(data),
-			"page":       page,
-			"page_size":  pageSize,
+			"data":      data,
+			"total":     len(data),
+			"page":      page,
+			"page_size": pageSize,
 		},
 	})
 }

@@ -9,10 +9,10 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
+	"servify/apps/server/internal/models"
 	agentapp "servify/apps/server/internal/modules/agent/application"
 	agentdomain "servify/apps/server/internal/modules/agent/domain"
-	"servify/apps/server/internal/models"
-	"gorm.io/gorm"
 )
 
 const (
@@ -32,8 +32,8 @@ type RedisRegistry struct {
 	logger     *logrus.Logger
 	localCache *InMemoryRegistry // For fast local reads
 
-	mu   sync.RWMutex
-	ctx  context.Context
+	mu     sync.RWMutex
+	ctx    context.Context
 	cancel context.CancelFunc
 }
 

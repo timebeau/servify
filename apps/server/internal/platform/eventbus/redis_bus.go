@@ -219,11 +219,11 @@ type streamEvent struct {
 	aggregateID string
 }
 
-func (e *streamEvent) ID() string        { return e.id }
-func (e *streamEvent) Name() string      { return e.name }
+func (e *streamEvent) ID() string            { return e.id }
+func (e *streamEvent) Name() string          { return e.name }
 func (e *streamEvent) OccurredAt() time.Time { return e.occurredAt }
-func (e *streamEvent) TenantID() string   { return e.tenantID }
-func (e *streamEvent) AggregateID() string { return e.aggregateID }
+func (e *streamEvent) TenantID() string      { return e.tenantID }
+func (e *streamEvent) AggregateID() string   { return e.aggregateID }
 
 // Helper functions for type conversion
 func castToString(v interface{}) string {

@@ -86,9 +86,9 @@ type WebRTCConfig struct {
 }
 
 type VoiceConfig struct {
-	RecordingProvider  string       `yaml:"recording_provider"`
-	TranscriptProvider string       `yaml:"transcript_provider"`
-	Twilio             TwilioConfig `yaml:"twilio"`
+	RecordingProvider  string         `yaml:"recording_provider"`
+	TranscriptProvider string         `yaml:"transcript_provider"`
+	Twilio             TwilioConfig   `yaml:"twilio"`
 	Deepgram           DeepgramConfig `yaml:"deepgram"`
 }
 

@@ -4805,6 +4805,10 @@ const docTemplate = `{
                     "description": "平均响应时间(秒)",
                     "type": "integer"
                 },
+                "connected_at": {
+                    "description": "上线时间(持久化，替代内存registry)",
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -4817,6 +4821,10 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "integer"
+                },
+                "last_activity_at": {
+                    "description": "最后活动时间(持久化，替代内存registry)",
+                    "type": "string"
                 },
                 "max_concurrent": {
                     "description": "最大并发工单数",
