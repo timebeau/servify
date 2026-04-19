@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	voicedelivery "servify/apps/server/internal/modules/voice/delivery"
@@ -133,19 +134,50 @@ func (h *VoiceHandler) ListTranscripts(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "voice coordinator unavailable"})
 		return
 	}
-	callID := c.Query("call_id")
-	if callID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "call_id is required"})
-		return
-	}
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
-	items, err := h.coordinator.ListTranscripts(ctx, callID)
+
+	// Parse pagination parameters
+	page := 1
+	pageSize := 10
+	if p, err := strconv.Atoi(c.DefaultQuery("page", "1")); err == nil && p > 0 {
+		page = p
+	}
+	if ps, err := strconv.Atoi(c.DefaultQuery("page_size", "10")); err == nil && ps > 0 {
+		pageSize = ps
+	}
+
+	callID := c.Query("call_id")
+	if callID != "" {
+		// List transcripts for a specific call
+		items, err := h.coordinator.ListTranscripts(ctx, callID)
+		if err != nil {
+			respondVoiceError(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data":    items,
+			"total":   len(items),
+			"page":    page,
+			"page_size": pageSize,
+		})
+		return
+	}
+
+	// List all transcripts with pagination
+	items, total, err := h.coordinator.ListAllTranscripts(ctx, page, pageSize)
 	if err != nil {
 		respondVoiceError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": items})
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    items,
+		"total":   total,
+		"page":    page,
+		"page_size": pageSize,
+	})
 }
 
 func respondVoiceError(c *gin.Context, err error) {
@@ -170,9 +202,38 @@ func (h *VoiceHandler) ListProtocols(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "voice protocol registry unavailable"})
 		return
 	}
+
+	protocols := h.registry.SupportedProtocols()
+
+	// Convert to DTO format with metadata
+	data := make([]gin.H, len(protocols))
+	for i, p := range protocols {
+		data[i] = gin.H{
+			"id":         string(p),
+			"type":       string(p),
+			"status":     "configured",
+			"created_at": time.Now().Format(time.RFC3339),
+		}
+	}
+
+	// Parse pagination parameters
+	page := 1
+	pageSize := len(data)
+	if p, err := strconv.Atoi(c.DefaultQuery("page", "1")); err == nil && p > 0 {
+		page = p
+	}
+	if ps, err := strconv.Atoi(c.DefaultQuery("page_size", "10")); err == nil && ps > 0 {
+		pageSize = ps
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"data":    h.registry.SupportedProtocols(),
+		"data": gin.H{
+			"data":       data,
+			"total":      len(data),
+			"page":       page,
+			"page_size":  pageSize,
+		},
 	})
 }
 

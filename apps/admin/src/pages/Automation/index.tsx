@@ -1,7 +1,7 @@
 import React from 'react';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
-import { Alert, Button, Space, Switch, Tag, message } from 'antd';
+import { Space, Switch, Tag, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { listAutomations, deleteAutomation, runAutomation } from '@/services/automation';
 
@@ -61,12 +61,11 @@ const AutomationPage: React.FC = () => {
                 await runAutomation(record.id);
                 message.success('规则已执行');
               } catch (error) {
-                message.error('执行失败：参数契约不匹配');
+                message.error('执行失败');
               }
             }}
-            style={{ color: '#999', cursor: 'not-allowed' }}
           >
-            执行（未实现）
+            执行
           </a>
           <a
             onClick={async () => {
@@ -86,16 +85,7 @@ const AutomationPage: React.FC = () => {
   ];
 
   return (
-    <>
-      <Alert
-        message="自动化执行功能未完成"
-        description="前端发送 { automation_id } 但后端期望 { event, ticket_ids, dry_run }。
-        参数契约不匹配，执行按钮无法正常工作。需要修复前端服务或后端 API 以统一参数格式。"
-        type="warning"
-        showIcon
-        style={{ marginBottom: 16 }}
-      />
-      <ProTable<API.Automation>
+    <ProTable<API.Automation>
       headerTitle="自动化规则"
       rowKey="id"
       columns={columns}
@@ -122,7 +112,6 @@ const AutomationPage: React.FC = () => {
       }}
       pagination={{ defaultPageSize: 20 }}
     />
-    </>
   );
 };
 

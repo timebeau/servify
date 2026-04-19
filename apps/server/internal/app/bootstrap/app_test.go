@@ -220,7 +220,7 @@ func TestBuildEventBusWarnsForInMemoryInProduction(t *testing.T) {
 	var buf bytes.Buffer
 	logger := newTestLogger(&buf)
 
-	bus, err := BuildEventBus(cfg, logger)
+	bus, err := BuildEventBus(cfg, logger, nil)
 	if err != nil {
 		t.Fatalf("BuildEventBus() error = %v", err)
 	}
@@ -236,7 +236,7 @@ func TestBuildEventBusRejectsUnsupportedProvider(t *testing.T) {
 	cfg := config.GetDefaultConfig()
 	cfg.EventBus.Provider = "kafka"
 
-	bus, err := BuildEventBus(cfg, nil)
+	bus, err := BuildEventBus(cfg, nil, nil)
 	if err == nil {
 		t.Fatal("expected error for unsupported provider")
 	}

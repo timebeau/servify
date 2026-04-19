@@ -7,12 +7,16 @@ import (
 	"servify/apps/server/internal/config"
 	"servify/apps/server/internal/platform/eventbus"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 )
 
-const eventBusProviderInMemory = "inmemory"
+const (
+	eventBusProviderInMemory = "inmemory"
+	eventBusProviderRedis    = "redis"
+)
 
-func BuildEventBus(cfg *config.Config, logger *logrus.Logger) (eventbus.Bus, error) {
+func BuildEventBus(cfg *config.Config, logger *logrus.Logger, redisClient *redis.Client) (eventbus.Bus, error) {
 	if cfg == nil {
 		cfg = config.GetDefaultConfig()
 	}
@@ -31,6 +35,12 @@ func BuildEventBus(cfg *config.Config, logger *logrus.Logger) (eventbus.Bus, err
 			logger.Warn("event bus provider 'inmemory' is running in production; asynchronous events are not durable and in-flight events are lost on restart")
 		}
 		return eventbus.NewInMemoryBusWithLogger(logger), nil
+	case eventBusProviderRedis:
+		if redisClient == nil {
+			return nil, fmt.Errorf("redis client required for redis event bus provider")
+		}
+		logger.Info("using redis event bus provider")
+		return eventbus.NewRedisBus(redisClient, logger), nil
 	default:
 		return nil, fmt.Errorf("unsupported event bus provider %q", cfg.EventBus.Provider)
 	}

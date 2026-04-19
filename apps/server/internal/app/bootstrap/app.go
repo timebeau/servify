@@ -46,7 +46,7 @@ type App struct {
 // Later tasks will move config, logging, db, router, and worker wiring here.
 func BuildApp(cfg *config.Config) (*App, error) {
 	logger := logrus.StandardLogger()
-	bus, err := BuildEventBus(cfg, logger)
+	bus, err := BuildEventBus(cfg, logger, nil)
 	if err != nil {
 		return nil, err
 	}

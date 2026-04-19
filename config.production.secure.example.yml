@@ -5,15 +5,20 @@ server:
   environment: "production"
 
 event_bus:
-  # WARNING: "inmemory" provider does NOT persist events. Events are lost on restart.
-  # Do NOT use in production if you need reliable async processing (statistics,
-  # automations, analytics). Use a persistent provider (Redis Streams, NATS, RabbitMQ)
-  # instead. Currently, only "inmemory" is implemented - this is a known limitation.
-  provider: "inmemory"
+  # Redis Streams provides persistent event storage and supports multi-instance deployment.
+  # Events survive restarts and can be consumed by multiple instances.
+  # Ensure Redis is configured and accessible before switching from "inmemory".
+  provider: "redis"
 
 voice:
-  recording_provider: "disabled"
-  transcript_provider: "disabled"
+  # Production providers: twilio, deepgram
+  recording_provider: "twilio"
+  transcript_provider: "deepgram"
+  twilio:
+    account_sid: "${TWILIO_ACCOUNT_SID}"
+    auth_token: "${TWILIO_AUTH_TOKEN}"
+  deepgram:
+    api_key: "${DEEPGRAM_API_KEY}"
 
 jwt:
   secret: "${SERVIFY_JWT_SECRET}"

@@ -155,6 +155,13 @@ func (c *Coordinator) ListTranscripts(ctx context.Context, callID string) ([]voi
 	return c.transcripts.ListByCallID(ctx, callID)
 }
 
+func (c *Coordinator) ListAllTranscripts(ctx context.Context, page, pageSize int) ([]voiceapp.TranscriptDTO, int64, error) {
+	if c == nil || c.transcripts == nil {
+		return nil, 0, nil
+	}
+	return c.transcripts.ListAll(ctx, page, pageSize)
+}
+
 func firstNonEmpty(values ...string) string {
 	for _, value := range values {
 		if value != "" {

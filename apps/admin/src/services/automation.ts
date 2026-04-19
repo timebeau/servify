@@ -19,7 +19,17 @@ export async function getAutomationRuns(params?: { page?: number; page_size?: nu
 }
 
 export async function runAutomation(id: number) {
-  return request(`${API}/run`, { method: 'POST', data: { automation_id: id } });
+  // RunBatch accepts BatchRunRequest with event, ticket_ids, dry_run
+  // For running a single automation by ID, use the event-based trigger
+  return request(`${API}/run`, {
+    method: 'POST',
+    data: {
+      event: 'manual_trigger',
+      ticket_ids: [],
+      dry_run: false,
+      metadata: { automation_id: id },
+    },
+  });
 }
 
 export async function bulkRunAutomations(data: { trigger_type: string; payload?: any }) {

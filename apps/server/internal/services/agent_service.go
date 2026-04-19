@@ -28,7 +28,7 @@ type AgentService struct {
 
 // NewAgentService 创建人工客服服务。
 func NewAgentService(db *gorm.DB, logger *logrus.Logger) *AgentService {
-	return BuildAgentServiceAssembly(db, logger).Service
+	return BuildAgentServiceAssembly(db, logger, nil).Service
 }
 
 func NewAgentServiceWithDependencies(deps AgentServiceDependencies) *AgentService {

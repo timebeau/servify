@@ -17,11 +17,11 @@ export GOCACHE="$GOWORK_CACHE_DIR/gocache"
 cd "$PROJECT_ROOT"
 
 # 创建测试输出目录
-mkdir -p "$OUT_DIR" "$GOCACHE"
+mkdir -p "$OUT_DIR" "$GOWORK_CACHE_DIR"
 
-# 运行所有测试并生成覆盖率报告
+# 运行所有 apps/server 模块测试（不仅 services/handlers）
 echo "📊 Running tests with coverage (no race)..."
-go test -v -coverprofile="$OUT_DIR/coverage.out" ./apps/server/internal/services/... ./apps/server/internal/handlers/...
+go test -v -coverprofile="$OUT_DIR/coverage.out" ./apps/server/...
 
 # 生成覆盖率HTML报告
 echo "📈 Generating coverage report..."
@@ -34,7 +34,7 @@ go tool cover -func="$OUT_DIR/coverage.out" | tail -1
 # 运行基准测试
 echo ""
 echo "⚡ Running benchmark tests..."
-go test -bench=. -benchmem ./apps/server/internal/services/... ./apps/server/internal/handlers/... > "$OUT_DIR/benchmark.txt"
+go test -bench=. -benchmem ./apps/server/... > "$OUT_DIR/benchmark.txt"
 
 echo ""
 echo "✅ Test run completed!"
@@ -53,9 +53,9 @@ echo "📊 Actual Coverage: ${COVERAGE}%"
 
 # 使用awk进行浮点数比较（避免bc依赖）
 if awk "BEGIN {exit !($COVERAGE >= $TARGET)}"; then
-    echo "✅ Coverage target achieved!"
-    exit 0
+	echo "✅ Coverage target achieved!"
+	exit 0
 else
-    echo "❌ Coverage below target. Need to add more tests."
-    exit 1
+	echo "❌ Coverage below target. Need to add more tests."
+	exit 1
 fi

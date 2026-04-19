@@ -20,4 +20,5 @@ type RecordingRepository interface {
 type TranscriptRepository interface {
 	Append(ctx context.Context, transcript TranscriptDTO) error
 	ListByCallID(ctx context.Context, callID string) ([]TranscriptDTO, error)
+	ListAll(ctx context.Context, page, pageSize int) ([]TranscriptDTO, int64, error)
 }

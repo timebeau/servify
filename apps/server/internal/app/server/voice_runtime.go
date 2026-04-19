@@ -8,6 +8,8 @@ import (
 	voiceapp "servify/apps/server/internal/modules/voice/application"
 	voiceproviderdisabled "servify/apps/server/internal/modules/voice/provider/disabled"
 	voiceprovidermock "servify/apps/server/internal/modules/voice/provider/mock"
+	providertwilio "servify/apps/server/internal/modules/voice/provider/twilio"
+	providerdeepgram "servify/apps/server/internal/modules/voice/provider/deepgram"
 
 	"github.com/sirupsen/logrus"
 )
@@ -15,6 +17,8 @@ import (
 const (
 	voiceProviderDisabled = "disabled"
 	voiceProviderMock     = "mock"
+	voiceProviderTwilio   = "twilio"
+	voiceProviderDeepgram = "deepgram"
 )
 
 func buildVoiceRecordingProvider(cfg *config.Config, logger *logrus.Logger) (voiceapp.RecordingProvider, error) {
@@ -36,6 +40,18 @@ func buildVoiceRecordingProvider(cfg *config.Config, logger *logrus.Logger) (voi
 		}
 		logger.Warn("voice recording provider is using mock implementation; only suitable for development and tests")
 		return voiceprovidermock.NewRecordingProvider(), nil
+	case voiceProviderTwilio:
+		// Check for environment variables or config values
+		accountSID := strings.TrimSpace(cfg.Voice.Twilio.AccountSID)
+		authToken := strings.TrimSpace(cfg.Voice.Twilio.AuthToken)
+		if accountSID == "" || authToken == "" {
+			return nil, fmt.Errorf("twilio provider requires account_sid and auth_token")
+		}
+		logger.Info("using twilio recording provider")
+		return providertwilio.NewRecordingProvider(providertwilio.Config{
+			AccountSID: accountSID,
+			AuthToken:  authToken,
+		}), nil
 	default:
 		return nil, fmt.Errorf("unsupported voice recording provider %q", cfg.Voice.RecordingProvider)
 	}
@@ -60,6 +76,15 @@ func buildVoiceTranscriptProvider(cfg *config.Config, logger *logrus.Logger) (vo
 		}
 		logger.Warn("voice transcript provider is using mock implementation; only suitable for development and tests")
 		return voiceprovidermock.NewTranscriptProvider(), nil
+	case voiceProviderDeepgram:
+		apiKey := strings.TrimSpace(cfg.Voice.Deepgram.APIKey)
+		if apiKey == "" {
+			return nil, fmt.Errorf("deepgram provider requires api_key")
+		}
+		logger.Info("using deepgram transcript provider")
+		return providerdeepgram.NewTranscriptProvider(providerdeepgram.Config{
+			APIKey: apiKey,
+		}), nil
 	default:
 		return nil, fmt.Errorf("unsupported voice transcript provider %q", cfg.Voice.TranscriptProvider)
 	}

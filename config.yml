@@ -31,8 +31,17 @@ webrtc:
   stun_server: "stun:stun.l.google.com:19302"
 
 voice:
+  # Available providers: disabled, mock, twilio
   recording_provider: "disabled"
+  # Available providers: disabled, mock, deepgram
   transcript_provider: "disabled"
+  # Twilio configuration (for recording_provider: twilio)
+  twilio:
+    account_sid: "${TWILIO_ACCOUNT_SID}"
+    auth_token: "${TWILIO_AUTH_TOKEN}"
+  # Deepgram configuration (for transcript_provider: deepgram)
+  deepgram:
+    api_key: "${DEEPGRAM_API_KEY}"
 
 ai:
   openai:

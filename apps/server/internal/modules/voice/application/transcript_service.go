@@ -54,6 +54,13 @@ func (s *TranscriptService) ListByCallID(ctx context.Context, callID string) ([]
 	return s.repo.ListByCallID(ctx, callID)
 }
 
+func (s *TranscriptService) ListAll(ctx context.Context, page, pageSize int) ([]TranscriptDTO, int64, error) {
+	if s.repo == nil {
+		return []TranscriptDTO{}, 0, nil
+	}
+	return s.repo.ListAll(ctx, page, pageSize)
+}
+
 func (s *TranscriptService) publish(ctx context.Context, name, aggregateID string, payload interface{}) {
 	if s.publisher == nil {
 		return
