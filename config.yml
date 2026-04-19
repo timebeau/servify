@@ -29,8 +29,8 @@ webrtc:
   stun_server: "stun:stun.l.google.com:19302"
 
 voice:
-  recording_provider: "mock"
-  transcript_provider: "mock"
+  recording_provider: "disabled"
+  transcript_provider: "disabled"
 
 ai:
   openai:
