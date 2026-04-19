@@ -23,6 +23,15 @@ type RuntimeOverrides struct {
 // LoadConfig loads configuration from the default path or a specific config file.
 func LoadConfig(configPath string) (*config.Config, error) {
 	viper.Reset()
+
+	// Expand environment variables ${VAR} in config file BEFORE Viper parses types
+	// This ensures ${DIFY_ENABLED} becomes "true"/"false" string before bool conversion
+	expandedPath := expandEnvVarsInConfig(configPath)
+	if expandedPath != "" {
+		defer os.Remove(expandedPath)
+		configPath = expandedPath
+	}
+
 	if configPath != "" {
 		viper.SetConfigFile(configPath)
 	} else {
@@ -47,8 +56,6 @@ func LoadConfig(configPath string) (*config.Config, error) {
 			return nil, err
 		}
 	}
-	// Expand environment variables in Viper's internal storage
-	expandViperEnvVars()
 	cfg, result, err := config.LoadWithResult()
 	if err != nil {
 		return nil, err
@@ -145,30 +152,51 @@ func serverPortFromEnv(defaultPort int) int {
 	return defaultPort
 }
 
-// expandViperEnvVars expands environment variables in Viper's internal storage.
-// This is needed because Viper doesn't automatically expand ${VAR} placeholders.
-// We need to expand before Viper parses types, so we read the raw config and expand.
-func expandViperEnvVars() {
-	configFile := viper.ConfigFileUsed()
-	if configFile == "" {
-		return
+// expandEnvVarsInConfig reads the config file, expands ${VAR} environment variables,
+// and writes to a temporary file. Returns the temp file path or empty string on error.
+// Must be called BEFORE viper.ReadInConfig() to ensure ${VAR} is expanded before type parsing.
+func expandEnvVarsInConfig(configPath string) string {
+	var configFiles []string
+
+	// Determine which config file(s) to read
+	if configPath != "" {
+		configFiles = []string{configPath}
+	} else {
+		// Search default locations
+		for _, searchDir := range []string{".", "..", "../..", "/app"} {
+			potentialPath := filepath.Join(searchDir, "config.yml")
+			if info, err := os.Stat(potentialPath); err == nil && !info.IsDir() {
+				configFiles = []string{potentialPath}
+				break
+			}
+		}
 	}
-	// Read the config file and expand env vars
-	content, err := os.ReadFile(configFile)
+
+	if len(configFiles) == 0 {
+		return ""
+	}
+
+	// Read and expand the first found config file
+	content, err := os.ReadFile(configFiles[0])
 	if err != nil {
-		return
+		return ""
 	}
-	// Expand environment variables in the content
+
+	// Expand ${VAR} placeholders using environment variables
+	// Note: os.ExpandEnv handles ${VAR} and $VAR syntax
 	expanded := os.ExpandEnv(string(content))
-	// Write back to a temp file and tell Viper to use it
-	tempFile := configFile + ".expanded"
-	if err := os.WriteFile(tempFile, []byte(expanded), 0o644); err != nil {
-		return
+
+	// Create a temp file for the expanded content
+	tmpFile, err := os.CreateTemp("", "servify-config-*.yml")
+	if err != nil {
+		return ""
 	}
-	defer os.Remove(tempFile)
-	// Merge the expanded config into existing Viper settings
-	viper.SetConfigFile(tempFile)
-	if err := viper.MergeInConfig(); err != nil {
-		// Silently ignore merge errors - continue with original config
+	defer tmpFile.Close()
+
+	if _, err := tmpFile.WriteString(expanded); err != nil {
+		os.Remove(tmpFile.Name())
+		return ""
 	}
+
+	return tmpFile.Name()
 }
