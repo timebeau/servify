@@ -132,9 +132,10 @@ security:
     enabled: true
     requests_per_minute: 60
     burst: 10
-    key_header: ""          # e.g. "X-API-Key" or "X-Forwarded-For"
+    key_header: "X-API-Key" # Header name for whitelist key bypass
     whitelist_ips: []
-    whitelist_keys: []
+    whitelist_keys:
+      - "internal-test-key" # Integration test key
     paths:
       - enabled: true
         prefix: "/public/"
