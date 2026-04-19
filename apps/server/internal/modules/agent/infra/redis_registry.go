@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -229,10 +230,13 @@ func (r *RedisRegistry) syncLoop() {
 
 // handleStatusChange processes a status change message from another instance.
 func (r *RedisRegistry) handleStatusChange(payload string) {
-	// Parse message: "online:123" or "offline:123"
-	var action string
+	parts := strings.SplitN(payload, ":", 2)
+	if len(parts) != 2 {
+		return
+	}
+	action := parts[0]
 	var userID uint
-	if _, err := fmt.Sscanf(payload, "%s:%d", &action, &userID); err != nil {
+	if _, err := fmt.Sscanf(parts[1], "%d", &userID); err != nil {
 		return
 	}
 

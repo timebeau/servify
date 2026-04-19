@@ -132,6 +132,29 @@ func TestOrchestratedEnhancedAIServiceUploadAndSyncWithDifyProvider(t *testing.T
 	}
 }
 
+func TestOrchestratedEnhancedAIServiceUploadKnowledgeDocumentDisabled(t *testing.T) {
+	base := NewAIService("", "")
+	base.InitializeKnowledgeBase()
+
+	svc := NewOrchestratedEnhancedAIService(
+		base,
+		&mockllm.Provider{},
+		nil,
+		"",
+		nil,
+		"",
+		nil,
+	)
+
+	err := svc.UploadKnowledgeDocument(context.Background(), "Manual Doc", "Manual content", []string{"manual"})
+	if err == nil {
+		t.Fatal("expected error when knowledge provider is disabled, got nil")
+	}
+	if err.Error() != "knowledge provider is not enabled" {
+		t.Fatalf("expected provider disabled error, got %v", err)
+	}
+}
+
 func TestOrchestratedEnhancedAIServiceSyncKnowledgeBaseDisabled(t *testing.T) {
 	base := NewAIService("", "")
 	base.InitializeKnowledgeBase()
@@ -156,6 +179,51 @@ func TestOrchestratedEnhancedAIServiceSyncKnowledgeBaseDisabled(t *testing.T) {
 	}
 	if err.Error() != "knowledge provider is not enabled" {
 		t.Fatalf("expected provider disabled error, got %v", err)
+	}
+}
+
+func TestOrchestratedEnhancedAIServiceUploadAndSyncRespectEnableToggle(t *testing.T) {
+	base := NewAIService("", "")
+	base.InitializeKnowledgeBase()
+	base.knowledgeBase.AddDocument(models.KnowledgeDoc{
+		Title:   "Billing FAQ",
+		Content: "Billing answer",
+		Tags:    "faq",
+	})
+
+	provider := &mockkp.Provider{}
+	svc := NewOrchestratedEnhancedAIService(
+		base,
+		&mockllm.Provider{},
+		provider,
+		"dify",
+		nil,
+		"dataset-1",
+		nil,
+	)
+
+	svc.SetKnowledgeProviderEnabled(false)
+
+	if err := svc.UploadKnowledgeDocument(context.Background(), "Manual Doc", "Manual content", []string{"manual"}); err == nil {
+		t.Fatal("expected upload to fail when knowledge provider disabled")
+	}
+	if err := svc.SyncKnowledgeBase(context.Background()); err == nil {
+		t.Fatal("expected sync to fail when knowledge provider disabled")
+	}
+
+	svc.SetKnowledgeProviderEnabled(true)
+
+	if err := svc.UploadKnowledgeDocument(context.Background(), "Manual Doc", "Manual content", []string{"manual"}); err != nil {
+		t.Fatalf("expected upload to recover after enable, got %v", err)
+	}
+	if err := svc.SyncKnowledgeBase(context.Background()); err != nil {
+		t.Fatalf("expected sync to recover after enable, got %v", err)
+	}
+	if _, ok := provider.Documents["Manual Doc"]; !ok {
+		t.Fatalf("expected manual doc to be uploaded after re-enable, got %+v", provider.Documents)
+	}
+	if _, ok := provider.Documents["Billing FAQ"]; !ok {
+		t.Fatalf("expected billing faq to be synced after re-enable, got %+v", provider.Documents)
 	}
 }
 

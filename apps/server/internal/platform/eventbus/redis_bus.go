@@ -96,18 +96,20 @@ func (b *RedisBus) Publish(ctx context.Context, event Event) error {
 	}
 
 	// Add to Redis Stream (persistent)
-	if err := b.client.XAdd(ctx, &redis.XAddArgs{
+	messageID, err := b.client.XAdd(ctx, &redis.XAddArgs{
 		Stream: streamKey,
 		ID:     "*", // Auto-generate ID
 		Values: values,
 		MaxLen: streamMaxLen,
-	}).Err(); err != nil {
+		Approx: true,
+	}).Result()
+	if err != nil {
 		return fmt.Errorf("publish to stream: %w", err)
 	}
 
 	// Also publish to Pub/Sub for real-time notification
 	// Don't fail if pub/sub fails - stream write succeeded
-	if err := b.client.Publish(ctx, eventPubSubChannel, streamKey).Err(); err != nil {
+	if err := b.client.Publish(ctx, eventPubSubChannel, formatDispatchPayload(streamKey, messageID)).Err(); err != nil {
 		b.logger.Warnf("pub/sub publish failed: %v", err)
 	}
 
@@ -131,14 +133,16 @@ func (b *RedisBus) subscribeLoop() {
 			if !ok {
 				return
 			}
-			// msg.Payload contains the stream key
+			// msg.Payload contains the stream key and optionally the message ID.
 			b.dispatchFromStream(b.ctx, msg.Payload)
 		}
 	}
 }
 
 // dispatchFromStream reads events from a stream and calls local handlers.
-func (b *RedisBus) dispatchFromStream(ctx context.Context, streamKey string) {
+func (b *RedisBus) dispatchFromStream(ctx context.Context, payload string) {
+	streamKey, messageID := parseDispatchPayload(payload)
+
 	// Extract event name from stream key
 	eventName := strings.TrimPrefix(streamKey, fmt.Sprintf(eventStreamPattern, ""))
 
@@ -152,12 +156,7 @@ func (b *RedisBus) dispatchFromStream(ctx context.Context, streamKey string) {
 		return
 	}
 
-	// Read pending messages from stream (new messages only)
-	streams, err := b.client.XRead(ctx, &redis.XReadArgs{
-		Streams: []string{streamKey, "$"}, // "$" means new messages only
-		Count:   10,
-		Block:   100 * time.Millisecond,
-	}).Result()
+	streams, err := b.readMessages(ctx, streamKey, messageID)
 
 	if err != nil && err != redis.Nil {
 		b.logger.Warnf("read from stream %s: %v", streamKey, err)
@@ -169,6 +168,26 @@ func (b *RedisBus) dispatchFromStream(ctx context.Context, streamKey string) {
 			b.dispatchMessage(ctx, eventName, message, handlers)
 		}
 	}
+}
+
+func (b *RedisBus) readMessages(ctx context.Context, streamKey, messageID string) ([]redis.XStream, error) {
+	if messageID != "" {
+		messages, err := b.client.XRange(ctx, streamKey, messageID, messageID).Result()
+		if err != nil {
+			return nil, err
+		}
+		if len(messages) == 0 {
+			return nil, redis.Nil
+		}
+		return []redis.XStream{{Stream: streamKey, Messages: messages}}, nil
+	}
+
+	// Backward-compatible fallback for payloads that only include the stream key.
+	return b.client.XRead(ctx, &redis.XReadArgs{
+		Streams: []string{streamKey, "$"},
+		Count:   10,
+		Block:   100 * time.Millisecond,
+	}).Result()
 }
 
 // dispatchMessage deserializes and dispatches a single message to handlers.
@@ -255,6 +274,22 @@ func castToInt64(v interface{}) int64 {
 	default:
 		return 0
 	}
+}
+
+func formatDispatchPayload(streamKey, messageID string) string {
+	if messageID == "" {
+		return streamKey
+	}
+	return streamKey + "|" + messageID
+}
+
+func parseDispatchPayload(payload string) (streamKey string, messageID string) {
+	parts := strings.SplitN(payload, "|", 2)
+	streamKey = parts[0]
+	if len(parts) == 2 {
+		messageID = parts[1]
+	}
+	return streamKey, messageID
 }
 
 // Ensure RedisBus implements Bus interface

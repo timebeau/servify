@@ -1,12 +1,15 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 
+	"github.com/alicebob/miniredis/v2"
 	"servify/apps/server/internal/config"
 	aidelivery "servify/apps/server/internal/modules/ai/delivery"
 	"servify/apps/server/internal/services"
@@ -26,7 +29,7 @@ func TestEnhancedHealthHandler_Health_And_Ready(t *testing.T) {
 	ai := services.NewAIService("", "")
 	ai.InitializeKnowledgeBase()
 
-	h := NewEnhancedHealthHandler(cfg, aidelivery.NewHandlerServiceAdapter(ai), nil)
+	h := NewEnhancedHealthHandler(cfg, aidelivery.NewHandlerServiceAdapter(ai), nil, nil)
 
 	r := gin.New()
 	r.GET("/health", h.Health)
@@ -60,7 +63,7 @@ func TestEnhancedHealthHandler_Health_WithDatabaseCheck(t *testing.T) {
 	ai := services.NewAIService("", "")
 	ai.InitializeKnowledgeBase()
 
-	h := NewEnhancedHealthHandler(cfg, aidelivery.NewHandlerServiceAdapter(ai), nil)
+	h := NewEnhancedHealthHandler(cfg, aidelivery.NewHandlerServiceAdapter(ai), nil, nil)
 
 	r := gin.New()
 	r.GET("/health", h.Health)
@@ -88,7 +91,7 @@ func TestEnhancedHealthHandler_Health_WithRedisCheck(t *testing.T) {
 	ai := services.NewAIService("", "")
 	ai.InitializeKnowledgeBase()
 
-	h := NewEnhancedHealthHandler(cfg, aidelivery.NewHandlerServiceAdapter(ai), nil)
+	h := NewEnhancedHealthHandler(cfg, aidelivery.NewHandlerServiceAdapter(ai), nil, nil)
 
 	r := gin.New()
 	r.GET("/health", h.Health)
@@ -97,7 +100,7 @@ func TestEnhancedHealthHandler_Health_WithRedisCheck(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodGet, "/health", nil)
 	r.ServeHTTP(w, req)
 
-	// Should return 200 even without actual Redis (simulated)
+	// Redis client 未初始化时仍返回 200，但状态应降级而不是假装 healthy。
 	if w.Code != http.StatusOK {
 		t.Fatalf("health status=%d body=%s", w.Code, w.Body.String())
 	}
@@ -117,7 +120,7 @@ func TestEnhancedHealthHandler_Health_WithKnowledgeProviderCheck(t *testing.T) {
 	ai := services.NewAIService("", "")
 	ai.InitializeKnowledgeBase()
 
-	h := NewEnhancedHealthHandler(cfg, aidelivery.NewHandlerServiceAdapter(ai), nil)
+	h := NewEnhancedHealthHandler(cfg, aidelivery.NewHandlerServiceAdapter(ai), nil, nil)
 
 	r := gin.New()
 	r.GET("/health", h.Health)
@@ -129,5 +132,29 @@ func TestEnhancedHealthHandler_Health_WithKnowledgeProviderCheck(t *testing.T) {
 	// Should return 200
 	if w.Code != http.StatusOK {
 		t.Fatalf("health status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestEnhancedHealthHandler_CheckRedisWithSharedClient(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	defer client.Close()
+
+	cfg := config.GetDefaultConfig()
+	cfg.Monitoring.HealthChecks.Redis = true
+
+	ai := services.NewAIService("", "")
+	ai.InitializeKnowledgeBase()
+	h := NewEnhancedHealthHandler(cfg, aidelivery.NewHandlerServiceAdapter(ai), nil, client)
+
+	response := &HealthResponse{Services: map[string]ServiceInfo{}}
+	allHealthy := true
+	h.checkRedis(context.Background(), response, &allHealthy)
+
+	if !allHealthy {
+		t.Fatal("expected redis health check to keep service healthy")
+	}
+	if response.Services["redis"].Status != "healthy" {
+		t.Fatalf("expected redis status healthy, got %q", response.Services["redis"].Status)
 	}
 }

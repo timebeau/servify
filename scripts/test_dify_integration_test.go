@@ -1,27 +1,32 @@
 package scripts
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
 
 func TestDifyIntegrationScriptRealModeRejectsLocalHost(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("bash-backed acceptance script tests are not stable against httptest servers on Windows")
+	}
+
 	evidenceDir := t.TempDir()
 
-	cmd := exec.Command("bash", "test-dify-integration.sh")
+	cmd := exec.Command("bash", "-lc", fmt.Sprintf("DIFY_ACCEPTANCE_MODE=real SERVIFY_URL=%q DIFY_URL=%q DIFY_DATASET_ID=%q EVIDENCE_DIR=%q ./test-dify-integration.sh",
+		"http://127.0.0.1:18080",
+		"http://127.0.0.1:15001/v1",
+		"dataset-1",
+		evidenceDir,
+	))
 	cmd.Dir = "."
-	cmd.Env = append(os.Environ(),
-		"DIFY_ACCEPTANCE_MODE=real",
-		"SERVIFY_URL=http://127.0.0.1:18080",
-		"DIFY_URL=http://127.0.0.1:15001/v1",
-		"DIFY_DATASET_ID=dataset-1",
-		"EVIDENCE_DIR="+evidenceDir,
-	)
+	cmd.Env = os.Environ()
 	output, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatalf("expected real mode to reject local host, output=%s", string(output))
@@ -40,6 +45,10 @@ func TestDifyIntegrationScriptRealModeRejectsLocalHost(t *testing.T) {
 }
 
 func TestDifyIntegrationScriptMockModeWritesEvidence(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("bash-backed acceptance script tests are not stable against httptest servers on Windows")
+	}
+
 	servify := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
@@ -73,15 +82,14 @@ func TestDifyIntegrationScriptMockModeWritesEvidence(t *testing.T) {
 
 	evidenceDir := t.TempDir()
 
-	cmd := exec.Command("bash", "test-dify-integration.sh")
+	cmd := exec.Command("bash", "-lc", fmt.Sprintf("DIFY_ACCEPTANCE_MODE=mock SERVIFY_URL=%q DIFY_URL=%q DIFY_DATASET_ID=%q EVIDENCE_DIR=%q ./test-dify-integration.sh",
+		servify.URL,
+		difyServer.URL+"/v1",
+		"dataset-1",
+		evidenceDir,
+	))
 	cmd.Dir = "."
-	cmd.Env = append(os.Environ(),
-		"DIFY_ACCEPTANCE_MODE=mock",
-		"SERVIFY_URL="+servify.URL,
-		"DIFY_URL="+difyServer.URL+"/v1",
-		"DIFY_DATASET_ID=dataset-1",
-		"EVIDENCE_DIR="+evidenceDir,
-	)
+	cmd.Env = os.Environ()
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("expected mock mode success, err=%v output=%s", err, string(output))
@@ -112,11 +120,97 @@ func TestDifyIntegrationScriptMockModeWritesEvidence(t *testing.T) {
 		"knowledge_provider=dify",
 		"knowledge_provider_enabled=true",
 		"knowledge_provider_healthy=true",
+		"query_ok=true",
 		"query_strategy=dify",
 		"dify_available=true",
 		"dify_usage_count=2",
 		"knowledge_upload_ok=true",
 		"knowledge_sync_ok=true",
+	} {
+		if !strings.Contains(summaryText, want) {
+			t.Fatalf("expected %q in summary, got %s", want, summaryText)
+		}
+	}
+}
+
+func TestDifyIntegrationScriptMockModePersistsFailureEvidence(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("bash-backed acceptance script tests are not stable against httptest servers on Windows")
+	}
+
+	servify := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/health":
+			_, _ = w.Write([]byte(`{"status":"healthy"}`))
+		case "/api/v1/ai/status":
+			_, _ = w.Write([]byte(`{"success":true,"data":{"type":"orchestrated_enhanced","knowledge_provider_enabled":true,"knowledge_provider":"dify","knowledge_provider_healthy":true}}`))
+		case "/api/v1/ai/query":
+			_, _ = w.Write([]byte(`{"success":true,"data":{"content":"dify-ok","strategy":"dify"}}`))
+		case "/api/v1/ai/knowledge/upload":
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = w.Write([]byte(`{"success":false,"error":"upload failed"}`))
+		case "/api/v1/ai/knowledge/sync":
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = w.Write([]byte(`{"success":false,"error":"sync failed"}`))
+		case "/api/v1/ai/metrics":
+			_, _ = w.Write([]byte(`{"success":true,"data":{"dify_usage_count":2}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer servify.Close()
+
+	difyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path != "/v1/datasets/dataset-1" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`{"id":"dataset-1","name":"Mock Dify Dataset"}`))
+	}))
+	defer difyServer.Close()
+
+	evidenceDir := t.TempDir()
+
+	cmd := exec.Command("bash", "-lc", fmt.Sprintf("DIFY_ACCEPTANCE_MODE=mock SERVIFY_URL=%q DIFY_URL=%q DIFY_DATASET_ID=%q EVIDENCE_DIR=%q ./test-dify-integration.sh",
+		servify.URL,
+		difyServer.URL+"/v1",
+		"dataset-1",
+		evidenceDir,
+	))
+	cmd.Dir = "."
+	cmd.Env = os.Environ()
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected mock mode to preserve failure evidence, err=%v output=%s", err, string(output))
+	}
+
+	uploadBody, readErr := os.ReadFile(filepath.Join(evidenceDir, "knowledge-upload.json"))
+	if readErr != nil {
+		t.Fatalf("read upload evidence: %v\noutput=%s", readErr, string(output))
+	}
+	if !strings.Contains(string(uploadBody), `"success":false`) {
+		t.Fatalf("expected failed upload evidence, got %s", string(uploadBody))
+	}
+
+	syncBody, readErr := os.ReadFile(filepath.Join(evidenceDir, "knowledge-sync.json"))
+	if readErr != nil {
+		t.Fatalf("read sync evidence: %v\noutput=%s", readErr, string(output))
+	}
+	if !strings.Contains(string(syncBody), `"success":false`) {
+		t.Fatalf("expected failed sync evidence, got %s", string(syncBody))
+	}
+
+	summary, err := os.ReadFile(filepath.Join(evidenceDir, "summary.txt"))
+	if err != nil {
+		t.Fatalf("read summary: %v", err)
+	}
+	summaryText := string(summary)
+	for _, want := range []string{
+		"query_ok=true",
+		"knowledge_upload_ok=false",
+		"knowledge_sync_ok=false",
 	} {
 		if !strings.Contains(summaryText, want) {
 			t.Fatalf("expected %q in summary, got %s", want, summaryText)

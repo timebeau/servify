@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 	"time"
@@ -36,6 +37,7 @@ type Dependencies struct {
 	Config                   *config.Config
 	Logger                   *logrus.Logger
 	DB                       *gorm.DB
+	Redis                    *redis.Client
 	AIService                aidelivery.RuntimeService
 	AIHandlerService         aidelivery.HandlerService
 	RealtimeGateway          realtimeplatform.RealtimeGateway

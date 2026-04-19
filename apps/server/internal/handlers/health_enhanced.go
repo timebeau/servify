@@ -11,6 +11,7 @@ import (
 	"servify/apps/server/internal/platform/configscope"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 )
 
@@ -24,15 +25,17 @@ type EnhancedHealthHandler struct {
 	config    *config.Config
 	aiService aidelivery.HandlerService
 	db        DatabasePing
+	redis     *redis.Client
 	logger    *logrus.Logger
 }
 
 // NewEnhancedHealthHandler 创建增强的健康检查处理器
-func NewEnhancedHealthHandler(cfg *config.Config, aiService aidelivery.HandlerService, db DatabasePing) *EnhancedHealthHandler {
+func NewEnhancedHealthHandler(cfg *config.Config, aiService aidelivery.HandlerService, db DatabasePing, redisClient *redis.Client) *EnhancedHealthHandler {
 	return &EnhancedHealthHandler{
 		config:    cfg,
 		aiService: aiService,
 		db:        db,
+		redis:     redisClient,
 		logger:    logrus.StandardLogger(),
 	}
 }
@@ -244,29 +247,29 @@ func (h *EnhancedHealthHandler) checkDatabase(ctx context.Context, response *Hea
 	response.Services["database"] = serviceInfo
 }
 
-// checkRedis 检查 Redis 状态
-// 注意：当前版本 Redis 检查为配置验证，不进行实际连接测试
-// 如果项目中添加了 Redis 客户端，应更新此函数进行实际连接检查
 func (h *EnhancedHealthHandler) checkRedis(ctx context.Context, response *HealthResponse, allHealthy *bool) {
 	start := time.Now()
 
-	// 当前版本只验证配置存在，不进行实际连接检查
-	// 当 Redis 被实际使用时，应添加 redisClient 并执行 Ping()
 	serviceInfo := ServiceInfo{
-		Status:  "disabled", // 当前 Redis 未被实际使用
 		Latency: time.Since(start).String(),
 		Details: map[string]interface{}{
 			"host":            h.config.Redis.Host,
 			"port":            h.config.Redis.Port,
-			"connection_type": "configuration_only",
+			"connection_type": "shared_client",
 		},
 	}
-
-	// 如果配置的 Redis 不是默认值，标记为配置可用
-	if h.config.Redis.Host != "" && h.config.Redis.Port > 0 {
-		serviceInfo.Status = "configured"
+	if h.redis == nil {
+		serviceInfo.Status = "disabled"
+		response.Services["redis"] = serviceInfo
+		return
 	}
-
+	if err := h.redis.Ping(ctx).Err(); err != nil {
+		serviceInfo.Status = "unhealthy"
+		serviceInfo.Error = err.Error()
+		*allHealthy = false
+	} else {
+		serviceInfo.Status = "healthy"
+	}
 	response.Services["redis"] = serviceInfo
 }
 

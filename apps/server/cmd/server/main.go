@@ -23,18 +23,11 @@ func main() {
 	if err != nil {
 		logrus.Fatalf("Failed to parse startup options: %v", err)
 	}
-	appLogger, err := appbootstrap.InitLogging(cfg)
-	if err != nil {
-		logrus.Warnf("init logger: %v", err)
-	}
-	if appLogger == nil {
-		appLogger = logrus.StandardLogger()
-	}
 	app, err := appbootstrap.BuildApp(cfg)
 	if err != nil {
-		appLogger.Fatalf("Failed to build app: %v", err)
+		logrus.Fatalf("Failed to build app: %v", err)
 	}
-	app.Logger = appLogger
+	appLogger := app.Logger
 
 	if err := appbootstrap.SetupObservability(context.Background(), cfg, app); err != nil {
 		appLogger.Warnf("init tracing: %v", err)

@@ -75,7 +75,7 @@ func TestReleaseCheckHealthEndpoints(t *testing.T) {
 
 	svc := services.NewAIService("", "")
 	svc.InitializeKnowledgeBase()
-	h := handlers.NewEnhancedHealthHandler(cfg, aidelivery.NewHandlerServiceAdapter(svc), nil)
+	h := handlers.NewEnhancedHealthHandler(cfg, aidelivery.NewHandlerServiceAdapter(svc), nil, nil)
 
 	r := gin.New()
 	r.GET("/health", h.Health)

@@ -51,31 +51,36 @@ func RegisterDefaultWorkers(app *bootstrap.App, cfg *config.Config, db *gorm.DB,
 		return
 	}
 
-	app.RegisterWorker(NewStatisticsWorker(deps.StatisticsServiceForWorker(), time.Hour))
-	app.RegisterWorker(NewSLAMonitorWorker(deps.SLAServiceForWorker(), 5*time.Minute))
+	app.RegisterWorker(NewStatisticsWorker(deps.StatisticsServiceForWorker(), time.Hour, app.Logger))
+	app.RegisterWorker(NewSLAMonitorWorker(deps.SLAServiceForWorker(), 5*time.Minute, app.Logger))
 
 	if cfg.Security.Audit.Enabled && db != nil {
 		app.RegisterWorker(NewAuditCleanupWorker(
 			auditplatform.NewGormRetentionService(db, cfg.Security.Audit.Retention, cfg.Security.Audit.CleanupBatchSize),
 			cfg.Security.Audit.CleanupInterval,
+			app.Logger,
 		))
 	}
 	if cfg.Security.TokenRevocation.Enabled && db != nil {
 		app.RegisterWorker(NewRevokedTokenCleanupWorker(
 			usersecurity.NewGormRevokedTokenRetentionService(db, cfg.Security.TokenRevocation.CleanupBatchSize),
 			cfg.Security.TokenRevocation.CleanupInterval,
+			app.Logger,
 		))
 	}
 }
 
-func NewStatisticsWorker(service statisticsService, interval time.Duration) bootstrap.Worker {
+func NewStatisticsWorker(service statisticsService, interval time.Duration, logger *logrus.Logger) bootstrap.Worker {
 	if interval <= 0 {
 		interval = time.Hour
+	}
+	if logger == nil {
+		logger = logrus.StandardLogger()
 	}
 	return &StatisticsWorker{
 		service:  service,
 		interval: interval,
-		logger:   logrus.StandardLogger(),
+		logger:   logger,
 	}
 }
 
@@ -145,14 +150,17 @@ type SLAMonitorWorker struct {
 	done   chan struct{}
 }
 
-func NewSLAMonitorWorker(service slaMonitorService, interval time.Duration) bootstrap.Worker {
+func NewSLAMonitorWorker(service slaMonitorService, interval time.Duration, logger *logrus.Logger) bootstrap.Worker {
 	if interval <= 0 {
 		interval = 5 * time.Minute
+	}
+	if logger == nil {
+		logger = logrus.StandardLogger()
 	}
 	return &SLAMonitorWorker{
 		service:  service,
 		interval: interval,
-		logger:   logrus.StandardLogger(),
+		logger:   logger,
 	}
 }
 
@@ -222,14 +230,17 @@ type AuditCleanupWorker struct {
 	done   chan struct{}
 }
 
-func NewAuditCleanupWorker(service auditRetentionService, interval time.Duration) bootstrap.Worker {
+func NewAuditCleanupWorker(service auditRetentionService, interval time.Duration, logger *logrus.Logger) bootstrap.Worker {
 	if interval <= 0 {
 		interval = 24 * time.Hour
+	}
+	if logger == nil {
+		logger = logrus.StandardLogger()
 	}
 	return &AuditCleanupWorker{
 		service:  service,
 		interval: interval,
-		logger:   logrus.StandardLogger(),
+		logger:   logger,
 		now:      time.Now,
 	}
 }
@@ -328,14 +339,17 @@ type RevokedTokenCleanupWorker struct {
 	done   chan struct{}
 }
 
-func NewRevokedTokenCleanupWorker(service revokedTokenRetentionService, interval time.Duration) bootstrap.Worker {
+func NewRevokedTokenCleanupWorker(service revokedTokenRetentionService, interval time.Duration, logger *logrus.Logger) bootstrap.Worker {
 	if interval <= 0 {
 		interval = 24 * time.Hour
+	}
+	if logger == nil {
+		logger = logrus.StandardLogger()
 	}
 	return &RevokedTokenCleanupWorker{
 		service:  service,
 		interval: interval,
-		logger:   logrus.StandardLogger(),
+		logger:   logger,
 		now:      time.Now,
 	}
 }

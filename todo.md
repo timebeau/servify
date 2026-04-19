@@ -67,7 +67,24 @@
   - 明确 dev/demo 与 prod 的事件总线策略
   - 至少一条异步链路可证明重启后不会静默丢失关键业务结果，或明确声明当前不承诺 durability 并落实监控/告警/死信审计
 - 状态：`[x]`
-- 最近进展：已新增显式 `event_bus.provider` 配置，统一由 bootstrap 工厂产出 event bus，并在 production + `inmemory` 时输出 durability 风险告警
+- 最近进展：已补齐 Redis client 的 bootstrap 初始化与共享注入链路，`BuildApp -> BuildEventBus -> BuildRuntime` 现可真正装配 `redis` event bus；同时补齐 `miniredis` 级别的 RedisBus 持久化、订阅分发、health 检查测试，并修复 `dispatchFromStream()` 依赖 `XRead(..., "$")` 导致刚发布消息可能被跳过的窗口丢消息问题，当前已能证明 Redis provider 下至少一条真实异步链路可持久化并被本地订阅者消费
+- 完成证据：
+  - 代码文件：
+    - `apps/server/internal/app/bootstrap/redis.go`
+    - `apps/server/internal/app/bootstrap/app.go`
+    - `apps/server/internal/app/bootstrap/app_test.go`
+    - `apps/server/internal/platform/eventbus/redis_bus.go`
+    - `apps/server/internal/platform/eventbus/redis_bus_test.go`
+    - `apps/server/internal/app/server/runtime.go`
+    - `apps/server/internal/app/server/router.go`
+    - `apps/server/internal/app/server/health.go`
+    - `apps/server/internal/handlers/health_enhanced.go`
+    - `apps/server/internal/handlers/health_enhanced_test.go`
+    - `apps/server/cmd/cli/run_enhanced.go`
+  - 验证命令：
+    - `go test ./internal/platform/eventbus`
+    - `go test ./internal/app/bootstrap ./internal/app/server ./internal/handlers ./internal/modules/agent/infra`
+    - `go test ./cmd/cli ./internal/releasecheck`
 - 完成证据：
   - 代码文件：
     - `apps/server/internal/config/config.go`
@@ -139,9 +156,15 @@
   - 客服上下线、负载、会话接管在重启后行为明确
   - 文档与实现对齐，不再让内存态伪装成企业能力
 - 状态：`[x]`
-- 最近进展：已将 agent 在线态/负载读取收口到数据库主真相，移除 service facade 默认 legacy runtime 读路径，保留内存 registry 仅承载瞬时 metadata
+- 最近进展：运行时已改为复用 bootstrap 注入的共享 Redis client，`BuildRuntime` 不再固定回退到 `nil`；同时已修复 `RedisRegistry.handleStatusChange("online:123")` 的 payload 解析 bug，并补回归测试锁定 malformed/offline payload 行为。当前进一步新增 integration 测试，证明两套 `BuildAgentServiceAssembly(...)` 在共享 Redis + DB 下，第一套写入的 online 状态会被第二套观测到，且 session transfer 后 `from/to agent` 的 `CurrentLoad` 也会在另一实例被正确观测到，说明 presence + load/transfer 两个关键面已有多实例证据
 - 完成证据：
   - 代码文件：
+    - `apps/server/internal/app/bootstrap/redis.go`
+    - `apps/server/internal/app/bootstrap/app.go`
+    - `apps/server/internal/app/server/runtime.go`
+    - `apps/server/internal/modules/agent/infra/redis_registry.go`
+    - `apps/server/internal/modules/agent/infra/redis_registry_test.go`
+    - `apps/server/internal/services/agent_service_redis_integration_test.go`
     - `apps/server/internal/modules/agent/application/repositories.go`
     - `apps/server/internal/modules/agent/application/service.go`
     - `apps/server/internal/modules/agent/infra/gorm_repository.go`
@@ -156,7 +179,7 @@
     - `apps/server/internal/services/agent_legacy_runtime_adapter_test.go`
   - 验证命令：
     - `go test ./internal/modules/agent/... ./internal/services ./internal/modules/routing/delivery`
-    - `go test -tags integration -run "TestAgentService|TestAgentRuntimeMaintenance" ./internal/services`
+    - `go test -tags integration ./internal/services -run 'Test(BuildAgentServiceAssembly_UsesRedisRegistryAcrossInstances|BuildAgentServiceAssembly_SyncsTransferLoadAcrossInstances)'`
 
 ### [!] P0-4 配置加载仍存在直接 `panic`，且默认模型配置偏旧
 
@@ -249,9 +272,9 @@
   - 至少一条真实文档上传、同步、查询命中成功
   - fallback 有实际日志、响应、状态三类证据
 - 状态：`[-]`
-- 最近进展：**2026-04-19 Docker 环境配置问题已修复**：1) 修复了 Viper 环境变量展开问题（`expandViperEnvVars` 函数），2) 添加了 config.yml 挂载，3) 对齐了 JWT_SECRET/SERVIFY_JWT_SECRET 环境变量，4) Docker Compose 环境下 WeKnora 已正确启用（`knowledge_provider_enabled: true`, `knowledge_provider_healthy: true`）。见 `docs/acceptance-weknora-docker.md` 完整验收报告。WeKnora mock 服务只实现了 health check，upload/sync 需要真实 WeKnora 服务完成端到端测试。
-- 下一步：使用真实 WeKnora 服务完成 upload/sync 端到端测试，更新验收清单状态为”通过”
-- 阻塞项：真实 WeKnora 服务环境与凭证
+- 最近进展：**2026-04-19** 除 Docker 环境配置修复外，本轮继续补齐了 AI / Knowledge 验收留档能力：1) `test-dify-integration.sh` 现已在 upload/sync 返回 4xx/5xx 时保留失败响应证据，不再因 `curl -f` 直接中断导致证据缺失；2) 新增 handler 级回归，锁定 knowledge provider 禁用时 `POST /api/v1/ai/knowledge/upload` 与 `POST /api/v1/ai/knowledge/sync` 均返回 `503`，避免控制面 disable 后 API 仍出现假成功；3) 脚本测试已标注当前 Windows 环境下对 bash + httptest server 的运行边界，避免本机门禁被宿主网络差异误伤
+- 下一步：使用真实 WeKnora 或 Dify 服务完成 upload/sync 端到端验收，并把成功/失败证据回填到 `docs/acceptance-checklist.md`，将 `知识上传`、`知识同步`、`AI 控制面人工运行验证第二轮/第三轮` 从 `部分通过` 推进到 `通过`
+- 阻塞项：真实 WeKnora / Dify 服务环境与凭证；当前 Windows 本机无法用 `go test ./scripts` 直接模拟 bash 脚本对 `httptest` 端口的访问，需要在 Linux/CI 或真实环境执行脚本留档
 
 ### [!] P1-2 Auth 自助 session 链路补齐真实验收
 
@@ -669,8 +692,8 @@
   - bootstrap 成为唯一可信的运行时装配根
   - `ARCHITECTURE.md` 与实际目录、责任划分一致
 - 状态：`[-]`
-- 最近进展：已把 server 启动的 flag/env 覆盖解析、数据库重试连接、默认 worker 注册、runtime attach、router/server 绑定以及统一 shutdown 生命周期收口到 `bootstrap` / `app` 层，并已同步回写 `ARCHITECTURE.md` 的当前落地边界；`cmd/server/main.go` 现已压缩为以启动顺序为主的薄入口
-- 下一步：继续把剩余 server 启动装配点收口为更明确的 bootstrap 入口，避免后续能力再次回流到 `cmd/server/main.go`
+- 最近进展：已把 server 启动的 flag/env 覆盖解析、数据库重试连接、默认 worker 注册、runtime attach、router/server 绑定以及统一 shutdown 生命周期收口到 `bootstrap` / `app` 层，并已同步回写 `ARCHITECTURE.md` 的当前落地边界；本轮继续收口 logger wiring，`BuildApp()` 已改为直接初始化共享 logger，`cmd/server` / `cmd/cli run` / `cmd/cli run_enhanced` 不再各自重复初始化并覆盖 `app.Logger`，默认 worker 也开始复用 `app.Logger` 而不是回退到 `logrus.StandardLogger()`
+- 下一步：继续减少 legacy/compat 入口对具体 `internal/services` 的直连，优先处理 `P1-7 Modules 与 legacy services/models 的边界收口`
 - 阻塞项：暂无
 
 ### [ ] P1-7 Modules 与 legacy services/models 的边界收口

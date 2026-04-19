@@ -8,7 +8,7 @@ import (
 )
 
 func registerHealthRoutes(r routeRegistrar, deps Dependencies) {
-	healthHandler := handlers.NewEnhancedHealthHandler(deps.Config, deps.AIHandlerService, deps.DB)
+	healthHandler := handlers.NewEnhancedHealthHandler(deps.Config, deps.AIHandlerService, deps.DB, deps.Redis)
 	r.GET("/health", healthHandler.Health)
 	r.GET("/ready", healthHandler.Ready)
 

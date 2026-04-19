@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 
 	"servify/apps/server/internal/config"
+	"servify/apps/server/internal/platform/eventbus"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/sirupsen/logrus"
 )
 
@@ -242,5 +246,67 @@ func TestBuildEventBusRejectsUnsupportedProvider(t *testing.T) {
 	}
 	if bus != nil {
 		t.Fatal("expected nil bus for unsupported provider")
+	}
+}
+
+func TestBuildEventBusRequiresRedisClientForRedisProvider(t *testing.T) {
+	cfg := config.GetDefaultConfig()
+	cfg.EventBus.Provider = "redis"
+
+	bus, err := BuildEventBus(cfg, nil, nil)
+	if err == nil {
+		t.Fatal("expected error for missing redis client")
+	}
+	if bus != nil {
+		t.Fatal("expected nil bus for missing redis client")
+	}
+}
+
+func TestRedisRequired(t *testing.T) {
+	cfg := config.GetDefaultConfig()
+	if redisRequired(cfg) {
+		t.Fatal("did not expect redis by default")
+	}
+
+	cfg.EventBus.Provider = "redis"
+	if !redisRequired(cfg) {
+		t.Fatal("expected redis to be required for redis event bus")
+	}
+
+	cfg = config.GetDefaultConfig()
+	cfg.Monitoring.HealthChecks.Redis = true
+	if redisRequired(cfg) {
+		t.Fatal("did not expect redis to be required for health checks alone")
+	}
+}
+
+func TestBuildAppUsesRedisBusWhenConfigured(t *testing.T) {
+	mr := miniredis.RunT(t)
+	host, portStr, err := net.SplitHostPort(mr.Addr())
+	if err != nil {
+		t.Fatalf("SplitHostPort() error = %v", err)
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		t.Fatalf("Atoi() error = %v", err)
+	}
+
+	cfg := config.GetDefaultConfig()
+	cfg.EventBus.Provider = "redis"
+	cfg.Redis.Host = host
+	cfg.Redis.Port = port
+
+	app, err := BuildApp(cfg)
+	if err != nil {
+		t.Fatalf("BuildApp() error = %v", err)
+	}
+	if app.Redis == nil {
+		t.Fatal("expected redis client to be initialized")
+	}
+	if _, ok := app.EventBus.(*eventbus.RedisBus); !ok {
+		t.Fatalf("expected redis event bus, got %T", app.EventBus)
+	}
+	if err := app.RunShutdownHooks(); err != nil {
+		t.Fatalf("RunShutdownHooks() error = %v", err)
 	}
 }

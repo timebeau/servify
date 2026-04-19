@@ -232,25 +232,29 @@ AI_QUERY=$(curl -fsS -X POST "$SERVIFY_URL/api/v1/ai/query" \
   }')
 save_response "ai-query" "$AI_QUERY"
 QUERY_STRATEGY=$(json_get "$AI_QUERY" '.data.strategy // "unknown"' || echo "unknown")
+QUERY_OK=false
+if echo "$AI_QUERY" | grep -q '"success":true'; then
+  QUERY_OK=true
+fi
 
-UPLOAD_RESPONSE=$(curl -fsS -X POST "$SERVIFY_URL/api/v1/ai/knowledge/upload" \
+UPLOAD_RESPONSE=$(curl -sS -X POST "$SERVIFY_URL/api/v1/ai/knowledge/upload" \
   -H "$AUTH_HEADER" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Dify Primary Acceptance Document",
     "content": "This document validates the Dify primary knowledge provider path.",
     "tags": ["dify", "acceptance"]
-  }')
+  }' || echo '{"success":false,"error":"curl failed"}')
 save_response "knowledge-upload" "$UPLOAD_RESPONSE"
 UPLOAD_OK=false
 if echo "$UPLOAD_RESPONSE" | grep -q '"success":true'; then
   UPLOAD_OK=true
 fi
 
-SYNC_RESPONSE=$(curl -fsS -X POST "$SERVIFY_URL/api/v1/ai/knowledge/sync" \
+SYNC_RESPONSE=$(curl -sS -X POST "$SERVIFY_URL/api/v1/ai/knowledge/sync" \
   -H "$AUTH_HEADER" \
   -H "Content-Type: application/json" \
-  -d '{}')
+  -d '{}' || echo '{"success":false,"error":"curl failed"}')
 save_response "knowledge-sync" "$SYNC_RESPONSE"
 SYNC_OK=false
 if echo "$SYNC_RESPONSE" | grep -q '"success":true'; then
@@ -266,6 +270,7 @@ append_summary "service_type=$SERVICE_TYPE"
 append_summary "knowledge_provider_enabled=$KNOWLEDGE_PROVIDER_ENABLED"
 append_summary "knowledge_provider=$ACTIVE_PROVIDER"
 append_summary "knowledge_provider_healthy=$KNOWLEDGE_PROVIDER_HEALTHY"
+append_summary "query_ok=$QUERY_OK"
 append_summary "query_strategy=$QUERY_STRATEGY"
 append_summary "dify_available=$DIFY_AVAILABLE"
 append_summary "dify_usage_count=$DIFY_USAGE_COUNT"

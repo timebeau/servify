@@ -62,54 +62,47 @@ func run(cmd *cobra.Command, args []string) {
 	if err != nil {
 		logrus.Fatalf("Failed to load config: %v", err)
 	}
-	appLogger, err := appbootstrap.InitLogging(cfg)
-	if err != nil {
-		logrus.Fatalf("Failed to initialize logger: %v", err)
-	}
-	if appLogger == nil {
-		appLogger = logrus.StandardLogger()
-	}
 	app, err := appbootstrap.BuildApp(cfg)
 	if err != nil {
-		appLogger.Fatalf("Failed to build app: %v", err)
+		logrus.Fatalf("Failed to build app: %v", err)
 	}
-	app.Logger = appLogger
+	appLogger := app.Logger
 	if err := appbootstrap.SetupObservability(context.Background(), cfg, app); err != nil {
-		logrus.Warnf("init tracing: %v", err)
+		appLogger.Warnf("init tracing: %v", err)
 	}
 
-	logrus.Info("🚀 Starting Servify with WeKnora integration...")
+	appLogger.Info("🚀 Starting Servify with WeKnora integration...")
 
 	db, err := appbootstrap.OpenDatabase(cfg, appbootstrap.DatabaseOptions{})
 	if err != nil {
-		logrus.Warnf("DB connect failed, message persistence disabled: %v", err)
+		appLogger.Warnf("DB connect failed, message persistence disabled: %v", err)
 	}
 	app.DB = db
 
-	logrus.Info("📚 Initializing AI assembly...")
+	appLogger.Info("📚 Initializing AI assembly...")
 	aiAssembly, err := appserver.BuildAIAssembly(cfg, app.Logger, appserver.AIAssemblyOptions{
 		RequireWeKnoraHealthy: false,
 		SyncKnowledgeBase:     cfg.Upload.AutoIndex,
 		HealthCheckTimeout:    10 * time.Second,
 	})
 	if err != nil {
-		logrus.Fatalf("❌ Failed to initialize AI assembly: %v", err)
+		appLogger.Fatalf("❌ Failed to initialize AI assembly: %v", err)
 	}
 	weKnoraClient := aiAssembly.WeKnoraClient
 	aiService := aiAssembly.RuntimeService
 	aiHandlerService := aiAssembly.Service
 	if aiAssembly.WeKnoraHealthy {
-		logrus.Info("✅ Enhanced AI service with WeKnora initialized")
+		appLogger.Info("✅ Enhanced AI service with WeKnora initialized")
 	} else if cfg.WeKnora.Enabled {
-		logrus.Warn("🔄 WeKnora unavailable, using fallback AI assembly")
+		appLogger.Warn("🔄 WeKnora unavailable, using fallback AI assembly")
 	} else {
-		logrus.Info("✅ Standard AI service initialized")
+		appLogger.Info("✅ Standard AI service initialized")
 	}
 
 	runtime := appserver.BuildRealtimeRuntime(cfg, app.Logger, db, aiService, aiHandlerService)
-	logrus.Info("🔌 Starting background services...")
+	appLogger.Info("🔌 Starting background services...")
 	if err := runtime.Start(); err != nil {
-		logrus.Fatalf("❌ Failed to start message router: %v", err)
+		appLogger.Fatalf("❌ Failed to start message router: %v", err)
 	}
 
 	// 设置 Gin 模式
@@ -128,12 +121,12 @@ func run(cmd *cobra.Command, args []string) {
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	})
-	appbootstrap.StartHTTPServer(server, logrus.StandardLogger(), fmt.Sprintf("🌐 Server starting on %s", server.Addr))
-	logrus.Infof("📍 Web UI: http://%s", server.Addr)
-	logrus.Infof("🔗 API Base: http://%s/api/v1", server.Addr)
-	logrus.Infof("🔌 WebSocket: ws://%s/api/v1/ws", server.Addr)
+	appbootstrap.StartHTTPServer(server, appLogger, fmt.Sprintf("🌐 Server starting on %s", server.Addr))
+	appLogger.Infof("📍 Web UI: http://%s", server.Addr)
+	appLogger.Infof("🔗 API Base: http://%s/api/v1", server.Addr)
+	appLogger.Infof("🔌 WebSocket: ws://%s/api/v1/ws", server.Addr)
 	if cfg.WeKnora.Enabled {
-		logrus.Infof("📚 WeKnora: %s", cfg.WeKnora.BaseURL)
+		appLogger.Infof("📚 WeKnora: %s", cfg.WeKnora.BaseURL)
 	}
 
 	// 启动健康检查（如果启用）
@@ -143,7 +136,7 @@ func run(cmd *cobra.Command, args []string) {
 
 	appbootstrap.WaitForShutdownSignal()
 
-	logrus.Info("🛑 Shutting down server...")
+	appLogger.Info("🛑 Shutting down server...")
 
 	// 优雅关闭
 	ctx, cancel := appbootstrap.ShutdownContext(30 * time.Second)
@@ -151,18 +144,18 @@ func run(cmd *cobra.Command, args []string) {
 
 	// 停止消息路由
 	if err := runtime.Stop(ctx); err != nil {
-		logrus.Errorf("❌ Failed to stop message router: %v", err)
+		appLogger.Errorf("❌ Failed to stop message router: %v", err)
 	}
 
 	// 关闭服务器
 	if err := server.Shutdown(ctx); err != nil {
-		logrus.Errorf("❌ Server forced to shutdown: %v", err)
+		appLogger.Errorf("❌ Server forced to shutdown: %v", err)
 	}
 	if err := app.RunShutdownHooks(); err != nil {
-		logrus.Errorf("Failed to run shutdown hooks: %v", err)
+		appLogger.Errorf("Failed to run shutdown hooks: %v", err)
 	}
 
-	logrus.Info("✅ Server shutdown complete")
+	appLogger.Info("✅ Server shutdown complete")
 }
 
 func setupEnhancedRouter(
@@ -192,7 +185,7 @@ func setupEnhancedRouter(
 	})
 
 	// 健康检查
-	healthHandler := handlers.NewEnhancedHealthHandler(cfg, runtime.AIHandlerService, db)
+	healthHandler := handlers.NewEnhancedHealthHandler(cfg, runtime.AIHandlerService, db, runtime.Redis)
 	router.GET("/health", healthHandler.Health)
 	router.GET("/ready", healthHandler.Ready)
 

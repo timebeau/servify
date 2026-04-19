@@ -9,21 +9,25 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
 
 func TestWeKnoraIntegrationScriptRealModeRejectsLocalHost(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("bash-backed acceptance script tests are not stable against httptest servers on Windows")
+	}
+
 	evidenceDir := t.TempDir()
 
-	cmd := exec.Command("bash", "test-weknora-integration.sh")
+	cmd := exec.Command("bash", "-lc", fmt.Sprintf("WEKNORA_ACCEPTANCE_MODE=real SERVIFY_URL=%q WEKNORA_URL=%q EVIDENCE_DIR=%q ./test-weknora-integration.sh",
+		"http://127.0.0.1:18080",
+		"http://127.0.0.1:19000",
+		evidenceDir,
+	))
 	cmd.Dir = "."
-	cmd.Env = append(os.Environ(),
-		"WEKNORA_ACCEPTANCE_MODE=real",
-		"SERVIFY_URL=http://127.0.0.1:18080",
-		"WEKNORA_URL=http://127.0.0.1:19000",
-		"EVIDENCE_DIR="+evidenceDir,
-	)
+	cmd.Env = os.Environ()
 	output, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatalf("expected real mode to reject local host, output=%s", string(output))
@@ -44,6 +48,10 @@ func TestWeKnoraIntegrationScriptRealModeRejectsLocalHost(t *testing.T) {
 }
 
 func TestWeKnoraIntegrationScriptMockModeWritesEvidence(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("bash-backed acceptance script tests are not stable against httptest servers on Windows")
+	}
+
 	knowledgeProviderEnabled := true
 	fallbackUsageCount := 0
 
@@ -117,14 +125,13 @@ func TestWeKnoraIntegrationScriptMockModeWritesEvidence(t *testing.T) {
 
 	evidenceDir := t.TempDir()
 
-	cmd := exec.Command("bash", "test-weknora-integration.sh")
+	cmd := exec.Command("bash", "-lc", fmt.Sprintf("WEKNORA_ACCEPTANCE_MODE=mock SERVIFY_URL=%q WEKNORA_URL=%q EVIDENCE_DIR=%q ./test-weknora-integration.sh",
+		servify.URL,
+		weknora.URL,
+		evidenceDir,
+	))
 	cmd.Dir = "."
-	cmd.Env = append(os.Environ(),
-		"WEKNORA_ACCEPTANCE_MODE=mock",
-		"SERVIFY_URL="+servify.URL,
-		"WEKNORA_URL="+weknora.URL,
-		"EVIDENCE_DIR="+evidenceDir,
-	)
+	cmd.Env = os.Environ()
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("expected mock mode success, err=%v output=%s", err, string(output))

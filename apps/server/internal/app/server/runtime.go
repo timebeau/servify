@@ -31,6 +31,7 @@ import (
 	"servify/apps/server/internal/platform/voiceprotocol"
 	"servify/apps/server/internal/services"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
@@ -40,6 +41,7 @@ type Runtime struct {
 	Config *config.Config
 	Logger *logrus.Logger
 	DB     *gorm.DB
+	Redis  *redis.Client
 	Bus    eventbus.Bus
 
 	AIService                aidelivery.RuntimeService
@@ -80,11 +82,12 @@ type websocketRunner interface {
 }
 
 // BuildRuntime wires the current modular-monolith runtime behind an explicit assembly boundary.
-func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus eventbus.Bus) (*Runtime, error) {
+func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, redisClient *redis.Client, bus eventbus.Bus) (*Runtime, error) {
 	rt := &Runtime{
 		Config: cfg,
 		Logger: logger,
 		DB:     db,
+		Redis:  redisClient,
 		Bus:    bus,
 	}
 
@@ -159,7 +162,7 @@ func BuildRuntime(cfg *config.Config, logger *logrus.Logger, db *gorm.DB, bus ev
 	slaService.SetAutomationService(automationService)
 
 	rt.CustomerHandlerService = customerdelivery.NewHandlerService(db)
-	agentAssembly := services.BuildAgentServiceAssembly(db, logger, nil)
+	agentAssembly := services.BuildAgentServiceAssembly(db, logger, redisClient)
 	rt.AgentHandlerService = agentAssembly.Service
 	go agentAssembly.Maintenance.Start()
 
@@ -239,6 +242,7 @@ func (rt *Runtime) RouterDependencies() Dependencies {
 		Config:                   rt.Config,
 		Logger:                   rt.Logger,
 		DB:                       rt.DB,
+		Redis:                    rt.Redis,
 		AIService:                rt.AIService,
 		AIHandlerService:         rt.AIHandlerService,
 		RealtimeGateway:          rt.RealtimeGateway,

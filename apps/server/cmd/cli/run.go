@@ -42,25 +42,18 @@ func run(cmd *cobra.Command, args []string) {
 	if err != nil {
 		logrus.Fatalf("Failed to load config: %v", err)
 	}
-	appLogger, err := appbootstrap.InitLogging(cfg)
-	if err != nil {
-		logrus.Fatalf("Failed to initialize logger: %v", err)
-	}
-	if appLogger == nil {
-		appLogger = logrus.StandardLogger()
-	}
 	app, err := appbootstrap.BuildApp(cfg)
 	if err != nil {
-		appLogger.Fatalf("Failed to build app: %v", err)
+		logrus.Fatalf("Failed to build app: %v", err)
 	}
-	app.Logger = appLogger
+	appLogger := app.Logger
 	if err := appbootstrap.SetupObservability(context.Background(), cfg, app); err != nil {
-		logrus.Warnf("init tracing: %v", err)
+		appLogger.Warnf("init tracing: %v", err)
 	}
 
 	db, err := appbootstrap.OpenDatabase(cfg, appbootstrap.DatabaseOptions{})
 	if err != nil {
-		logrus.Warnf("DB connect failed, message persistence disabled: %v", err)
+		appLogger.Warnf("DB connect failed, message persistence disabled: %v", err)
 	}
 	app.DB = db
 
@@ -90,28 +83,28 @@ func run(cmd *cobra.Command, args []string) {
 	router := setupRouter(cfg, runtime)
 
 	server := appbootstrap.NewHTTPServer(cfg, router, appbootstrap.HTTPServerOptions{})
-	appbootstrap.StartHTTPServer(server, logrus.StandardLogger(), fmt.Sprintf("Starting server on %s", server.Addr))
+	appbootstrap.StartHTTPServer(server, appLogger, fmt.Sprintf("Starting server on %s", server.Addr))
 	appbootstrap.WaitForShutdownSignal()
 
-	logrus.Info("Shutting down server...")
+	appLogger.Info("Shutting down server...")
 
 	ctx, cancel := appbootstrap.ShutdownContext(30 * time.Second)
 	defer cancel()
 
 	// 停止消息路由
 	if err := runtime.Stop(ctx); err != nil {
-		logrus.Errorf("Failed to stop message router: %v", err)
+		appLogger.Errorf("Failed to stop message router: %v", err)
 	}
 
 	// 关闭服务器
 	if err := server.Shutdown(ctx); err != nil {
-		logrus.Errorf("Server forced to shutdown: %v", err)
+		appLogger.Errorf("Server forced to shutdown: %v", err)
 	}
 	if err := app.RunShutdownHooks(); err != nil {
-		logrus.Errorf("Failed to run shutdown hooks: %v", err)
+		appLogger.Errorf("Failed to run shutdown hooks: %v", err)
 	}
 
-	logrus.Info("Server exited")
+	appLogger.Info("Server exited")
 }
 
 func setupRouter(cfg *config.Config, runtime *appserver.RealtimeRuntime) *gin.Engine {

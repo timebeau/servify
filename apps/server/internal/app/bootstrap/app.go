@@ -10,6 +10,7 @@ import (
 	"servify/apps/server/internal/config"
 	"servify/apps/server/internal/platform/eventbus"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
@@ -28,12 +29,12 @@ type HTTPRuntime interface {
 	Router() http.Handler
 }
 
-// App is the bootstrap root for server runtime wiring.
-// The initial skeleton only collects shared runtime dependencies.
+// App is the bootstrap root for shared server runtime wiring.
 type App struct {
 	Config        *config.Config
 	Logger        *logrus.Logger
 	DB            *gorm.DB
+	Redis         *redis.Client
 	Runtime       HTTPRuntime
 	Router        http.Handler
 	Server        *http.Server
@@ -42,22 +43,41 @@ type App struct {
 	ShutdownHooks []func() error
 }
 
-// BuildApp creates the application runtime skeleton.
-// Later tasks will move config, logging, db, router, and worker wiring here.
+// BuildApp creates the shared application runtime dependencies used by entrypoints.
 func BuildApp(cfg *config.Config) (*App, error) {
-	logger := logrus.StandardLogger()
-	bus, err := BuildEventBus(cfg, logger, nil)
+	logger, err := InitLogging(cfg)
 	if err != nil {
 		return nil, err
 	}
+	if logger == nil {
+		logger = logrus.StandardLogger()
+	}
+	redisClient, err := OpenRedis(cfg)
+	if err != nil {
+		return nil, err
+	}
+	bus, err := BuildEventBus(cfg, logger, redisClient)
+	if err != nil {
+		if redisClient != nil {
+			_ = redisClient.Close()
+		}
+		return nil, err
+	}
 
-	return &App{
+	app := &App{
 		Config:        cfg,
 		Logger:        logger,
+		Redis:         redisClient,
 		EventBus:      bus,
 		Workers:       make([]Worker, 0),
 		ShutdownHooks: make([]func() error, 0),
-	}, nil
+	}
+	if redisClient != nil {
+		app.AddShutdownHook(func() error {
+			return redisClient.Close()
+		})
+	}
+	return app, nil
 }
 
 // RegisterWorker appends a managed background worker.
@@ -110,7 +130,7 @@ func (a *App) BuildServerRuntime() (*appserver.Runtime, error) {
 	if a == nil {
 		return nil, errors.New("bootstrap app is nil")
 	}
-	rt, err := appserver.BuildRuntime(a.Config, a.Logger, a.DB, a.EventBus)
+	rt, err := appserver.BuildRuntime(a.Config, a.Logger, a.DB, a.Redis, a.EventBus)
 	if err != nil {
 		return nil, err
 	}

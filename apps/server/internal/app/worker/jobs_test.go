@@ -78,10 +78,7 @@ func (f *fakeRuntimeWorkerDependencies) SLAServiceForWorker() *services.SLAServi
 
 func TestStatisticsWorkerLifecycle(t *testing.T) {
 	loop := &fakeLoop{started: make(chan struct{}), stopped: make(chan struct{})}
-	w := &StatisticsWorker{
-		service:  &fakeStatisticsService{loop: loop},
-		interval: 100 * time.Millisecond,
-	}
+	w := NewStatisticsWorker(&fakeStatisticsService{loop: loop}, 100*time.Millisecond, nil)
 	if err := w.Start(); err != nil {
 		t.Fatalf("Start() error = %v", err)
 	}
@@ -104,10 +101,7 @@ func TestStatisticsWorkerLifecycle(t *testing.T) {
 
 func TestSLAMonitorWorkerLifecycle(t *testing.T) {
 	loop := &fakeLoop{started: make(chan struct{}), stopped: make(chan struct{})}
-	w := &SLAMonitorWorker{
-		service:  &fakeSLAService{loop: loop},
-		interval: 100 * time.Millisecond,
-	}
+	w := NewSLAMonitorWorker(&fakeSLAService{loop: loop}, 100*time.Millisecond, nil)
 	if err := w.Start(); err != nil {
 		t.Fatalf("Start() error = %v", err)
 	}
@@ -130,11 +124,8 @@ func TestSLAMonitorWorkerLifecycle(t *testing.T) {
 
 func TestAuditCleanupWorkerLifecycle(t *testing.T) {
 	calls := make(chan struct{}, 1)
-	w := &AuditCleanupWorker{
-		service:  &fakeAuditRetentionService{calls: calls},
-		interval: 100 * time.Millisecond,
-		now:      time.Now,
-	}
+	w := NewAuditCleanupWorker(&fakeAuditRetentionService{calls: calls}, 100*time.Millisecond, nil)
+	w.(*AuditCleanupWorker).now = time.Now
 	if err := w.Start(); err != nil {
 		t.Fatalf("Start() error = %v", err)
 	}
@@ -152,11 +143,8 @@ func TestAuditCleanupWorkerLifecycle(t *testing.T) {
 
 func TestRevokedTokenCleanupWorkerLifecycle(t *testing.T) {
 	calls := make(chan struct{}, 1)
-	w := &RevokedTokenCleanupWorker{
-		service:  &fakeRevokedTokenRetentionService{calls: calls},
-		interval: 100 * time.Millisecond,
-		now:      time.Now,
-	}
+	w := NewRevokedTokenCleanupWorker(&fakeRevokedTokenRetentionService{calls: calls}, 100*time.Millisecond, nil)
+	w.(*RevokedTokenCleanupWorker).now = time.Now
 	if err := w.Start(); err != nil {
 		t.Fatalf("Start() error = %v", err)
 	}
