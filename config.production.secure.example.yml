@@ -5,6 +5,10 @@ server:
   environment: "production"
 
 event_bus:
+  # WARNING: "inmemory" provider does NOT persist events. Events are lost on restart.
+  # Do NOT use in production if you need reliable async processing (statistics,
+  # automations, analytics). Use a persistent provider (Redis Streams, NATS, RabbitMQ)
+  # instead. Currently, only "inmemory" is implemented - this is a known limitation.
   provider: "inmemory"
 
 voice:

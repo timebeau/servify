@@ -3,6 +3,8 @@ server:
   port: 8080
 
 event_bus:
+  # WARNING: "inmemory" provider does NOT persist events. Events are lost on restart.
+  # This is acceptable for development/demo but NOT for production use.
   provider: "inmemory"
 
 database:

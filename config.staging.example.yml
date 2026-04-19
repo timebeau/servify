@@ -5,6 +5,8 @@ server:
   environment: "staging"
 
 event_bus:
+  # WARNING: "inmemory" provider does NOT persist events. Events are lost on restart.
+  # For staging, consider using a persistent provider if you need reliable async processing.
   provider: "inmemory"
 
 voice:
