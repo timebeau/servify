@@ -1,0 +1,46 @@
+# Dify mock-backed 集成环境
+# 注意：当前 compose 文件构建的是 ./dify-mock，用于本地协议回归与验收证据留档，
+# 不是"真实 Dify staging/production"部署模板。
+# 使用方法: docker compose -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dify.yml up -d
+
+services:
+  # Dify mock 服务
+  dify:
+    build:
+      context: ./dify-mock
+    container_name: servify_dify
+    ports:
+      - "5001:8001"  # Dify API 端口 (外部 5001 -> 内部 8001)
+    environment:
+      # Mock 配置
+      - MOCK_MODE=true
+      - API_PORT=8001
+      - LOG_LEVEL=info
+    networks:
+      - servify-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8001/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Servify 主服务（Dify 配置）
+  servify:
+    environment:
+      # Dify 集成配置
+      - DIFY_ENABLED=true
+      - DIFY_BASE_URL=http://dify:8001  # 内部网络仍使用 8001
+      - DIFY_API_KEY=${DIFY_API_KEY:-mock-dify-key}
+      - DIFY_DATASET_ID=${DIFY_DATASET_ID:-mock-dataset-1}
+      # 服务器配置
+      - SERVIFY_HOST=0.0.0.0
+      - SERVIFY_PORT=8080
+    depends_on:
+      - postgres
+      - redis
+      - dify
+
+networks:
+  servify-network:
+    driver: bridge

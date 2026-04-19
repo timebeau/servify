@@ -42,8 +42,8 @@ ai:
     timeout: 30s
 
 dify:
-  enabled: false
-  base_url: "https://api.dify.example/v1"
+  enabled: ${DIFY_ENABLED}
+  base_url: "${DIFY_BASE_URL}"
   api_key: "${DIFY_API_KEY}"
   dataset_id: "${DIFY_DATASET_ID}"
   timeout: 30s
@@ -52,6 +52,19 @@ dify:
     score_threshold: 0.7
     search_method: "semantic_search"
     reranking_enable: false
+
+weknora:
+  enabled: ${WEKNORA_ENABLED}
+  base_url: "${WEKNORA_BASE_URL}"
+  api_key: "${WEKNORA_API_KEY}"
+  tenant_id: "${WEKNORA_TENANT_ID}"
+  knowledge_base_id: "${WEKNORA_KB_ID}"
+  timeout: 30s
+  max_retries: 3
+  search:
+    default_limit: 10
+    score_threshold: 0.7
+    strategy: "semantic"
 
 jwt:
   secret: "${SERVIFY_JWT_SECRET}"

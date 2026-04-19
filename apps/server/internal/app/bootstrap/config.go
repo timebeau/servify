@@ -23,15 +23,23 @@ type RuntimeOverrides struct {
 // LoadConfig loads configuration from the default path or a specific config file.
 func LoadConfig(configPath string) (*config.Config, error) {
 	viper.Reset()
-	viper.AddConfigPath(".")
-	viper.AddConfigPath("..")
-	viper.AddConfigPath(filepath.Join("..", ".."))
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.AutomaticEnv()
 	if configPath != "" {
 		viper.SetConfigFile(configPath)
+	} else {
+		// Default to /app/config.yml for Docker environment
+		defaultConfigPaths := []string{
+			".",
+			"..",
+			filepath.Join("..", ".."),
+			"/app",
+		}
+		for _, p := range defaultConfigPaths {
+			viper.AddConfigPath(p)
+		}
+		viper.SetConfigName("config")
+		viper.SetConfigType("yaml")
 	}
+	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err != nil {
 		var notFound viper.ConfigFileNotFoundError
@@ -39,6 +47,8 @@ func LoadConfig(configPath string) (*config.Config, error) {
 			return nil, err
 		}
 	}
+	// Expand environment variables in Viper's internal storage
+	expandViperEnvVars()
 	cfg, result, err := config.LoadWithResult()
 	if err != nil {
 		return nil, err
@@ -133,4 +143,32 @@ func serverPortFromEnv(defaultPort int) int {
 		}
 	}
 	return defaultPort
+}
+
+// expandViperEnvVars expands environment variables in Viper's internal storage.
+// This is needed because Viper doesn't automatically expand ${VAR} placeholders.
+// We need to expand before Viper parses types, so we read the raw config and expand.
+func expandViperEnvVars() {
+	configFile := viper.ConfigFileUsed()
+	if configFile == "" {
+		return
+	}
+	// Read the config file and expand env vars
+	content, err := os.ReadFile(configFile)
+	if err != nil {
+		return
+	}
+	// Expand environment variables in the content
+	expanded := os.ExpandEnv(string(content))
+	// Write back to a temp file and tell Viper to use it
+	tempFile := configFile + ".expanded"
+	if err := os.WriteFile(tempFile, []byte(expanded), 0o644); err != nil {
+		return
+	}
+	defer os.Remove(tempFile)
+	// Merge the expanded config into existing Viper settings
+	viper.SetConfigFile(tempFile)
+	if err := viper.MergeInConfig(); err != nil {
+		// Silently ignore merge errors - continue with original config
+	}
 }

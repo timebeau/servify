@@ -249,9 +249,9 @@
   - 至少一条真实文档上传、同步、查询命中成功
   - fallback 有实际日志、响应、状态三类证据
 - 状态：`[-]`
-- 最近进展：已把 Dify/WeKnora 验收脚本接入 `Makefile` 统一入口、CI 脚本门禁和本地开发文档入口；当前 `make dify-acceptance` / `make weknora-acceptance` / `make knowledge-provider-acceptance` 已成为稳定执行口径；同时已修正 `OrchestratedEnhancedAIService.SyncKnowledgeBase()` 在 provider 未启用时返回假成功的问题，避免把“未配置/不可用”误记成“同步完成”；另外已把 `knowledge-docs` 的 `Create/Update` 接到当前 provider `UpsertDocument`，并把外部 `document_id` 映射持久化到 `KnowledgeDoc.provider_id/external_id`，删除链路也开始优先使用外部 ID；当前 Dify 删除能力已恢复到可用状态，但 WeKnora 仍缺真实删除实现，因此 provider 删除闭环还没有全量完成
-- 下一步：以 `docs/acceptance-checklist.md` 为准补齐真实 provider 场景的运行证据，把 `upload` / `sync` 从“部分通过”推进到“通过”，并在有真实凭证时回填验收结果
-- 阻塞项：外部 provider 环境与凭证
+- 最近进展：**2026-04-19 Docker 环境配置问题已修复**：1) 修复了 Viper 环境变量展开问题（`expandViperEnvVars` 函数），2) 添加了 config.yml 挂载，3) 对齐了 JWT_SECRET/SERVIFY_JWT_SECRET 环境变量，4) Docker Compose 环境下 WeKnora 已正确启用（`knowledge_provider_enabled: true`, `knowledge_provider_healthy: true`）。见 `docs/acceptance-weknora-docker.md` 完整验收报告。WeKnora mock 服务只实现了 health check，upload/sync 需要真实 WeKnora 服务完成端到端测试。
+- 下一步：使用真实 WeKnora 服务完成 upload/sync 端到端测试，更新验收清单状态为”通过”
+- 阻塞项：真实 WeKnora 服务环境与凭证
 
 ### [!] P1-2 Auth 自助 session 链路补齐真实验收
 
