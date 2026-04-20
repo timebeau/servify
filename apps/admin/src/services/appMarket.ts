@@ -15,5 +15,5 @@ export async function updateIntegration(id: number, data: Partial<API.Integratio
 }
 
 export async function deleteIntegration(id: number) {
-  return request(`${API}/${id}`, { method: 'DELETE' });
+  return request<API.MessageResponse>(`${API}/${id}`, { method: 'DELETE' });
 }

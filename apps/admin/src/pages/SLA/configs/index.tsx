@@ -5,6 +5,7 @@ import { Button, Space, Tag, message, Modal, Form, Input, InputNumber, Switch } 
 import { PlusOutlined } from '@ant-design/icons';
 import { TICKET_PRIORITY_MAP } from '@/utils/constants';
 import { listSLAConfigs, deleteSLAConfig, createSLAConfig, updateSLAConfig } from '@/services/sla';
+import { getErrorMessage, isFormValidationError } from '@/utils/error';
 
 const SLAConfigsPage: React.FC = () => {
   const actionRef = useRef<ActionType>();
@@ -46,9 +47,9 @@ const SLAConfigsPage: React.FC = () => {
       setModalOpen(false);
       form.resetFields();
       actionRef.current?.reload();
-    } catch (error: any) {
-      if (error?.errorFields) return;
-      message.error('操作失败: ' + (error?.message || '未知错误'));
+    } catch (error: unknown) {
+      if (isFormValidationError(error)) return;
+      message.error(getErrorMessage(error, '操作失败'));
     } finally {
       setSubmitting(false);
     }
@@ -65,8 +66,8 @@ const SLAConfigsPage: React.FC = () => {
           await deleteSLAConfig(id);
           message.success('策略已删除');
           actionRef.current?.reload();
-        } catch (error) {
-          message.error('删除失败');
+        } catch (error: unknown) {
+          message.error(getErrorMessage(error, '删除失败'));
         }
       },
     });
@@ -128,8 +129,8 @@ const SLAConfigsPage: React.FC = () => {
               page_size: params.pageSize,
             });
             return {
-              data: result?.data || [],
-              total: result?.total || 0,
+              data: result.data,
+              total: result.total,
               success: true,
             };
           } catch (error) {

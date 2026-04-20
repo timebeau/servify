@@ -216,7 +216,7 @@ const ConversationPage: React.FC = () => {
     setSending(true);
     try {
       const payload = await sendConversationMessage(selectedId, { content });
-      const item = payload?.data as API.ConversationMessage | undefined;
+      const item = payload.data;
       if (item) {
         setMessages((prev) => [...prev, item]);
       }
@@ -615,7 +615,7 @@ const ConversationPage: React.FC = () => {
   ];
 
   const onlineAgents = (overview?.agent_stats?.available_agents || []).filter(
-    (a: any) => a.id !== selectedSession?.agent_id,
+    (a) => a.id !== selectedSession?.agent_id,
   );
 
   return (
@@ -878,7 +878,7 @@ const ConversationPage: React.FC = () => {
             placeholder="选择客服"
             value={transferTarget}
             onChange={(v) => setTransferTarget(v)}
-            options={onlineAgents.map((a: any) => ({ label: a.name || `客服 #${a.id}`, value: a.id }))}
+            options={onlineAgents.map((a) => ({ label: a.name || `客服 #${a.id}`, value: a.id }))}
           />
         )}
       </Modal>

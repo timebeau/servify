@@ -5,6 +5,7 @@ import { Tag, Button, Switch, Space, Spin, message, Modal, Form, Input, InputNum
 import { goBack, useDetailParams } from '@/lib/navigation';
 import { AGENT_STATUS_MAP } from '@/utils/constants';
 import { getAgent, updateAgentStatus, updateAgent } from '@/services/agent';
+import { getErrorMessage, isFormValidationError } from '@/utils/error';
 
 const AgentDetailPage: React.FC = () => {
   const { id } = useDetailParams();
@@ -39,8 +40,8 @@ const AgentDetailPage: React.FC = () => {
       await updateAgentStatus(Number(id), newStatus);
       setAgent({ ...agent!, status: newStatus });
       message.success(`状态已切换为${checked ? '在线' : '离线'}`);
-    } catch (error) {
-      message.error('状态切换失败');
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '状态切换失败'));
     }
   };
 
@@ -62,9 +63,9 @@ const AgentDetailPage: React.FC = () => {
       // 刷新数据
       const result = await getAgent(Number(id));
       if (result) setAgent(result);
-    } catch (error: any) {
-      if (error?.errorFields) return;
-      message.error('更新失败');
+    } catch (error: unknown) {
+      if (isFormValidationError(error)) return;
+      message.error(getErrorMessage(error, '更新失败'));
     } finally {
       setSaving(false);
     }

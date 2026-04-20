@@ -37,5 +37,5 @@ export async function updateDoc(id: number, data: {
 }
 
 export async function deleteDoc(id: number) {
-  return request(`${API}/${id}`, { method: 'DELETE' });
+  return request<API.MessageResponse>(`${API}/${id}`, { method: 'DELETE' });
 }

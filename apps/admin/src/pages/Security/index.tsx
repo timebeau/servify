@@ -24,6 +24,7 @@ import {
   revokeUserSession,
   revokeUserTokens,
 } from '@/services/security';
+import { getErrorMessage, isFormValidationError } from '@/utils/error';
 
 const parseUserIds = (raw: string): number[] => {
   const seen = new Set<number>();
@@ -90,10 +91,10 @@ const SecurityPage: React.FC = () => {
       setPreviewItems(result?.items || []);
       setLookupUserIds(userIds);
       setSelectedRowKeys((keys) => keys.filter((key) => userIds.includes(Number(key))));
-    } catch (error: any) {
+    } catch (error: unknown) {
       setPreviewItems([]);
       setSelectedRowKeys([]);
-      message.error(error?.message || '查询用户安全态失败');
+      message.error(getErrorMessage(error, '查询用户安全态失败'));
     } finally {
       setLookupLoading(false);
     }
@@ -110,8 +111,8 @@ const SecurityPage: React.FC = () => {
       ]);
       setSelectedUserDetail(detailResult || null);
       setSelectedUserSessions(sessionsResult?.items || []);
-    } catch (error: any) {
-      message.error(error?.message || '加载用户安全详情失败');
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '加载用户安全详情失败'));
       setSelectedUserDetail(null);
       setSelectedUserSessions([]);
     } finally {
@@ -142,8 +143,8 @@ const SecurityPage: React.FC = () => {
       if (selectedUser?.user_id === userId) {
         await reloadSelectedUser();
       }
-    } catch (error: any) {
-      message.error(error?.message || '吊销用户 Token 失败');
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '吊销用户 Token 失败'));
     }
   };
 
@@ -168,8 +169,8 @@ const SecurityPage: React.FC = () => {
           if (selectedUser && userIds.includes(selectedUser.user_id)) {
             await reloadSelectedUser();
           }
-        } catch (error: any) {
-          message.error(error?.message || '批量吊销用户 Token 失败');
+        } catch (error: unknown) {
+          message.error(getErrorMessage(error, '批量吊销用户 Token 失败'));
         }
       },
     });
@@ -184,8 +185,8 @@ const SecurityPage: React.FC = () => {
       await revokeUserSession(selectedUser.user_id, sessionId);
       message.success(`已吊销会话 ${sessionId}`);
       await reloadSelectedUser();
-    } catch (error: any) {
-      message.error(error?.message || '吊销会话失败');
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '吊销会话失败'));
     }
   };
 
@@ -198,8 +199,8 @@ const SecurityPage: React.FC = () => {
       await revokeAllUserSessions(selectedUser.user_id);
       message.success(`已吊销用户 #${selectedUser.user_id} 的全部活跃会话`);
       await reloadSelectedUser();
-    } catch (error: any) {
-      message.error(error?.message || '批量吊销会话失败');
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '批量吊销会话失败'));
     }
   };
 
@@ -212,11 +213,11 @@ const SecurityPage: React.FC = () => {
       setTokenModalOpen(false);
       tokenForm.resetFields();
       revokedActionRef.current?.reload();
-    } catch (error: any) {
-      if (error?.errorFields) {
+    } catch (error: unknown) {
+      if (isFormValidationError(error)) {
         return;
       }
-      message.error(error?.message || '吊销 JWT 失败');
+      message.error(getErrorMessage(error, '吊销 JWT 失败'));
     } finally {
       setTokenSubmitting(false);
     }
@@ -507,12 +508,12 @@ const SecurityPage: React.FC = () => {
     },
   ];
 
-  const detailData = selectedUser
+  const detailData: Partial<API.UserSecurityPreview & API.UserSecurityDetail> | undefined = selectedUser
     ? {
         ...selectedUser,
         ...selectedUserDetail,
       }
-    : selectedUserDetail;
+    : selectedUserDetail || undefined;
 
   return (
     <div>
@@ -661,12 +662,14 @@ const SecurityPage: React.FC = () => {
                 {
                   title: '角色',
                   dataIndex: 'role',
-                  render: (_, record: any) => <Tag color="blue">{String(record.role || '-')}</Tag>,
+                  render: (_, record: Partial<API.UserSecurityPreview & API.UserSecurityDetail>) => (
+                    <Tag color="blue">{String(record.role || '-')}</Tag>
+                  ),
                 },
                 {
                   title: '状态',
                   dataIndex: 'status',
-                  render: (_, record: any) => (
+                  render: (_, record: Partial<API.UserSecurityPreview & API.UserSecurityDetail>) => (
                     <Tag color={statusColorMap[String(record.status || '')] || 'default'}>
                       {String(record.status || '-')}
                     </Tag>

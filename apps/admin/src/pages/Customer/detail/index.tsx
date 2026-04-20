@@ -6,11 +6,17 @@ import { goBack, useDetailParams } from '@/lib/navigation';
 import { CUSTOMER_SOURCE_MAP } from '@/utils/constants';
 import { getCustomer, getCustomerActivity, updateCustomer } from '@/services/customer';
 
+type CustomerActivityItem = {
+  key: string;
+  title: string;
+  description: string;
+};
+
 const CustomerDetailPage: React.FC = () => {
   const { id } = useDetailParams();
   const [loading, setLoading] = useState(true);
   const [customer, setCustomer] = useState<API.Customer | null>(null);
-  const [activities, setActivities] = useState<any[]>([]);
+  const [activities, setActivities] = useState<CustomerActivityItem[]>([]);
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
@@ -38,7 +44,24 @@ const CustomerDetailPage: React.FC = () => {
       if (!id) return;
       try {
         const result = await getCustomerActivity(Number(id));
-        setActivities(Array.isArray(result) ? result : result?.data || []);
+        const mergedActivities: CustomerActivityItem[] = [
+          ...(result.recent_sessions || []).map((session) => ({
+            key: `session-${session.id}`,
+            title: `会话 ${session.id}`,
+            description: session.started_at || '-',
+          })),
+          ...(result.recent_tickets || []).map((ticket) => ({
+            key: `ticket-${ticket.id}`,
+            title: ticket.title || `工单 #${ticket.id}`,
+            description: ticket.created_at || '-',
+          })),
+          ...(result.recent_messages || []).map((msg) => ({
+            key: `message-${msg.id}`,
+            title: msg.content || '-',
+            description: msg.created_at || '-',
+          })),
+        ];
+        setActivities(mergedActivities);
       } catch (error) {
         console.error('获取活动记录失败:', error);
       }
@@ -77,8 +100,14 @@ const CustomerDetailPage: React.FC = () => {
       setEditOpen(false);
       const result = await getCustomer(Number(id));
       if (result) setCustomer(result);
-    } catch (error: any) {
-      if (error?.errorFields) return;
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'errorFields' in error
+      ) {
+        return;
+      }
       message.error('更新失败');
     } finally {
       setSaving(false);
@@ -147,11 +176,11 @@ const CustomerDetailPage: React.FC = () => {
         <List
           dataSource={activities}
           locale={{ emptyText: '暂无活动记录' }}
-          renderItem={(item: any) => (
+          renderItem={(item) => (
             <List.Item>
               <List.Item.Meta
-                title={item.action || item.description || '-'}
-                description={item.created_at || '-'}
+                title={item.title}
+                description={item.description}
               />
             </List.Item>
           )}

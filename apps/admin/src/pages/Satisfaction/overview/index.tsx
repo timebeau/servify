@@ -4,10 +4,21 @@ import { Row, Col, Spin, Empty, Result, Button } from 'antd';
 import { Column, Pie } from '@ant-design/charts';
 import { getSatisfactionStats } from '@/services/satisfaction';
 
+type TrendChartDatum = {
+  date: string;
+  value: number;
+  count: number;
+};
+
+type DistributionChartDatum = {
+  rating: string;
+  count: number;
+};
+
 const SatisfactionOverviewPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<API.SatisfactionStats | null>(null);
 
   const fetchStats = async () => {
     setLoading(true);
@@ -49,14 +60,14 @@ const SatisfactionOverviewPage: React.FC = () => {
   }
 
   // 满意度趋势图数据
-  const trendData = (stats?.trend_data || []).map((item: any) => ({
+  const trendData = (stats?.trend_data || []).map((item) => ({
     date: item.date,
-    value: Number((item.average_rating || 0).toFixed(2)),
+    value: Number(item.average_rating.toFixed(2)),
     count: item.count,
   }));
 
   // 评分分布数据
-  const distEntries = Object.entries(stats?.rating_distribution || {}) as [string, any][];
+  const distEntries = Object.entries(stats?.rating_distribution || {}) as [string, number][];
   const distributionData = distEntries.map(([rating, count]) => ({
     rating: `${rating} 星`,
     count: Number(count),
@@ -114,7 +125,7 @@ const SatisfactionOverviewPage: React.FC = () => {
             yField="value"
             color="#1677ff"
             label={{
-              text: (origin: any) => origin.value?.toFixed(1),
+              text: (origin: TrendChartDatum) => origin.value?.toFixed(1),
               position: 'top' as const,
             }}
             meta={{
@@ -122,7 +133,7 @@ const SatisfactionOverviewPage: React.FC = () => {
             }}
             tooltip={{
               fields: ['date', 'value', 'count'],
-              formatter: (datum: any) => ({
+              formatter: (datum: TrendChartDatum) => ({
                 name: datum.date,
                 value: `评分: ${datum.value} / 评价数: ${datum.count || 0}`,
               }),
@@ -143,7 +154,7 @@ const SatisfactionOverviewPage: React.FC = () => {
             label={{
               type: 'inner' as const,
               offset: '-30%',
-              content: (obj: any) => `${obj.rating}: ${obj.count}`,
+              content: (obj: DistributionChartDatum) => `${obj.rating}: ${obj.count}`,
             }}
             style={{ height: 300 }}
           />

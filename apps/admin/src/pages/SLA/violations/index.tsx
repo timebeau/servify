@@ -4,20 +4,10 @@ import type { ProColumns } from '@ant-design/pro-components';
 import { Tag, Space, message } from 'antd';
 import { SLA_VIOLATION_STATUS_MAP } from '@/utils/constants';
 import { listSLAViolations, resolveSLAViolation } from '@/services/sla';
-
-interface SLAViolationRecord {
-  id: number;
-  ticket_id: string;
-  policy_name: string;
-  metric: string;
-  target: number;
-  actual: number;
-  status: string;
-  created_at: string;
-}
+import { getErrorMessage } from '@/utils/error';
 
 const SLAViolationsPage: React.FC = () => {
-  const columns: ProColumns<SLAViolationRecord>[] = [
+  const columns: ProColumns<API.SLAViolation>[] = [
     {
       title: 'ID',
       dataIndex: 'id',
@@ -77,8 +67,8 @@ const SLAViolationsPage: React.FC = () => {
             try {
               await resolveSLAViolation(record.id);
               message.success('违规已处理');
-            } catch (error) {
-              message.error('处理失败');
+            } catch (error: unknown) {
+              message.error(getErrorMessage(error, '处理失败'));
             }
           }}
         >
@@ -89,7 +79,7 @@ const SLAViolationsPage: React.FC = () => {
   ];
 
   return (
-    <ProTable<SLAViolationRecord>
+    <ProTable<API.SLAViolation>
       headerTitle="SLA 违规记录"
       rowKey="id"
       columns={columns}
@@ -101,11 +91,11 @@ const SLAViolationsPage: React.FC = () => {
             status: params.status,
           });
           return {
-            data: result?.data || [],
-            total: result?.total || 0,
+            data: result.data,
+            total: result.total,
             success: true,
           };
-        } catch (error) {
+        } catch (error: unknown) {
           console.error('获取 SLA 违规记录失败:', error);
           return { data: [], total: 0, success: true };
         }

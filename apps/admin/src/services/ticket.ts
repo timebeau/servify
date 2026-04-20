@@ -31,27 +31,27 @@ export async function updateTicket(id: number, data: Partial<API.Ticket>) {
 }
 
 export async function assignTicket(id: number, agentId: number) {
-  return request(`${API}/${id}/assign`, { method: 'POST', data: { agent_id: agentId } });
+  return request<API.MessageResponse<API.Ticket>>(`${API}/${id}/assign`, { method: 'POST', data: { agent_id: agentId } });
 }
 
 export async function closeTicket(id: number) {
-  return request(`${API}/${id}/close`, { method: 'POST' });
+  return request<API.MessageResponse<API.Ticket>>(`${API}/${id}/close`, { method: 'POST' });
 }
 
 export async function addComment(id: number, data: { content: string; internal?: boolean }) {
-  return request(`${API}/${id}/comments`, { method: 'POST', data });
+  return request<API.MessageResponse<API.TicketComment>>(`${API}/${id}/comments`, { method: 'POST', data });
 }
 
 export async function getComments(id: number) {
-  return request(`${API}/${id}/comments`);
+  return request<API.ListResponse<API.TicketComment>>(`${API}/${id}/comments`);
 }
 
 export async function getTicketSatisfaction(id: number) {
-  return request(`${API}/${id}/satisfaction`);
+  return request<API.Satisfaction>(`${API}/${id}/satisfaction`);
 }
 
 export async function bulkUpdateTickets(data: { ticket_ids: number[]; action: string }) {
-  return request(`${API}/bulk`, { method: 'POST', data });
+  return request<API.MessageResponse>(`${API}/bulk`, { method: 'POST', data });
 }
 
 export async function exportTickets(params: API.TicketListParams) {

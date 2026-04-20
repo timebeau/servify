@@ -82,11 +82,11 @@ const TicketDetailPage: React.FC = () => {
   const { id } = useDetailParams();
   const [loading, setLoading] = useState(true);
   const [ticket, setTicket] = useState<API.Ticket | null>(null);
-  const [comments, setComments] = useState<any[]>([]);
+  const [comments, setComments] = useState<API.TicketComment[]>([]);
   const [commentContent, setCommentContent] = useState('');
   const [commentsError, setCommentsError] = useState<string | null>(null);
   const [submittingComment, setSubmittingComment] = useState(false);
-  const [conversations, setConversations] = useState<any[]>([]);
+  const [conversations, setConversations] = useState<API.Session[]>([]);
   const [conversationsLoading, setConversationsLoading] = useState(false);
   const [conversationsError, setConversationsError] = useState<string | null>(null);
 
@@ -114,7 +114,7 @@ const TicketDetailPage: React.FC = () => {
       setCommentsError(null);
       try {
         const result = await getComments(Number(id));
-        setComments(Array.isArray(result) ? result : result?.data || []);
+        setComments(result.data || []);
       } catch (error) {
         console.error('获取评论失败:', error);
         setCommentsError('获取评论失败，请刷新重试');
@@ -191,7 +191,7 @@ const TicketDetailPage: React.FC = () => {
       message.success('评论已添加');
       setCommentContent('');
       const result = await getComments(Number(id));
-      setComments(Array.isArray(result) ? result : result?.data || []);
+      setComments(result.data || []);
     } catch (error) {
       message.error('添加评论失败');
     } finally {
@@ -299,7 +299,7 @@ const TicketDetailPage: React.FC = () => {
         <List
           dataSource={comments}
           locale={{ emptyText: '暂无评论' }}
-          renderItem={(item: any) => (
+          renderItem={(item) => (
             <List.Item>
               <List.Item.Meta
                 title={
@@ -343,7 +343,7 @@ const TicketDetailPage: React.FC = () => {
             <List
               dataSource={conversations}
               locale={{ emptyText: '暂无关联会话' }}
-              renderItem={(session: any) => (
+              renderItem={(session) => (
                 <List.Item
                   actions={[
                     <Button
@@ -359,7 +359,7 @@ const TicketDetailPage: React.FC = () => {
                   <List.Item.Meta
                     title={
                       <Space>
-                        <Tag color={platformColorMap[session.platform] || 'default'}>
+                        <Tag color={platformColorMap[session.platform || ''] || 'default'}>
                           {session.platform || '未知'}
                         </Tag>
                         <span>{session.customer_name || '未知客户'}</span>

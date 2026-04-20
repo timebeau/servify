@@ -1,9 +1,10 @@
 import React from 'react';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
-import { Space, Switch, Tag, message } from 'antd';
+import { Button, Space, Switch, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { listAutomations, deleteAutomation, runAutomation } from '@/services/automation';
+import { getErrorMessage } from '@/utils/error';
 
 const AutomationPage: React.FC = () => {
   const columns: ProColumns<API.Automation>[] = [
@@ -60,8 +61,8 @@ const AutomationPage: React.FC = () => {
               try {
                 await runAutomation(record.id);
                 message.success('规则已执行');
-              } catch (error) {
-                message.error('执行失败');
+              } catch (error: unknown) {
+                message.error(getErrorMessage(error, '执行失败'));
               }
             }}
           >
@@ -72,8 +73,8 @@ const AutomationPage: React.FC = () => {
               try {
                 await deleteAutomation(record.id);
                 message.success('规则已删除');
-              } catch (error) {
-                message.error('删除失败');
+              } catch (error: unknown) {
+                message.error(getErrorMessage(error, '删除失败'));
               }
             }}
           >
@@ -101,11 +102,11 @@ const AutomationPage: React.FC = () => {
             page_size: params.pageSize,
           });
           return {
-            data: result?.data || [],
-            total: result?.total || 0,
+            data: result.data,
+            total: result.total,
             success: true,
           };
-        } catch (error) {
+        } catch (error: unknown) {
           console.error('获取自动化规则失败:', error);
           return { data: [], total: 0, success: true };
         }

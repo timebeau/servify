@@ -6,6 +6,7 @@ import { PlusOutlined } from '@ant-design/icons';
 import { navigateTo } from '@/lib/navigation';
 import { CUSTOMER_SOURCE_MAP } from '@/utils/constants';
 import { listCustomers, createCustomer } from '@/services/customer';
+import { getErrorMessage, isFormValidationError } from '@/utils/error';
 
 const CustomerListPage: React.FC = () => {
   const actionRef = useRef<ActionType>();
@@ -31,9 +32,9 @@ const CustomerListPage: React.FC = () => {
       setCreateOpen(false);
       form.resetFields();
       actionRef.current?.reload();
-    } catch (error: any) {
-      if (error?.errorFields) return;
-      message.error('创建失败: ' + (error?.message || '未知错误'));
+    } catch (error: unknown) {
+      if (isFormValidationError(error)) return;
+      message.error(getErrorMessage(error, '创建失败'));
     } finally {
       setCreating(false);
     }
@@ -125,8 +126,8 @@ const CustomerListPage: React.FC = () => {
               source: params.source,
             });
             return {
-              data: result?.data || [],
-              total: result?.total || 0,
+              data: result.data,
+              total: result.total,
               success: true,
             };
           } catch (error) {

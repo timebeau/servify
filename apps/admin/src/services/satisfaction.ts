@@ -7,13 +7,13 @@ export async function listSatisfactions(params?: { page?: number; page_size?: nu
 }
 
 export async function getSatisfactionStats() {
-  return request(`${API}/stats`);
+  return request<API.SatisfactionStats>(`${API}/stats`);
 }
 
 export async function listSurveys(params?: { page?: number; page_size?: number }) {
-  return request(`${API}/surveys`, { params });
+  return request<API.PaginatedResponse<API.SatisfactionSurvey>>(`${API}/surveys`, { params });
 }
 
 export async function resendSurvey(id: number) {
-  return request(`${API}/surveys/${id}/resend`, { method: 'POST' });
+  return request<API.MessageResponse>(`${API}/surveys/${id}/resend`, { method: 'POST' });
 }

@@ -1,5 +1,5 @@
 import { request } from '@/lib/request';
 
 export async function getWorkspaceOverview() {
-  return request('/api/omni/workspace');
+  return request<API.WorkspaceOverview>('/api/omni/workspace');
 }

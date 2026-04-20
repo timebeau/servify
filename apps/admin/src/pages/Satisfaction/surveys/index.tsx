@@ -4,18 +4,8 @@ import type { ProColumns } from '@ant-design/pro-components';
 import { Tag } from 'antd';
 import { listSurveys } from '@/services/satisfaction';
 
-interface SurveyRecord {
-  id: number;
-  customer: string;
-  agent: string;
-  ticket_id: string;
-  rating: number;
-  comment: string;
-  created_at: string;
-}
-
 const SatisfactionSurveysPage: React.FC = () => {
-  const columns: ProColumns<SurveyRecord>[] = [
+  const columns: ProColumns<API.SatisfactionSurvey>[] = [
     {
       title: 'ID',
       dataIndex: 'id',
@@ -62,7 +52,7 @@ const SatisfactionSurveysPage: React.FC = () => {
   ];
 
   return (
-    <ProTable<SurveyRecord>
+    <ProTable<API.SatisfactionSurvey>
       headerTitle="评价列表"
       rowKey="id"
       columns={columns}

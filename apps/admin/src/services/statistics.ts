@@ -1,5 +1,26 @@
 import { request } from '@/lib/request';
 
+type SeriesPoint = {
+  date: string;
+  tickets?: number;
+  sessions?: number;
+  messages?: number;
+};
+
+type NamedValue = {
+  name: string;
+  value: number;
+};
+
+type AgentPerformance = {
+  agent_id: number;
+  agent_name: string;
+  resolved_tickets: number;
+  avg_first_response_time: number;
+  avg_resolution_time: number;
+  satisfaction_score?: number;
+};
+
 /** 仪表板统计 */
 export async function getDashboardStats() {
   return request<API.DashboardStats>('/api/statistics/dashboard');
@@ -10,7 +31,7 @@ export async function getTimeRangeStats(params: {
   start_date: string;
   end_date: string;
 }) {
-  return request('/api/statistics/time-range', { params });
+  return request<SeriesPoint[]>('/api/statistics/time-range', { params });
 }
 
 /** 工单分类统计 */
@@ -18,7 +39,7 @@ export async function getTicketCategoryStats(params?: {
   start_date?: string;
   end_date?: string;
 }) {
-  return request('/api/statistics/ticket-category', { params });
+  return request<NamedValue[]>('/api/statistics/ticket-category', { params });
 }
 
 /** 工单优先级统计 */
@@ -26,7 +47,7 @@ export async function getTicketPriorityStats(params?: {
   start_date?: string;
   end_date?: string;
 }) {
-  return request('/api/statistics/ticket-priority', { params });
+  return request<NamedValue[]>('/api/statistics/ticket-priority', { params });
 }
 
 /** 客服绩效 */
@@ -35,12 +56,12 @@ export async function getAgentPerformanceStats(params: {
   end_date: string;
   limit?: number;
 }) {
-  return request('/api/statistics/agent-performance', { params });
+  return request<AgentPerformance[]>('/api/statistics/agent-performance', { params });
 }
 
 /** 客户来源分布 */
 export async function getCustomerSourceStats() {
-  return request('/api/statistics/customer-source');
+  return request<NamedValue[]>('/api/statistics/customer-source');
 }
 
 /** 远程协助工单统计 */

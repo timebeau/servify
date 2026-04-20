@@ -15,9 +15,14 @@ export async function updateShift(id: number, data: Partial<API.Shift>) {
 }
 
 export async function deleteShift(id: number) {
-  return request(`${API}/${id}`, { method: 'DELETE' });
+  return request<API.MessageResponse>(`${API}/${id}`, { method: 'DELETE' });
 }
 
 export async function getShiftStats() {
-  return request(`${API}/stats`);
+  return request<{
+    total: number;
+    active: number;
+    upcoming: number;
+    completed: number;
+  }>(`${API}/stats`);
 }

@@ -7,11 +7,11 @@ export async function getUserSecurity(userId: number) {
 }
 
 export async function revokeUserTokens(userId: number) {
-  return request(`${API}/users/${userId}/revoke-tokens`, { method: 'POST' });
+  return request<API.MessageResponse>(`${API}/users/${userId}/revoke-tokens`, { method: 'POST' });
 }
 
 export async function batchRevokeUserTokens(userIds: number[]) {
-  return request<{ count: number; items: Array<{ user_id: number; token_version: number }> }>(
+  return request<API.CountedListResponse<{ user_id: number; token_version: number }>>(
     `${API}/users/revoke-tokens`,
     {
       method: 'POST',
@@ -21,27 +21,27 @@ export async function batchRevokeUserTokens(userIds: number[]) {
 }
 
 export async function queryUsersSecurity(userIds: number[]) {
-  return request<{ count: number; items: API.UserSecurityPreview[] }>(`${API}/users/query`, {
+  return request<API.CountedListResponse<API.UserSecurityPreview>>(`${API}/users/query`, {
     method: 'POST',
     data: { user_ids: userIds },
   });
 }
 
 export async function listUserSessions(userId: number) {
-  return request<{ user_id: number; count: number; items: API.UserSecuritySession[] }>(
+  return request<{ user_id: number } & API.CountedListResponse<API.UserSecuritySession>>(
     `${API}/users/${userId}/sessions`,
   );
 }
 
 export async function revokeUserSession(userId: number, sessionId: string) {
-  return request(`${API}/users/${userId}/sessions/revoke`, {
+  return request<API.MessageResponse>(`${API}/users/${userId}/sessions/revoke`, {
     method: 'POST',
     data: { session_id: sessionId },
   });
 }
 
 export async function revokeAllUserSessions(userId: number, exceptSessionId?: string) {
-  return request<{ count: number; items: API.UserSecuritySession[] }>(
+  return request<API.CountedListResponse<API.UserSecuritySession>>(
     `${API}/users/${userId}/sessions/revoke-all`,
     {
       method: 'POST',
@@ -66,7 +66,7 @@ export async function listRevokedTokens(params?: {
   token_use?: string;
   active_only?: boolean | string;
 }) {
-  return request<{ count: number; items: API.RevokedToken[] }>(`${API}/tokens/revoked`, {
+  return request<API.CountedListResponse<API.RevokedToken>>(`${API}/tokens/revoked`, {
     params,
   });
 }

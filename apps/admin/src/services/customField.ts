@@ -19,5 +19,5 @@ export async function updateCustomField(id: number, data: Partial<API.CustomFiel
 }
 
 export async function deleteCustomField(id: number) {
-  return request(`${API}/${id}`, { method: 'DELETE' });
+  return request<API.MessageResponse>(`${API}/${id}`, { method: 'DELETE' });
 }

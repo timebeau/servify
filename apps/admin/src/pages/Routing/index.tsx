@@ -4,28 +4,10 @@ import type { ProColumns, ActionType } from '@ant-design/pro-components';
 import { Tag, Button, Space, message } from 'antd';
 import { getWaitingQueue, getTransferHistory, processQueue } from '@/services/sessionTransfer';
 
-interface QueueRecord {
-  id: string;
-  customer: string;
-  channel: string;
-  wait_time: number;
-  priority: string;
-  created_at: string;
-}
-
-interface TransferRecord {
-  id: string;
-  ticket_id: string;
-  from_agent: string;
-  to_agent: string;
-  reason: string;
-  created_at: string;
-}
-
 const RoutingPage: React.FC = () => {
   const queueActionRef = useRef<ActionType>();
 
-  const queueColumns: ProColumns<QueueRecord>[] = [
+  const queueColumns: ProColumns<API.TransferQueueRecord>[] = [
     { title: 'ID', dataIndex: 'id', width: 80 },
     { title: '客户', dataIndex: 'customer', width: 120 },
     { title: '渠道', dataIndex: 'channel', width: 100 },
@@ -55,7 +37,7 @@ const RoutingPage: React.FC = () => {
     },
   ];
 
-  const transferColumns: ProColumns<TransferRecord>[] = [
+  const transferColumns: ProColumns<API.SessionTransferRecord>[] = [
     { title: 'ID', dataIndex: 'id', width: 80 },
     { title: '工单ID', dataIndex: 'ticket_id', width: 100 },
     { title: '原客服', dataIndex: 'from_agent', width: 120 },
@@ -71,7 +53,7 @@ const RoutingPage: React.FC = () => {
 
   return (
     <div>
-      <ProTable<QueueRecord>
+      <ProTable<API.TransferQueueRecord>
         headerTitle="等待队列"
         rowKey="id"
         columns={queueColumns}
@@ -96,8 +78,8 @@ const RoutingPage: React.FC = () => {
         request={async () => {
           try {
             const result = await getWaitingQueue();
-            const data = Array.isArray(result) ? result : result?.data || [];
-            return { data, total: data.length, success: true };
+            const data = result.data || [];
+            return { data, total: result.count || data.length, success: true };
           } catch (error) {
             console.error('获取等待队列失败:', error);
             return { data: [], total: 0, success: true };
@@ -107,7 +89,7 @@ const RoutingPage: React.FC = () => {
         pagination={{ defaultPageSize: 10 }}
       />
 
-      <ProTable<TransferRecord>
+      <ProTable<API.SessionTransferRecord>
         headerTitle="转接历史"
         rowKey="id"
         columns={transferColumns}
@@ -115,8 +97,7 @@ const RoutingPage: React.FC = () => {
         request={async () => {
           try {
             const result = await getTransferHistory('');
-            const data = Array.isArray(result) ? result : result?.data || [];
-            return { data, total: data.length, success: true };
+            return { data: result, total: result.length, success: true };
           } catch (error) {
             console.error('获取转接历史失败:', error);
             return { data: [], total: 0, success: true };

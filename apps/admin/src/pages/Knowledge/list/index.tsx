@@ -5,6 +5,7 @@ import { Tag, Button, Space, message, Modal, Form, Input, Select, Switch } from 
 import { PlusOutlined } from '@ant-design/icons';
 import { navigateTo } from '@/lib/navigation';
 import { listDocs, deleteDoc, createDoc, updateDoc } from '@/services/knowledge';
+import { getErrorMessage, isFormValidationError } from '@/utils/error';
 
 const CATEGORIES = ['产品文档', '常见问题', '操作指南', 'API文档', '其他'];
 
@@ -67,9 +68,9 @@ const KnowledgeListPage: React.FC = () => {
       setModalOpen(false);
       form.resetFields();
       actionRef.current?.reload();
-    } catch (error: any) {
-      if (error?.errorFields) return;
-      message.error('操作失败: ' + (error?.message || '未知错误'));
+    } catch (error: unknown) {
+      if (isFormValidationError(error)) return;
+      message.error(getErrorMessage(error, '操作失败'));
     } finally {
       setSubmitting(false);
     }
@@ -86,8 +87,8 @@ const KnowledgeListPage: React.FC = () => {
           await deleteDoc(id);
           message.success('文档已删除');
           actionRef.current?.reload();
-        } catch (error) {
-          message.error('删除失败');
+        } catch (error: unknown) {
+          message.error(getErrorMessage(error, '删除失败'));
         }
       },
     });
@@ -179,8 +180,8 @@ const KnowledgeListPage: React.FC = () => {
               status: params.status,
             });
             return {
-              data: result?.data || [],
-              total: result?.total || 0,
+              data: result.data,
+              total: result.total,
               success: true,
             };
           } catch (error) {

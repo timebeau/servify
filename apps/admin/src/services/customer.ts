@@ -26,21 +26,25 @@ export async function updateCustomer(id: number, data: Partial<API.Customer>) {
 }
 
 export async function updateCustomerTags(id: number, tags: string[]) {
-  return request(`${API}/${id}/tags`, { method: 'PUT', data: { tags } });
+  return request<API.MessageResponse>(`${API}/${id}/tags`, { method: 'PUT', data: { tags } });
 }
 
 export async function addCustomerNote(id: number, content: string) {
-  return request(`${API}/${id}/notes`, { method: 'POST', data: { content } });
+  return request<API.MessageResponse>(`${API}/${id}/notes`, { method: 'POST', data: { content } });
 }
 
 export async function getCustomerActivity(id: number) {
-  return request(`${API}/${id}/activity`);
+  return request<API.CustomerActivity>(`${API}/${id}/activity`);
 }
 
 export async function revokeCustomerTokens(id: number) {
-  return request(`${API}/${id}/revoke-tokens`, { method: 'POST' });
+  return request<API.MessageResponse>(`${API}/${id}/revoke-tokens`, { method: 'POST' });
 }
 
 export async function getCustomerStats() {
-  return request(`${API}/stats`);
+  return request<{
+    total_customers: number;
+    active_customers: number;
+    new_customers_today: number;
+  }>(`${API}/stats`);
 }

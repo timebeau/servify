@@ -36,7 +36,7 @@ export const layout = () => ({
 export const request = {
   timeout: 30000,
   responseInterceptors: [
-    (response: any) => {
+    (response: Response) => {
       if (response.status === 401) {
         clearToken();
         window.location.replace(loginPath);

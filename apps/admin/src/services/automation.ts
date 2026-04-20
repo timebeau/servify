@@ -11,17 +11,17 @@ export async function createAutomation(data: Partial<API.Automation>) {
 }
 
 export async function deleteAutomation(id: number) {
-  return request(`${API}/${id}`, { method: 'DELETE' });
+  return request<API.MessageResponse>(`${API}/${id}`, { method: 'DELETE' });
 }
 
 export async function getAutomationRuns(params?: { page?: number; page_size?: number }) {
-  return request(`${API}/runs`, { params });
+  return request<API.PaginatedResponse<API.AutomationRun>>(`${API}/runs`, { params });
 }
 
 export async function runAutomation(id: number) {
   // RunBatch accepts BatchRunRequest with event, ticket_ids, dry_run
   // For running a single automation by ID, use the event-based trigger
-  return request(`${API}/run`, {
+  return request<API.MessageResponse>(`${API}/run`, {
     method: 'POST',
     data: {
       event: 'manual_trigger',
@@ -32,6 +32,6 @@ export async function runAutomation(id: number) {
   });
 }
 
-export async function bulkRunAutomations(data: { trigger_type: string; payload?: any }) {
-  return request(`${API}/run`, { method: 'POST', data });
+export async function bulkRunAutomations(data: { trigger_type: string; payload?: Record<string, unknown> }) {
+  return request<API.MessageResponse>(`${API}/run`, { method: 'POST', data });
 }

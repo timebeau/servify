@@ -15,9 +15,9 @@ export async function updateMacro(id: number, data: Partial<API.Macro>) {
 }
 
 export async function deleteMacro(id: number) {
-  return request(`${API}/${id}`, { method: 'DELETE' });
+  return request<API.MessageResponse>(`${API}/${id}`, { method: 'DELETE' });
 }
 
 export async function applyMacro(id: number, data?: { ticket_id?: number; conversation_id?: string }) {
-  return request(`${API}/${id}/apply`, { method: 'POST', data });
+  return request<API.MessageResponse>(`${API}/${id}/apply`, { method: 'POST', data });
 }

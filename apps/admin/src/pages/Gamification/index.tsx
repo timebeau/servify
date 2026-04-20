@@ -4,18 +4,8 @@ import type { ProColumns } from '@ant-design/pro-components';
 import { Tag } from 'antd';
 import { getLeaderboard } from '@/services/gamification';
 
-interface LeaderboardRecord {
-  id: string;
-  rank: number;
-  agent: string;
-  score: number;
-  resolved_tickets: number;
-  avg_rating: number;
-  avg_response_time: number;
-}
-
 const GamificationPage: React.FC = () => {
-  const columns: ProColumns<LeaderboardRecord>[] = [
+  const columns: ProColumns<API.LeaderboardRecord>[] = [
     {
       title: '排名',
       dataIndex: 'rank',
@@ -80,7 +70,7 @@ const GamificationPage: React.FC = () => {
   ];
 
   return (
-    <ProTable<LeaderboardRecord>
+    <ProTable<API.LeaderboardRecord>
       headerTitle="客服排行榜"
       rowKey="id"
       columns={columns}
@@ -90,10 +80,10 @@ const GamificationPage: React.FC = () => {
             page: params.current,
             page_size: params.pageSize,
           });
-          const data = Array.isArray(result) ? result : result?.data || [];
+          const data = Array.isArray(result) ? result : result.data || [];
           return {
             data,
-            total: result?.total || data.length,
+            total: Array.isArray(result) ? data.length : result.total || data.length,
             success: true,
           };
         } catch (error) {

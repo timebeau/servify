@@ -18,6 +18,22 @@ declare namespace API {
     pages: number;
   }
 
+  /** 通用数据响应 */
+  interface DataResponse<T> {
+    data: T;
+  }
+
+  /** 通用列表响应 */
+  interface ListResponse<T> {
+    data: T[];
+  }
+
+  /** 通用计数列表响应 */
+  interface CountedListResponse<T> {
+    count: number;
+    items: T[];
+  }
+
   /** 错误响应 */
   interface ErrorResponse {
     error: string;
@@ -26,9 +42,29 @@ declare namespace API {
   }
 
   /** 成功响应 */
-  interface SuccessResponse {
+  interface SuccessResponse<T = unknown> {
     message: string;
-    data?: any;
+    data?: T;
+  }
+
+  interface MessageResponse<T = unknown> {
+    message: string;
+    data?: T;
+  }
+
+  interface DashboardTrendPoint {
+    date: string;
+    tickets?: number;
+    sessions?: number;
+    messages?: number;
+    value?: number;
+    type?: string;
+  }
+
+  interface SatisfactionTrendPoint {
+    date: string;
+    average_rating: number;
+    count: number;
   }
 
   // ---- 工单 ----
@@ -184,6 +220,33 @@ declare namespace API {
     created_at: string;
   }
 
+  interface SatisfactionStats {
+    average_rating: number;
+    total_ratings: number;
+    rating_distribution: Record<string, number>;
+    trend_data: Array<{
+      date: string;
+      average_rating: number;
+      count: number;
+    }>;
+    category_stats?: Record<string, {
+      average_rating: number;
+      count?: number;
+    }>;
+  }
+
+  interface SatisfactionSurvey {
+    id: number;
+    ticket_id: number;
+    customer?: string;
+    agent?: string;
+    rating: number;
+    comment?: string;
+    status?: string;
+    channel?: string;
+    created_at: string;
+  }
+
   // ---- 自定义字段 ----
   interface CustomField {
     id: number;
@@ -283,12 +346,39 @@ declare namespace API {
     ended_at?: string;
   }
 
+  interface CustomerActivity {
+    customer_id: number;
+    recent_sessions: API.Session[];
+    recent_tickets: API.Ticket[];
+    recent_messages: Array<{
+      id: number;
+      session_id: string;
+      sender: string;
+      content: string;
+      created_at: string;
+    }>;
+  }
+
   // ---- AI ----
   interface AIStatus {
     provider: string;
     model: string;
     available: boolean;
     latency_ms?: number;
+  }
+
+  interface AIQueryResponse {
+    answer?: string;
+    strategy?: string;
+    intent?: string;
+    similar_tickets?: unknown[];
+    knowledge_docs?: unknown[];
+  }
+
+  interface AIMetrics {
+    total_queries?: number;
+    avg_latency_ms?: number;
+    fallback_queries?: number;
   }
 
   // ---- 集成 ----
@@ -308,6 +398,24 @@ declare namespace API {
     status: string;
     started_at: string;
     duration?: number;
+  }
+
+  interface VoiceRecording {
+    id: string;
+    call_id: string;
+    provider?: string;
+    status: string;
+    started_at?: string;
+    stopped_at?: string;
+  }
+
+  interface VoiceTranscript {
+    id?: string;
+    call_id: string;
+    content: string;
+    language?: string;
+    finalized?: boolean;
+    appended_at?: string;
   }
 
   // ---- 安全管理 ----
@@ -371,5 +479,76 @@ declare namespace API {
     reason?: string;
     expires_at?: string;
     revoked_at?: string;
+  }
+
+  interface TicketComment {
+    id: number;
+    content: string;
+    internal?: boolean;
+    author?: string;
+    created_at: string;
+  }
+
+  interface SLAViolation {
+    id: number;
+    ticket_id: string | number;
+    policy_name: string;
+    metric: string;
+    target: number;
+    actual: number;
+    status: string;
+    created_at: string;
+  }
+
+  interface SLAStats {
+    total_violations: number;
+    unresolved_violations: number;
+    resolved_violations: number;
+    active_configs: number;
+  }
+
+  interface AutomationRun {
+    id: number;
+    trigger_id?: number;
+    status: string;
+    event?: string;
+    dry_run?: boolean;
+    created_at: string;
+    completed_at?: string;
+  }
+
+  interface TransferQueueRecord {
+    id: string;
+    customer?: string;
+    channel?: string;
+    wait_time?: number;
+    priority?: string;
+    created_at?: string;
+  }
+
+  interface SessionTransferRecord {
+    id: string | number;
+    ticket_id?: string | number;
+    from_agent?: string;
+    to_agent?: string;
+    reason?: string;
+    created_at?: string;
+  }
+
+  interface SessionTransferResult {
+    success?: boolean;
+    session_id?: string;
+    message?: string;
+    target_agent_id?: number;
+  }
+
+  interface LeaderboardRecord {
+    id: string | number;
+    rank: number;
+    agent: string;
+    score: number;
+    resolved_tickets: number;
+    avg_rating: number;
+    avg_response_time: number;
   }
 }

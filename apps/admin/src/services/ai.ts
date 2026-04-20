@@ -1,7 +1,7 @@
 import { request } from '@/lib/request';
 
 export async function queryAI(data: { query: string; conversation_id?: string; customer_id?: number }) {
-  return request('/api/v1/ai/query', { method: 'POST', data });
+  return request<API.AIQueryResponse>('/api/v1/ai/query', { method: 'POST', data });
 }
 
 export async function getAIStatus() {
@@ -9,5 +9,5 @@ export async function getAIStatus() {
 }
 
 export async function getAIMetrics() {
-  return request('/api/v1/ai/metrics');
+  return request<API.AIMetrics>('/api/v1/ai/metrics');
 }

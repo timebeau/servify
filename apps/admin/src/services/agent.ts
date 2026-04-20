@@ -34,29 +34,35 @@ export async function updateAgent(id: number, data: {
 }
 
 export async function updateAgentStatus(id: number, status: string) {
-  return request(`${API}/${id}/status`, { method: 'PUT', data: { status } });
+  return request<API.MessageResponse>(`${API}/${id}/status`, { method: 'PUT', data: { status } });
 }
 
 export async function agentOnline(id: number) {
-  return request(`${API}/${id}/online`, { method: 'POST' });
+  return request<API.MessageResponse>(`${API}/${id}/online`, { method: 'POST' });
 }
 
 export async function agentOffline(id: number) {
-  return request(`${API}/${id}/offline`, { method: 'POST' });
+  return request<API.MessageResponse>(`${API}/${id}/offline`, { method: 'POST' });
 }
 
 export async function assignSessionToAgent(id: number, sessionId: string) {
-  return request(`${API}/${id}/assign-session`, { method: 'POST', data: { session_id: sessionId } });
+  return request<API.MessageResponse>(`${API}/${id}/assign-session`, { method: 'POST', data: { session_id: sessionId } });
 }
 
 export async function releaseAgentSession(id: number, sessionId: string) {
-  return request(`${API}/${id}/release-session`, { method: 'POST', data: { session_id: sessionId } });
+  return request<API.MessageResponse>(`${API}/${id}/release-session`, { method: 'POST', data: { session_id: sessionId } });
 }
 
 export async function getOnlineAgents() {
-  return request(`${API}/online`);
+  return request<API.ListResponse<API.Agent>>(`${API}/online`);
 }
 
 export async function getAgentStats() {
-  return request(`${API}/stats`);
+  return request<{
+    total: number;
+    online: number;
+    busy: number;
+    avg_response_time: number;
+    avg_rating: number;
+  }>(`${API}/stats`);
 }

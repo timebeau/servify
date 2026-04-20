@@ -1,7 +1,7 @@
 import React from 'react';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
-import { Tag, Button } from 'antd';
+import { Tag } from 'antd';
 import { listProtocols, listTranscripts } from '@/services/voice';
 
 const VoicePage: React.FC = () => {
@@ -13,8 +13,8 @@ const VoicePage: React.FC = () => {
       dataIndex: 'status',
       width: 100,
       render: (_, record) => (
-        <Tag color={record.status === 'active' ? 'green' : 'default'}>
-          {record.status === 'active' ? '已连接' : '未连接'}
+        <Tag color={record.status === 'active' || record.status === 'configured' ? 'green' : 'default'}>
+          {record.status === 'active' ? '已连接' : record.status === 'configured' ? '已配置' : '未连接'}
         </Tag>
       ),
     },
@@ -48,11 +48,6 @@ const VoicePage: React.FC = () => {
         headerTitle="语音协议"
         rowKey="id"
         columns={protocolColumns}
-        toolBarRender={() => [
-          <Button key="add" type="primary">
-            添加协议
-          </Button>,
-        ]}
         request={async (params) => {
           try {
             const result = await listProtocols({
@@ -86,7 +81,7 @@ const VoicePage: React.FC = () => {
             });
             return {
               data: result?.data || [],
-              total: result?.total || 0,
+              total: result?.total || result?.data?.length || 0,
               success: true,
             };
           } catch (error) {

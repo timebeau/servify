@@ -4,6 +4,7 @@ import type { ProColumns } from '@ant-design/pro-components';
 import { Button, Space, Tag, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { listCustomFields, deleteCustomField } from '@/services/customField';
+import { getErrorMessage } from '@/utils/error';
 
 const CustomFieldPage: React.FC = () => {
   const columns: ProColumns<API.CustomField>[] = [
@@ -55,8 +56,8 @@ const CustomFieldPage: React.FC = () => {
               try {
                 await deleteCustomField(record.id);
                 message.success('字段已删除');
-              } catch (error) {
-                message.error('删除失败');
+              } catch (error: unknown) {
+                message.error(getErrorMessage(error, '删除失败'));
               }
             }}
           >
@@ -85,11 +86,11 @@ const CustomFieldPage: React.FC = () => {
             entity_type: params.entity_type,
           });
           return {
-            data: result?.data || [],
-            total: result?.total || 0,
+            data: result.data,
+            total: result.total,
             success: true,
           };
-        } catch (error) {
+        } catch (error: unknown) {
           console.error('获取自定义字段失败:', error);
           return { data: [], total: 0, success: true };
         }

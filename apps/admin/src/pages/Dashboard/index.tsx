@@ -28,7 +28,7 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<API.DashboardStats | null>(null);
-  const [timeRangeData, setTimeRangeData] = useState<any[]>([]);
+  const [timeRangeData, setTimeRangeData] = useState<API.DashboardTrendPoint[]>([]);
   const [timeRangeLoading, setTimeRangeLoading] = useState(false);
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
     dayjs().subtract(7, 'day'),
@@ -44,8 +44,8 @@ const Dashboard: React.FC = () => {
       if (result) {
         setStats(result);
       }
-    } catch (err: any) {
-      setError(err?.message || '获取仪表板数据失败');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '获取仪表板数据失败');
     } finally {
       setLoading(false);
     }
@@ -59,9 +59,8 @@ const Dashboard: React.FC = () => {
         end_date: end.format('YYYY-MM-DD'),
       });
       if (result) {
-        // 转换为图表数据（多线合并）
-        const chartData: any[] = [];
-        (result as any[]).forEach((item: any) => {
+        const chartData: API.DashboardTrendPoint[] = [];
+        result.forEach((item) => {
           chartData.push(
             { date: item.date, value: item.tickets || 0, type: '工单' },
             { date: item.date, value: item.sessions || 0, type: '会话' },
