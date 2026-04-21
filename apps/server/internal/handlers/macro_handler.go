@@ -67,7 +67,11 @@ func (h *MacroHandler) Update(c *gin.Context) {
 	}
 	macro, err := h.service.Update(c.Request.Context(), uint(id), &req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Failed to update macro", Message: err.Error()})
+		status := http.StatusBadRequest
+		if isNotFoundError(err) {
+			status = http.StatusNotFound
+		}
+		c.JSON(status, ErrorResponse{Error: "Failed to update macro", Message: err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, macro)
@@ -82,7 +86,7 @@ func (h *MacroHandler) Delete(c *gin.Context) {
 	}
 	if err := h.service.Delete(c.Request.Context(), uint(id)); err != nil {
 		status := http.StatusBadRequest
-		if err.Error() == "macro not found" {
+		if isNotFoundError(err) {
 			status = http.StatusNotFound
 		}
 		c.JSON(status, ErrorResponse{Error: "Failed to delete macro", Message: err.Error()})
@@ -108,7 +112,11 @@ func (h *MacroHandler) Apply(c *gin.Context) {
 	}
 	comment, err := h.service.ApplyToTicket(c.Request.Context(), uint(id), req.TicketID, req.UserID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Failed to apply macro", Message: err.Error()})
+		status := http.StatusBadRequest
+		if isNotFoundError(err) {
+			status = http.StatusNotFound
+		}
+		c.JSON(status, ErrorResponse{Error: "Failed to apply macro", Message: err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, comment)

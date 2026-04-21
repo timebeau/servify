@@ -223,3 +223,24 @@ func TestAgentHandler_AuditSnapshotsForStatusChanges(t *testing.T) {
 		t.Fatalf("unexpected offline snapshot: %s", recorder.entries[2].AfterJSON)
 	}
 }
+
+func TestAgentHandler_CreateAgent_NotFoundAndNilLoggerSafe(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestDBForAgents(t)
+	svc := services.NewAgentService(db, nil)
+	h := NewAgentHandler(svc, nil)
+
+	r := gin.New()
+	r.POST("/api/agents", h.CreateAgent)
+
+	body, _ := json.Marshal(map[string]any{"user_id": 9999})
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodPost, "/api/agents", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}

@@ -61,7 +61,11 @@ func (h *AppMarketHandler) CreateIntegration(c *gin.Context) {
 	}
 	item, err := h.service.Create(c.Request.Context(), &req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Failed to create integration", Message: err.Error()})
+		status := http.StatusBadRequest
+		if isConflictError(err) {
+			status = http.StatusConflict
+		}
+		c.JSON(status, ErrorResponse{Error: "Failed to create integration", Message: err.Error()})
 		return
 	}
 	c.JSON(http.StatusCreated, item)
@@ -83,7 +87,7 @@ func (h *AppMarketHandler) UpdateIntegration(c *gin.Context) {
 	item, err := h.service.Update(c.Request.Context(), uint(id), &req)
 	if err != nil {
 		status := http.StatusBadRequest
-		if err.Error() == "integration not found" {
+		if isNotFoundError(err) {
 			status = http.StatusNotFound
 		}
 		c.JSON(status, ErrorResponse{Error: "Failed to update integration", Message: err.Error()})
@@ -102,7 +106,7 @@ func (h *AppMarketHandler) DeleteIntegration(c *gin.Context) {
 	}
 	if err := h.service.Delete(c.Request.Context(), uint(id)); err != nil {
 		status := http.StatusBadRequest
-		if err.Error() == "integration not found" {
+		if isNotFoundError(err) {
 			status = http.StatusNotFound
 		}
 		c.JSON(status, ErrorResponse{Error: "Failed to delete integration", Message: err.Error()})

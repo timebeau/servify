@@ -96,6 +96,9 @@ func (s *Service) MarkAway(ctx context.Context, userID uint) error {
 func (s *Service) AssignSession(ctx context.Context, sessionID string, agentUserID uint) error {
 	runtime, err := s.repo.GetAgentRuntimeByUserID(ctx, agentUserID)
 	if err != nil {
+		if _, _, lookupErr := s.repo.GetAgentByUserID(ctx, agentUserID); lookupErr != nil {
+			return lookupErr
+		}
 		return fmt.Errorf("agent %d is not online", agentUserID)
 	}
 	if runtime.CurrentChatLoad >= runtime.MaxChatConcurrency {

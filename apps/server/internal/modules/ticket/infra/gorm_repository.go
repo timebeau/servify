@@ -379,7 +379,14 @@ func (r *GormRepository) CloseTicket(ctx context.Context, ticket *domain.Ticket,
 }
 
 func (r *GormRepository) UpdateTicketModel(ctx context.Context, ticketID uint, updates map[string]interface{}) error {
-	return applyTicketScope(r.db.WithContext(ctx).Model(&models.Ticket{}), ctx).Where("id = ?", ticketID).Updates(updates).Error
+	result := applyTicketScope(r.db.WithContext(ctx).Model(&models.Ticket{}), ctx).Where("id = ?", ticketID).Updates(updates)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (r *GormRepository) SyncTicketCustomFieldValues(
@@ -453,8 +460,12 @@ func (r *GormRepository) AssignTicketModel(
 		if toStatus != fromStatus {
 			updates["status"] = toStatus
 		}
-		if err := applyTicketScope(tx.Model(&models.Ticket{}), ctx).Where("id = ?", ticketID).Updates(updates).Error; err != nil {
-			return err
+		result := applyTicketScope(tx.Model(&models.Ticket{}), ctx).Where("id = ?", ticketID).Updates(updates)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
 		}
 		if err := tx.Model(&models.Agent{}).Where("user_id = ?", agentID).UpdateColumn("current_load", gorm.Expr("current_load + 1")).Error; err != nil {
 			return err
@@ -494,8 +505,12 @@ func (r *GormRepository) UnassignTicketModel(
 		if toStatus != fromStatus {
 			updates["status"] = toStatus
 		}
-		if err := applyTicketScope(tx.Model(&models.Ticket{}), ctx).Where("id = ?", ticketID).Updates(updates).Error; err != nil {
-			return err
+		result := applyTicketScope(tx.Model(&models.Ticket{}), ctx).Where("id = ?", ticketID).Updates(updates)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
 		}
 
 		change := models.TicketStatus{

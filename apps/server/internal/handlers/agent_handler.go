@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"servify/apps/server/internal/models"
 	agentdelivery "servify/apps/server/internal/modules/agent/delivery"
@@ -89,8 +90,18 @@ func (h *AgentHandler) CreateAgent(c *gin.Context) {
 
 	agent, err := h.agentService.CreateAgent(c.Request.Context(), &req)
 	if err != nil {
-		h.logger.Errorf("Failed to create agent: %v", err)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
+		if h.logger != nil {
+			h.logger.Errorf("Failed to create agent: %v", err)
+		}
+		status := http.StatusInternalServerError
+		if isInvalidInputError(err) {
+			status = http.StatusBadRequest
+		} else if isConflictError(err) {
+			status = http.StatusConflict
+		} else if isNotFoundError(err) {
+			status = http.StatusNotFound
+		}
+		c.JSON(status, ErrorResponse{
 			Error:   "Failed to create agent",
 			Message: err.Error(),
 		})
@@ -124,9 +135,17 @@ func (h *AgentHandler) GetAgent(c *gin.Context) {
 
 	agent, err := h.agentService.GetAgentByUserID(c.Request.Context(), uint(id))
 	if err != nil {
-		h.logger.Errorf("Failed to get agent %d: %v", id, err)
-		c.JSON(http.StatusNotFound, ErrorResponse{
-			Error:   "Agent not found",
+		if h.logger != nil {
+			h.logger.Errorf("Failed to get agent %d: %v", id, err)
+		}
+		status := http.StatusInternalServerError
+		label := "Failed to get agent"
+		if isNotFoundError(err) {
+			status = http.StatusNotFound
+			label = "Agent not found"
+		}
+		c.JSON(status, ErrorResponse{
+			Error:   label,
 			Message: err.Error(),
 		})
 		return
@@ -172,8 +191,16 @@ func (h *AgentHandler) UpdateAgentStatus(c *gin.Context) {
 	h.setAgentAuditSnapshot(c, uint(id), true)
 
 	if err := h.agentService.UpdateAgentStatus(c.Request.Context(), uint(id), req.Status); err != nil {
-		h.logger.Errorf("Failed to update agent %d status: %v", id, err)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
+		if h.logger != nil {
+			h.logger.Errorf("Failed to update agent %d status: %v", id, err)
+		}
+		status := http.StatusInternalServerError
+		if isNotFoundError(err) {
+			status = http.StatusNotFound
+		} else if isInvalidInputError(err) {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, ErrorResponse{
 			Error:   "Failed to update agent status",
 			Message: err.Error(),
 		})
@@ -213,8 +240,14 @@ func (h *AgentHandler) AgentGoOnline(c *gin.Context) {
 	h.setAgentAuditSnapshot(c, uint(id), true)
 
 	if err := h.agentService.AgentGoOnline(c.Request.Context(), uint(id)); err != nil {
-		h.logger.Errorf("Failed to set agent %d online: %v", id, err)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
+		if h.logger != nil {
+			h.logger.Errorf("Failed to set agent %d online: %v", id, err)
+		}
+		status := http.StatusInternalServerError
+		if isNotFoundError(err) {
+			status = http.StatusNotFound
+		}
+		c.JSON(status, ErrorResponse{
 			Error:   "Failed to set agent online",
 			Message: err.Error(),
 		})
@@ -253,8 +286,14 @@ func (h *AgentHandler) AgentGoOffline(c *gin.Context) {
 	h.setAgentAuditSnapshot(c, uint(id), true)
 
 	if err := h.agentService.AgentGoOffline(c.Request.Context(), uint(id)); err != nil {
-		h.logger.Errorf("Failed to set agent %d offline: %v", id, err)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
+		if h.logger != nil {
+			h.logger.Errorf("Failed to set agent %d offline: %v", id, err)
+		}
+		status := http.StatusInternalServerError
+		if isNotFoundError(err) {
+			status = http.StatusNotFound
+		}
+		c.JSON(status, ErrorResponse{
 			Error:   "Failed to set agent offline",
 			Message: err.Error(),
 		})
@@ -316,7 +355,9 @@ func (h *AgentHandler) ListAgents(c *gin.Context) {
 	}
 	agents, err := h.agentService.ListAgents(c.Request.Context(), limit)
 	if err != nil {
-		h.logger.Errorf("Failed to list agents: %v", err)
+		if h.logger != nil {
+			h.logger.Errorf("Failed to list agents: %v", err)
+		}
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "Failed to list agents",
 			Message: err.Error(),
@@ -361,8 +402,16 @@ func (h *AgentHandler) AssignSession(c *gin.Context) {
 	}
 
 	if err := h.agentService.AssignSessionToAgent(c.Request.Context(), req.SessionID, uint(id)); err != nil {
-		h.logger.Errorf("Failed to assign session %s to agent %d: %v", req.SessionID, id, err)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
+		if h.logger != nil {
+			h.logger.Errorf("Failed to assign session %s to agent %d: %v", req.SessionID, id, err)
+		}
+		status := http.StatusInternalServerError
+		if isNotFoundError(err) {
+			status = http.StatusNotFound
+		} else if isInvalidInputError(err) {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, ErrorResponse{
 			Error:   "Failed to assign session",
 			Message: err.Error(),
 		})
@@ -411,8 +460,16 @@ func (h *AgentHandler) ReleaseSession(c *gin.Context) {
 	}
 
 	if err := h.agentService.ReleaseSessionFromAgent(c.Request.Context(), req.SessionID, uint(id)); err != nil {
-		h.logger.Errorf("Failed to release session %s from agent %d: %v", req.SessionID, id, err)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
+		if h.logger != nil {
+			h.logger.Errorf("Failed to release session %s from agent %d: %v", req.SessionID, id, err)
+		}
+		status := http.StatusInternalServerError
+		if isNotFoundError(err) {
+			status = http.StatusNotFound
+		} else if isInvalidInputError(err) {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, ErrorResponse{
 			Error:   "Failed to release session",
 			Message: err.Error(),
 		})
@@ -450,8 +507,16 @@ func (h *AgentHandler) RevokeAgentTokens(c *gin.Context) {
 
 	version, err := h.agentService.RevokeAgentTokens(c.Request.Context(), uint(id))
 	if err != nil {
-		h.logger.Errorf("Failed to revoke agent %d tokens: %v", id, err)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
+		if h.logger != nil {
+			h.logger.Errorf("Failed to revoke agent %d tokens: %v", id, err)
+		}
+		status := http.StatusInternalServerError
+		if isNotFoundError(err) {
+			status = http.StatusNotFound
+		} else if isInvalidInputError(err) {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, ErrorResponse{
 			Error:   "Failed to revoke agent tokens",
 			Message: err.Error(),
 		})
@@ -486,7 +551,9 @@ func (h *AgentHandler) GetAgentStats(c *gin.Context) {
 
 	stats, err := h.agentService.GetAgentStats(c.Request.Context(), agentID)
 	if err != nil {
-		h.logger.Errorf("Failed to get agent stats: %v", err)
+		if h.logger != nil {
+			h.logger.Errorf("Failed to get agent stats: %v", err)
+		}
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "Failed to get agent statistics",
 			Message: err.Error(),
@@ -515,9 +582,19 @@ func (h *AgentHandler) FindAvailableAgent(c *gin.Context) {
 
 	agent, err := h.agentService.FindAvailableAgent(c.Request.Context(), skills, priority)
 	if err != nil {
-		h.logger.Errorf("Failed to find available agent: %v", err)
-		c.JSON(http.StatusNotFound, ErrorResponse{
-			Error:   "No available agent found",
+		if h.logger != nil {
+			h.logger.Errorf("Failed to find available agent: %v", err)
+		}
+		status := http.StatusInternalServerError
+		label := "Failed to find available agent"
+		if isNotFoundError(err) || strings.Contains(strings.ToLower(err.Error()), "no available agent found") {
+			status = http.StatusNotFound
+			label = "No available agent found"
+		} else if isInvalidInputError(err) {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, ErrorResponse{
+			Error:   label,
 			Message: err.Error(),
 		})
 		return

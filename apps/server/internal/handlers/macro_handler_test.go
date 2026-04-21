@@ -185,6 +185,26 @@ func TestMacroHandler_Update_InvalidID(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
+func TestMacroHandler_Update_NotFound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newMacroHandlerTestDB(t)
+	svc := services.NewMacroService(db)
+	handler := NewMacroHandler(svc)
+
+	router := gin.New()
+	router.PUT("/api/macros/:id", handler.Update)
+
+	body := bytes.NewReader([]byte(`{"description":"Updated"}`))
+	req := httptest.NewRequest("PUT", "/api/macros/999", body)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
 func TestMacroHandler_Delete_Success(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -294,6 +314,26 @@ func TestMacroHandler_Apply_InvalidID(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestMacroHandler_Apply_NotFound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newMacroHandlerTestDB(t)
+	svc := services.NewMacroService(db)
+	handler := NewMacroHandler(svc)
+
+	router := gin.New()
+	router.POST("/api/macros/:id/apply", handler.Apply)
+
+	body := bytes.NewReader([]byte(`{"ticket_id":1,"user_id":1}`))
+	req := httptest.NewRequest("POST", "/api/macros/999/apply", body)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
 }
 
 func TestNewMacroHandler(t *testing.T) {

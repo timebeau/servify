@@ -79,7 +79,11 @@ func (h *CustomFieldHandler) Update(c *gin.Context) {
 	}
 	field, err := h.service.Update(c.Request.Context(), uint(id), &req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Failed to update custom field", Message: err.Error()})
+		status := http.StatusBadRequest
+		if isNotFoundError(err) {
+			status = http.StatusNotFound
+		}
+		c.JSON(status, ErrorResponse{Error: "Failed to update custom field", Message: err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, field)
@@ -92,7 +96,11 @@ func (h *CustomFieldHandler) Delete(c *gin.Context) {
 		return
 	}
 	if err := h.service.Delete(c.Request.Context(), uint(id)); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Failed to delete custom field", Message: err.Error()})
+		status := http.StatusBadRequest
+		if isNotFoundError(err) {
+			status = http.StatusNotFound
+		}
+		c.JSON(status, ErrorResponse{Error: "Failed to delete custom field", Message: err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, SuccessResponse{Message: "deleted"})

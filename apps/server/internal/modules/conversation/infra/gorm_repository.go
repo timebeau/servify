@@ -120,7 +120,10 @@ func (r *GormRepository) ListMessagesBefore(ctx context.Context, conversationID 
 		Where("session_id = ?", conversationID)
 	if beforeMessageID != "" {
 		var pivot models.Message
-		if err := r.db.WithContext(ctx).Where("id = ?", beforeMessageID).First(&pivot).Error; err != nil {
+		if err := applyConversationScope(r.db.WithContext(ctx), ctx).
+			Where("session_id = ?", conversationID).
+			Where("id = ?", beforeMessageID).
+			First(&pivot).Error; err != nil {
 			return nil, err
 		}
 		q = q.Where("created_at < ?", pivot.CreatedAt)

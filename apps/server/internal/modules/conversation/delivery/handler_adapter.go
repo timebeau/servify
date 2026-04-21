@@ -35,6 +35,12 @@ func (a *HandlerServiceAdapter) GetConversation(ctx context.Context, sessionID s
 }
 
 func (a *HandlerServiceAdapter) ListMessages(ctx context.Context, sessionID string, limit int) ([]conversationapp.ConversationMessageDTO, error) {
+	if _, err := a.service.GetConversation(ctx, sessionID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrConversationNotFound
+		}
+		return nil, err
+	}
 	items, err := a.service.ListRecentMessages(ctx, sessionID, limit)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -46,6 +52,12 @@ func (a *HandlerServiceAdapter) ListMessages(ctx context.Context, sessionID stri
 }
 
 func (a *HandlerServiceAdapter) ListMessagesBefore(ctx context.Context, sessionID string, beforeMessageID string, limit int) ([]conversationapp.ConversationMessageDTO, error) {
+	if _, err := a.service.GetConversation(ctx, sessionID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrConversationNotFound
+		}
+		return nil, err
+	}
 	items, err := a.service.ListMessagesBefore(ctx, sessionID, beforeMessageID, limit)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

@@ -5,6 +5,7 @@ package infra
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -12,6 +13,8 @@ import (
 	"servify/apps/server/internal/modules/ticket/application"
 	"servify/apps/server/internal/modules/ticket/domain"
 	platformauth "servify/apps/server/internal/platform/auth"
+
+	"gorm.io/gorm"
 )
 
 func scopedTicketContext(tenantID, workspaceID string) context.Context {
@@ -130,5 +133,33 @@ func TestGormRepositoryListTicketCustomFieldsByScope(t *testing.T) {
 	}
 	if len(fields) != 1 || fields[0].Key != "severity" {
 		t.Fatalf("unexpected scoped custom fields: %+v", fields)
+	}
+}
+
+func TestGormRepositoryAssignTicketModelReturnsNotFoundWhenScopedOut(t *testing.T) {
+	db := newTicketInfraTestDB(t)
+	repo := NewGormRepository(db)
+	now := time.Now()
+
+	ticket := &models.Ticket{
+		ID:          1,
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-a",
+		Title:       "A",
+		CustomerID:  1,
+		Status:      "open",
+		Priority:    "normal",
+		Category:    "billing",
+		Source:      "web",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := db.Create(ticket).Error; err != nil {
+		t.Fatalf("seed ticket: %v", err)
+	}
+
+	err := repo.AssignTicketModel(scopedTicketContext("tenant-b", "workspace-b"), 1, 9, nil, "open", "assigned", 99, "assign")
+	if err == nil || !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("expected ErrRecordNotFound, got %v", err)
 	}
 }

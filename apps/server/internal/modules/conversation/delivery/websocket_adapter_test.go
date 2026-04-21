@@ -163,3 +163,21 @@ func TestHandlerServiceAdapterGetConversationFallsBackToMessageHistory(t *testin
 		t.Fatalf("last_message_at = %+v want %v", dto.LastMessageAt, now)
 	}
 }
+
+func TestHandlerServiceAdapterListMessagesReturnsNotFoundForMissingConversation(t *testing.T) {
+	handler := NewHandlerService(conversationapp.NewService(&stubConversationRepo{}, nil))
+
+	_, err := handler.ListMessages(context.Background(), "missing", 10)
+	if err != ErrConversationNotFound {
+		t.Fatalf("expected ErrConversationNotFound, got %v", err)
+	}
+}
+
+func TestHandlerServiceAdapterListMessagesBeforeReturnsNotFoundForMissingConversation(t *testing.T) {
+	handler := NewHandlerService(conversationapp.NewService(&stubConversationRepo{}, nil))
+
+	_, err := handler.ListMessagesBefore(context.Background(), "missing", "1", 10)
+	if err != ErrConversationNotFound {
+		t.Fatalf("expected ErrConversationNotFound, got %v", err)
+	}
+}

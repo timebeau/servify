@@ -47,7 +47,7 @@ func TestAgentHandler_CreateAgent_BadRequest(t *testing.T) {
 		{
 			name:       "non-existent user",
 			body:       `{"user_id":9999}`,
-			wantStatus: http.StatusInternalServerError,
+			wantStatus: http.StatusNotFound,
 		},
 	}
 

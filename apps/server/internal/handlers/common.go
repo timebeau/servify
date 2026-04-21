@@ -1,5 +1,12 @@
 package handlers
 
+import (
+	"errors"
+	"strings"
+
+	"gorm.io/gorm"
+)
+
 // ErrorResponse 错误响应结构
 type ErrorResponse struct {
 	Error   string `json:"error"`
@@ -20,4 +27,31 @@ type PaginatedResponse struct {
 type SuccessResponse struct {
 	Message string      `json:"message"`
 	Data    interface{} `json:"data,omitempty"`
+}
+
+func isNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return true
+	}
+	msg := strings.ToLower(strings.TrimSpace(err.Error()))
+	return strings.Contains(msg, "not found")
+}
+
+func isInvalidInputError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(strings.TrimSpace(err.Error()))
+	return strings.Contains(msg, "required") || strings.Contains(msg, "invalid")
+}
+
+func isConflictError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(strings.TrimSpace(err.Error()))
+	return strings.Contains(msg, "already exists") || strings.Contains(msg, "already an agent") || strings.Contains(msg, "duplicate")
 }

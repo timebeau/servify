@@ -103,6 +103,37 @@ func TestAppMarketHandler_CreateIntegration_InvalidJSON(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
+func TestAppMarketHandler_CreateIntegration_Conflict(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newAppMarketHandlerTestDB(t)
+	svc := services.NewAppIntegrationService(db, nil)
+	handler := NewAppMarketHandler(svc)
+
+	existing := &models.AppIntegration{Name: "slack", Slug: "slack", IFrameURL: "https://example.com/app"}
+	if err := db.Create(existing).Error; err != nil {
+		t.Fatalf("seed integration: %v", err)
+	}
+
+	router := gin.New()
+	router.POST("/apps/integrations", handler.CreateIntegration)
+
+	payload := map[string]interface{}{
+		"name":       "Slack",
+		"slug":       "slack",
+		"iframe_url": "https://example.com/another",
+	}
+	body, _ := json.Marshal(payload)
+
+	req := httptest.NewRequest("POST", "/apps/integrations", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusConflict, w.Code)
+}
+
 func TestAppMarketHandler_UpdateIntegration_NotFound(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

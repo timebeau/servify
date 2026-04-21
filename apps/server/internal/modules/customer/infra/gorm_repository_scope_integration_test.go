@@ -5,6 +5,7 @@ package infra
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -213,5 +214,26 @@ func TestCustomerRepositoryGetActivityStaysScoped(t *testing.T) {
 	}
 	if len(activity.RecentMessages) != 1 || activity.RecentMessages[0].ID != 201 {
 		t.Fatalf("unexpected scoped messages: %+v", activity.RecentMessages)
+	}
+}
+
+func TestCustomerRepositoryUpdateCustomerReturnsNotFoundWhenMissing(t *testing.T) {
+	db := newCustomerInfraTestDB(t)
+	repo := NewGormRepository(db)
+
+	name := "updated"
+	_, err := repo.UpdateCustomer(context.Background(), 999, customerapp.UpdateCustomerCommand{Name: &name})
+	if err == nil || !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("expected ErrRecordNotFound, got %v", err)
+	}
+}
+
+func TestCustomerRepositoryUpdateTagsReturnsNotFoundWhenMissing(t *testing.T) {
+	db := newCustomerInfraTestDB(t)
+	repo := NewGormRepository(db)
+
+	err := repo.UpdateTags(context.Background(), 999, []string{"vip"})
+	if err == nil || !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("expected ErrRecordNotFound, got %v", err)
 	}
 }

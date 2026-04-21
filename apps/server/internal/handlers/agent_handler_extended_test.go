@@ -131,7 +131,15 @@ func TestAgentHandler_AssignSession(t *testing.T) {
 			body: map[string]string{
 				"session_id": "session123",
 			},
-			wantStatus: http.StatusInternalServerError,
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:    "non-existent session",
+			agentID: "10",
+			body: map[string]string{
+				"session_id": "missing-session",
+			},
+			wantStatus: http.StatusNotFound,
 		},
 	}
 
@@ -181,6 +189,14 @@ func TestAgentHandler_ReleaseSession(t *testing.T) {
 	svc := services.NewAgentService(db, logger)
 	h := NewAgentHandler(svc, logger)
 
+	session := &models.Session{
+		ID:      "session456",
+		Status:  "active",
+		UserID:  1,
+		AgentID: uintPtr(11),
+	}
+	db.Create(session)
+
 	r := gin.New()
 	r.POST("/api/agents/:id/release-session", h.ReleaseSession)
 
@@ -213,6 +229,14 @@ func TestAgentHandler_ReleaseSession(t *testing.T) {
 				"other_field": "value",
 			},
 			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:    "session not assigned to agent",
+			agentID: "11",
+			body: map[string]string{
+				"session_id": "missing-session",
+			},
+			wantStatus: http.StatusNotFound,
 		},
 	}
 

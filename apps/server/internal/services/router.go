@@ -338,8 +338,12 @@ func (r *MessageRouter) ensureSession(sessionID string, platform string, tenantI
 		if s.WorkspaceID == "" && workspaceID != "" {
 			updates["workspace_id"] = workspaceID
 		}
-		if err := r.db.Model(&models.Session{}).Where("id = ?", sessionID).Updates(updates).Error; err != nil {
-			return "", "", fmt.Errorf("update session scope: %w", err)
+		result := r.db.Model(&models.Session{}).Where("id = ?", sessionID).Updates(updates)
+		if result.Error != nil {
+			return "", "", fmt.Errorf("update session scope: %w", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			return "", "", fmt.Errorf("update session scope: %w", gorm.ErrRecordNotFound)
 		}
 		if s.TenantID == "" && tenantID != "" {
 			s.TenantID = tenantID

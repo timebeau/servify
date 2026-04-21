@@ -106,8 +106,12 @@ func (r *GormRepository) ListActiveAgentRuntimes(ctx context.Context) ([]agentap
 }
 
 func (r *GormRepository) UpdatePresenceStatus(ctx context.Context, userID uint, status agentdomain.PresenceStatus) error {
-	if err := applyAgentScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Where("user_id = ?", userID).Update("status", string(status)).Error; err != nil {
-		return fmt.Errorf("failed to update agent status: %w", err)
+	result := applyAgentScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Where("user_id = ?", userID).Update("status", string(status))
+	if result.Error != nil {
+		return fmt.Errorf("failed to update agent status: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("agent not found: %w", gorm.ErrRecordNotFound)
 	}
 	return nil
 }
@@ -115,22 +119,50 @@ func (r *GormRepository) UpdatePresenceStatus(ctx context.Context, userID uint, 
 // UpdateLastActivity updates the agent's last activity timestamp (persisted).
 func (r *GormRepository) UpdateLastActivity(ctx context.Context, userID uint) error {
 	now := time.Now()
-	return applyAgentScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Where("user_id = ?", userID).Update("last_activity_at", now).Error
+	result := applyAgentScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Where("user_id = ?", userID).Update("last_activity_at", now)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 // SetConnectedTime sets the agent's connected timestamp (persisted).
 func (r *GormRepository) SetConnectedTime(ctx context.Context, userID uint) error {
 	now := time.Now()
-	return applyAgentScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Where("user_id = ?", userID).Update("connected_at", now).Error
+	result := applyAgentScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Where("user_id = ?", userID).Update("connected_at", now)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 // ClearConnectedTime clears the agent's connected timestamp when going offline.
 func (r *GormRepository) ClearConnectedTime(ctx context.Context, userID uint) error {
-	return applyAgentScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Where("user_id = ?", userID).Update("connected_at", nil).Error
+	result := applyAgentScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Where("user_id = ?", userID).Update("connected_at", nil)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (r *GormRepository) UpdateChatLoad(ctx context.Context, userID uint, currentLoad int) error {
-	return applyAgentScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Where("user_id = ?", userID).Update("current_load", currentLoad).Error
+	result := applyAgentScope(r.db.WithContext(ctx).Model(&models.Agent{}), ctx).Where("user_id = ?", userID).Update("current_load", currentLoad)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (r *GormRepository) GetSessionByID(ctx context.Context, sessionID string) (*models.Session, error) {
@@ -142,22 +174,30 @@ func (r *GormRepository) GetSessionByID(ctx context.Context, sessionID string) (
 }
 
 func (r *GormRepository) AssignSession(ctx context.Context, sessionID string, agentUserID uint) error {
-	if err := r.db.WithContext(ctx).Model(&models.Session{}).Where("id = ?", sessionID).Updates(map[string]interface{}{
+	result := r.db.WithContext(ctx).Model(&models.Session{}).Where("id = ?", sessionID).Updates(map[string]interface{}{
 		"agent_id": agentUserID,
 		"status":   "active",
 		"ended_at": nil,
-	}).Error; err != nil {
-		return fmt.Errorf("failed to assign session: %w", err)
+	})
+	if result.Error != nil {
+		return fmt.Errorf("failed to assign session: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("session not found: %w", gorm.ErrRecordNotFound)
 	}
 	return nil
 }
 
 func (r *GormRepository) ReleaseSession(ctx context.Context, sessionID string, agentUserID uint) error {
-	if err := r.db.WithContext(ctx).Model(&models.Session{}).Where("id = ? AND agent_id = ?", sessionID, agentUserID).Updates(map[string]interface{}{
+	result := r.db.WithContext(ctx).Model(&models.Session{}).Where("id = ? AND agent_id = ?", sessionID, agentUserID).Updates(map[string]interface{}{
 		"status":   "ended",
 		"ended_at": time.Now(),
-	}).Error; err != nil {
-		return fmt.Errorf("failed to release session: %w", err)
+	})
+	if result.Error != nil {
+		return fmt.Errorf("failed to release session: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("session not found or not assigned to agent: %w", gorm.ErrRecordNotFound)
 	}
 	return nil
 }

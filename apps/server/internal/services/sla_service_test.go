@@ -160,6 +160,36 @@ func TestSLAService_ResolveViolationsByTicket(t *testing.T) {
 	}
 }
 
+func TestSLAService_ResolveViolationsByTicket_NoMatchesIsNoop(t *testing.T) {
+	db := newSLATestDB(t)
+	svc := NewSLAService(db, logrus.New())
+
+	ticket := &models.Ticket{
+		ID:        999,
+		Title:     "No violations yet",
+		Priority:  "normal",
+		Status:    "open",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	if err := db.Create(ticket).Error; err != nil {
+		t.Fatalf("failed to insert ticket: %v", err)
+	}
+
+	if err := svc.ResolveViolationsByTicket(context.Background(), ticket.ID, []string{"first_response"}); err != nil {
+		t.Fatalf("expected no-op success, got %v", err)
+	}
+}
+
+func TestSLAService_ResolveViolationsByTicket_MissingTicket(t *testing.T) {
+	db := newSLATestDB(t)
+	svc := NewSLAService(db, logrus.New())
+
+	if err := svc.ResolveViolationsByTicket(context.Background(), 999, []string{"first_response"}); err == nil {
+		t.Fatal("expected missing ticket to fail")
+	}
+}
+
 func TestSLAService_ViolationsScopedByWorkspace(t *testing.T) {
 	db := newSLATestDB(t)
 	svc := NewSLAService(db, logrus.New())

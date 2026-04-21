@@ -69,14 +69,22 @@ func (h *SLAHandler) CreateSLAConfig(c *gin.Context) {
 
 	config, err := h.slaService.CreateSLAConfig(c.Request.Context(), &req)
 	if err != nil {
-		if strings.Contains(err.Error(), "invalid priority") {
+		lowerErr := strings.ToLower(err.Error())
+		if isInvalidInputError(err) && strings.Contains(lowerErr, "priority") {
 			c.JSON(http.StatusBadRequest, ErrorResponse{
 				Error:   "INVALID_PRIORITY",
 				Message: "无效的优先级: " + req.Priority,
 			})
 			return
 		}
-		if strings.Contains(err.Error(), "already exists") {
+		if isInvalidInputError(err) || strings.Contains(lowerErr, "must be less than") || strings.Contains(lowerErr, "must be at least") {
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error:   "INVALID_CONFIG",
+				Message: "SLA配置参数无效: " + err.Error(),
+			})
+			return
+		}
+		if isConflictError(err) {
 			c.JSON(http.StatusConflict, ErrorResponse{
 				Error:   "CONFIG_EXISTS",
 				Message: "该优先级/客户等级的SLA配置已存在",
@@ -117,7 +125,7 @@ func (h *SLAHandler) GetSLAConfig(c *gin.Context) {
 
 	config, err := h.slaService.GetSLAConfig(c.Request.Context(), uint(id))
 	if err != nil {
-		if err.Error() == "SLA config not found" {
+		if isNotFoundError(err) {
 			c.JSON(http.StatusNotFound, ErrorResponse{
 				Error:   "CONFIG_NOT_FOUND",
 				Message: "SLA配置不存在",
@@ -221,17 +229,32 @@ func (h *SLAHandler) UpdateSLAConfig(c *gin.Context) {
 
 	config, err := h.slaService.UpdateSLAConfig(c.Request.Context(), uint(id), &req)
 	if err != nil {
-		if err.Error() == "SLA config not found" {
+		lowerErr := strings.ToLower(err.Error())
+		if isNotFoundError(err) {
 			c.JSON(http.StatusNotFound, ErrorResponse{
 				Error:   "CONFIG_NOT_FOUND",
 				Message: "SLA配置不存在",
 			})
 			return
 		}
-		if err.Error() == "invalid priority: "+*req.Priority {
+		if isInvalidInputError(err) && strings.Contains(lowerErr, "priority") {
 			c.JSON(http.StatusBadRequest, ErrorResponse{
 				Error:   "INVALID_PRIORITY",
 				Message: "无效的优先级",
+			})
+			return
+		}
+		if isInvalidInputError(err) || strings.Contains(lowerErr, "must be less than") || strings.Contains(lowerErr, "must be at least") {
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Error:   "INVALID_CONFIG",
+				Message: "SLA配置参数无效: " + err.Error(),
+			})
+			return
+		}
+		if isConflictError(err) {
+			c.JSON(http.StatusConflict, ErrorResponse{
+				Error:   "CONFIG_EXISTS",
+				Message: "该优先级/客户等级的SLA配置已存在",
 			})
 			return
 		}
@@ -269,7 +292,7 @@ func (h *SLAHandler) DeleteSLAConfig(c *gin.Context) {
 	}
 
 	if err := h.slaService.DeleteSLAConfig(c.Request.Context(), uint(id)); err != nil {
-		if err.Error() == "SLA config not found" {
+		if isNotFoundError(err) {
 			c.JSON(http.StatusNotFound, ErrorResponse{
 				Error:   "CONFIG_NOT_FOUND",
 				Message: "SLA配置不存在",
@@ -407,7 +430,7 @@ func (h *SLAHandler) ResolveSLAViolation(c *gin.Context) {
 	}
 
 	if err := h.slaService.ResolveSLAViolation(c.Request.Context(), uint(id)); err != nil {
-		if err.Error() == "SLA violation not found" {
+		if isNotFoundError(err) {
 			c.JSON(http.StatusNotFound, ErrorResponse{
 				Error:   "VIOLATION_NOT_FOUND",
 				Message: "SLA违约记录不存在",
@@ -473,9 +496,16 @@ func (h *SLAHandler) CheckTicketSLA(c *gin.Context) {
 	// 获取真实工单信息
 	ticket, err := h.ticketService.GetTicketByID(c.Request.Context(), uint(ticketID))
 	if err != nil {
-		c.JSON(http.StatusNotFound, ErrorResponse{
-			Error:   "TICKET_NOT_FOUND",
-			Message: "工单不存在或已删除",
+		if isNotFoundError(err) {
+			c.JSON(http.StatusNotFound, ErrorResponse{
+				Error:   "TICKET_NOT_FOUND",
+				Message: "工单不存在或已删除",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "GET_TICKET_FAILED",
+			Message: "获取工单失败: " + err.Error(),
 		})
 		return
 	}

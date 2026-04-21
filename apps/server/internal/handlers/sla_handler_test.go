@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -254,5 +255,81 @@ func TestSLAHandler_GetSLAStats(t *testing.T) {
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d, body: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestSLAHandler_CreateSLAConfig_InvalidTimeLogic(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestDBForSLA(t)
+	svc := services.NewSLAService(db, logrus.New())
+	h := NewSLAHandler(svc, nil)
+
+	r := gin.New()
+	r.POST("/api/sla/configs", h.CreateSLAConfig)
+
+	body := map[string]any{
+		"name":                "bad-config",
+		"priority":            "normal",
+		"first_response_time": 60,
+		"resolution_time":     30,
+		"escalation_time":     20,
+	}
+	b, _ := json.Marshal(body)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodPost, "/api/sla/configs", bytes.NewReader(b))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "SLA配置参数无效") {
+		t.Fatalf("expected invalid config message, got %s", w.Body.String())
+	}
+}
+
+func TestSLAHandler_UpdateSLAConfig_Conflict(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestDBForSLA(t)
+	svc := services.NewSLAService(db, logrus.New())
+	h := NewSLAHandler(svc, nil)
+
+	now := models.SLAConfig{
+		Name:              "normal-default",
+		Priority:          "normal",
+		FirstResponseTime: 30,
+		ResolutionTime:    240,
+		EscalationTime:    60,
+	}
+	other := models.SLAConfig{
+		Name:              "high-default",
+		Priority:          "high",
+		FirstResponseTime: 15,
+		ResolutionTime:    120,
+		EscalationTime:    30,
+	}
+	if err := db.Create(&now).Error; err != nil {
+		t.Fatalf("create config 1: %v", err)
+	}
+	if err := db.Create(&other).Error; err != nil {
+		t.Fatalf("create config 2: %v", err)
+	}
+
+	r := gin.New()
+	r.PUT("/api/sla/configs/:id", h.UpdateSLAConfig)
+
+	body := map[string]any{
+		"priority": "high",
+	}
+	b, _ := json.Marshal(body)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodPut, "/api/sla/configs/"+toStr(now.ID), bytes.NewReader(b))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d body=%s", w.Code, w.Body.String())
 	}
 }

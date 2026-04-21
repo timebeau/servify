@@ -5,6 +5,7 @@ package infra
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -190,5 +191,15 @@ func TestGormRepositoryUpdateTicketModelWithStatusAndCustomFields(t *testing.T) 
 	}
 	if stored[1].CustomFieldID != 3 || stored[1].Value != "customer-facing" {
 		t.Fatalf("expected field 3 to be inserted, got %+v", stored[1])
+	}
+}
+
+func TestGormRepositoryUpdateTicketModelReturnsNotFoundWhenMissing(t *testing.T) {
+	db := newTicketInfraTestDB(t)
+	repo := NewGormRepository(db)
+
+	err := repo.UpdateTicketModel(context.Background(), 999, map[string]interface{}{"title": "missing"})
+	if err == nil || !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("expected ErrRecordNotFound, got %v", err)
 	}
 }

@@ -5,6 +5,7 @@ package infra
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -127,5 +128,41 @@ func TestConversationRepositoryFiltersMessagesByScope(t *testing.T) {
 	}
 	if len(items) != 1 || items[0].Content != "visible" {
 		t.Fatalf("unexpected scoped messages: %+v", items)
+	}
+}
+
+func TestConversationRepositoryListMessagesBeforeScopesPivotLookup(t *testing.T) {
+	db := newConversationInfraTestDB(t)
+	repo := NewGormRepository(db)
+	now := time.Now()
+
+	if err := db.Create(&models.Message{
+		SessionID:   "conv-shared",
+		TenantID:    "tenant-a",
+		WorkspaceID: "workspace-a",
+		Content:     "visible",
+		Type:        "text",
+		Sender:      "user",
+		CreatedAt:   now,
+	}).Error; err != nil {
+		t.Fatalf("seed visible message: %v", err)
+	}
+	var hidden models.Message
+	hidden = models.Message{
+		SessionID:   "conv-shared",
+		TenantID:    "tenant-b",
+		WorkspaceID: "workspace-b",
+		Content:     "hidden",
+		Type:        "text",
+		Sender:      "user",
+		CreatedAt:   now.Add(time.Second),
+	}
+	if err := db.Create(&hidden).Error; err != nil {
+		t.Fatalf("seed hidden message: %v", err)
+	}
+
+	_, err := repo.ListMessagesBefore(scopedConversationContext("tenant-a", "workspace-a"), "conv-shared", fmt.Sprintf("%d", hidden.ID), 10)
+	if err == nil {
+		t.Fatal("expected scoped pivot lookup to reject cross-tenant message")
 	}
 }

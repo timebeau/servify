@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"servify/apps/server/internal/models"
@@ -66,10 +67,11 @@ func (h *SatisfactionHandler) CreateSatisfaction(c *gin.Context) {
 
 	satisfaction, err := h.satisfactionService.CreateSatisfaction(c.Request.Context(), &req)
 	if err != nil {
-		h.logger.Errorf("Failed to create satisfaction: %v", err)
+		if h.logger != nil {
+			h.logger.Errorf("Failed to create satisfaction: %v", err)
+		}
 
-		// 根据错误类型返回不同状态码
-		if err.Error() == "satisfaction rating already exists for this ticket" {
+		if isConflictError(err) {
 			c.JSON(http.StatusConflict, ErrorResponse{
 				Error:   "Satisfaction already exists",
 				Message: err.Error(),
@@ -77,7 +79,7 @@ func (h *SatisfactionHandler) CreateSatisfaction(c *gin.Context) {
 			return
 		}
 
-		if err.Error() == "customer is not the owner of this ticket" {
+		if strings.Contains(strings.ToLower(err.Error()), "not the owner") {
 			c.JSON(http.StatusForbidden, ErrorResponse{
 				Error:   "Access denied",
 				Message: err.Error(),
@@ -118,7 +120,7 @@ func (h *SatisfactionHandler) GetSatisfaction(c *gin.Context) {
 
 	satisfaction, err := h.satisfactionService.GetSatisfaction(c.Request.Context(), uint(id))
 	if err != nil {
-		if err.Error() == "satisfaction not found" {
+		if isNotFoundError(err) {
 			c.JSON(http.StatusNotFound, ErrorResponse{
 				Error:   "Satisfaction not found",
 				Message: err.Error(),
@@ -126,7 +128,9 @@ func (h *SatisfactionHandler) GetSatisfaction(c *gin.Context) {
 			return
 		}
 
-		h.logger.Errorf("Failed to get satisfaction: %v", err)
+		if h.logger != nil {
+			h.logger.Errorf("Failed to get satisfaction: %v", err)
+		}
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "Failed to get satisfaction",
 			Message: err.Error(),
@@ -194,7 +198,9 @@ func (h *SatisfactionHandler) ListSatisfactions(c *gin.Context) {
 
 	satisfactions, total, err := h.satisfactionService.ListSatisfactions(c.Request.Context(), &req)
 	if err != nil {
-		h.logger.Errorf("Failed to list satisfactions: %v", err)
+		if h.logger != nil {
+			h.logger.Errorf("Failed to list satisfactions: %v", err)
+		}
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "Failed to list satisfactions",
 			Message: err.Error(),
@@ -237,7 +243,9 @@ func (h *SatisfactionHandler) ListSurveys(c *gin.Context) {
 
 	surveys, total, err := h.satisfactionService.ListSurveys(c.Request.Context(), &req)
 	if err != nil {
-		h.logger.Errorf("Failed to list CSAT surveys: %v", err)
+		if h.logger != nil {
+			h.logger.Errorf("Failed to list CSAT surveys: %v", err)
+		}
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "Failed to list surveys",
 			Message: err.Error(),
@@ -296,7 +304,9 @@ func (h *SatisfactionHandler) ResendSurvey(c *gin.Context) {
 			})
 			return
 		default:
-			h.logger.Errorf("Failed to resend CSAT survey: %v", err)
+			if h.logger != nil {
+				h.logger.Errorf("Failed to resend CSAT survey: %v", err)
+			}
 			c.JSON(http.StatusInternalServerError, ErrorResponse{
 				Error:   "Failed to resend survey",
 				Message: err.Error(),
@@ -335,7 +345,9 @@ func (h *SatisfactionHandler) GetSatisfactionByTicket(c *gin.Context) {
 
 	satisfaction, err := h.satisfactionService.GetSatisfactionByTicket(c.Request.Context(), uint(ticketID))
 	if err != nil {
-		h.logger.Errorf("Failed to get satisfaction by ticket: %v", err)
+		if h.logger != nil {
+			h.logger.Errorf("Failed to get satisfaction by ticket: %v", err)
+		}
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "Failed to get satisfaction",
 			Message: err.Error(),
@@ -392,7 +404,9 @@ func (h *SatisfactionHandler) GetSatisfactionStats(c *gin.Context) {
 
 	stats, err := h.satisfactionService.GetSatisfactionStats(c.Request.Context(), dateFrom, dateTo)
 	if err != nil {
-		h.logger.Errorf("Failed to get satisfaction stats: %v", err)
+		if h.logger != nil {
+			h.logger.Errorf("Failed to get satisfaction stats: %v", err)
+		}
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "Failed to get satisfaction statistics",
 			Message: err.Error(),
@@ -440,7 +454,7 @@ func (h *SatisfactionHandler) UpdateSatisfaction(c *gin.Context) {
 
 	satisfaction, err := h.satisfactionService.UpdateSatisfaction(c.Request.Context(), uint(id), req.Comment)
 	if err != nil {
-		if err.Error() == "satisfaction not found" {
+		if isNotFoundError(err) {
 			c.JSON(http.StatusNotFound, ErrorResponse{
 				Error:   "Satisfaction not found",
 				Message: err.Error(),
@@ -448,7 +462,9 @@ func (h *SatisfactionHandler) UpdateSatisfaction(c *gin.Context) {
 			return
 		}
 
-		h.logger.Errorf("Failed to update satisfaction: %v", err)
+		if h.logger != nil {
+			h.logger.Errorf("Failed to update satisfaction: %v", err)
+		}
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "Failed to update satisfaction",
 			Message: err.Error(),
@@ -482,7 +498,7 @@ func (h *SatisfactionHandler) DeleteSatisfaction(c *gin.Context) {
 
 	err = h.satisfactionService.DeleteSatisfaction(c.Request.Context(), uint(id))
 	if err != nil {
-		if err.Error() == "satisfaction not found" {
+		if isNotFoundError(err) {
 			c.JSON(http.StatusNotFound, ErrorResponse{
 				Error:   "Satisfaction not found",
 				Message: err.Error(),
@@ -490,7 +506,9 @@ func (h *SatisfactionHandler) DeleteSatisfaction(c *gin.Context) {
 			return
 		}
 
-		h.logger.Errorf("Failed to delete satisfaction: %v", err)
+		if h.logger != nil {
+			h.logger.Errorf("Failed to delete satisfaction: %v", err)
+		}
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "Failed to delete satisfaction",
 			Message: err.Error(),

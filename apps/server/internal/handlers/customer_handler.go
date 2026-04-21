@@ -49,8 +49,16 @@ func (h *CustomerHandler) CreateCustomer(c *gin.Context) {
 
 	customer, err := h.customerService.CreateCustomer(c.Request.Context(), &req)
 	if err != nil {
-		h.logger.Errorf("Failed to create customer: %v", err)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
+		if h.logger != nil {
+			h.logger.Errorf("Failed to create customer: %v", err)
+		}
+		status := http.StatusInternalServerError
+		if isInvalidInputError(err) {
+			status = http.StatusBadRequest
+		} else if isConflictError(err) {
+			status = http.StatusConflict
+		}
+		c.JSON(status, ErrorResponse{
 			Error:   "Failed to create customer",
 			Message: err.Error(),
 		})
@@ -84,9 +92,17 @@ func (h *CustomerHandler) GetCustomer(c *gin.Context) {
 
 	customer, err := h.customerService.GetCustomerByID(c.Request.Context(), uint(id))
 	if err != nil {
-		h.logger.Errorf("Failed to get customer %d: %v", id, err)
-		c.JSON(http.StatusNotFound, ErrorResponse{
-			Error:   "Customer not found",
+		if h.logger != nil {
+			h.logger.Errorf("Failed to get customer %d: %v", id, err)
+		}
+		status := http.StatusInternalServerError
+		label := "Failed to get customer"
+		if isNotFoundError(err) {
+			status = http.StatusNotFound
+			label = "Customer not found"
+		}
+		c.JSON(status, ErrorResponse{
+			Error:   label,
 			Message: err.Error(),
 		})
 		return
@@ -132,8 +148,16 @@ func (h *CustomerHandler) UpdateCustomer(c *gin.Context) {
 
 	customer, err := h.customerService.UpdateCustomer(c.Request.Context(), uint(id), &req)
 	if err != nil {
-		h.logger.Errorf("Failed to update customer %d: %v", id, err)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
+		if h.logger != nil {
+			h.logger.Errorf("Failed to update customer %d: %v", id, err)
+		}
+		status := http.StatusInternalServerError
+		if isNotFoundError(err) {
+			status = http.StatusNotFound
+		} else if isInvalidInputError(err) {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, ErrorResponse{
 			Error:   "Failed to update customer",
 			Message: err.Error(),
 		})
@@ -170,8 +194,16 @@ func (h *CustomerHandler) RevokeCustomerTokens(c *gin.Context) {
 
 	version, err := h.customerService.RevokeCustomerTokens(c.Request.Context(), uint(id))
 	if err != nil {
-		h.logger.Errorf("Failed to revoke customer %d tokens: %v", id, err)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
+		if h.logger != nil {
+			h.logger.Errorf("Failed to revoke customer %d tokens: %v", id, err)
+		}
+		status := http.StatusInternalServerError
+		if isNotFoundError(err) {
+			status = http.StatusNotFound
+		} else if isInvalidInputError(err) {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, ErrorResponse{
 			Error:   "Failed to revoke customer tokens",
 			Message: err.Error(),
 		})
@@ -219,7 +251,9 @@ func (h *CustomerHandler) ListCustomers(c *gin.Context) {
 
 	customers, total, err := h.customerService.ListCustomers(c.Request.Context(), &req)
 	if err != nil {
-		h.logger.Errorf("Failed to list customers: %v", err)
+		if h.logger != nil {
+			h.logger.Errorf("Failed to list customers: %v", err)
+		}
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "Failed to list customers",
 			Message: err.Error(),
@@ -267,8 +301,14 @@ func (h *CustomerHandler) GetCustomerActivity(c *gin.Context) {
 
 	activity, err := h.customerService.GetCustomerActivity(c.Request.Context(), uint(id), limit)
 	if err != nil {
-		h.logger.Errorf("Failed to get customer activity %d: %v", id, err)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
+		if h.logger != nil {
+			h.logger.Errorf("Failed to get customer activity %d: %v", id, err)
+		}
+		status := http.StatusInternalServerError
+		if isNotFoundError(err) {
+			status = http.StatusNotFound
+		}
+		c.JSON(status, ErrorResponse{
 			Error:   "Failed to get customer activity",
 			Message: err.Error(),
 		})
@@ -325,8 +365,16 @@ func (h *CustomerHandler) AddCustomerNote(c *gin.Context) {
 	h.setCustomerAuditSnapshot(c, uint(id), true)
 
 	if err := h.customerService.AddCustomerNote(c.Request.Context(), uint(id), req.Note, userID.(uint)); err != nil {
-		h.logger.Errorf("Failed to add note to customer %d: %v", id, err)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
+		if h.logger != nil {
+			h.logger.Errorf("Failed to add note to customer %d: %v", id, err)
+		}
+		status := http.StatusInternalServerError
+		if isNotFoundError(err) {
+			status = http.StatusNotFound
+		} else if isInvalidInputError(err) {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, ErrorResponse{
 			Error:   "Failed to add customer note",
 			Message: err.Error(),
 		})
@@ -382,8 +430,14 @@ func (h *CustomerHandler) UpdateCustomerTags(c *gin.Context) {
 	h.setCustomerAuditSnapshot(c, uint(id), true)
 
 	if err := h.customerService.UpdateCustomerTags(c.Request.Context(), uint(id), req.Tags); err != nil {
-		h.logger.Errorf("Failed to update tags for customer %d: %v", id, err)
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
+		if h.logger != nil {
+			h.logger.Errorf("Failed to update tags for customer %d: %v", id, err)
+		}
+		status := http.StatusInternalServerError
+		if isNotFoundError(err) {
+			status = http.StatusNotFound
+		}
+		c.JSON(status, ErrorResponse{
 			Error:   "Failed to update customer tags",
 			Message: err.Error(),
 		})
@@ -430,7 +484,9 @@ func (h *CustomerHandler) setCustomerAuditSnapshot(c *gin.Context, customerID ui
 func (h *CustomerHandler) GetCustomerStats(c *gin.Context) {
 	stats, err := h.customerService.GetCustomerStats(c.Request.Context())
 	if err != nil {
-		h.logger.Errorf("Failed to get customer stats: %v", err)
+		if h.logger != nil {
+			h.logger.Errorf("Failed to get customer stats: %v", err)
+		}
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "Failed to get customer statistics",
 			Message: err.Error(),

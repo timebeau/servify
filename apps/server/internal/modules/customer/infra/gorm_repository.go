@@ -121,13 +121,21 @@ func (r *GormRepository) UpdateCustomer(ctx context.Context, customerID uint, cm
 	}
 	if err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if len(userUpdates) > 0 {
-			if err := tx.Model(&models.User{}).Where("id = ?", customerID).Updates(userUpdates).Error; err != nil {
-				return fmt.Errorf("failed to update user: %w", err)
+			result := tx.Model(&models.User{}).Where("id = ?", customerID).Updates(userUpdates)
+			if result.Error != nil {
+				return fmt.Errorf("failed to update user: %w", result.Error)
+			}
+			if result.RowsAffected == 0 {
+				return fmt.Errorf("customer not found: %w", gorm.ErrRecordNotFound)
 			}
 		}
 		if len(customerUpdates) > 0 {
-			if err := applyCustomerScope(tx.Model(&models.Customer{}), ctx).Where("user_id = ?", customerID).Updates(customerUpdates).Error; err != nil {
-				return fmt.Errorf("failed to update customer: %w", err)
+			result := applyCustomerScope(tx.Model(&models.Customer{}), ctx).Where("user_id = ?", customerID).Updates(customerUpdates)
+			if result.Error != nil {
+				return fmt.Errorf("failed to update customer: %w", result.Error)
+			}
+			if result.RowsAffected == 0 {
+				return fmt.Errorf("customer not found: %w", gorm.ErrRecordNotFound)
 			}
 		}
 		return nil
@@ -211,15 +219,23 @@ func (r *GormRepository) AddNote(ctx context.Context, customerID uint, note cust
 	if customer.Notes != "" {
 		next = customer.Notes + "\n" + line
 	}
-	if err := applyCustomerScope(r.db.WithContext(ctx).Model(&models.Customer{}), ctx).Where("user_id = ?", customerID).Update("notes", next).Error; err != nil {
-		return fmt.Errorf("failed to add note: %w", err)
+	result := applyCustomerScope(r.db.WithContext(ctx).Model(&models.Customer{}), ctx).Where("user_id = ?", customerID).Update("notes", next)
+	if result.Error != nil {
+		return fmt.Errorf("failed to add note: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("customer not found: %w", gorm.ErrRecordNotFound)
 	}
 	return nil
 }
 
 func (r *GormRepository) UpdateTags(ctx context.Context, customerID uint, tags []string) error {
-	if err := applyCustomerScope(r.db.WithContext(ctx).Model(&models.Customer{}), ctx).Where("user_id = ?", customerID).Update("tags", strings.Join(tags, ",")).Error; err != nil {
-		return fmt.Errorf("failed to update tags: %w", err)
+	result := applyCustomerScope(r.db.WithContext(ctx).Model(&models.Customer{}), ctx).Where("user_id = ?", customerID).Update("tags", strings.Join(tags, ","))
+	if result.Error != nil {
+		return fmt.Errorf("failed to update tags: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("customer not found: %w", gorm.ErrRecordNotFound)
 	}
 	return nil
 }

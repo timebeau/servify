@@ -140,7 +140,7 @@ func TestCustomFieldHandler_Update_NotFound(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, http.StatusNotFound, w.Code)
 }
 
 func TestCustomFieldHandler_Delete_NotFound(t *testing.T) {
@@ -158,7 +158,7 @@ func TestCustomFieldHandler_Delete_NotFound(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, http.StatusNotFound, w.Code)
 }
 
 func TestNewCustomFieldHandler(t *testing.T) {

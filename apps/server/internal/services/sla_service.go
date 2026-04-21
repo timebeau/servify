@@ -701,6 +701,15 @@ func (s *SLAService) ResolveViolationsByTicket(ctx context.Context, ticketID uin
 	ctx, span := s.tracer.Start(ctx, "sla.resolve_ticket_violations")
 	defer span.End()
 
+	var ticket models.Ticket
+	if err := applyScopeFilter(s.db.WithContext(ctx), ctx).First(&ticket, ticketID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return fmt.Errorf("ticket not found")
+		}
+		span.RecordError(err)
+		return fmt.Errorf("failed to validate ticket: %w", err)
+	}
+
 	query := applyScopeFilter(s.db.WithContext(ctx).Model(&models.SLAViolation{}), ctx).
 		Where("ticket_id = ? AND resolved = false", ticketID)
 	if len(violationTypes) > 0 {

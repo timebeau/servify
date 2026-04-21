@@ -5,6 +5,7 @@ package infra
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -99,5 +100,30 @@ func TestAgentRepositoryFiltersListAndStatsByScope(t *testing.T) {
 	}
 	if stats.Total != 1 {
 		t.Fatalf("unexpected scoped stats: %+v", stats)
+	}
+}
+
+func TestAgentRepositoryAssignSessionReturnsNotFoundWhenSessionMissing(t *testing.T) {
+	db := newAgentInfraTestDB(t)
+	repo := NewGormRepository(db)
+
+	err := repo.AssignSession(context.Background(), "missing", 1)
+	if err == nil || !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("expected ErrRecordNotFound, got %v", err)
+	}
+}
+
+func TestAgentRepositoryReleaseSessionReturnsNotFoundWhenNotAssigned(t *testing.T) {
+	db := newAgentInfraTestDB(t)
+	repo := NewGormRepository(db)
+
+	session := &models.Session{ID: "sess-1", Status: "active", UserID: 1}
+	if err := db.Create(session).Error; err != nil {
+		t.Fatalf("seed session: %v", err)
+	}
+
+	err := repo.ReleaseSession(context.Background(), "sess-1", 99)
+	if err == nil || !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("expected ErrRecordNotFound, got %v", err)
 	}
 }

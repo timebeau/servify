@@ -88,14 +88,21 @@ func (s *sessionTransferLegacyStore) loadSessionMessages(ctx context.Context, se
 }
 
 func (s *sessionTransferLegacyStore) syncTransferSession(ctx context.Context, tx *gorm.DB, session *conversationdelivery.TransferSession, targetAgentID uint) error {
-	return tx.WithContext(ctx).
+	result := tx.WithContext(ctx).
 		Model(&models.Session{}).
 		Where("id = ?", session.ID).
 		Updates(map[string]interface{}{
 			"agent_id": targetAgentID,
 			"status":   "active",
 			"ended_at": nil,
-		}).Error
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (s *sessionTransferLegacyStore) loadTransferTicket(tx *gorm.DB, ticketID uint) (*models.Ticket, error) {
@@ -113,8 +120,12 @@ func (s *sessionTransferLegacyStore) syncTransferTicket(tx *gorm.DB, ticketID ui
 	}
 
 	updates, fromStatus, toStatus := ticketapp.BuildTransferAssignmentUpdate(targetAgentID, ticket.Status)
-	if err := tx.Model(&models.Ticket{}).Where("id = ?", ticket.ID).Updates(updates).Error; err != nil {
-		return err
+	result := tx.Model(&models.Ticket{}).Where("id = ?", ticket.ID).Updates(updates)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
 	}
 
 	s.appendTransferTicketStatus(tx, ticket.ID, targetAgentID, fromStatus, toStatus, transferAt)
