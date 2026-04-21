@@ -80,10 +80,9 @@ const GamificationPage: React.FC = () => {
             page: params.current,
             page_size: params.pageSize,
           });
-          const data = Array.isArray(result) ? result : result.data || [];
           return {
-            data,
-            total: Array.isArray(result) ? data.length : result.total || data.length,
+            data: result.data,
+            total: result.total,
             success: true,
           };
         } catch (error) {

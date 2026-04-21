@@ -1,22 +1,11 @@
 import { request } from '@/lib/request';
+import { normalizePaginatedResponse } from './_response';
 
 const API = '/api/voice';
 
-type VoiceProtocolsResponse = {
-  success: boolean;
-  data: API.PaginatedResponse<API.VoiceProtocol>;
-};
-
-type VoiceTranscriptsResponse<T = API.VoiceTranscript> = {
-  success: boolean;
-  data: T[];
-  total: number;
-  page: number;
-  page_size: number;
-};
-
 export async function listProtocols(params?: { page?: number; page_size?: number }) {
-  return request<VoiceProtocolsResponse>(`${API}/protocols`, { params });
+  const payload = await request<unknown>(`${API}/protocols`, { params });
+  return normalizePaginatedResponse<API.VoiceProtocol>(payload);
 }
 
 export async function startRecording(callId: string) {
@@ -38,5 +27,6 @@ export async function getRecording(recordingId: string) {
 }
 
 export async function listTranscripts(params?: { call_id?: string; page?: number; page_size?: number }) {
-  return request<VoiceTranscriptsResponse>(`${API}/transcripts`, { params });
+  const payload = await request<unknown>(`${API}/transcripts`, { params });
+  return normalizePaginatedResponse<API.VoiceTranscript>(payload);
 }

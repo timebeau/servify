@@ -1,4 +1,5 @@
 import { request } from '@/lib/request';
+import { normalizePaginatedResponse } from './_response';
 
 const API = '/api/customers';
 
@@ -10,7 +11,8 @@ export async function listCustomers(params: {
   industry?: string;
   tags?: string;
 }) {
-  return request<API.PaginatedResponse<API.Customer>>(API, { params });
+  const payload = await request<unknown>(API, { params });
+  return normalizePaginatedResponse<API.Customer>(payload);
 }
 
 export async function getCustomer(id: number) {

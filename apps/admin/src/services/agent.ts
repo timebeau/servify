@@ -1,4 +1,5 @@
 import { request } from '@/lib/request';
+import { normalizePaginatedResponse } from './_response';
 
 const API = '/api/agents';
 
@@ -8,7 +9,8 @@ export async function listAgents(params: {
   status?: string;
   search?: string;
 }) {
-  return request<API.PaginatedResponse<API.Agent>>(API, { params });
+  const payload = await request<unknown>(API, { params });
+  return normalizePaginatedResponse<API.Agent>(payload);
 }
 
 export async function getAgent(id: number) {

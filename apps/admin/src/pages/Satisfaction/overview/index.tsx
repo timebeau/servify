@@ -65,9 +65,21 @@ const SatisfactionOverviewPage: React.FC = () => {
     value: Number(item.average_rating.toFixed(2)),
     count: item.count,
   }));
+  const totalRatings = stats?.total_ratings || 0;
+  const ratingDistribution = stats?.rating_distribution || {};
+  const positiveCount = [4, 5].reduce(
+    (sum, rating) => sum + Number(ratingDistribution[String(rating)] || 0),
+    0,
+  );
+  const negativeCount = [1, 2].reduce(
+    (sum, rating) => sum + Number(ratingDistribution[String(rating)] || 0),
+    0,
+  );
+  const positiveRate = totalRatings > 0 ? (positiveCount / totalRatings) * 100 : 0;
+  const negativeRate = totalRatings > 0 ? (negativeCount / totalRatings) * 100 : 0;
 
   // 评分分布数据
-  const distEntries = Object.entries(stats?.rating_distribution || {}) as [string, number][];
+  const distEntries = Object.entries(ratingDistribution) as [string, number][];
   const distributionData = distEntries.map(([rating, count]) => ({
     rating: `${rating} 星`,
     count: Number(count),
@@ -89,7 +101,7 @@ const SatisfactionOverviewPage: React.FC = () => {
           <StatisticCard
             statistic={{
               title: '评价总数',
-              value: stats?.total_ratings || 0,
+              value: totalRatings,
             }}
           />
         </Col>
@@ -97,9 +109,7 @@ const SatisfactionOverviewPage: React.FC = () => {
           <StatisticCard
             statistic={{
               title: '好评率',
-              value: stats?.category_stats?.positive
-                ? `${(stats.category_stats.positive.average_rating * 20).toFixed(1)}%`
-                : '0%',
+              value: `${positiveRate.toFixed(1)}%`,
             }}
           />
         </Col>
@@ -107,9 +117,7 @@ const SatisfactionOverviewPage: React.FC = () => {
           <StatisticCard
             statistic={{
               title: '差评率',
-              value: stats?.category_stats?.negative
-                ? `${(stats.category_stats.negative.average_rating * 20).toFixed(1)}%`
-                : '0%',
+              value: `${negativeRate.toFixed(1)}%`,
             }}
           />
         </Col>

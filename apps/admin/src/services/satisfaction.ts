@@ -1,9 +1,11 @@
 import { request } from '@/lib/request';
+import { normalizePaginatedResponse } from './_response';
 
 const API = '/api/satisfactions';
 
 export async function listSatisfactions(params?: { page?: number; page_size?: number; ticket_id?: number }) {
-  return request<API.PaginatedResponse<API.Satisfaction>>(API, { params });
+  const payload = await request<unknown>(API, { params });
+  return normalizePaginatedResponse<API.Satisfaction>(payload);
 }
 
 export async function getSatisfactionStats() {
@@ -11,7 +13,8 @@ export async function getSatisfactionStats() {
 }
 
 export async function listSurveys(params?: { page?: number; page_size?: number }) {
-  return request<API.PaginatedResponse<API.SatisfactionSurvey>>(`${API}/surveys`, { params });
+  const payload = await request<unknown>(`${API}/surveys`, { params });
+  return normalizePaginatedResponse<API.SatisfactionSurvey>(payload);
 }
 
 export async function resendSurvey(id: number) {

@@ -55,8 +55,8 @@ const VoicePage: React.FC = () => {
               page_size: params.pageSize,
             });
             return {
-              data: result?.data?.data || result?.data || [],
-              total: result?.data?.total || (result?.data?.data || result?.data || []).length,
+              data: result.data,
+              total: result.total,
               success: true,
             };
           } catch (error) {
@@ -80,8 +80,8 @@ const VoicePage: React.FC = () => {
               page_size: params.pageSize,
             });
             return {
-              data: result?.data || [],
-              total: result?.total || result?.data?.length || 0,
+              data: result.data,
+              total: result.total,
               success: true,
             };
           } catch (error) {

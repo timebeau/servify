@@ -1,4 +1,5 @@
 import { request } from '@/lib/request';
+import { normalizePaginatedResponse } from './_response';
 
 const API = '/api/tickets';
 
@@ -15,7 +16,8 @@ function normalizeTicketPayload(data: CreateTicketPayload) {
 }
 
 export async function listTickets(params: API.TicketListParams) {
-  return request<API.PaginatedResponse<API.Ticket>>(API, { params });
+  const payload = await request<unknown>(API, { params });
+  return normalizePaginatedResponse<API.Ticket>(payload);
 }
 
 export async function getTicket(id: number) {
