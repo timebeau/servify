@@ -104,12 +104,11 @@ func TestRedisBusHealth(t *testing.T) {
 func waitForSubscription(t *testing.T, bus *RedisBus) {
 	t.Helper()
 
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if bus.subscribed {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	if bus.waitUntilReady(ctx) {
+		return
 	}
 
 	t.Fatal("redis bus subscription did not start")

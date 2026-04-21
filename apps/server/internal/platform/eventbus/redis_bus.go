@@ -35,9 +35,10 @@ type RedisBus struct {
 	handlers map[string][]Handler
 
 	// Subscription management
-	ctx        context.Context
-	cancel     context.CancelFunc
-	subscribed bool
+	ctx       context.Context
+	cancel    context.CancelFunc
+	readyOnce sync.Once
+	readyCh   chan struct{}
 }
 
 // NewRedisBus creates a new Redis-backed event bus.
@@ -54,6 +55,7 @@ func NewRedisBus(client *redis.Client, logger *logrus.Logger) *RedisBus {
 		handlers: make(map[string][]Handler),
 		ctx:      ctx,
 		cancel:   cancel,
+		readyCh:  make(chan struct{}),
 	}
 
 	// Start background subscriber
@@ -121,7 +123,9 @@ func (b *RedisBus) Publish(ctx context.Context, event Event) error {
 func (b *RedisBus) subscribeLoop() {
 	pubsub := b.client.Subscribe(b.ctx, eventPubSubChannel)
 	defer pubsub.Close()
-	b.subscribed = true
+	b.readyOnce.Do(func() {
+		close(b.readyCh)
+	})
 
 	ch := pubsub.Channel()
 	for {
@@ -136,6 +140,15 @@ func (b *RedisBus) subscribeLoop() {
 			// msg.Payload contains the stream key and optionally the message ID.
 			b.dispatchFromStream(b.ctx, msg.Payload)
 		}
+	}
+}
+
+func (b *RedisBus) waitUntilReady(ctx context.Context) bool {
+	select {
+	case <-b.readyCh:
+		return true
+	case <-ctx.Done():
+		return false
 	}
 }
 
