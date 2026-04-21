@@ -1,7 +1,7 @@
 import React from 'react';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
-import { Tag, Space } from 'antd';
+import { Space, Tag } from 'antd';
 import { listIntegrations } from '@/services/appMarket';
 
 const AppMarketPage: React.FC = () => {
@@ -17,9 +17,15 @@ const AppMarketPage: React.FC = () => {
       search: true,
     },
     {
-      title: '类型',
-      dataIndex: 'type',
-      width: 120,
+      title: '分类',
+      dataIndex: 'category',
+      width: 140,
+    },
+    {
+      title: '厂商',
+      dataIndex: 'vendor',
+      width: 160,
+      search: false,
     },
     {
       title: '状态',
@@ -59,11 +65,12 @@ const AppMarketPage: React.FC = () => {
           const result = await listIntegrations({
             page: params.current,
             page_size: params.pageSize,
-            type: params.type,
+            search: typeof params.name === 'string' ? params.name : undefined,
+            category: typeof params.category === 'string' ? params.category : undefined,
           });
           return {
-            data: result?.data || [],
-            total: result?.total || 0,
+            data: result.data || [],
+            total: result.total || 0,
             success: true,
           };
         } catch (error) {

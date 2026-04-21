@@ -1,7 +1,7 @@
 import React from 'react';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
-import { Tag, Space } from 'antd';
+import { Tag } from 'antd';
 import { listAuditLogs } from '@/services/audit';
 
 const AuditPage: React.FC = () => {
@@ -52,11 +52,10 @@ const AuditPage: React.FC = () => {
     },
     {
       title: '详情',
-      dataIndex: 'details',
+      dataIndex: 'request_json',
       ellipsis: true,
       search: false,
-      render: (_, record) =>
-        record.details ? JSON.stringify(record.details) : '-',
+      render: (_, record) => record.request_json || '-',
     },
     {
       title: '时间',

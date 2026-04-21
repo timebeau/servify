@@ -1,9 +1,11 @@
 import { request } from '@/lib/request';
+import { normalizePaginatedResponse } from './_response';
 
-const API = '/api/integrations';
+const API = '/api/apps/integrations';
 
 export async function listIntegrations(params?: { page?: number; page_size?: number; type?: string }) {
-  return request<API.PaginatedResponse<API.Integration>>(API, { params });
+  const payload = await request<unknown>(API, { params });
+  return normalizePaginatedResponse<API.Integration>(payload);
 }
 
 export async function createIntegration(data: Partial<API.Integration>) {

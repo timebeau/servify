@@ -1,7 +1,7 @@
 import React from 'react';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
-import { Button, Space, message } from 'antd';
+import { Button, Space, Tag, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { listMacros, deleteMacro } from '@/services/macro';
 
@@ -24,15 +24,28 @@ const MacroPage: React.FC = () => {
       search: false,
     },
     {
-      title: '分类',
-      dataIndex: 'category',
-      width: 120,
+      title: '语言',
+      dataIndex: 'language',
+      width: 100,
+      search: false,
+    },
+    {
+      title: '状态',
+      dataIndex: 'active',
+      width: 100,
+      search: false,
+      render: (_, record) => (
+        <Tag color={record.active ? 'green' : 'default'}>
+          {record.active ? '启用' : '停用'}
+        </Tag>
+      ),
     },
     {
       title: '创建时间',
       dataIndex: 'created_at',
       valueType: 'dateTime',
       width: 180,
+      search: false,
     },
     {
       title: '操作',
@@ -71,14 +84,19 @@ const MacroPage: React.FC = () => {
       ]}
       request={async (params) => {
         try {
-          const result = await listMacros({
-            page: params.current,
-            page_size: params.pageSize,
-            category: params.category,
-          });
+          const result = await listMacros();
+          const keyword = typeof params.name === 'string' ? params.name.trim().toLowerCase() : '';
+          let data = result.data;
+          if (keyword) {
+            data = data.filter((item) => item.name.toLowerCase().includes(keyword));
+          }
+          const total = data.length;
+          const current = params.current || 1;
+          const pageSize = params.pageSize || 20;
+          const pageData = data.slice((current - 1) * pageSize, current * pageSize);
           return {
-            data: result?.data || [],
-            total: result?.total || 0,
+            data: pageData,
+            total,
             success: true,
           };
         } catch (error) {

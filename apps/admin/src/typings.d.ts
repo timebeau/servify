@@ -160,8 +160,7 @@ declare namespace API {
     title: string;
     content?: string;
     category?: string;
-    status: string;
-    tags?: string[];
+    tags?: string | string[];
     is_public?: boolean;
     created_at: string;
     updated_at: string;
@@ -172,11 +171,14 @@ declare namespace API {
     id: number;
     name: string;
     description?: string;
-    trigger_type: string;
-    conditions?: Record<string, any>;
-    actions?: Record<string, any>;
-    enabled: boolean;
+    event?: string;
+    trigger_type?: string;
+    conditions?: string | Record<string, any>;
+    actions?: string | Record<string, any>;
+    active?: boolean;
+    enabled?: boolean;
     created_at: string;
+    updated_at?: string;
   }
 
   // ---- 宏 ----
@@ -184,9 +186,12 @@ declare namespace API {
     id: number;
     name: string;
     description?: string;
+    language?: string;
     content: string;
     category?: string;
+    active?: boolean;
     created_at: string;
+    updated_at?: string;
   }
 
   // ---- SLA 配置 ----
@@ -195,19 +200,36 @@ declare namespace API {
     name: string;
     description?: string;
     priority: string;
+    customer_tier?: string;
+    tags?: string | string[];
+    warning_threshold?: number;
     first_response_time: number;
     resolution_time: number;
-    enabled: boolean;
+    escalation_time?: number;
+    business_hours_only?: boolean;
+    active?: boolean;
+    enabled?: boolean;
+    created_at?: string;
+    updated_at?: string;
   }
 
   // ---- 班次 ----
   interface Shift {
     id: number;
     agent_id: number;
+    agent?: {
+      id?: number;
+      name?: string;
+      username?: string;
+    };
     agent_name?: string;
+    shift_type?: string;
     start_time: string;
     end_time: string;
+    date?: string;
     status: string;
+    created_at?: string;
+    updated_at?: string;
   }
 
   // ---- 满意度 ----
@@ -252,10 +274,16 @@ declare namespace API {
     id: number;
     name: string;
     key: string;
-    field_type: 'string' | 'number' | 'boolean' | 'date' | 'select' | 'multi_select';
+    type?: 'string' | 'number' | 'boolean' | 'date' | 'select' | 'multi_select' | 'multiselect';
+    field_type?: 'string' | 'number' | 'boolean' | 'date' | 'select' | 'multi_select' | 'multiselect';
     options?: string[];
+    options_json?: string;
     required: boolean;
-    entity_type: string;
+    active?: boolean;
+    resource?: string;
+    entity_type?: string;
+    created_at?: string;
+    updated_at?: string;
   }
 
   // ---- 审计日志 ----
@@ -266,7 +294,15 @@ declare namespace API {
     resource_id: string;
     actor_user_id?: number;
     principal_kind?: string;
-    details?: Record<string, any>;
+    route?: string;
+    method?: string;
+    status_code?: number;
+    request_id?: string;
+    client_ip?: string;
+    user_agent?: string;
+    request_json?: string;
+    before_json?: string;
+    after_json?: string;
     success: boolean;
     created_at: string;
   }
@@ -492,11 +528,12 @@ declare namespace API {
   interface SLAViolation {
     id: number;
     ticket_id: string | number;
-    policy_name: string;
-    metric: string;
-    target: number;
-    actual: number;
-    status: string;
+    sla_config_id?: number;
+    violation_type: string;
+    deadline?: string;
+    violated_at?: string;
+    resolved_at?: string;
+    resolved?: boolean;
     created_at: string;
   }
 

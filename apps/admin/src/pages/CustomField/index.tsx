@@ -14,7 +14,7 @@ const CustomFieldPage: React.FC = () => {
       width: 80,
     },
     {
-      title: '字段名',
+      title: '字段名称',
       dataIndex: 'name',
       search: true,
     },
@@ -24,15 +24,15 @@ const CustomFieldPage: React.FC = () => {
     },
     {
       title: '字段类型',
-      dataIndex: 'field_type',
+      dataIndex: 'type',
       width: 120,
-      render: (_, record) => <Tag>{record.field_type}</Tag>,
+      render: (_, record) => <Tag>{record.type || record.field_type}</Tag>,
     },
     {
       title: '适用资源',
-      dataIndex: 'entity_type',
+      dataIndex: 'resource',
       width: 120,
-      render: (_, record) => <Tag color="blue">{record.entity_type}</Tag>,
+      render: (_, record) => <Tag color="blue">{record.resource || record.entity_type}</Tag>,
     },
     {
       title: '必填',
@@ -41,6 +41,17 @@ const CustomFieldPage: React.FC = () => {
       render: (_, record) => (
         <Tag color={record.required ? 'red' : 'default'}>
           {record.required ? '是' : '否'}
+        </Tag>
+      ),
+    },
+    {
+      title: '启用',
+      dataIndex: 'active',
+      width: 80,
+      search: false,
+      render: (_, record) => (
+        <Tag color={record.active ? 'green' : 'default'}>
+          {record.active ? '启用' : '停用'}
         </Tag>
       ),
     },
@@ -81,13 +92,24 @@ const CustomFieldPage: React.FC = () => {
       request={async (params) => {
         try {
           const result = await listCustomFields({
-            page: params.current,
-            page_size: params.pageSize,
-            entity_type: params.entity_type,
+            resource: typeof params.resource === 'string' ? params.resource : undefined,
           });
+          const keyword = typeof params.name === 'string' ? params.name.trim().toLowerCase() : '';
+          const resource = typeof params.resource === 'string' ? params.resource.trim() : '';
+          let data = result.data;
+          if (keyword) {
+            data = data.filter((item) => item.name.toLowerCase().includes(keyword));
+          }
+          if (resource) {
+            data = data.filter((item) => (item.resource || item.entity_type) === resource);
+          }
+          const total = data.length;
+          const current = params.current || 1;
+          const pageSize = params.pageSize || 20;
+          const pageData = data.slice((current - 1) * pageSize, current * pageSize);
           return {
-            data: result.data,
-            total: result.total,
+            data: pageData,
+            total,
             success: true,
           };
         } catch (error: unknown) {

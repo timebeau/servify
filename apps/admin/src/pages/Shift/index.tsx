@@ -16,23 +16,32 @@ const ShiftPage: React.FC = () => {
     {
       title: '客服',
       dataIndex: 'agent_name',
+      width: 140,
+      search: false,
+      render: (_, record) => record.agent?.name || record.agent?.username || record.agent_name || `#${record.agent_id}`,
+    },
+    {
+      title: '班次类型',
+      dataIndex: 'shift_type',
       width: 120,
-      search: true,
+      search: false,
     },
     {
       title: '开始时间',
       dataIndex: 'start_time',
       width: 180,
+      valueType: 'dateTime',
     },
     {
       title: '结束时间',
       dataIndex: 'end_time',
       width: 180,
+      valueType: 'dateTime',
     },
     {
       title: '状态',
       dataIndex: 'status',
-      width: 80,
+      width: 100,
       render: (_, record) => (
         <Tag color={record.status === 'active' ? 'green' : 'default'}>
           {record.status === 'active' ? '进行中' : record.status}
@@ -78,7 +87,6 @@ const ShiftPage: React.FC = () => {
           const result = await listShifts({
             page: params.current,
             page_size: params.pageSize,
-            agent_id: params.agent_name ? Number(params.agent_name) : undefined,
           });
           return {
             data: result.data,

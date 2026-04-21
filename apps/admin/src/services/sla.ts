@@ -1,9 +1,11 @@
 import { request } from '@/lib/request';
+import { normalizePaginatedResponse } from './_response';
 
 const API = '/api/sla';
 
 export async function listSLAConfigs(params?: { page?: number; page_size?: number }) {
-  return request<API.PaginatedResponse<API.SLAConfig>>(`${API}/configs`, { params });
+  const payload = await request<unknown>(`${API}/configs`, { params });
+  return normalizePaginatedResponse<API.SLAConfig>(payload);
 }
 
 export async function createSLAConfig(data: Partial<API.SLAConfig>) {
@@ -23,7 +25,19 @@ export async function getSLAStats() {
 }
 
 export async function listSLAViolations(params?: { page?: number; page_size?: number; status?: string }) {
-  return request<API.PaginatedResponse<API.SLAViolation>>(`${API}/violations`, { params });
+  const payload = await request<unknown>(`${API}/violations`, {
+    params: {
+      page: params?.page,
+      page_size: params?.page_size,
+      resolved:
+        params?.status === 'resolved'
+          ? true
+          : params?.status === 'pending'
+            ? false
+            : undefined,
+    },
+  });
+  return normalizePaginatedResponse<API.SLAViolation>(payload);
 }
 
 export async function resolveSLAViolation(id: number) {

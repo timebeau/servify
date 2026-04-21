@@ -7,6 +7,19 @@ import { navigateTo } from '@/lib/navigation';
 import { listDocs, deleteDoc, createDoc, updateDoc } from '@/services/knowledge';
 import { getErrorMessage, isFormValidationError } from '@/utils/error';
 
+function normalizeTags(tags?: string | string[]) {
+  if (Array.isArray(tags)) {
+    return tags.map((tag) => tag.trim()).filter(Boolean);
+  }
+  if (typeof tags === 'string') {
+    return tags
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 const CATEGORIES = ['产品文档', '常见问题', '操作指南', 'API文档', '其他'];
 
 const KnowledgeListPage: React.FC = () => {
@@ -31,7 +44,7 @@ const KnowledgeListPage: React.FC = () => {
       title: record.title,
       category: record.category,
       content: record.content,
-      tags: record.tags?.join(', '),
+      tags: normalizeTags(record.tags).join(', '),
       is_public: record.is_public ?? false,
     });
     setModalOpen(true);
@@ -114,12 +127,6 @@ const KnowledgeListPage: React.FC = () => {
       valueEnum: Object.fromEntries(CATEGORIES.map((c) => [c, { text: c }])),
     },
     {
-      title: '状态',
-      dataIndex: 'status',
-      width: 100,
-      render: (_, record) => <Tag>{record.status}</Tag>,
-    },
-    {
       title: '公开',
       dataIndex: 'is_public',
       width: 100,
@@ -134,8 +141,7 @@ const KnowledgeListPage: React.FC = () => {
       title: '标签',
       dataIndex: 'tags',
       search: false,
-      render: (_, record) =>
-        record.tags?.map((tag) => <Tag key={tag}>{tag}</Tag>),
+      render: (_, record) => normalizeTags(record.tags).map((tag) => <Tag key={tag}>{tag}</Tag>),
     },
     {
       title: '更新时间',
@@ -177,7 +183,6 @@ const KnowledgeListPage: React.FC = () => {
               page_size: params.pageSize,
               search: params.title,
               category: params.category,
-              status: params.status,
             });
             return {
               data: result.data,

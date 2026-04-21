@@ -1,9 +1,11 @@
 import { request } from '@/lib/request';
+import { normalizePaginatedResponse } from './_response';
 
 const API = '/api/macros';
 
 export async function listMacros(params?: { page?: number; page_size?: number; category?: string }) {
-  return request<API.PaginatedResponse<API.Macro>>(API, { params });
+  const payload = await request<unknown>(API, { params });
+  return normalizePaginatedResponse<API.Macro>(payload);
 }
 
 export async function createMacro(data: Partial<API.Macro>) {

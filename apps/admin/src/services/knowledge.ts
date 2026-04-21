@@ -7,7 +7,6 @@ export async function listDocs(params: {
   page_size?: number;
   search?: string;
   category?: string;
-  status?: string;
 }) {
   return request<API.PaginatedResponse<API.KnowledgeDoc>>(API, { params });
 }

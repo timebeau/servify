@@ -19,26 +19,37 @@ const AutomationPage: React.FC = () => {
       search: true,
     },
     {
-      title: '触发条件',
-      dataIndex: 'trigger_type',
-      width: 200,
+      title: '触发事件',
+      dataIndex: 'event',
+      width: 180,
+      search: false,
     },
     {
       title: '执行动作',
       dataIndex: 'actions',
-      width: 200,
-      render: (_, record) =>
-        record.actions ? JSON.stringify(record.actions) : '-',
+      width: 240,
+      search: false,
+      render: (_, record) => {
+        if (typeof record.actions === 'string') {
+          return record.actions;
+        }
+        if (record.actions) {
+          return JSON.stringify(record.actions);
+        }
+        return '-';
+      },
     },
     {
       title: '状态',
-      dataIndex: 'enabled',
+      dataIndex: 'active',
       width: 100,
+      search: false,
       render: (_, record) => (
         <Switch
-          checked={record.enabled}
+          checked={Boolean(record.active ?? record.enabled)}
           checkedChildren="启用"
           unCheckedChildren="停用"
+          disabled
           onChange={() => {}}
         />
       ),
@@ -48,6 +59,7 @@ const AutomationPage: React.FC = () => {
       dataIndex: 'created_at',
       valueType: 'dateTime',
       width: 180,
+      search: false,
     },
     {
       title: '操作',
@@ -97,13 +109,19 @@ const AutomationPage: React.FC = () => {
       ]}
       request={async (params) => {
         try {
-          const result = await listAutomations({
-            page: params.current,
-            page_size: params.pageSize,
-          });
+          const result = await listAutomations();
+          const keyword = typeof params.name === 'string' ? params.name.trim().toLowerCase() : '';
+          let data = result.data;
+          if (keyword) {
+            data = data.filter((item) => item.name.toLowerCase().includes(keyword));
+          }
+          const total = data.length;
+          const current = params.current || 1;
+          const pageSize = params.pageSize || 20;
+          const pageData = data.slice((current - 1) * pageSize, current * pageSize);
           return {
-            data: result.data,
-            total: result.total,
+            data: pageData,
+            total,
             success: true,
           };
         } catch (error: unknown) {

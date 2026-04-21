@@ -17,7 +17,11 @@ const SLAConfigsPage: React.FC = () => {
   const openCreate = () => {
     setEditingId(null);
     form.resetFields();
-    form.setFieldsValue({ enabled: true });
+    form.setFieldsValue({
+      active: true,
+      warning_threshold: 80,
+      business_hours_only: false,
+    });
     setModalOpen(true);
   };
 
@@ -28,7 +32,10 @@ const SLAConfigsPage: React.FC = () => {
       priority: record.priority,
       first_response_time: record.first_response_time,
       resolution_time: record.resolution_time,
-      enabled: record.enabled,
+      escalation_time: record.escalation_time,
+      warning_threshold: record.warning_threshold,
+      business_hours_only: record.business_hours_only,
+      active: record.active ?? record.enabled,
     });
     setModalOpen(true);
   };
@@ -85,15 +92,17 @@ const SLAConfigsPage: React.FC = () => {
         return item ? <Tag color={item.color}>{item.text}</Tag> : record.priority;
       },
     },
-    { title: '首次响应时间(分)', dataIndex: 'first_response_time', width: 150 },
-    { title: '解决时间(分)', dataIndex: 'resolution_time', width: 140 },
+    { title: '首次响应(分)', dataIndex: 'first_response_time', width: 130, search: false },
+    { title: '解决时限(分)', dataIndex: 'resolution_time', width: 130, search: false },
+    { title: '升级时限(分)', dataIndex: 'escalation_time', width: 130, search: false },
     {
       title: '状态',
-      dataIndex: 'enabled',
-      width: 80,
+      dataIndex: 'active',
+      width: 100,
+      search: false,
       render: (_, record) => (
-        <Tag color={record.enabled ? 'green' : 'default'}>
-          {record.enabled ? '启用' : '停用'}
+        <Tag color={record.active ?? record.enabled ? 'green' : 'default'}>
+          {record.active ?? record.enabled ? '启用' : '停用'}
         </Tag>
       ),
     },
@@ -104,7 +113,9 @@ const SLAConfigsPage: React.FC = () => {
       render: (_, record) => (
         <Space>
           <a onClick={() => openEdit(record)}>编辑</a>
-          <a onClick={() => handleDelete(record.id)} style={{ color: '#ff4d4f' }}>删除</a>
+          <a onClick={() => handleDelete(record.id)} style={{ color: '#ff4d4f' }}>
+            删除
+          </a>
         </Space>
       ),
     },
@@ -144,25 +155,49 @@ const SLAConfigsPage: React.FC = () => {
       <Modal
         title={editingId ? '编辑 SLA 策略' : '新建 SLA 策略'}
         open={modalOpen}
-        onCancel={() => { setModalOpen(false); form.resetFields(); }}
+        onCancel={() => {
+          setModalOpen(false);
+          form.resetFields();
+        }}
         onOk={handleSubmit}
         confirmLoading={submitting}
         okText={editingId ? '保存' : '创建'}
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item name="name" label="策略名称" rules={[{ required: true, message: '请输入策略名称' }]}>
-            <Input placeholder="如: 标准SLA" />
+            <Input placeholder="例如：标准 SLA" />
           </Form.Item>
           <Form.Item name="priority" label="适用优先级" rules={[{ required: true, message: '请输入优先级' }]}>
-            <Input placeholder="如: high, medium, low" />
+            <Input placeholder="例如：low, normal, high, urgent" />
           </Form.Item>
-          <Form.Item name="first_response_time" label="首次响应时间(分钟)" rules={[{ required: true, message: '请输入时间' }]}>
-            <InputNumber min={1} style={{ width: '100%' }} placeholder="如: 30" />
+          <Form.Item
+            name="first_response_time"
+            label="首次响应时间(分钟)"
+            rules={[{ required: true, message: '请输入首次响应时间' }]}
+          >
+            <InputNumber min={1} style={{ width: '100%' }} placeholder="例如：30" />
           </Form.Item>
-          <Form.Item name="resolution_time" label="解决时间(分钟)" rules={[{ required: true, message: '请输入时间' }]}>
-            <InputNumber min={1} style={{ width: '100%' }} placeholder="如: 480" />
+          <Form.Item
+            name="resolution_time"
+            label="解决时间(分钟)"
+            rules={[{ required: true, message: '请输入解决时间' }]}
+          >
+            <InputNumber min={1} style={{ width: '100%' }} placeholder="例如：480" />
           </Form.Item>
-          <Form.Item name="enabled" label="启用" valuePropName="checked">
+          <Form.Item
+            name="escalation_time"
+            label="升级时间(分钟)"
+            rules={[{ required: true, message: '请输入升级时间' }]}
+          >
+            <InputNumber min={1} style={{ width: '100%' }} placeholder="例如：240" />
+          </Form.Item>
+          <Form.Item name="warning_threshold" label="预警阈值(%)">
+            <InputNumber min={50} max={100} style={{ width: '100%' }} placeholder="例如：80" />
+          </Form.Item>
+          <Form.Item name="business_hours_only" label="仅工作时段" valuePropName="checked">
+            <Switch checkedChildren="是" unCheckedChildren="否" />
+          </Form.Item>
+          <Form.Item name="active" label="启用" valuePropName="checked">
             <Switch checkedChildren="启用" unCheckedChildren="停用" />
           </Form.Item>
         </Form>

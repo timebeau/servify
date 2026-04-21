@@ -1,9 +1,11 @@
 import { request } from '@/lib/request';
+import { normalizePaginatedResponse } from './_response';
 
 const API = '/api/automations';
 
 export async function listAutomations(params?: { page?: number; page_size?: number }) {
-  return request<API.PaginatedResponse<API.Automation>>(API, { params });
+  const payload = await request<unknown>(API, { params });
+  return normalizePaginatedResponse<API.Automation>(payload);
 }
 
 export async function createAutomation(data: Partial<API.Automation>) {
