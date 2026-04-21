@@ -50,6 +50,24 @@ func (r *GormRepository) ListAssignments(ctx context.Context, sessionID string) 
 	return out, nil
 }
 
+func (r *GormRepository) ListRecentAssignments(ctx context.Context, limit int) ([]domain.TransferRecord, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	var items []models.TransferRecord
+	if err := applyRoutingScope(r.db.WithContext(ctx), ctx).
+		Order("transferred_at DESC").
+		Limit(limit).
+		Find(&items).Error; err != nil {
+		return nil, err
+	}
+	out := make([]domain.TransferRecord, 0, len(items))
+	for _, item := range items {
+		out = append(out, mapTransferRecord(item))
+	}
+	return out, nil
+}
+
 func (r *GormRepository) CreateQueueEntry(ctx context.Context, entry *domain.QueueEntry) error {
 	if entry == nil {
 		return fmt.Errorf("queue entry required")

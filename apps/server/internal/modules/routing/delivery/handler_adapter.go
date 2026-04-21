@@ -293,6 +293,14 @@ func (s *HandlerServiceAdapter) GetTransferHistory(ctx context.Context, sessionI
 	return records, nil
 }
 
+func (s *HandlerServiceAdapter) ListRecentTransferHistory(ctx context.Context, limit int) ([]models.TransferRecord, error) {
+	records, err := s.routing.ListRecentTransferHistory(ctx, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list recent transfer history: %w", err)
+	}
+	return records, nil
+}
+
 func (s *HandlerServiceAdapter) ListWaitingRecords(ctx context.Context, status string, limit int) ([]models.WaitingRecord, error) {
 	status, limit = normalizeWaitingRecordQuery(status, limit)
 	records, err := s.routing.ListWaitingRecords(ctx, status, limit)

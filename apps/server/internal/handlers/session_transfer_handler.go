@@ -132,6 +132,40 @@ func (h *SessionTransferHandler) GetTransferHistory(c *gin.Context) {
 	c.JSON(http.StatusOK, history)
 }
 
+// ListRecentTransferHistory 鑾峰彇杩戞湡杞帴鍘嗗彶
+// @Summary 鑾峰彇杩戞湡杞帴鍘嗗彶
+// @Description 鑾峰彇鏈€杩戠殑浼氳瘽杞帴璁板綍
+// @Tags 浼氳瘽杞帴
+// @Accept json
+// @Produce json
+// @Param limit query int false "杩斿洖鏉℃暟锛堥粯璁?50锛屾渶澶?200锛?"
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} ErrorResponse
+// @Router /api/session-transfer/history [get]
+func (h *SessionTransferHandler) ListRecentTransferHistory(c *gin.Context) {
+	limit := 50
+	if v := c.Query("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			limit = n
+		}
+	}
+
+	history, err := h.transferService.ListRecentTransferHistory(c.Request.Context(), limit)
+	if err != nil {
+		h.logger.Errorf("Failed to list recent transfer history: %v", err)
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error:   "Failed to list recent transfer history",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":  history,
+		"count": len(history),
+	})
+}
+
 // ListWaitingRecords 获取等待队列记录
 // @Summary 获取等待队列
 // @Description 获取等待队列记录（默认 status=waiting）
@@ -287,6 +321,7 @@ func RegisterSessionTransferRoutes(r *gin.RouterGroup, handler *SessionTransferH
 	{
 		transfer.POST("/to-human", handler.TransferToHuman)
 		transfer.POST("/to-agent", handler.TransferToAgent)
+		transfer.GET("/history", handler.ListRecentTransferHistory)
 		transfer.GET("/history/:session_id", handler.GetTransferHistory)
 		transfer.GET("/waiting", handler.ListWaitingRecords)
 		transfer.POST("/cancel", handler.CancelWaiting)

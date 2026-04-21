@@ -94,6 +94,22 @@ func TestRoutingRepositoryAppliesScopeOnCreateAndRead(t *testing.T) {
 		t.Fatalf("expected scoped assignment filter, got %+v", records)
 	}
 
+	recent, err := repo.ListRecentAssignments(ctxA, 10)
+	if err != nil {
+		t.Fatalf("list recent assignments: %v", err)
+	}
+	if len(recent) != 1 || recent[0].SessionID != "sess-a" {
+		t.Fatalf("unexpected recent assignments: %+v", recent)
+	}
+
+	recent, err = repo.ListRecentAssignments(ctxB, 10)
+	if err != nil {
+		t.Fatalf("list recent assignments with mismatched scope: %v", err)
+	}
+	if len(recent) != 0 {
+		t.Fatalf("expected scoped recent assignments filter, got %+v", recent)
+	}
+
 	got, err := repo.GetQueueEntry(ctxA, "sess-a")
 	if err != nil {
 		t.Fatalf("get queue entry: %v", err)

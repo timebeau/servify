@@ -55,6 +55,20 @@ func (s *stubRoutingRepo) ListAssignments(ctx context.Context, sessionID string)
 	return out, nil
 }
 
+func (s *stubRoutingRepo) ListRecentAssignments(ctx context.Context, limit int) ([]domain.TransferRecord, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	out := make([]domain.TransferRecord, 0, len(s.transferLog))
+	for _, item := range s.transferLog {
+		out = append(out, item)
+	}
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
+}
+
 func (s *stubRoutingRepo) CreateQueueEntry(ctx context.Context, entry *domain.QueueEntry) error {
 	if s.err != nil {
 		return s.err
@@ -260,5 +274,23 @@ func TestServiceGetTransferHistory(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].SessionID != "sess-1" || got[0].Reason != "handoff" {
 		t.Fatalf("unexpected transfer history: %+v", got)
+	}
+}
+
+func TestServiceListRecentTransferHistory(t *testing.T) {
+	repo := &stubRoutingRepo{
+		transferLog: []domain.TransferRecord{
+			{SessionID: "sess-1", Reason: "handoff"},
+			{SessionID: "sess-2", Reason: "other"},
+		},
+	}
+	svc := NewService(repo, nil)
+
+	got, err := svc.ListRecentTransferHistory(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(got) != 1 || got[0].SessionID != "sess-1" {
+		t.Fatalf("unexpected recent transfer history: %+v", got)
 	}
 }

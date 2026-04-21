@@ -1,11 +1,18 @@
 import { request } from '@/lib/request';
+import { normalizeCountedListResponse } from './_response';
 
 export async function getWaitingQueue() {
   return request<{ count: number; data: API.TransferQueueRecord[] }>('/api/session-transfer/waiting');
 }
 
-export async function getTransferHistory(sessionId: string) {
-  return request<API.SessionTransferRecord[]>(`/api/session-transfer/history/${sessionId}`);
+export async function getTransferHistory(sessionId?: string, limit = 50) {
+  const normalizedSessionId = sessionId?.trim();
+  const payload = normalizedSessionId
+    ? await request<unknown>(`/api/session-transfer/history/${normalizedSessionId}`)
+    : await request<unknown>('/api/session-transfer/history', {
+        params: { limit },
+      });
+  return normalizeCountedListResponse<API.SessionTransferRecord>(payload);
 }
 
 export async function transferToAgent(data: { session_id: string; agent_id: number; reason?: string }) {

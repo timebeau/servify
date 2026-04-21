@@ -24,6 +24,7 @@ type RuntimeService interface {
 	AddToWaitingQueue(ctx context.Context, tx *gorm.DB, sessionID string, reason string, targetSkills []string, priority string, notes string) (*models.WaitingRecord, error)
 	AssignAgent(ctx context.Context, tx *gorm.DB, cmd AssignAgentCommand) (*models.TransferRecord, error)
 	GetTransferHistory(ctx context.Context, sessionID string) ([]models.TransferRecord, error)
+	ListRecentTransferHistory(ctx context.Context, limit int) ([]models.TransferRecord, error)
 	ListWaitingRecords(ctx context.Context, status string, limit int) ([]models.WaitingRecord, error)
 	GetWaitingRecord(ctx context.Context, sessionID string) (*models.WaitingRecord, error)
 	CancelWaiting(ctx context.Context, tx *gorm.DB, sessionID string, reason string) (*models.WaitingRecord, error)

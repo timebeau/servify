@@ -10,6 +10,7 @@ import (
 type RoutingRepository interface {
 	CreateAssignment(ctx context.Context, assignment *domain.Assignment) error
 	ListAssignments(ctx context.Context, sessionID string) ([]domain.TransferRecord, error)
+	ListRecentAssignments(ctx context.Context, limit int) ([]domain.TransferRecord, error)
 	CreateQueueEntry(ctx context.Context, entry *domain.QueueEntry) error
 	GetQueueEntry(ctx context.Context, sessionID string) (*domain.QueueEntry, error)
 	ListQueueEntries(ctx context.Context, status string, limit int) ([]domain.QueueEntry, error)

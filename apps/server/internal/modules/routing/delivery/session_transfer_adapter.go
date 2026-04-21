@@ -90,6 +90,18 @@ func (a *SessionTransferAdapter) GetTransferHistory(ctx context.Context, session
 	return out, nil
 }
 
+func (a *SessionTransferAdapter) ListRecentTransferHistory(ctx context.Context, limit int) ([]models.TransferRecord, error) {
+	items, err := a.service.ListRecentTransferHistory(ctx, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]models.TransferRecord, 0, len(items))
+	for _, item := range items {
+		out = append(out, mapTransferRecord(item))
+	}
+	return out, nil
+}
+
 func (a *SessionTransferAdapter) ListWaitingRecords(ctx context.Context, status string, limit int) ([]models.WaitingRecord, error) {
 	items, err := a.service.ListWaitingEntries(ctx, status, limit)
 	if err != nil {

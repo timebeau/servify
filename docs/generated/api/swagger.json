@@ -2141,6 +2141,44 @@
                 }
             }
         },
+        "/api/session-transfer/history": {
+            "get": {
+                "description": "鑾峰彇鏈€杩戠殑浼氳瘽杞帴璁板綍",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "浼氳瘽杞帴"
+                ],
+                "summary": "鑾峰彇杩戞湡杞帴鍘嗗彶",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "杩斿洖鏉℃暟锛堥粯璁?50锛屾渶澶?200锛?",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/session-transfer/history/{session_id}": {
             "get": {
                 "description": "获取会话的转接历史记录",

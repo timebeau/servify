@@ -2805,6 +2805,31 @@ paths:
       summary: 检查自动转接
       tags:
       - 会话转接
+  /api/session-transfer/history:
+    get:
+      consumes:
+      - application/json
+      description: 鑾峰彇鏈€杩戠殑浼氳瘽杞帴璁板綍
+      parameters:
+      - description: 杩斿洖鏉℃暟锛堥粯璁?50锛屾渶澶?200锛?
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: 鑾峰彇杩戞湡杞帴鍘嗗彶
+      tags:
+      - 浼氳瘽杞帴
   /api/session-transfer/history/{session_id}:
     get:
       consumes:

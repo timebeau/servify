@@ -214,6 +214,60 @@ func TestSessionTransferHandler_GetTransferHistory(t *testing.T) {
 	}
 }
 
+func TestSessionTransferHandler_ListRecentTransferHistory(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := newTestDBForSessionTransferHandler(t)
+	logger := logrus.New()
+	logger.SetLevel(logrus.WarnLevel)
+
+	if err := db.Create(&models.User{ID: 1, Username: "u1", Name: "u1", Email: "u1@example.com", Role: "customer"}).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	now := time.Now()
+	if err := db.Create(&models.Session{ID: "s1", UserID: 1, Status: "active", Platform: "web", StartedAt: now, CreatedAt: now, UpdatedAt: now}).Error; err != nil {
+		t.Fatalf("seed session: %v", err)
+	}
+	if err := db.Create(&models.TransferRecord{
+		SessionID:     "s1",
+		Reason:        "manual_transfer",
+		TransferredAt: now,
+		CreatedAt:     now,
+	}).Error; err != nil {
+		t.Fatalf("seed transfer record: %v", err)
+	}
+
+	agentSvc := services.NewAgentService(db, logger)
+	transferSvc := newRoutingTransferHandlerService(db, logger, stubAIForTransferHandler{}, agentSvc)
+	h := NewSessionTransferHandler(transferSvc, logger)
+
+	r := gin.New()
+	r.GET("/session-transfer/history", h.ListRecentTransferHistory)
+
+	req := httptest.NewRequest("GET", "/session-transfer/history?limit=10", nil)
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d, body: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Count int                     `json:"count"`
+		Data  []models.TransferRecord `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v body=%s", err, w.Body.String())
+	}
+	if resp.Count < 1 || len(resp.Data) < 1 {
+		t.Fatalf("expected at least one record, got %+v", resp)
+	}
+	if resp.Data[0].SessionID != "s1" {
+		t.Fatalf("unexpected session id: %+v", resp.Data[0])
+	}
+}
+
 func TestSessionTransferHandler_ProcessWaitingQueue(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

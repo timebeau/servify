@@ -106,6 +106,14 @@ func TestSessionTransferAdapter_AssignAgent_And_History(t *testing.T) {
 	if history[0].Reason != "manual_transfer" || history[0].Notes != "vip escalation" {
 		t.Fatalf("unexpected history item: %#v", history[0])
 	}
+
+	recent, err := adapter.ListRecentTransferHistory(context.Background(), 10)
+	if err != nil {
+		t.Fatalf("ListRecentTransferHistory: %v", err)
+	}
+	if len(recent) != 1 || recent[0].SessionID != "sess-assign" {
+		t.Fatalf("unexpected recent history: %#v", recent)
+	}
 }
 
 func TestSessionTransferAdapter_UsesTransactionScopedRepository(t *testing.T) {

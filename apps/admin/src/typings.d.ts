@@ -518,20 +518,28 @@ declare namespace API {
   }
 
   interface TransferQueueRecord {
-    id: string;
-    customer?: string;
-    channel?: string;
-    wait_time?: number;
+    id?: string | number;
+    session_id: string;
+    reason?: string;
+    target_skills?: string;
     priority?: string;
+    notes?: string;
+    status?: string;
+    queued_at?: string;
+    assigned_at?: string;
+    assigned_to?: number;
     created_at?: string;
   }
 
   interface SessionTransferRecord {
     id: string | number;
-    ticket_id?: string | number;
-    from_agent?: string;
-    to_agent?: string;
+    session_id: string;
+    from_agent_id?: number;
+    to_agent_id?: number;
     reason?: string;
+    notes?: string;
+    session_summary?: string;
+    transferred_at?: string;
     created_at?: string;
   }
 
