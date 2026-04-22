@@ -12,7 +12,14 @@ export async function getSatisfactionStats() {
   return request<API.SatisfactionStats>(`${API}/stats`);
 }
 
-export async function listSurveys(params?: { page?: number; page_size?: number }) {
+export async function listSurveys(params?: {
+  page?: number;
+  page_size?: number;
+  ticket_id?: number;
+  customer_id?: number;
+  status?: string[];
+  channel?: string[];
+}) {
   const payload = await request<unknown>(`${API}/surveys`, { params });
   return normalizePaginatedResponse<API.SatisfactionSurvey>(payload);
 }

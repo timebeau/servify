@@ -1,7 +1,7 @@
 import React from 'react';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
-import { Tag } from 'antd';
+import { Space, Tag } from 'antd';
 import { getLeaderboard } from '@/services/gamification';
 
 const GamificationPage: React.FC = () => {
@@ -29,6 +29,12 @@ const GamificationPage: React.FC = () => {
       title: '客服',
       dataIndex: 'agent',
       width: 120,
+    },
+    {
+      title: '部门',
+      dataIndex: 'department',
+      width: 120,
+      search: false,
     },
     {
       title: '积分',
@@ -66,6 +72,24 @@ const GamificationPage: React.FC = () => {
       dataIndex: 'avg_response_time',
       width: 160,
       sorter: true,
+      search: false,
+    },
+    {
+      title: '徽章',
+      dataIndex: 'badges',
+      search: false,
+      render: (_, record) =>
+        record.badges && record.badges.length > 0 ? (
+          <Space wrap>
+            {record.badges.map((badge) => (
+              <Tag key={badge.id} color="blue">
+                {badge.name}
+              </Tag>
+            ))}
+          </Space>
+        ) : (
+          '-'
+        ),
     },
   ];
 
@@ -77,12 +101,11 @@ const GamificationPage: React.FC = () => {
       request={async (params) => {
         try {
           const result = await getLeaderboard({
-            page: params.current,
-            page_size: params.pageSize,
+            limit: params.pageSize,
           });
           return {
             data: result.data,
-            total: result.total,
+            total: result.total || result.data.length,
             success: true,
           };
         } catch (error) {

@@ -42,14 +42,23 @@ function normalizeLeaderboardRecord(entry: LeaderboardEntry, index: number): API
     id,
     rank: toFiniteNumber(entry.rank, index + 1),
     agent,
+    agent_id: entry.agent_id,
+    department: typeof entry.department === 'string' ? entry.department : undefined,
     score: toFiniteNumber(entry.score),
     resolved_tickets: toFiniteNumber(entry.resolved_tickets),
     avg_rating: toFiniteNumber(entry.avg_rating ?? entry.csat_avg),
     avg_response_time: toFiniteNumber(entry.avg_response_time),
+    badges: Array.isArray(entry.badges) ? entry.badges : undefined,
   };
 }
 
-export async function getLeaderboard(params?: { page?: number; page_size?: number; period?: string }) {
+export async function getLeaderboard(params?: {
+  limit?: number;
+  days?: number;
+  start_date?: string;
+  end_date?: string;
+  department?: string;
+}) {
   const payload = await request<unknown>('/api/gamification/leaderboard', { params });
   const normalized = normalizePaginatedResponse<LeaderboardEntry>(payload, ['entries', 'data', 'items']);
 

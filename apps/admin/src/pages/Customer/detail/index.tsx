@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { ProDescriptions } from '@ant-design/pro-components';
-import { ProCard } from '@ant-design/pro-components';
-import { Tag, Button, Space, Spin, List, message, Modal, Form, Input } from 'antd';
-import { goBack, useDetailParams } from '@/lib/navigation';
-import { CUSTOMER_SOURCE_MAP } from '@/utils/constants';
+import React, { useEffect, useState } from 'react';
+import { ProCard, ProDescriptions } from '@ant-design/pro-components';
+import { Button, Form, Input, List, Modal, Space, Spin, Tag, message } from 'antd';
 import { getCustomer, getCustomerActivity, updateCustomer } from '@/services/customer';
+import { goBack, navigateTo, useDetailParams } from '@/lib/navigation';
+import { CUSTOMER_SOURCE_MAP } from '@/utils/constants';
+import { getErrorMessage, isFormValidationError } from '@/utils/error';
 
 type CustomerActivityItem = {
   key: string;
@@ -23,7 +23,9 @@ const CustomerDetailPage: React.FC = () => {
 
   useEffect(() => {
     const fetchCustomer = async () => {
-      if (!id) return;
+      if (!id) {
+        return;
+      }
       setLoading(true);
       try {
         const result = await getCustomer(Number(id));
@@ -36,12 +38,15 @@ const CustomerDetailPage: React.FC = () => {
         setLoading(false);
       }
     };
-    fetchCustomer();
+
+    void fetchCustomer();
   }, [id]);
 
   useEffect(() => {
     const fetchActivity = async () => {
-      if (!id) return;
+      if (!id) {
+        return;
+      }
       try {
         const result = await getCustomerActivity(Number(id));
         const mergedActivities: CustomerActivityItem[] = [
@@ -66,8 +71,40 @@ const CustomerDetailPage: React.FC = () => {
         console.error('获取活动记录失败:', error);
       }
     };
-    fetchActivity();
+
+    void fetchActivity();
   }, [id]);
+
+  const openEditModal = () => {
+    form.setFieldsValue({
+      name: customer?.name,
+      email: customer?.email,
+      phone: customer?.phone,
+      company: customer?.company,
+    });
+    setEditOpen(true);
+  };
+
+  const handleEdit = async () => {
+    if (!id) {
+      return;
+    }
+    try {
+      const values = await form.validateFields();
+      setSaving(true);
+      const updated = await updateCustomer(Number(id), values);
+      setCustomer(updated);
+      setEditOpen(false);
+      message.success('客户信息已更新');
+    } catch (error: unknown) {
+      if (isFormValidationError(error)) {
+        return;
+      }
+      message.error(getErrorMessage(error, '更新失败'));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -91,39 +128,6 @@ const CustomerDetailPage: React.FC = () => {
 
   const sourceText = customer.source ? CUSTOMER_SOURCE_MAP[customer.source] : undefined;
 
-  const handleEdit = async () => {
-    try {
-      const values = await form.validateFields();
-      setSaving(true);
-      await updateCustomer(Number(id), values);
-      message.success('客户信息已更新');
-      setEditOpen(false);
-      const result = await getCustomer(Number(id));
-      if (result) setCustomer(result);
-    } catch (error) {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'errorFields' in error
-      ) {
-        return;
-      }
-      message.error('更新失败');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const openEditModal = () => {
-    form.setFieldsValue({
-      name: customer?.name,
-      email: customer?.email,
-      phone: customer?.phone,
-      company: customer?.company,
-    });
-    setEditOpen(true);
-  };
-
   return (
     <div>
       <ProCard
@@ -132,7 +136,12 @@ const CustomerDetailPage: React.FC = () => {
           <Space>
             <Button onClick={goBack}>返回</Button>
             <Button onClick={openEditModal}>编辑</Button>
-            <Button type="primary">新建工单</Button>
+            <Button
+              type="primary"
+              onClick={() => navigateTo(`/ticket/list?create=1&customer_id=${customer.id}`)}
+            >
+              新建工单
+            </Button>
           </Space>
         }
       >
@@ -148,8 +157,7 @@ const CustomerDetailPage: React.FC = () => {
             {
               title: '来源',
               dataIndex: 'source',
-              render: () =>
-                sourceText ? <Tag>{sourceText}</Tag> : customer.source,
+              render: () => (sourceText ? <Tag>{sourceText}</Tag> : customer.source || '-'),
             },
             { title: '创建时间', dataIndex: 'created_at' },
           ]}
@@ -166,9 +174,7 @@ const CustomerDetailPage: React.FC = () => {
             ))}
           </Space>
         ) : (
-          <div style={{ textAlign: 'center', padding: 20, color: '#999' }}>
-            暂无标签
-          </div>
+          <div style={{ textAlign: 'center', padding: 20, color: '#999' }}>暂无标签</div>
         )}
       </ProCard>
 
@@ -178,10 +184,7 @@ const CustomerDetailPage: React.FC = () => {
           locale={{ emptyText: '暂无活动记录' }}
           renderItem={(item) => (
             <List.Item>
-              <List.Item.Meta
-                title={item.title}
-                description={item.description}
-              />
+              <List.Item.Meta title={item.title} description={item.description} />
             </List.Item>
           )}
         />

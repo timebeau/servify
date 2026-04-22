@@ -260,13 +260,17 @@ declare namespace API {
   interface SatisfactionSurvey {
     id: number;
     ticket_id: number;
-    customer?: string;
-    agent?: string;
-    rating: number;
-    comment?: string;
-    status?: string;
+    customer_id?: number;
+    agent_id?: number;
     channel?: string;
+    status?: string;
+    survey_token?: string;
+    sent_at?: string;
+    expires_at?: string;
+    completed_at?: string;
+    satisfaction_id?: number;
     created_at: string;
+    updated_at?: string;
   }
 
   // ---- 自定义字段 ----
@@ -598,9 +602,16 @@ declare namespace API {
     id: string | number;
     rank: number;
     agent: string;
+    agent_id?: number | string;
+    department?: string;
     score: number;
     resolved_tickets: number;
     avg_rating: number;
     avg_response_time: number;
+    badges?: Array<{
+      id: string;
+      name: string;
+      description: string;
+    }>;
   }
 }

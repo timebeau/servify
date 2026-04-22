@@ -14,15 +14,24 @@ function buildQueryString(params?: object) {
   }
 
   const search = new URLSearchParams();
-  Object.entries(params as Record<string, unknown>).forEach(([key, value]) => {
+  const appendValue = (key: string, value: unknown) => {
     if (
       value !== undefined &&
       value !== null &&
       value !== '' &&
       (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')
     ) {
-      search.set(key, String(value));
+      search.append(key, String(value));
     }
+  };
+
+  Object.entries(params as Record<string, unknown>).forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      value.forEach((item) => appendValue(key, item));
+      return;
+    }
+
+    appendValue(key, value);
   });
 
   const query = search.toString();

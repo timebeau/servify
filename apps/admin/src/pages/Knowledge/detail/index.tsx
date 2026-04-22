@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { ProDescriptions } from '@ant-design/pro-components';
 import { ProCard } from '@ant-design/pro-components';
-import { Button, Space, Spin, Tag } from 'antd';
+import { Button, Space, Spin, Tag, Modal, Form, Input, Select, Switch, message } from 'antd';
 import { goBack, useDetailParams } from '@/lib/navigation';
-import { getDoc } from '@/services/knowledge';
+import { getDoc, updateDoc } from '@/services/knowledge';
+import { getErrorMessage, isFormValidationError } from '@/utils/error';
+
+const CATEGORIES = ['产品文档', '常见问题', '操作指南', 'API文档', '其他'];
 
 function normalizeTags(tags?: string | string[]) {
   if (Array.isArray(tags)) {
@@ -22,6 +25,10 @@ const KnowledgeDetailPage: React.FC = () => {
   const { id } = useDetailParams();
   const [loading, setLoading] = useState(true);
   const [doc, setDoc] = useState<API.KnowledgeDoc | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [form] = Form.useForm();
 
   useEffect(() => {
     const fetchDoc = async () => {
@@ -40,6 +47,57 @@ const KnowledgeDetailPage: React.FC = () => {
     };
     fetchDoc();
   }, [id]);
+
+  const openEditModal = () => {
+    if (!doc) return;
+    form.setFieldsValue({
+      title: doc.title,
+      category: doc.category,
+      content: doc.content,
+      tags: normalizeTags(doc.tags).join(', '),
+      is_public: doc.is_public ?? false,
+    });
+    setModalOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!id) return;
+    try {
+      const values = await form.validateFields();
+      setSubmitting(true);
+      const updated = await updateDoc(Number(id), {
+        title: values.title,
+        category: values.category,
+        content: values.content,
+        tags: values.tags
+          ? values.tags.split(',').map((tag: string) => tag.trim()).filter(Boolean)
+          : [],
+        is_public: values.is_public ?? false,
+      });
+      setDoc(updated);
+      setModalOpen(false);
+      message.success('文档已更新');
+    } catch (error: unknown) {
+      if (isFormValidationError(error)) return;
+      message.error(getErrorMessage(error, '更新失败'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handlePublish = async () => {
+    if (!id || !doc || doc.is_public) return;
+    try {
+      setPublishing(true);
+      const updated = await updateDoc(Number(id), { is_public: true });
+      setDoc(updated);
+      message.success('文档已发布');
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '发布失败'));
+    } finally {
+      setPublishing(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -68,8 +126,10 @@ const KnowledgeDetailPage: React.FC = () => {
         extra={
           <Space>
             <Button onClick={goBack}>返回</Button>
-            <Button>编辑</Button>
-            <Button type="primary">发布</Button>
+            <Button onClick={openEditModal}>编辑</Button>
+            <Button type="primary" onClick={handlePublish} loading={publishing} disabled={doc.is_public}>
+              {doc.is_public ? '已公开' : '发布'}
+            </Button>
           </Space>
         }
       >
@@ -114,6 +174,37 @@ const KnowledgeDetailPage: React.FC = () => {
           </div>
         )}
       </ProCard>
+
+      <Modal
+        title="编辑文档"
+        open={modalOpen}
+        onCancel={() => {
+          setModalOpen(false);
+          form.resetFields();
+        }}
+        onOk={handleSave}
+        confirmLoading={submitting}
+        okText="保存"
+        width={720}
+      >
+        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item name="title" label="标题" rules={[{ required: true, message: '请输入标题' }]}>
+            <Input placeholder="文档标题" />
+          </Form.Item>
+          <Form.Item name="category" label="分类">
+            <Select allowClear options={CATEGORIES.map((item) => ({ label: item, value: item }))} />
+          </Form.Item>
+          <Form.Item name="tags" label="标签（逗号分隔）">
+            <Input placeholder="例如：入门, API, 常见问题" />
+          </Form.Item>
+          <Form.Item name="is_public" label="公开" valuePropName="checked">
+            <Switch checkedChildren="公开" unCheckedChildren="内部" />
+          </Form.Item>
+          <Form.Item name="content" label="内容" rules={[{ required: true, message: '请输入内容' }]}>
+            <Input.TextArea rows={10} placeholder="文档内容" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

@@ -1,10 +1,23 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { ProTable } from '@ant-design/pro-components';
-import type { ProColumns } from '@ant-design/pro-components';
-import { Space, Tag } from 'antd';
-import { listIntegrations } from '@/services/appMarket';
+import type { ProColumns, ActionType } from '@ant-design/pro-components';
+import { Space, Tag, message } from 'antd';
+import { listIntegrations, updateIntegration } from '@/services/appMarket';
+import { getErrorMessage } from '@/utils/error';
 
 const AppMarketPage: React.FC = () => {
+  const actionRef = useRef<ActionType>();
+
+  const handleToggleEnabled = async (record: API.Integration, enabled: boolean) => {
+    try {
+      await updateIntegration(record.id, { enabled });
+      message.success(enabled ? '应用已启用' : '应用已停用');
+      actionRef.current?.reload();
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, enabled ? '启用失败' : '停用失败'));
+    }
+  };
+
   const columns: ProColumns<API.Integration>[] = [
     {
       title: 'ID',
@@ -46,10 +59,17 @@ const AppMarketPage: React.FC = () => {
     {
       title: '操作',
       valueType: 'option',
-      width: 100,
+      width: 160,
       render: (_, record) => (
         <Space>
-          {record.enabled ? <a>配置</a> : <a>启用</a>}
+          {record.enabled ? (
+            <a onClick={() => handleToggleEnabled(record, false)}>停用</a>
+          ) : (
+            <a onClick={() => handleToggleEnabled(record, true)}>启用</a>
+          )}
+          {record.enabled && record.iframe_url ? (
+            <a onClick={() => window.open(record.iframe_url, '_blank', 'noopener,noreferrer')}>配置</a>
+          ) : null}
         </Space>
       ),
     },
@@ -59,6 +79,7 @@ const AppMarketPage: React.FC = () => {
     <ProTable<API.Integration>
       headerTitle="应用市场"
       rowKey="id"
+      actionRef={actionRef}
       columns={columns}
       request={async (params) => {
         try {
