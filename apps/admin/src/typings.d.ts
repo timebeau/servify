@@ -421,10 +421,18 @@ declare namespace API {
   interface Integration {
     id: number;
     name: string;
-    type: string;
-    config?: Record<string, any>;
+    slug?: string;
+    vendor?: string;
+    category?: string;
+    summary?: string;
+    icon_url?: string;
+    capabilities?: string[];
+    config_schema?: Record<string, any>;
+    iframe_url?: string;
     enabled: boolean;
+    last_sync_status?: string;
     created_at: string;
+    updated_at?: string;
   }
 
   // ---- 语音 ----
@@ -432,8 +440,7 @@ declare namespace API {
     id: string;
     type: string;
     status: string;
-    started_at: string;
-    duration?: number;
+    created_at: string;
   }
 
   interface VoiceRecording {

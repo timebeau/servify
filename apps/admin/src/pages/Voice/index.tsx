@@ -26,19 +26,33 @@ const VoicePage: React.FC = () => {
     },
   ];
 
-  const transcriptColumns: ProColumns<any>[] = [
-    { title: 'ID', dataIndex: 'id', width: 80 },
-    { title: '协议ID', dataIndex: 'call_id', width: 120 },
+  const transcriptColumns: ProColumns<API.VoiceTranscript>[] = [
+    { title: '协议ID', dataIndex: 'call_id', width: 120, search: true },
     {
       title: '内容',
       dataIndex: 'content',
       ellipsis: true,
+      search: false,
+    },
+    {
+      title: '语言',
+      dataIndex: 'language',
+      width: 120,
+      search: false,
+    },
+    {
+      title: '状态',
+      dataIndex: 'finalized',
+      width: 100,
+      search: false,
+      render: (_, record) => <Tag color={record.finalized ? 'green' : 'default'}>{record.finalized ? '已定稿' : '处理中'}</Tag>,
     },
     {
       title: '创建时间',
       dataIndex: 'appended_at',
       valueType: 'dateTime',
       width: 180,
+      search: false,
     },
   ];
 
@@ -68,14 +82,15 @@ const VoicePage: React.FC = () => {
         pagination={{ defaultPageSize: 10 }}
       />
 
-      <ProTable<any>
+      <ProTable<API.VoiceTranscript>
         headerTitle="语音转写记录"
-        rowKey="id"
+        rowKey={(record) => `${record.call_id}-${record.appended_at}-${record.content}`}
         columns={transcriptColumns}
         style={{ marginTop: 16 }}
         request={async (params) => {
           try {
             const result = await listTranscripts({
+              call_id: typeof params.call_id === 'string' ? params.call_id : undefined,
               page: params.current,
               page_size: params.pageSize,
             });

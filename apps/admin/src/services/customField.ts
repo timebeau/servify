@@ -3,10 +3,16 @@ import { normalizePaginatedResponse } from './_response';
 
 const API = '/api/custom-fields';
 
-export async function listCustomFields(params?: { page?: number; page_size?: number; entity_type?: string }) {
+export async function listCustomFields(params?: {
+  page?: number;
+  page_size?: number;
+  resource?: string;
+  active?: boolean;
+}) {
   const payload = await request<unknown>(API, {
     params: {
-      resource: params?.entity_type,
+      resource: params?.resource,
+      active: params?.active,
     },
   });
   return normalizePaginatedResponse<API.CustomField>(payload);

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { ProTable } from '@ant-design/pro-components';
-import type { ProColumns } from '@ant-design/pro-components';
+import type { ProColumns, ActionType } from '@ant-design/pro-components';
 import { Tag, message } from 'antd';
 import { listSLAViolations, resolveSLAViolation } from '@/services/sla';
 import { getErrorMessage } from '@/utils/error';
@@ -12,6 +12,7 @@ const VIOLATION_TYPE_LABELS: Record<string, string> = {
 };
 
 const SLAViolationsPage: React.FC = () => {
+  const actionRef = useRef<ActionType>();
   const columns: ProColumns<API.SLAViolation>[] = [
     {
       title: 'ID',
@@ -70,6 +71,7 @@ const SLAViolationsPage: React.FC = () => {
               try {
                 await resolveSLAViolation(record.id);
                 message.success('违规已处理');
+                actionRef.current?.reload();
               } catch (error: unknown) {
                 message.error(getErrorMessage(error, '处理失败'));
               }
@@ -85,6 +87,7 @@ const SLAViolationsPage: React.FC = () => {
     <ProTable<API.SLAViolation>
       headerTitle="SLA 违规记录"
       rowKey="id"
+      actionRef={actionRef}
       columns={columns}
       request={async (params) => {
         try {

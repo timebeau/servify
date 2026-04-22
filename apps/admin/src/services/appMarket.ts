@@ -3,7 +3,13 @@ import { normalizePaginatedResponse } from './_response';
 
 const API = '/api/apps/integrations';
 
-export async function listIntegrations(params?: { page?: number; page_size?: number; type?: string }) {
+export async function listIntegrations(params?: {
+  page?: number;
+  page_size?: number;
+  search?: string;
+  category?: string;
+  status?: string[];
+}) {
   const payload = await request<unknown>(API, { params });
   return normalizePaginatedResponse<API.Integration>(payload);
 }

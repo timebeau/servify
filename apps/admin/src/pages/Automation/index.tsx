@@ -1,12 +1,14 @@
 import React from 'react';
 import { ProTable } from '@ant-design/pro-components';
-import type { ProColumns } from '@ant-design/pro-components';
+import type { ProColumns, ActionType } from '@ant-design/pro-components';
 import { Button, Space, Switch, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
+import { useRef } from 'react';
 import { listAutomations, deleteAutomation, runAutomation } from '@/services/automation';
 import { getErrorMessage } from '@/utils/error';
 
 const AutomationPage: React.FC = () => {
+  const actionRef = useRef<ActionType>();
   const columns: ProColumns<API.Automation>[] = [
     {
       title: 'ID',
@@ -85,6 +87,7 @@ const AutomationPage: React.FC = () => {
               try {
                 await deleteAutomation(record.id);
                 message.success('规则已删除');
+                actionRef.current?.reload();
               } catch (error: unknown) {
                 message.error(getErrorMessage(error, '删除失败'));
               }
@@ -101,6 +104,7 @@ const AutomationPage: React.FC = () => {
     <ProTable<API.Automation>
       headerTitle="自动化规则"
       rowKey="id"
+      actionRef={actionRef}
       columns={columns}
       toolBarRender={() => [
         <Button key="create" type="primary" icon={<PlusOutlined />}>

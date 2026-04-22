@@ -1,12 +1,14 @@
 import React from 'react';
 import { ProTable } from '@ant-design/pro-components';
-import type { ProColumns } from '@ant-design/pro-components';
+import type { ProColumns, ActionType } from '@ant-design/pro-components';
 import { Button, Space, Tag, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
+import { useRef } from 'react';
 import { listCustomFields, deleteCustomField } from '@/services/customField';
 import { getErrorMessage } from '@/utils/error';
 
 const CustomFieldPage: React.FC = () => {
+  const actionRef = useRef<ActionType>();
   const columns: ProColumns<API.CustomField>[] = [
     {
       title: 'ID',
@@ -26,6 +28,7 @@ const CustomFieldPage: React.FC = () => {
       title: '字段类型',
       dataIndex: 'type',
       width: 120,
+      search: false,
       render: (_, record) => <Tag>{record.type || record.field_type}</Tag>,
     },
     {
@@ -67,6 +70,7 @@ const CustomFieldPage: React.FC = () => {
               try {
                 await deleteCustomField(record.id);
                 message.success('字段已删除');
+                actionRef.current?.reload();
               } catch (error: unknown) {
                 message.error(getErrorMessage(error, '删除失败'));
               }
@@ -83,6 +87,7 @@ const CustomFieldPage: React.FC = () => {
     <ProTable<API.CustomField>
       headerTitle="自定义字段"
       rowKey="id"
+      actionRef={actionRef}
       columns={columns}
       toolBarRender={() => [
         <Button key="create" type="primary" icon={<PlusOutlined />}>
@@ -93,6 +98,7 @@ const CustomFieldPage: React.FC = () => {
         try {
           const result = await listCustomFields({
             resource: typeof params.resource === 'string' ? params.resource : undefined,
+            active: false,
           });
           const keyword = typeof params.name === 'string' ? params.name.trim().toLowerCase() : '';
           const resource = typeof params.resource === 'string' ? params.resource.trim() : '';

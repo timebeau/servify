@@ -2,7 +2,17 @@ import { request } from '@/lib/request';
 
 const API = '/api/shifts';
 
-export async function listShifts(params?: { page?: number; page_size?: number; agent_id?: number }) {
+export async function listShifts(params?: {
+  page?: number;
+  page_size?: number;
+  agent_id?: number;
+  shift_type?: string[];
+  status?: string[];
+  date_from?: string;
+  date_to?: string;
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
+}) {
   return request<API.PaginatedResponse<API.Shift>>(API, { params });
 }
 

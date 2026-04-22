@@ -1,11 +1,13 @@
 import React from 'react';
 import { ProTable } from '@ant-design/pro-components';
-import type { ProColumns } from '@ant-design/pro-components';
+import type { ProColumns, ActionType } from '@ant-design/pro-components';
 import { Button, Space, Tag, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
+import { useRef } from 'react';
 import { listMacros, deleteMacro } from '@/services/macro';
 
 const MacroPage: React.FC = () => {
+  const actionRef = useRef<ActionType>();
   const columns: ProColumns<API.Macro>[] = [
     {
       title: 'ID',
@@ -60,6 +62,7 @@ const MacroPage: React.FC = () => {
               try {
                 await deleteMacro(record.id);
                 message.success('宏已删除');
+                actionRef.current?.reload();
               } catch (error) {
                 message.error('删除失败');
               }
@@ -76,6 +79,7 @@ const MacroPage: React.FC = () => {
     <ProTable<API.Macro>
       headerTitle="宏模板"
       rowKey="id"
+      actionRef={actionRef}
       columns={columns}
       toolBarRender={() => [
         <Button key="create" type="primary" icon={<PlusOutlined />}>
