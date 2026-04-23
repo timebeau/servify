@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./docs/.vuepress/public/icon.png" width="80" alt="Servify Logo">
+  <img src="./docs/.vitepress/public/icon.png" width="80" alt="Servify Logo">
 </p>
 
 <div align="center">
