@@ -32,14 +32,14 @@ const appendixPages = [
   '/MERMAID_COMPATIBILITY',
 ];
 
-export const docsNavbar = [
+export const docsNav = [
   { text: '首页', link: '/' },
   { text: '产品', link: '/remote-assistance' },
   { text: '架构', link: '/ARCHITECTURE' },
   { text: '部署', link: '/deployment' },
   {
     text: '运行与安全',
-    children: [
+    items: [
       { text: '安全基线', link: '/security-baseline-operations' },
       { text: '配置作用域', link: '/configuration-scopes' },
       { text: 'Token 生命周期', link: '/token-lifecycle-and-key-rotation' },
@@ -48,7 +48,7 @@ export const docsNavbar = [
   },
   {
     text: '研发附录',
-    children: [
+    items: [
       { text: '实施计划', link: '/implementation/' },
       { text: 'WeKnora 集成', link: '/WEKNORA_INTEGRATION' },
       { text: 'CI / Runner', link: '/CI_SELF_HOSTED' },
@@ -63,21 +63,21 @@ export const docsSidebar = {
   '/implementation/': [
     {
       text: '实施计划',
-      children: ['/implementation/', ...implementationPages],
+      items: ['/implementation/', ...implementationPages],
     },
   ],
   '/': [
     {
       text: '产品与上手',
-      children: ['/', ...productPages],
+      items: ['/', ...productPages],
     },
     {
       text: '运行与安全',
-      children: operationsPages,
+      items: operationsPages,
     },
     {
       text: '研发附录',
-      children: [
+      items: [
         '/implementation/',
         ...implementationPages,
         ...appendixPages.filter((page) => page !== '/ARCHITECTURE'),
