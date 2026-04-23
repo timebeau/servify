@@ -39,7 +39,7 @@ jobs:
         timeout-minutes: 3
         uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: docs/package-lock.json
 
@@ -72,7 +72,7 @@ jobs:
         timeout-minutes: 3
         uses: actions/upload-pages-artifact@v4
         with:
-          path: docs/.vuepress/dist
+          path: docs/.vitepress/dist
 
       - name: Deploy to GitHub Pages
         timeout-minutes: 3

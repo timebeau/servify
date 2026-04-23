@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "description": "Servify product documentation site powered by VitePress",
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "dev": "vitepress dev . --host 0.0.0.0 --port 8082",

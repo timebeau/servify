@@ -146,7 +146,7 @@ jobs:
         timeout-minutes: 3
         uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: sdk/package-lock.json
 
@@ -216,7 +216,7 @@ jobs:
         timeout-minutes: 3
         uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: docs/package-lock.json
 
@@ -327,7 +327,7 @@ jobs:
         timeout-minutes: 3
         uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: sdk/package-lock.json
 
@@ -357,7 +357,7 @@ jobs:
         timeout-minutes: 3
         uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: '24'
 
       - name: Setup pnpm
         timeout-minutes: 3
