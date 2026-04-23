@@ -1,11 +1,17 @@
 import { defineConfig } from 'vitepress';
+import { withMermaid } from 'vitepress-plugin-mermaid';
 import { docsNav, docsSidebar } from './site-structure';
 
-export default defineConfig({
+const docsBase =
+  process.env.SERVIFY_DOCS_BASE ??
+  (process.env.GITHUB_ACTIONS === 'true' ? '/servify/' : '/');
+
+const config = defineConfig({
+  srcDir: '.',
   lang: 'zh-CN',
   title: 'Servify Docs',
   description: 'Servify product docs for intelligent customer service, remote assistance, deployment, and operations',
-  base: '/servify/',
+  base: docsBase,
   head: [['meta', { name: 'theme-color', content: '#0f172a' }]],
   ignoreDeadLinks: true,
 
@@ -14,7 +20,7 @@ export default defineConfig({
     nav: docsNav,
     sidebar: docsSidebar,
     editLink: {
-      pattern: 'https://github.com/Toconvo/servify/edit/main/docs/:path',
+      pattern: 'https://github.com/timebeau/servify/edit/main/docs/:path',
       text: '在 GitHub 上编辑此页',
     },
     lastUpdated: {
@@ -37,3 +43,5 @@ export default defineConfig({
     },
   },
 });
+
+export default withMermaid(config);

@@ -1,10 +1,32 @@
 ---
-title: 文档首页说明
----
+layout: home
 
-> VitePress 首页入口已经迁移到 [index.md](./index.md)。
->
-> 这里保留原始内容入口，避免仓库内引用 `docs/README.md` 失效。
+hero:
+  name: Servify
+  text: 面向企业独立部署的智能客服系统
+  tagline: Web 优先，AI 协同，远程协助，工单闭环
+  actions:
+    - theme: brand
+      text: 了解产品能力
+      link: /ARCHITECTURE
+    - theme: alt
+      text: 查看部署文档
+      link: /deployment
+
+features:
+  - title: Web 接入
+    details: 以网站客服入口为起点，把访客接待、实时会话和后续处理串成统一链路。
+  - title: AI 协同接待
+    details: 通过知识库和模型能力完成首答、澄清和建议，让 AI 成为客服流程里的协作角色。
+  - title: 远程协助
+    details: 针对需要演示、引导和排查的问题，支持远程协助场景，不只停留在文字问答。
+  - title: 人工接管与转接
+    details: 坐席可以随时接管 AI 会话，并继续转接、协作和推进复杂问题。
+  - title: 工单闭环
+    details: 无法即时解决的问题进入工单继续跟进，让服务从聊天延伸到持续处理。
+  - title: 后台运营
+    details: 在统一后台管理坐席、知识库、权限、安全策略和产品运行配置。
+---
 
 ## 产品概览
 

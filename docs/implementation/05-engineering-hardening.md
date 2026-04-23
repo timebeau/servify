@@ -13,7 +13,7 @@
 - [x] 为 Go 增加 `go test -race` 分层执行策略
 - [x] 为 Go 增加覆盖率产物输出
 - [x] 为 SDK 增加 `typecheck` 独立 job
-- [x] 为 docs/VuePress 增加构建校验 job
+- [x] 为 docs/VitePress 增加构建校验 job
 - [x] 为 shell/script 增加最小静态检查
 
 验收：
@@ -56,7 +56,7 @@
 
 ## H5 docs-delivery
 
-- [x] 补 VuePress 站点配置骨架
+- [x] 补 VitePress 站点配置骨架
 - [x] 补 docs 导航与侧边栏生成策略
 - [x] 增加 GitHub Pages 或 artifact 发布流程
 - [x] 增加 Mermaid 渲染兼容性约束说明

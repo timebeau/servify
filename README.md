@@ -145,7 +145,7 @@ Servify 当前更适合这样理解：
 推荐先读：
 
 - [远程协助产品说明](./docs/remote-assistance.md)
-- [文档站首页](./docs/README.md)
+- [文档站首页](./docs/index.md)
 - [v0.1.0 Release Notes](./docs/release-notes-v0.1.0.md)
 
 当前不会把“平台化租户能力”作为产品中心持续扩张，而是先把独立部署客服产品做扎实。
@@ -375,7 +375,7 @@ Jaeger 默认地址：`http://localhost:16686`
 ### 📖 核心文档
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md)
-- [docs/README.md](./docs/README.md)
+- [docs/index.md](./docs/index.md)
 - [docs/WEKNORA_INTEGRATION.md](./docs/WEKNORA_INTEGRATION.md)
 - [docs/CI_SELF_HOSTED.md](./docs/CI_SELF_HOSTED.md) - GitHub Hosted CI 说明
 - [docs/repo-hygiene.md](./docs/repo-hygiene.md) - 运行时产物、生成物与 ignore 边界
@@ -455,7 +455,7 @@ Jaeger 默认地址：`http://localhost:16686`
 ## 🔄 CI 与文档发布
 
 - GitHub Actions 工作流：`.github/workflows/ci.yml`
-- 文档目录按 VuePress 使用方式组织：`docs/`
+- 文档目录按 VitePress 使用方式组织：`docs/`
 - CI 运行环境与检查项见 [docs/CI_SELF_HOSTED.md](./docs/CI_SELF_HOSTED.md)
 
 ---

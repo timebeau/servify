@@ -74,6 +74,6 @@
 ## 后续可继续补的检查
 
 - `golangci-lint`
-- 文档站点实际构建检查（等 VuePress 配置入仓后再加）
+- Mermaid 最小渲染冒烟检查
 - OpenAPI/contract drift check
 - 更细粒度的 integration matrix
