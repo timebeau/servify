@@ -1,10 +1,7 @@
 package handlers
 
 import (
-	"errors"
 	"strings"
-
-	"gorm.io/gorm"
 )
 
 // ErrorResponse 错误响应结构
@@ -32,9 +29,6 @@ type SuccessResponse struct {
 func isNotFoundError(err error) bool {
 	if err == nil {
 		return false
-	}
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return true
 	}
 	msg := strings.ToLower(strings.TrimSpace(err.Error()))
 	return strings.Contains(msg, "not found")
