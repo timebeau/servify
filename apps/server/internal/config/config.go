@@ -49,6 +49,8 @@ type Config struct {
 	Security   SecurityConfig   `yaml:"security"`
 	Portal     PortalConfig     `yaml:"portal"`
 	Upload     UploadConfig     `yaml:"upload"`
+	Embedding  EmbeddingConfig  `yaml:"embedding"`
+	Knowledge  KnowledgeConfig  `yaml:"knowledge"`
 }
 
 type ServerConfig struct {
@@ -314,6 +316,58 @@ type UploadConfig struct {
 	StoragePath  string   `yaml:"storage_path"`
 	AutoProcess  bool     `yaml:"auto_process"`
 	AutoIndex    bool     `yaml:"auto_index"`
+}
+
+// EmbeddingConfig 是文本嵌入服务配置
+type EmbeddingConfig struct {
+	Provider   string                 `yaml:"provider" json:"provider,omitempty"`
+	OpenAI     OpenAIEmbedConfig      `yaml:"openai" json:"openai,omitempty"`
+	TEI        TEIEmbedConfig         `yaml:"tei" json:"tei,omitempty"`
+	Xinference XinferenceEmbedConfig  `yaml:"xinference" json:"xinference,omitempty"`
+}
+
+// OpenAIEmbedConfig 是 OpenAI Embedding 配置
+type OpenAIEmbedConfig struct {
+	APIKey  string `yaml:"api_key" json:"api_key,omitempty"`
+	BaseURL string `yaml:"base_url" json:"base_url,omitempty"`
+	Model   string `yaml:"model" json:"model,omitempty"`
+}
+
+// TEIEmbedConfig 是 TEI Embedding 配置
+type TEIEmbedConfig struct {
+	BaseURL string `yaml:"base_url" json:"base_url,omitempty"`
+	Model   string `yaml:"model" json:"model,omitempty"`
+}
+
+// XinferenceEmbedConfig 是 Xinference Embedding 配置
+type XinferenceEmbedConfig struct {
+	BaseURL  string `yaml:"base_url" json:"base_url,omitempty"`
+	ModelUID string `yaml:"model_uid" json:"model_uid,omitempty"`
+}
+
+// KnowledgeConfig 是知识库配置
+type KnowledgeConfig struct {
+	Provider  string         `yaml:"provider" json:"provider,omitempty"`
+	Pgvector  PgvectorConfig `yaml:"pgvector" json:"pgvector,omitempty"`
+}
+
+// PgvectorConfig 是 pgvector 知识库配置
+type PgvectorConfig struct {
+	Search   SearchConfig   `yaml:"search" json:"search,omitempty"`
+	Indexing IndexingConfig `yaml:"indexing" json:"indexing,omitempty"`
+}
+
+// SearchConfig 是向量搜索配置
+type SearchConfig struct {
+	TopK      int     `yaml:"top_k" json:"top_k,omitempty"`
+	Threshold float64 `yaml:"threshold" json:"threshold,omitempty"`
+	Strategy  string  `yaml:"strategy" json:"strategy,omitempty"`
+}
+
+// IndexingConfig 是索引配置
+type IndexingConfig struct {
+	ChunkSize    int `yaml:"chunk_size" json:"chunk_size,omitempty"`
+	ChunkOverlap int `yaml:"chunk_overlap" json:"chunk_overlap,omitempty"`
 }
 
 func Load() (*Config, error) {
@@ -656,6 +710,27 @@ func GetDefaultConfig() *Config {
 			StoragePath:  "./.runtime/uploads",
 			AutoProcess:  true,
 			AutoIndex:    true,
+		},
+		Embedding: EmbeddingConfig{
+			Provider: "openai",
+			OpenAI: OpenAIEmbedConfig{
+				BaseURL: "https://api.openai.com/v1",
+				Model:   "text-embedding-3-small",
+			},
+		},
+		Knowledge: KnowledgeConfig{
+			Provider: "pgvector",
+			Pgvector: PgvectorConfig{
+				Search: SearchConfig{
+					TopK:      5,
+					Threshold: 0.7,
+					Strategy:  "hybrid",
+				},
+				Indexing: IndexingConfig{
+					ChunkSize:    1000,
+					ChunkOverlap: 200,
+				},
+			},
 		},
 	}
 }

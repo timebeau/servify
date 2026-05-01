@@ -202,3 +202,37 @@ upload:
   storage_path: "./.runtime/uploads"
   auto_process: true
   auto_index: true
+
+# Embedding configuration for text vectorization
+embedding:
+  # Available providers: openai, tei, xinference
+  provider: "openai"
+  # OpenAI embedding configuration
+  openai:
+    api_key: "${OPENAI_API_KEY}"
+    base_url: "https://api.openai.com/v1"
+    model: "text-embedding-3-small"
+  # TEI (Text Embeddings Inference) configuration
+  tei:
+    base_url: "http://localhost:8080"
+    model: "bge-m3"
+  # Xinference embedding configuration
+  xinference:
+    base_url: "http://localhost:9997"
+    model_uid: "embedding-model"
+
+# Knowledge base configuration
+knowledge:
+  # Available providers: pgvector
+  provider: "pgvector"
+  pgvector:
+    # Vector search configuration
+    search:
+      top_k: 5
+      threshold: 0.7
+      # Available strategies: semantic, hybrid, keyword
+      strategy: "hybrid"
+    # Document indexing configuration
+    indexing:
+      chunk_size: 1000
+      chunk_overlap: 200
