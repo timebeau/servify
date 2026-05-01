@@ -1,6 +1,6 @@
 # Servify Makefile
 
-.PHONY: help build build-cli build-weknora build-knowledge-provider run run-cli run-weknora run-knowledge-provider migrate migrate-seed test clean clean-runtime docker-build docker-run docker-up-weknora docker-up-knowledge-provider docker-down docker-logs-weknora docker-logs-knowledge-provider docker-up-observ docker-down-observ dev-setup fmt lint update-deps docs changelog release-changelog sdk-sync-versions sdk-check-versions repo-hygiene generated-assets local-check security-check observability-check release-check dify-acceptance weknora-acceptance knowledge-provider-acceptance auth-session-acceptance validate-acceptance-manifest check-acceptance-evidence
+.PHONY: help build build-cli build-weknora build-knowledge-provider run run-cli run-weknora run-knowledge-provider migrate migrate-seed test clean clean-runtime docker-build docker-run docker-up-weknora docker-up-knowledge-provider docker-down docker-logs-weknora docker-logs-knowledge-provider docker-up-observ docker-down-observ dev-setup fmt lint update-deps docs changelog release-changelog sdk-sync-versions sdk-check-versions repo-hygiene generated-assets local-check security-check observability-check release-check dify-acceptance weknora-acceptance knowledge-provider-acceptance knowledge-acceptance auth-session-acceptance validate-acceptance-manifest check-acceptance-evidence
 
 # Default target
 help:
@@ -41,6 +41,7 @@ help:
 	@echo "  dify-acceptance - Run the Dify primary-path acceptance script"
 	@echo "  weknora-acceptance - Run the WeKnora compatibility acceptance script"
 	@echo "  knowledge-provider-acceptance - Alias of weknora-acceptance for provider compatibility runs"
+	@echo "  knowledge-acceptance - Run the knowledge base acceptance script"
 	@echo "  auth-session-acceptance - Run the auth self-service session acceptance script"
 	@echo "  validate-acceptance-manifest - Validate a generated acceptance manifest"
 	@echo "  check-acceptance-evidence - Validate all checked-in acceptance manifests under scripts/test-results"
@@ -226,6 +227,11 @@ weknora-acceptance:
 	./scripts/test-weknora-integration.sh
 
 knowledge-provider-acceptance: weknora-acceptance
+
+knowledge-acceptance:
+	@echo "Running knowledge base acceptance..."
+	chmod +x ./scripts/test-knowledge-acceptance.sh
+	./scripts/test-knowledge-acceptance.sh
 
 auth-session-acceptance:
 	@echo "Running auth self-service session acceptance..."
