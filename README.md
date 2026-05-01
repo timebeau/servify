@@ -233,6 +233,37 @@ flowchart LR
 - 后续如果切 Milvus、Elasticsearch、pgvector、自研知识库，只需要新增 provider adapter
 - AI 主流程不应该感知具体知识库实现，只依赖统一检索 contract
 
+### 自建知识库 (pgvector)
+
+Servify 现在支持基于 pgvector 的自建知识库，这是企业私有部署的推荐方案。
+
+**配置:**
+
+```yaml
+embedding:
+  provider: "openai"  # 或 tei, xinference
+  openai:
+    api_key: "${OPENAI_API_KEY}"
+    model: "text-embedding-3-small"
+
+knowledge:
+  provider: "pgvector"
+  pgvector:
+    search:
+      top_k: 5
+      threshold: 0.7
+```
+
+**内网部署:**
+
+使用 TEI (Text Embeddings Inference) 进行本地 embedding：
+
+```bash
+docker run -p 8080:8080 \
+  ghcr.io/huggingface/text-embeddings-inference:cpu-1.5 \
+  --model-id BAAI/bge-small-zh-v1.5
+```
+
 ---
 
 ## 📦 SDK 与渠道预留
