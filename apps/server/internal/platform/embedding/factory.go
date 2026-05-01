@@ -11,9 +11,9 @@ import (
 // FactoryConfig is the configuration for creating an embedding provider
 type FactoryConfig struct {
 	Provider string                 `yaml:"provider" json:"provider"`
-	OpenAI   OpenAIProviderConfig   `yaml:"openai" json:"openai,omitempty"`
-	TEI      TEIProviderConfig      `yaml:"tei" json:"tei,omitempty"`
-	Xinference XinferenceProviderConfig `yaml:"xinference" json:"xinference,omitempty"`
+	OpenAI   OpenAIProviderConfig   `yaml:"openai" json:"openai"`
+	TEI      TEIProviderConfig      `yaml:"tei" json:"tei"`
+	Xinference XinferenceProviderConfig `yaml:"xinference" json:"xinference"`
 }
 
 // OpenAIProviderConfig holds configuration for OpenAI embedding provider
