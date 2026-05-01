@@ -77,3 +77,24 @@ CREATE TRIGGER update_mappings_updated_at
 --     ('常见问题解答', '以下是用户最常遇到的问题及解决方案...', '常见问题', '问题,解答,FAQ', NOW(), NOW()),
 --     ('API 使用文档', 'REST API 接口说明和使用示例...', '开发文档', 'API,开发,文档', NOW(), NOW())
 -- ON CONFLICT DO NOTHING;
+
+-- 扩展 knowledge_docs 表以支持 pgvector
+ALTER TABLE knowledge_docs
+ADD COLUMN IF NOT EXISTS embedding vector(1536),
+ADD COLUMN IF NOT EXISTS chunk_index int DEFAULT 0,
+ADD COLUMN IF NOT EXISTS doc_chunk_id varchar(255);
+
+-- 创建向量索引（使用 ivfflat）
+CREATE INDEX IF NOT EXISTS idx_knowledge_docs_embedding
+ON knowledge_docs
+USING ivfflat (embedding vector_cosine_ops)
+WITH (lists = 100);
+
+-- 为 doc_chunk_id 创建索引以优化 chunk 查询
+CREATE INDEX IF NOT EXISTS idx_knowledge_docs_doc_chunk_id
+ON knowledge_docs(doc_chunk_id);
+
+-- 添加注释
+COMMENT ON COLUMN knowledge_docs.embedding IS '文档的向量表示，用于语义搜索';
+COMMENT ON COLUMN knowledge_docs.chunk_index IS '文档分块索引，同一文档的不同分块有相同 doc_chunk_id';
+COMMENT ON COLUMN knowledge_docs.doc_chunk_id IS '文档块 ID，用于标识属于同一文档的不同分块';
