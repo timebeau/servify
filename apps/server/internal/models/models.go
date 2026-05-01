@@ -1,6 +1,7 @@
 package models
 
 import (
+	"github.com/pgvector/pgvector-go"
 	"gorm.io/gorm"
 	"time"
 )
@@ -292,8 +293,12 @@ type KnowledgeDoc struct {
 	Category    string    `json:"category"`
 	Tags        string    `json:"tags"`
 	IsPublic    bool      `gorm:"default:false;index" json:"is_public"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	// 新增字段 - pgvector 支持
+	Embedding   pgvector.Vector `gorm:"type:vector(1536)" json:"embedding,omitempty"`
+	ChunkIndex  int             `gorm:"default:0" json:"chunk_index,omitempty"`
+	DocChunkID  string          `gorm:"index" json:"doc_chunk_id,omitempty"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
 }
 
 // 知识库索引任务
