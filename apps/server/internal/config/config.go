@@ -320,10 +320,10 @@ type UploadConfig struct {
 
 // EmbeddingConfig 是文本嵌入服务配置
 type EmbeddingConfig struct {
-	Provider   string                 `yaml:"provider" json:"provider,omitempty"`
-	OpenAI     OpenAIEmbedConfig      `yaml:"openai" json:"openai,omitempty"`
-	TEI        TEIEmbedConfig         `yaml:"tei" json:"tei,omitempty"`
-	Xinference XinferenceEmbedConfig  `yaml:"xinference" json:"xinference,omitempty"`
+	Provider   string                `yaml:"provider" json:"provider,omitempty"`
+	OpenAI     OpenAIEmbedConfig     `yaml:"openai" json:"openai,omitempty"`
+	TEI        TEIEmbedConfig        `yaml:"tei" json:"tei,omitempty"`
+	Xinference XinferenceEmbedConfig `yaml:"xinference" json:"xinference,omitempty"`
 }
 
 // OpenAIEmbedConfig 是 OpenAI Embedding 配置
@@ -347,8 +347,8 @@ type XinferenceEmbedConfig struct {
 
 // KnowledgeConfig 是知识库配置
 type KnowledgeConfig struct {
-	Provider  string         `yaml:"provider" json:"provider,omitempty"`
-	Pgvector  PgvectorConfig `yaml:"pgvector" json:"pgvector,omitempty"`
+	Provider string         `yaml:"provider" json:"provider,omitempty"`
+	Pgvector PgvectorConfig `yaml:"pgvector" json:"pgvector,omitempty"`
 }
 
 // PgvectorConfig 是 pgvector 知识库配置

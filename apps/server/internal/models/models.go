@@ -283,22 +283,22 @@ type WaitingRecord struct {
 
 // 知识库文档
 type KnowledgeDoc struct {
-	ID          uint      `gorm:"primaryKey" json:"id"`
-	TenantID    string    `gorm:"index" json:"tenant_id"`
-	WorkspaceID string    `gorm:"index" json:"workspace_id"`
-	ProviderID  string    `gorm:"index" json:"provider_id"`
-	ExternalID  string    `gorm:"index" json:"external_id"`
-	Title       string    `json:"title"`
-	Content     string    `gorm:"type:text" json:"content"`
-	Category    string    `json:"category"`
-	Tags        string    `json:"tags"`
-	IsPublic    bool      `gorm:"default:false;index" json:"is_public"`
+	ID          uint   `gorm:"primaryKey" json:"id"`
+	TenantID    string `gorm:"index" json:"tenant_id"`
+	WorkspaceID string `gorm:"index" json:"workspace_id"`
+	ProviderID  string `gorm:"index" json:"provider_id"`
+	ExternalID  string `gorm:"index" json:"external_id"`
+	Title       string `json:"title"`
+	Content     string `gorm:"type:text" json:"content"`
+	Category    string `json:"category"`
+	Tags        string `json:"tags"`
+	IsPublic    bool   `gorm:"default:false;index" json:"is_public"`
 	// 新增字段 - pgvector 支持
-	Embedding   pgvector.Vector `gorm:"type:vector(1536)" json:"embedding,omitempty"`
-	ChunkIndex  int             `gorm:"default:0" json:"chunk_index,omitempty"`
-	DocChunkID  string          `gorm:"index" json:"doc_chunk_id,omitempty"`
-	CreatedAt   time.Time       `json:"created_at"`
-	UpdatedAt   time.Time       `json:"updated_at"`
+	Embedding  pgvector.Vector `gorm:"type:vector(1536)" json:"embedding,omitempty"`
+	ChunkIndex int             `gorm:"default:0" json:"chunk_index,omitempty"`
+	DocChunkID string          `gorm:"index" json:"doc_chunk_id,omitempty"`
+	CreatedAt  time.Time       `json:"created_at"`
+	UpdatedAt  time.Time       `json:"updated_at"`
 }
 
 // 知识库索引任务

@@ -32,17 +32,17 @@ type HTTPRuntime interface {
 
 // App is the bootstrap root for shared server runtime wiring.
 type App struct {
-	Config           *config.Config
-	Logger           *logrus.Logger
-	DB               *gorm.DB
-	Redis            *redis.Client
-	Runtime          HTTPRuntime
-	Router           http.Handler
-	Server           *http.Server
-	EventBus         eventbus.Bus
+	Config            *config.Config
+	Logger            *logrus.Logger
+	DB                *gorm.DB
+	Redis             *redis.Client
+	Runtime           HTTPRuntime
+	Router            http.Handler
+	Server            *http.Server
+	EventBus          eventbus.Bus
 	EmbeddingProvider embedding.Provider
-	Workers          []Worker
-	ShutdownHooks    []func() error
+	Workers           []Worker
+	ShutdownHooks     []func() error
 }
 
 // BuildApp creates the shared application runtime dependencies used by entrypoints.
@@ -91,13 +91,13 @@ func BuildApp(cfg *config.Config) (*App, error) {
 	}
 
 	app := &App{
-		Config:           cfg,
-		Logger:           logger,
-		Redis:            redisClient,
-		EventBus:         bus,
+		Config:            cfg,
+		Logger:            logger,
+		Redis:             redisClient,
+		EventBus:          bus,
 		EmbeddingProvider: embeddingProvider,
-		Workers:          make([]Worker, 0),
-		ShutdownHooks:    make([]func() error, 0),
+		Workers:           make([]Worker, 0),
+		ShutdownHooks:     make([]func() error, 0),
 	}
 	if redisClient != nil {
 		app.AddShutdownHook(func() error {

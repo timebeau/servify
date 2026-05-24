@@ -66,16 +66,16 @@ func TestValidateAcceptanceManifestScriptAcceptsValidAuthSessionManifest(t *test
 
 	dir := t.TempDir()
 	writeAcceptanceFixture(t, dir, map[string]string{
-		"summary.txt":                          "ok",
-		"auth-register.json":                   "{}",
-		"auth-login-primary.json":              "{}",
-		"auth-login-secondary.json":            "{}",
-		"auth-refresh.json":                    "{}",
-		"auth-refresh-reuse-old.json":          "{}",
-		"auth-sessions-before.json":            "{}",
-		"auth-logout-others.json":              "{}",
-		"auth-sessions-after-logout-others.json": "{}",
-		"auth-logout-current.json":             "{}",
+		"summary.txt":                             "ok",
+		"auth-register.json":                      "{}",
+		"auth-login-primary.json":                 "{}",
+		"auth-login-secondary.json":               "{}",
+		"auth-refresh.json":                       "{}",
+		"auth-refresh-reuse-old.json":             "{}",
+		"auth-sessions-before.json":               "{}",
+		"auth-logout-others.json":                 "{}",
+		"auth-sessions-after-logout-others.json":  "{}",
+		"auth-logout-current.json":                "{}",
 		"auth-sessions-after-logout-current.json": "{}",
 		"manifest.json": `{
   "provider": "auth-session",

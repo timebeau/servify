@@ -7,59 +7,59 @@ import (
 
 func TestNewChunker(t *testing.T) {
 	tests := []struct {
-		name          string
-		chunkSize     int
-		chunkOverlap  int
-		expectedSize  int
+		name            string
+		chunkSize       int
+		chunkOverlap    int
+		expectedSize    int
 		expectedOverlap int
 	}{
 		{
-			name:          "valid parameters",
-			chunkSize:     1000,
-			chunkOverlap:  100,
-			expectedSize:  1000,
+			name:            "valid parameters",
+			chunkSize:       1000,
+			chunkOverlap:    100,
+			expectedSize:    1000,
 			expectedOverlap: 100,
 		},
 		{
-			name:          "zero chunk size uses default",
-			chunkSize:     0,
-			chunkOverlap:  50,
-			expectedSize:  500,
+			name:            "zero chunk size uses default",
+			chunkSize:       0,
+			chunkOverlap:    50,
+			expectedSize:    500,
 			expectedOverlap: 50,
 		},
 		{
-			name:          "negative chunk size uses default",
-			chunkSize:     -100,
-			chunkOverlap:  50,
-			expectedSize:  500,
+			name:            "negative chunk size uses default",
+			chunkSize:       -100,
+			chunkOverlap:    50,
+			expectedSize:    500,
 			expectedOverlap: 50,
 		},
 		{
-			name:          "negative overlap uses default",
-			chunkSize:     1000,
-			chunkOverlap:  -10,
-			expectedSize:  1000,
+			name:            "negative overlap uses default",
+			chunkSize:       1000,
+			chunkOverlap:    -10,
+			expectedSize:    1000,
 			expectedOverlap: 50,
 		},
 		{
-			name:          "overlap equals chunk size adjusts to 10%",
-			chunkSize:     1000,
-			chunkOverlap:  1000,
-			expectedSize:  1000,
+			name:            "overlap equals chunk size adjusts to 10%",
+			chunkSize:       1000,
+			chunkOverlap:    1000,
+			expectedSize:    1000,
 			expectedOverlap: 100,
 		},
 		{
-			name:          "overlap greater than chunk size adjusts to 10%",
-			chunkSize:     500,
-			chunkOverlap:  600,
-			expectedSize:  500,
+			name:            "overlap greater than chunk size adjusts to 10%",
+			chunkSize:       500,
+			chunkOverlap:    600,
+			expectedSize:    500,
 			expectedOverlap: 50,
 		},
 		{
-			name:          "zero overlap is allowed",
-			chunkSize:     500,
-			chunkOverlap:  0,
-			expectedSize:  500,
+			name:            "zero overlap is allowed",
+			chunkSize:       500,
+			chunkOverlap:    0,
+			expectedSize:    500,
 			expectedOverlap: 0,
 		},
 	}
@@ -232,8 +232,8 @@ func TestChunkByParagraph(t *testing.T) {
 			maxChunk: 1,
 		},
 		{
-			name: "multiple short paragraphs",
-			text: "First paragraph.\n\nSecond paragraph.\n\nThird paragraph.",
+			name:     "multiple short paragraphs",
+			text:     "First paragraph.\n\nSecond paragraph.\n\nThird paragraph.",
 			minChunk: 1,
 			maxChunk: 3,
 		},
@@ -392,8 +392,8 @@ func TestIsChinese(t *testing.T) {
 		{' ', false},
 		{'。', true},  // 中文句号
 		{'！', true},  // 中文感叹号
-		{'.', false},  // 英文句号
-		{'!', false},  // 英文感叹号
+		{'.', false}, // 英文句号
+		{'!', false}, // 英文感叹号
 	}
 
 	for _, tt := range tests {

@@ -22,8 +22,8 @@ type Provider struct {
 }
 
 type embedRequest struct {
-	Input    *string  `json:"input,omitempty"`    // 单个文本
-	Inputs   []string `json:"inputs,omitempty"`   // 多个文本
+	Input    *string  `json:"input,omitempty"`  // 单个文本
+	Inputs   []string `json:"inputs,omitempty"` // 多个文本
 	Truncate bool     `json:"truncate,omitempty"`
 }
 

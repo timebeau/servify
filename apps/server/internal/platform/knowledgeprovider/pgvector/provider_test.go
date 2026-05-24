@@ -73,9 +73,9 @@ func TestNewProvider(t *testing.T) {
 	mockEmbedding := &mockEmbeddingProvider{dimension: 512}
 
 	tests := []struct {
-		name     string
-		config   Config
-		wantSize int
+		name        string
+		config      Config
+		wantSize    int
 		wantOverlap int
 	}{
 		{
@@ -90,7 +90,7 @@ func TestNewProvider(t *testing.T) {
 					ChunkOverlap: 50,
 				},
 			},
-			wantSize: 500,
+			wantSize:    500,
 			wantOverlap: 50,
 		},
 		{
@@ -99,7 +99,7 @@ func TestNewProvider(t *testing.T) {
 				Search:   SearchConfig{},
 				Indexing: IndexingConfig{},
 			},
-			wantSize: 500,
+			wantSize:    500,
 			wantOverlap: 0,
 		},
 		{
@@ -109,7 +109,7 @@ func TestNewProvider(t *testing.T) {
 					ChunkSize: 0,
 				},
 			},
-			wantSize: 500,
+			wantSize:    500,
 			wantOverlap: 0,
 		},
 	}
@@ -284,7 +284,7 @@ func TestProvider_UpsertDocument(t *testing.T) {
 		mockEmbedding := &mockEmbeddingProvider{
 			dimension: 3,
 			// 空内容会返回原内容作为 1 个块
-			vectors:   [][]float32{{0.1, 0.2, 0.3}},
+			vectors: [][]float32{{0.1, 0.2, 0.3}},
 		}
 		p := NewProvider(db, mockEmbedding, Config{
 			Indexing: IndexingConfig{ChunkSize: 100},
