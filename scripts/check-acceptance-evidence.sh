@@ -15,7 +15,7 @@ fi
 printf '%s\n' "$MANIFESTS" | while IFS= read -r manifest; do
   [ -n "$manifest" ] || continue
   echo "Validating acceptance manifest: $manifest"
-  sh "$ROOT_DIR/scripts/validate-acceptance-manifest.sh" "$manifest"
+  "$ROOT_DIR/scripts/validate-acceptance-manifest.sh" "$manifest"
 done
 
 echo "Acceptance evidence checks passed."
