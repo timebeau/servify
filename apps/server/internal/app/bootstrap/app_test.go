@@ -42,6 +42,39 @@ func TestBuildApp(t *testing.T) {
 	if app.ShutdownHooks == nil {
 		t.Fatal("expected shutdown hooks slice")
 	}
+	if app.EmbeddingProvider != nil {
+		t.Fatal("expected default app to skip unconfigured embedding provider")
+	}
+}
+
+func TestBuildEmbeddingProviderSkipsDefaultOpenAIWithoutAPIKey(t *testing.T) {
+	cfg := config.GetDefaultConfig()
+
+	provider, err := BuildEmbeddingProvider(cfg)
+	if err != nil {
+		t.Fatalf("BuildEmbeddingProvider() error = %v", err)
+	}
+	if provider != nil {
+		t.Fatal("expected nil provider when default OpenAI API key is empty")
+	}
+}
+
+func TestBuildEmbeddingProviderReturnsConfigurationErrors(t *testing.T) {
+	cfg := config.GetDefaultConfig()
+	cfg.Embedding.Provider = "xinference"
+	cfg.Embedding.Xinference.BaseURL = ""
+	cfg.Embedding.Xinference.ModelUID = ""
+
+	provider, err := BuildEmbeddingProvider(cfg)
+	if err == nil {
+		t.Fatal("expected configuration error")
+	}
+	if provider != nil {
+		t.Fatal("expected nil provider on configuration error")
+	}
+	if !strings.Contains(err.Error(), "xinference provider requires base_url") {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
 
 type stubWorker struct {

@@ -95,7 +95,7 @@ func (s *OrchestratedEnhancedAIService) ProcessQueryEnhanced(ctx context.Context
 			Enabled:   true,
 			TopK:      5,
 			Threshold: 0.7,
-			Strategy:  "hybrid",
+			Strategy:  "semantic",
 		},
 	})
 	if err != nil {

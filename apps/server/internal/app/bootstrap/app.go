@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	appserver "servify/apps/server/internal/app/server"
 	"servify/apps/server/internal/config"
@@ -66,23 +67,7 @@ func BuildApp(cfg *config.Config) (*App, error) {
 		return nil, err
 	}
 
-	// 初始化 Embedding Provider
-	embeddingProvider, err := embedding.NewProvider(embedding.FactoryConfig{
-		Provider: cfg.Embedding.Provider,
-		OpenAI: embedding.OpenAIProviderConfig{
-			APIKey:  cfg.Embedding.OpenAI.APIKey,
-			BaseURL: cfg.Embedding.OpenAI.BaseURL,
-			Model:   cfg.Embedding.OpenAI.Model,
-		},
-		TEI: embedding.TEIProviderConfig{
-			BaseURL: cfg.Embedding.TEI.BaseURL,
-			Model:   cfg.Embedding.TEI.Model,
-		},
-		Xinference: embedding.XinferenceProviderConfig{
-			BaseURL:  cfg.Embedding.Xinference.BaseURL,
-			ModelUID: cfg.Embedding.Xinference.ModelUID,
-		},
-	})
+	embeddingProvider, err := BuildEmbeddingProvider(cfg)
 	if err != nil {
 		if redisClient != nil {
 			_ = redisClient.Close()
@@ -209,4 +194,34 @@ func (a *App) Shutdown(ctx context.Context) error {
 		errs = append(errs, err)
 	}
 	return errors.Join(errs...)
+}
+
+func BuildEmbeddingProvider(cfg *config.Config) (embedding.Provider, error) {
+	if cfg == nil {
+		return nil, nil
+	}
+	provider := strings.TrimSpace(cfg.Embedding.Provider)
+	if provider == "" {
+		return nil, nil
+	}
+	embeddingProvider, err := embedding.NewProvider(embedding.FactoryConfig{
+		Provider: provider,
+		OpenAI: embedding.OpenAIProviderConfig{
+			APIKey:  cfg.Embedding.OpenAI.APIKey,
+			BaseURL: cfg.Embedding.OpenAI.BaseURL,
+			Model:   cfg.Embedding.OpenAI.Model,
+		},
+		TEI: embedding.TEIProviderConfig{
+			BaseURL: cfg.Embedding.TEI.BaseURL,
+			Model:   cfg.Embedding.TEI.Model,
+		},
+		Xinference: embedding.XinferenceProviderConfig{
+			BaseURL:  cfg.Embedding.Xinference.BaseURL,
+			ModelUID: cfg.Embedding.Xinference.ModelUID,
+		},
+	})
+	if err != nil && provider == "openai" && strings.TrimSpace(cfg.Embedding.OpenAI.APIKey) == "" {
+		return nil, nil
+	}
+	return embeddingProvider, err
 }

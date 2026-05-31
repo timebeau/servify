@@ -3,6 +3,7 @@ package pgvector
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"gorm.io/gorm"
 
@@ -86,6 +87,7 @@ func (p *Provider) Search(ctx context.Context, req knowledgeprovider.SearchReque
 	if strategy == "" {
 		strategy = p.config.Search.Strategy
 	}
+	strategy = normalizeSearchStrategy(strategy)
 
 	// 3. 构建查询
 	query := p.db.WithContext(ctx).Table("knowledge_docs")
@@ -172,6 +174,10 @@ func (p *Provider) Search(ctx context.Context, req knowledgeprovider.SearchReque
 
 // UpsertDocument 创建或更新文档
 func (p *Provider) UpsertDocument(ctx context.Context, doc knowledgeprovider.KnowledgeDocument) (string, error) {
+	externalID := strings.TrimSpace(doc.ExternalID)
+	if externalID == "" {
+		externalID = strings.TrimSpace(doc.ID)
+	}
 	// 1. 文档分块
 	chunks := p.chunker.Chunk(doc.Content)
 	if len(chunks) == 0 {
@@ -188,12 +194,12 @@ func (p *Provider) UpsertDocument(ctx context.Context, doc knowledgeprovider.Kno
 	}
 
 	// 3. 首先删除该文档的所有现有 chunks（如果是更新）
-	if doc.ID != "" || doc.ExternalID != "" {
+	if doc.ID != "" || externalID != "" {
 		query := p.db.WithContext(ctx).Table("knowledge_docs")
-		if doc.ID != "" {
+		if externalID != "" {
+			query = query.Where("external_id = ? AND provider_id = ?", externalID, "pgvector")
+		} else if doc.ID != "" {
 			query = query.Where("id = ?", doc.ID)
-		} else if doc.ExternalID != "" {
-			query = query.Where("external_id = ? AND provider_id = ?", doc.ExternalID, "pgvector")
 		}
 		if doc.TenantID != "" {
 			query = query.Where("tenant_id = ?", doc.TenantID)
@@ -210,7 +216,7 @@ func (p *Provider) UpsertDocument(ctx context.Context, doc knowledgeprovider.Kno
 			TenantID:    doc.TenantID,
 			WorkspaceID: doc.KnowledgeID,
 			ProviderID:  "pgvector",
-			ExternalID:  doc.ExternalID,
+			ExternalID:  externalID,
 			Title:       doc.Title,
 			Content:     chunk,
 			Category:    "knowledge",
@@ -236,8 +242,8 @@ func (p *Provider) UpsertDocument(ctx context.Context, doc knowledgeprovider.Kno
 
 		// 设置 chunk 相关字段
 		docModel.ChunkIndex = i
-		if doc.ExternalID != "" {
-			docModel.DocChunkID = fmt.Sprintf("%s-chunk-%d", doc.ExternalID, i)
+		if externalID != "" {
+			docModel.DocChunkID = fmt.Sprintf("%s-chunk-%d", externalID, i)
 		} else {
 			docModel.DocChunkID = fmt.Sprintf("chunk-%d", i)
 		}
@@ -255,13 +261,25 @@ func (p *Provider) UpsertDocument(ctx context.Context, doc knowledgeprovider.Kno
 		}
 	}
 
+	if externalID != "" {
+		return externalID, nil
+	}
 	return firstDocID, nil
 }
 
 // DeleteDocument 删除文档及其所有 chunks
 func (p *Provider) DeleteDocument(ctx context.Context, id string) error {
-	query := p.db.WithContext(ctx).Table("knowledge_docs").Where("id = ?", id)
+	id = strings.TrimSpace(id)
+	query := p.db.WithContext(ctx).Table("knowledge_docs").
+		Where("external_id = ? AND provider_id = ?", id, "pgvector")
 	result := query.Delete(&models.KnowledgeDoc{})
+	if result.Error != nil {
+		return fmt.Errorf("failed to delete document: %w", result.Error)
+	}
+	if result.RowsAffected > 0 {
+		return nil
+	}
+	result = p.db.WithContext(ctx).Table("knowledge_docs").Where("id = ?", id).Delete(&models.KnowledgeDoc{})
 	if result.Error != nil {
 		return fmt.Errorf("failed to delete document: %w", result.Error)
 	}
@@ -324,4 +342,13 @@ func exp64(x float64) float64 {
 		}
 	}
 	return result
+}
+
+func normalizeSearchStrategy(strategy string) string {
+	switch strings.TrimSpace(strings.ToLower(strategy)) {
+	case "", "semantic", "hybrid":
+		return "cosine"
+	default:
+		return strings.TrimSpace(strings.ToLower(strategy))
+	}
 }

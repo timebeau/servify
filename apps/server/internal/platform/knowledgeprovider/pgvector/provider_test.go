@@ -434,6 +434,57 @@ func TestProvider_DeleteDocument(t *testing.T) {
 	}
 }
 
+func TestProvider_DeleteDocumentDeletesAllChunksByExternalID(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+	provider := NewProvider(db, &mockEmbeddingProvider{dimension: 3}, Config{})
+
+	_, err := provider.UpsertDocument(ctx, knowledgeprovider.KnowledgeDocument{
+		ExternalID: "doc-1",
+		Title:      "Test",
+		Content:    strings.Repeat("chunk ", 400),
+	})
+	if err != nil {
+		t.Fatalf("UpsertDocument() error = %v", err)
+	}
+
+	var before int64
+	if err := db.Table("knowledge_docs").Where("external_id = ?", "doc-1").Count(&before).Error; err != nil {
+		t.Fatalf("count before delete: %v", err)
+	}
+	if before < 2 {
+		t.Fatalf("expected chunked rows before delete, got %d", before)
+	}
+
+	if err := provider.DeleteDocument(ctx, "doc-1"); err != nil {
+		t.Fatalf("DeleteDocument() error = %v", err)
+	}
+
+	var after int64
+	if err := db.Table("knowledge_docs").Where("external_id = ?", "doc-1").Count(&after).Error; err != nil {
+		t.Fatalf("count after delete: %v", err)
+	}
+	if after != 0 {
+		t.Fatalf("expected all chunks deleted, got %d", after)
+	}
+}
+
+func TestProvider_SearchNormalizesHybridStrategy(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+	provider := NewProvider(db, &mockEmbeddingProvider{
+		dimension: 3,
+		vectors:   [][]float32{{0.1, 0.2, 0.3}},
+	}, Config{
+		Search: SearchConfig{Strategy: "hybrid"},
+	})
+
+	_, err := provider.Search(ctx, knowledgeprovider.SearchRequest{Query: "test", Strategy: "hybrid"})
+	if err != nil && strings.Contains(err.Error(), "unsupported search strategy") {
+		t.Fatalf("Search() did not normalize hybrid strategy: %v", err)
+	}
+}
+
 // TestProvider_HealthCheck 测试 HealthCheck 方法
 func TestProvider_HealthCheck(t *testing.T) {
 	db := setupTestDB(t)
