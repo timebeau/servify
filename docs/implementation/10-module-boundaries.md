@@ -23,6 +23,7 @@
 - `app/server/*`
   - 负责 runtime assembly
   - 可以持有 legacy concrete service，但对 HTTP 注入时应优先暴露 `modules/*/delivery` contract
+  - 路由注册与 runtime 装配应按领域或接入面拆分文件，避免继续集中回单个超大入口文件
 - `services/*`
   - 只在确有未迁出 runtime glue、状态同步、side effect 组装时临时保留
   - 已收口且不再承担必要职责时应直接删除，而不是继续增长为默认业务中心
@@ -48,6 +49,7 @@
 - `handlers -> modules/*/application` 直接拼业务
 - `services/*` 为了新需求再次变成 handler 默认入口
 - runtime 新增一条与既有 module contract 平行的 legacy 入口
+- 在 `app/server` 重新堆积跨域装配逻辑到单个 `router.go` 或 `runtime.go`
 
 ## 当前已锁定的边界
 
@@ -61,8 +63,20 @@
   - HTTP 入口必须走 `modules/routing/delivery.HandlerService`
 - `ai`
   - HTTP / health / metrics 入口必须走 `modules/ai/delivery.HandlerService`
+- `customer`
+  - HTTP 入口必须走 `modules/customer/delivery.HandlerService`
+- `automation`
+  - HTTP 入口必须走 `modules/automation/delivery.HandlerService`
+- `knowledge`
+  - HTTP 入口必须走 `modules/knowledge/delivery.HandlerService`
+- `suggestion`
+  - HTTP 入口必须走 `modules/suggestion/delivery.HandlerService`
+- `gamification`
+  - HTTP 入口必须走 `modules/gamification/delivery.HandlerService`
 - `conversation`
   - websocket persistence 入口必须走 `modules/conversation/delivery.WebSocketMessageWriter`
+- handler-local contracts
+  - `satisfaction`、`macro`、`app integration`、`custom field`、`shift`、`sla` 等尚未完全模块化的薄能力，HTTP handler 与 router/runtime surface 必须停留在 handler-local contract，避免回退到 concrete legacy service
 
 对应规则：
 

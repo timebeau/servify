@@ -16,7 +16,8 @@ import (
 	"gorm.io/gorm"
 
 	"servify/apps/server/internal/models"
-	"servify/apps/server/internal/services"
+	gamificationcontract "servify/apps/server/internal/modules/gamification/contract"
+	gamificationdelivery "servify/apps/server/internal/modules/gamification/delivery"
 )
 
 func newTestDBForGamification(t *testing.T) *gorm.DB {
@@ -38,7 +39,7 @@ func newTestDBForGamification(t *testing.T) *gorm.DB {
 func TestGamificationHandler_Leaderboard_BadgesAndOrder(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	db := newTestDBForGamification(t)
-	svc := services.NewGamificationService(db)
+	svc := gamificationdelivery.NewHandlerService(db)
 	h := NewGamificationHandler(svc)
 
 	// seed agents
@@ -124,7 +125,7 @@ func TestGamificationHandler_Leaderboard_BadgesAndOrder(t *testing.T) {
 		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
 	}
 
-	var resp services.LeaderboardResponse
+	var resp gamificationcontract.LeaderboardResponse
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("unmarshal: %v body=%s", err, w.Body.String())
 	}
@@ -141,11 +142,11 @@ func TestGamificationHandler_Leaderboard_BadgesAndOrder(t *testing.T) {
 	// - top_resolver should be on agent1
 	// - customer_hero should be on agent2
 	// - speedster should be on agent2
-	entryByID := map[uint]services.LeaderboardEntry{}
+	entryByID := map[uint]gamificationcontract.LeaderboardEntry{}
 	for _, e := range resp.Entries {
 		entryByID[e.AgentID] = e
 	}
-	hasBadge := func(e services.LeaderboardEntry, id string) bool {
+	hasBadge := func(e gamificationcontract.LeaderboardEntry, id string) bool {
 		for _, b := range e.Badges {
 			if b.ID == id {
 				return true

@@ -1,24 +1,20 @@
 package handlers
 
 import (
-	"context"
 	"net/http"
 	"strconv"
 
-	"servify/apps/server/internal/services"
+	suggestioncontract "servify/apps/server/internal/modules/suggestion/contract"
+	suggestiondelivery "servify/apps/server/internal/modules/suggestion/delivery"
 
 	"github.com/gin-gonic/gin"
 )
 
 type SuggestionHandler struct {
-	service SuggestionService
+	service suggestiondelivery.HandlerService
 }
 
-type SuggestionService interface {
-	Suggest(ctx context.Context, req *services.SuggestionRequest) (*services.SuggestionResponse, error)
-}
-
-func NewSuggestionHandler(service SuggestionService) *SuggestionHandler {
+func NewSuggestionHandler(service suggestiondelivery.HandlerService) *SuggestionHandler {
 	return &SuggestionHandler{service: service}
 }
 
@@ -27,7 +23,7 @@ func (h *SuggestionHandler) Suggest(c *gin.Context) {
 	limit := parseIntDefault(c.Query("limit"), 5)
 	docLimit := parseIntDefault(c.Query("doc_limit"), 5)
 
-	resp, err := h.service.Suggest(c.Request.Context(), &services.SuggestionRequest{
+	resp, err := h.service.Suggest(c.Request.Context(), &suggestioncontract.SuggestionRequest{
 		Query:             query,
 		TicketLimit:       limit,
 		KnowledgeDocLimit: docLimit,
@@ -43,7 +39,7 @@ func (h *SuggestionHandler) Suggest(c *gin.Context) {
 }
 
 func (h *SuggestionHandler) SuggestPost(c *gin.Context) {
-	var req services.SuggestionRequest
+	var req suggestioncontract.SuggestionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid request", Message: err.Error()})
 		return

@@ -1,25 +1,21 @@
 package handlers
 
 import (
-	"context"
 	"net/http"
 	"strconv"
 	"time"
 
-	"servify/apps/server/internal/services"
+	gamificationcontract "servify/apps/server/internal/modules/gamification/contract"
+	gamificationdelivery "servify/apps/server/internal/modules/gamification/delivery"
 
 	"github.com/gin-gonic/gin"
 )
 
 type GamificationHandler struct {
-	service GamificationService
+	service gamificationdelivery.HandlerService
 }
 
-type GamificationService interface {
-	GetLeaderboard(ctx context.Context, req *services.LeaderboardRequest) (*services.LeaderboardResponse, error)
-}
-
-func NewGamificationHandler(service GamificationService) *GamificationHandler {
+func NewGamificationHandler(service gamificationdelivery.HandlerService) *GamificationHandler {
 	return &GamificationHandler{service: service}
 }
 
@@ -66,7 +62,7 @@ func (h *GamificationHandler) GetLeaderboard(c *gin.Context) {
 		start = end.AddDate(0, 0, -days)
 	}
 
-	resp, err := h.service.GetLeaderboard(c.Request.Context(), &services.LeaderboardRequest{
+	resp, err := h.service.GetLeaderboard(c.Request.Context(), &gamificationdelivery.LeaderboardRequest{
 		StartDate:  start,
 		EndDate:    end,
 		Limit:      limit,
@@ -76,7 +72,7 @@ func (h *GamificationHandler) GetLeaderboard(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Failed to get leaderboard", Message: err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, (*gamificationcontract.LeaderboardResponse)(resp))
 }
 
 func RegisterGamificationRoutes(r *gin.RouterGroup, handler *GamificationHandler) {

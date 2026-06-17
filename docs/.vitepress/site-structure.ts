@@ -7,10 +7,22 @@ const implementationPages = [
   '/implementation/06-voice-and-protocol-expansion',
   '/implementation/07-sdk-multi-surface',
   '/implementation/08-ai-provider-expansion',
+  '/implementation/09-runtime-and-repo-hygiene',
+  '/implementation/11-tenant-auth-and-audit',
+  '/implementation/12-operator-observability',
+];
+
+const migrationGovernancePages = [
+  '/implementation/10-service-to-module-migration',
+  '/implementation/10-migration-inventory',
+  '/implementation/10-migration-scorecard',
+  '/implementation/10-module-boundaries',
 ];
 
 const productPages = [
   '/ARCHITECTURE',
+  '/current-architecture',
+  '/architecture-redesign-plan',
   '/remote-assistance',
   '/deployment',
   '/local-development',
@@ -50,6 +62,8 @@ export const docsNav = [
     text: '研发附录',
     items: [
       { text: '实施计划', link: '/implementation/' },
+      { text: '当前架构分析', link: '/current-architecture' },
+      { text: '架构重设计计划', link: '/architecture-redesign-plan' },
       { text: 'WeKnora 集成', link: '/WEKNORA_INTEGRATION' },
       { text: 'CI / Runner', link: '/CI_SELF_HOSTED' },
       { text: '版本发布', link: '/release-versioning' },
@@ -62,8 +76,12 @@ export const docsNav = [
 export const docsSidebar = {
   '/implementation/': [
     {
-      text: '实施计划',
+      text: '实施主线',
       items: ['/implementation/', ...implementationPages],
+    },
+    {
+      text: '模块迁移治理',
+      items: migrationGovernancePages,
     },
   ],
   '/': [
@@ -80,6 +98,7 @@ export const docsSidebar = {
       items: [
         '/implementation/',
         ...implementationPages,
+        ...migrationGovernancePages,
         ...appendixPages.filter((page) => page !== '/ARCHITECTURE'),
       ],
     },

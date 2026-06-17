@@ -12,6 +12,10 @@
 
 - [总体架构设计](../ARCHITECTURE.md)
   - 宏观边界、运行时分层、未来扩展方向
+- [当前架构分析](../current-architecture.md)
+  - 当前真实架构快照、模块迁移状态与过渡风险
+- [架构重设计计划](../architecture-redesign-plan.md)
+  - 下一轮重设计的阶段、验收方式和文档状态源
 - [01-platform-and-runtime.md](./01-platform-and-runtime.md)
   - 入口、bootstrap、router、auth、event bus、realtime 等平台任务
 
@@ -63,8 +67,17 @@
 当前进度：
 
 - `01` 到 `08` 已全部清零
-- `09` 到 `12` 已建档，待拆分执行
+- `09` 已完成仓库卫生与运行时产物治理
+- `10` 已进入模块迁移治理阶段，配套 inventory / scorecard / boundaries 已建档
+- `11` 和 `12` 已建档并持续补真实实现进展
 - 新增实施项应以新的 backlog 文件继续拆分，避免回填已完成任务包
+
+当前阅读顺序：
+
+1. 先读 [当前架构分析](../current-architecture.md)，确认仓库真实状态。
+2. 再读 [架构重设计计划](../architecture-redesign-plan.md)，确认下一轮设计主线。
+3. 然后读 [10-service-to-module-migration.md](./10-service-to-module-migration.md)，进入模块迁移治理。
+4. 最后用 [10-migration-scorecard.md](./10-migration-scorecard.md) 和 [10-module-boundaries.md](./10-module-boundaries.md) 校对状态与规则。
 
 配套专题：
 

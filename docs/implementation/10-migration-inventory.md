@@ -58,7 +58,7 @@
   - 结论：`ai` 已完成 handler/runtime 主路径收口，后续重点是继续收缩 runtime 局部接口
 
 - `legacy handler-only capabilities`
-  - `satisfaction`、`csat public`、`macro`、`app integration`、`custom field`、`shift`、`suggestion`、`gamification` 等能力尚未模块化
+  - `satisfaction`、`csat public`、`macro`、`app integration`、`custom field`、`shift` 等能力尚未模块化
   - 这批 handler 现在已改为依赖 `handlers` 包内定义的最小接口，而不再把 `*services.*` concrete type 暴露到 `app/server` runtime/router surface
   - 结论：虽然还不属于 `services -> modules` 迁移完成项，但已完成一轮“装配面收口”，可减少 concrete legacy service 在顶层 runtime 的扩散
 
@@ -95,6 +95,18 @@
   - `modules/knowledge/infra` 已补齐 `KnowledgeIndexJob` 的 Gorm 持久化仓储，module delivery 也已支持按 runtime 注入 provider
   - 结论：knowledge 的 handler/runtime 主路径都已贴近 module；legacy facade 仅保留历史调用兼容
 
+- `suggestion`
+  - `modules/suggestion/application`、`contract`、`infra`、`delivery` 已落地
+  - handler/runtime 已直接消费 `modules/suggestion/delivery.HandlerService`
+  - 旧 `services/SuggestionService` 已收缩为 DTO alias 与兼容 facade
+  - 结论：handler/runtime 主路径已贴近 module；旧 facade 仅保留历史调用兼容
+
+- `gamification`
+  - `modules/gamification/application`、`contract`、`infra`、`delivery` 已落地
+  - handler/runtime 已直接消费 `modules/gamification/delivery.HandlerService`
+  - 旧 `services/GamificationService` 已收缩为 DTO alias 与兼容 facade
+  - 结论：handler/runtime 主路径已贴近 module；旧 facade 仅保留历史调用兼容
+
 ## 按迁移成熟度分组
 
 ### A. 已有明显 module facade
@@ -105,6 +117,8 @@
 - `customer`
 - `automation`
 - `knowledge`
+- `suggestion`
+- `gamification`
 
 这些模块的共同特点：
 
@@ -112,17 +126,16 @@
 - 旧 `services/*` 更多承担兼容包装、DTO 映射、runtime glue
 - 适合优先定义“唯一入口”并冻结旧 service 新增逻辑
 
-### B. 已局部接入 module adapter，但主流程仍偏旧
+### B. 已接入 module adapter，但仍需运行态硬化
 
 - `conversation` 相关 websocket/runtime 路径
 
 这些模块的共同特点：
 
 - module 已存在
-- 核心运行时仍由旧 runtime struct 主导
-- 需要先画清 runtime 职责边界，再做 handler/adapter 收口
-- `automation` 的 handler 已可先行收口，但 runtime 仍需要旧 service 持有 event bus subscriber
-- `conversation` 仍是下一轮最重的运行态迁移区域
+- 关键持久化入口已切到 module delivery adapter
+- connection hub、通知、转接协作等运行态对象仍需要持续保持窄接口
+- 后续重点不是回退重迁移，而是避免在 realtime runtime 内重新引入业务直写路径
 
 ### C. 多实现并存，需要先确定默认主路径
 
@@ -141,20 +154,22 @@
 4. `customer`
 5. `automation`
 6. `knowledge`
-7. `conversation / websocket runtime`
-8. 扩大 scorecard 覆盖范围
+7. `suggestion`
+8. `gamification`
+9. 持续硬化 `conversation / websocket runtime`
+10. 扩大 scorecard 覆盖范围
 
 ## 当前高风险点
 
 - 同一个业务能力同时存在 handler interface、legacy service、module service、delivery adapter 多层入口
 - 旧 service 中仍混有 runtime 状态与 side effects，导致无法简单替换
 - `ai` 路径下仍有多种 provider / enhanced 实现，runtime contract 如果不继续收窄仍可能重新分叉
-- `conversation` 仍强依赖旧 websocket / session runtime
+- `conversation` 的持久化主入口已收口，但 realtime connection hub 仍是运行态核心对象，需要继续防止业务写路径回流
 - 若不继续守护，未模块化但较薄的 legacy handler service 仍可能重新把 concrete type 扩散回 `app/server` runtime/router
 
 ## 下一步建议
 
-- 持续把 `conversation` 的运行态写路径收口到 module contract
+- 持续守住 `conversation` 的运行态写路径，避免绕过 module contract
 - 明确剩余 `services/*` 中哪些类型属于 runtime state holder / event bus glue / 历史兼容入口
 - 为仍处于 `legacy` 的能力拆最小任务包，并同步写入 scorecard
 
@@ -179,6 +194,14 @@
   - HTTP handler 入口：`modules/knowledge/delivery.HandlerService`
   - runtime 装配入口：`modules/knowledge/delivery.NewHandlerServiceWithProvider(db, ...)`
   - 旧 `services/KnowledgeDocService` 定位：兼容 facade + module application / repository 装配
+- `suggestion`
+  - HTTP handler 入口：`modules/suggestion/delivery.HandlerService`
+  - runtime 装配入口：`modules/suggestion/delivery.NewHandlerService(db)`
+  - 旧 `services/SuggestionService` 定位：兼容 facade + DTO alias
+- `gamification`
+  - HTTP handler 入口：`modules/gamification/delivery.HandlerService`
+  - runtime 装配入口：`modules/gamification/delivery.NewHandlerService(db)`
+  - 旧 `services/GamificationService` 定位：兼容 facade + DTO alias
 - `routing / session transfer`
   - HTTP handler 入口：`modules/routing/delivery.HandlerService`
   - 旧 `services/SessionTransferService` 状态：已删除
@@ -218,6 +241,7 @@
 - `scripts/check-module-boundaries.sh`
   - 校验 `ticket` / `agent` / `analytics` / `customer` / `automation` / `knowledge` / `routing` / `ai` 的 handler constructor 必须依赖 `modules/*/delivery.HandlerService`
   - 校验 router/runtime 对这八个模块的注入类型必须停留在 handler-facing contract，并校验 `knowledge` runtime 必须直接通过 module delivery 装配，以及 `conversation` 的 websocket persistence 入口必须走 module delivery adapter
-  - 校验 `satisfaction` / `macro` / `app integration` / `custom field` / `shift` / `suggestion` / `gamification` 等薄 handler 依赖必须停留在 handler-local contract，避免 `app/server` 顶层装配回退暴露 concrete legacy service
+  - 校验 `satisfaction` / `macro` / `app integration` / `custom field` / `shift` 等薄 handler 依赖必须停留在 handler-local contract，避免 `app/server` 顶层装配回退暴露 concrete legacy service
+  - 校验 `suggestion` / `gamification` 的 handler/runtime 入口必须停留在 module delivery contract
   - 校验 `workspace` / `websocket transfer` 等新增收窄点必须依赖 `WorkspaceOverviewReader`、`SessionTransferRuntime` 等接口，并禁止 `app/server` runtime/router 回退暴露若干 concrete legacy service
   - 目的：先锁住已完成迁移的入口，避免回退到 handler 直连具体旧 service

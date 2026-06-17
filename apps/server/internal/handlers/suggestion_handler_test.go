@@ -16,7 +16,7 @@ import (
 	"gorm.io/gorm"
 
 	"servify/apps/server/internal/models"
-	"servify/apps/server/internal/services"
+	suggestiondelivery "servify/apps/server/internal/modules/suggestion/delivery"
 )
 
 func newTestDBForSuggestions(t *testing.T) *gorm.DB {
@@ -60,7 +60,7 @@ func TestSuggestionHandler_Suggest_ReturnsIntentAndRecommendations(t *testing.T)
 		}
 	}
 
-	svc := services.NewSuggestionService(db)
+	svc := suggestiondelivery.NewHandlerService(db)
 	h := NewSuggestionHandler(svc)
 
 	r := gin.New()

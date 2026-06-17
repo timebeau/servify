@@ -8,11 +8,21 @@ RULES_FILE="$ROOT_DIR/scripts/module-boundaries.rules"
 
 has_error=0
 
+if command -v rg >/dev/null 2>&1; then
+  SEARCH_CMD=(rg)
+  SEARCH_Q=(rg -q)
+  SEARCH_Q_MULTILINE=(rg -q --multiline)
+else
+  SEARCH_CMD=(grep -R -n -E)
+  SEARCH_Q=(grep -q -E)
+  SEARCH_Q_MULTILINE=(grep -q -E)
+fi
+
 require_pattern() {
   local file="$1"
   local pattern="$2"
   local message="$3"
-  if ! rg -q --multiline "$pattern" "$file"; then
+  if ! "${SEARCH_Q_MULTILINE[@]}" "$pattern" "$file"; then
     echo "$message"
     has_error=1
   fi
@@ -22,7 +32,7 @@ forbid_pattern() {
   local file="$1"
   local pattern="$2"
   local message="$3"
-  if rg -q --multiline "$pattern" "$file"; then
+  if "${SEARCH_Q_MULTILINE[@]}" "$pattern" "$file"; then
     echo "$message"
     has_error=1
   fi
@@ -32,7 +42,7 @@ forbid_glob_pattern() {
   local glob="$1"
   local pattern="$2"
   local message="$3"
-  if find apps/server/internal/handlers -type f -name "$glob" ! -name '*_test.go' -print0 | xargs -0 rg -q "$pattern"; then
+  if find apps/server/internal/handlers -type f -name "$glob" ! -name '*_test.go' -print0 | xargs -0 "${SEARCH_Q[@]}" "$pattern"; then
     echo "$message"
     has_error=1
   fi

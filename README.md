@@ -337,7 +337,7 @@ flowchart LR
 
 - **Go** 1.25.0（toolchain go1.25.7）- 项目使用 Go workspace 模式
 - **PostgreSQL** 12+ 或 SQLite（开发/测试）
-- **Node.js** 22+（仅 Web/管理端/文档相关任务需要）
+- **Node.js** 24+（仅 Web/管理端/文档相关任务需要）
   - 管理端使用 **pnpm** 10+ 作为包管理器
 - 可选：**Docker** / **Docker Compose**
 
@@ -406,6 +406,8 @@ Jaeger 默认地址：`http://localhost:16686`
 ### 📖 核心文档
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md)
+- [docs/current-architecture.md](./docs/current-architecture.md) - 当前真实架构快照
+- [docs/architecture-redesign-plan.md](./docs/architecture-redesign-plan.md) - 下一轮架构重设计计划
 - [docs/index.md](./docs/index.md)
 - [docs/WEKNORA_INTEGRATION.md](./docs/WEKNORA_INTEGRATION.md)
 - [docs/CI_SELF_HOSTED.md](./docs/CI_SELF_HOSTED.md) - GitHub Hosted CI 说明
@@ -428,6 +430,9 @@ Jaeger 默认地址：`http://localhost:16686`
 - [docs/implementation/08-ai-provider-expansion.md](./docs/implementation/08-ai-provider-expansion.md)
 - [docs/implementation/09-runtime-and-repo-hygiene.md](./docs/implementation/09-runtime-and-repo-hygiene.md)
 - [docs/implementation/10-service-to-module-migration.md](./docs/implementation/10-service-to-module-migration.md)
+- [docs/implementation/10-migration-inventory.md](./docs/implementation/10-migration-inventory.md)
+- [docs/implementation/10-migration-scorecard.md](./docs/implementation/10-migration-scorecard.md)
+- [docs/implementation/10-module-boundaries.md](./docs/implementation/10-module-boundaries.md)
 - [docs/implementation/11-tenant-auth-and-audit.md](./docs/implementation/11-tenant-auth-and-audit.md)
 - [docs/implementation/12-operator-observability.md](./docs/implementation/12-operator-observability.md)
 

@@ -61,9 +61,17 @@
   - 默认 handler 主路径已提升到 orchestrated enhanced AI，而不是直接暴露旧 `AIServiceInterface`
   - server/runtime/router/websocket 主链路已改为依赖 `modules/ai/delivery.RuntimeService` 或局部 runtime contract，不再透传 `services.AIServiceInterface`
   - 旧 `services/AIServiceInterface` / `EnhancedAIServiceInterface` 已删除
+- `suggestion`
+  - handler-facing contract 已收口到 `modules/suggestion/delivery.HandlerService`
+  - runtime 已改为 `modules/suggestion/delivery.NewHandlerService(db)`
+  - 旧 `services.SuggestionService` 明确保留为兼容 facade + DTO alias 包装
+- `gamification`
+  - handler-facing contract 已收口到 `modules/gamification/delivery.HandlerService`
+  - runtime 已改为 `modules/gamification/delivery.NewHandlerService(db)`
+  - 旧 `services.GamificationService` 明确保留为兼容 facade + DTO alias 包装
 - 边界守护
   - CI 已增加 `scripts/check-module-boundaries.sh`
-  - 当前自动校验 `ticket` / `agent` / `analytics` / `routing` / `ai` 的 handler constructor、router dependency、runtime wiring，以及 `conversation` 的 websocket persistence wiring，都必须停留在 module delivery contract
+  - 当前自动校验 `ticket` / `agent` / `analytics` / `customer` / `automation` / `knowledge` / `routing` / `ai` / `suggestion` / `gamification` 的 handler constructor、router dependency、runtime wiring，以及 `conversation` 的 websocket persistence wiring，都必须停留在 module delivery contract
 
 ## M3 legacy-service-retirement
 
@@ -134,3 +142,14 @@
 
 - [10-migration-scorecard.md](./10-migration-scorecard.md)
 - [10-module-boundaries.md](./10-module-boundaries.md)
+
+## M6 app-server-assembly-hardening
+
+- [x] 将 `app/server/router.go` 按 auth / management / public / realtime 拆分
+- [x] 将 `app/server/runtime.go` 拆为可组合的分阶段装配函数
+- [x] 保持现有行为不变，并通过 `app/server` 与 `app/bootstrap` 测试验证
+
+验收：
+
+- `app/server` 不再依赖单个超大装配文件承载全部启动复杂度
+- 新增模块或新接入面时，有明确的装配落点，而不是继续堆进总入口
