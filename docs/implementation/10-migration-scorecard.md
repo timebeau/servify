@@ -31,8 +31,8 @@
 | `customer` | `modules/customer/delivery.HandlerService` | `modules/customer/delivery.NewHandlerService(db)` | compatibility facade + DTO mapping for old callers | `stabilized` | handler/router/runtime 主路径已直接走 module delivery，集成测试与边界脚本已守护 |
 | `automation` | `modules/automation/delivery.HandlerService` | `modules/automation/delivery.NewHandlerService(db)` | compatibility facade + event bus glue | `stabilized` | handler/router/runtime 主路径已直接走 module delivery；subscriber 仍在 legacy service，但 HTTP 入口与测试已收口 |
 | `knowledge` | `modules/knowledge/delivery.HandlerService` | `modules/knowledge/delivery.NewHandlerServiceWithProvider(db, ...)` | compatibility facade retained for old callers | `stabilized` | handler/router/runtime 的主路径已走 module delivery；index job 仓储与 knowledge provider 装配已纳入 runtime 主路径，并进入边界脚本守护，运行时按 Dify 优先、WeKnora 兼容装配 |
-| `suggestion` | `modules/suggestion/delivery.HandlerService` | `modules/suggestion/delivery.NewHandlerService(db)` | compatibility facade retained for old callers | `stabilized` | handler/router/runtime 主路径已切到 module delivery；旧 `services.SuggestionService` 仅保留别名 DTO 与兼容包装 |
-| `gamification` | `modules/gamification/delivery.HandlerService` | `modules/gamification/delivery.NewHandlerService(db)` | compatibility facade retained for old callers | `stabilized` | handler/router/runtime 主路径已切到 module delivery；旧 `services.GamificationService` 仅保留别名 DTO 与兼容包装 |
+| `suggestion` | `modules/suggestion/delivery.HandlerService` | `modules/suggestion/delivery.NewHandlerService(db)` | legacy service removed | `stabilized` | handler/router/runtime 主路径已切到 module delivery；旧 `services.SuggestionService` 已删除，helper 单元测试与 DB 集成测试已下沉到 module application / delivery |
+| `gamification` | `modules/gamification/delivery.HandlerService` | `modules/gamification/delivery.NewHandlerService(db)` | legacy service removed | `stabilized` | handler/router/runtime 主路径已切到 module delivery；旧 `services.GamificationService` 已删除，评分 / 徽章单元测试与 DB 集成测试已下沉到 module application / delivery |
 | `voice` | already module coordinator | module coordinator | not primarily legacy | `mixed` | 已较模块化，但不属于本轮 `services -> modules` 的典型迁移样式 |
 
 ## 当前结论
@@ -42,8 +42,8 @@
 - `automation` 的旧 facade 仅保留 event bus subscriber 与少量兼容 glue
 - `knowledge` 已完成 handler/runtime 收口，索引任务仓储与 provider 集成已纳入 module delivery 主路径
 - 一批尚未完全模块化的薄 handler 能力已完成 `app/server` 装配面收口：`satisfaction`、`macro`、`app integration`、`custom field`、`shift`
-- `suggestion` 已完成 handler/runtime 收口，旧 facade 仅保留兼容包装
-- `gamification` 已完成 handler/runtime 收口，旧 facade 仅保留兼容包装
+- `suggestion` 已完成 handler/runtime 收口，旧 `services.SuggestionService` 已删除，helper 与集成测试已下沉到 module 层
+- `gamification` 已完成 handler/runtime 收口，旧 `services.GamificationService` 已删除，评分 / 徽章逻辑与测试已下沉到 module 层
 - `message router` 已完成 runtime/router/handler 装配面收口，保留 concrete 生命周期实现于 `services.MessageRouter`
 - `sla` 已完成 handler/runtime/router 的装配面收口，但 service 本体仍保留 automation glue 与 runtime 组装职责
 - `realtime runtime` 已去掉 `WebSocketHub` / `WebRTCService` 的顶层 concrete 暴露，仅保留 gateway contract 与内部启动细节

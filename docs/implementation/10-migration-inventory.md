@@ -98,14 +98,14 @@
 - `suggestion`
   - `modules/suggestion/application`、`contract`、`infra`、`delivery` 已落地
   - handler/runtime 已直接消费 `modules/suggestion/delivery.HandlerService`
-  - 旧 `services/SuggestionService` 已收缩为 DTO alias 与兼容 facade
-  - 结论：handler/runtime 主路径已贴近 module；旧 facade 仅保留历史调用兼容
+  - 旧 `services/SuggestionService` 已删除，DTO alias 与 helper 已全部下沉到 module application / contract
+  - 结论：`suggestion` 已完成主路径收口，并采用删除 legacy service 的策略收尾
 
 - `gamification`
   - `modules/gamification/application`、`contract`、`infra`、`delivery` 已落地
   - handler/runtime 已直接消费 `modules/gamification/delivery.HandlerService`
-  - 旧 `services/GamificationService` 已收缩为 DTO alias 与兼容 facade
-  - 结论：handler/runtime 主路径已贴近 module；旧 facade 仅保留历史调用兼容
+  - 旧 `services/GamificationService` 已删除，评分 / 徽章逻辑与 DTO alias 已全部下沉到 module application / contract
+  - 结论：`gamification` 已完成主路径收口，并采用删除 legacy service 的策略收尾
 
 ## 按迁移成熟度分组
 
@@ -197,11 +197,11 @@
 - `suggestion`
   - HTTP handler 入口：`modules/suggestion/delivery.HandlerService`
   - runtime 装配入口：`modules/suggestion/delivery.NewHandlerService(db)`
-  - 旧 `services/SuggestionService` 定位：兼容 facade + DTO alias
+  - 旧 `services/SuggestionService` 状态：已删除
 - `gamification`
   - HTTP handler 入口：`modules/gamification/delivery.HandlerService`
   - runtime 装配入口：`modules/gamification/delivery.NewHandlerService(db)`
-  - 旧 `services/GamificationService` 定位：兼容 facade + DTO alias
+  - 旧 `services/GamificationService` 状态：已删除
 - `routing / session transfer`
   - HTTP handler 入口：`modules/routing/delivery.HandlerService`
   - 旧 `services/SessionTransferService` 状态：已删除
