@@ -46,7 +46,7 @@
   - 默认装配下 `LoadTransferSession(...)` 的 adapter 错误会直接上抛，不再静默回退到 legacy DB 查询，避免掩盖 conversation runtime 故障
   - 加入等待队列时的会话 active/unassigned 同步也已切到 `modules/conversation/delivery.RuntimeService.SyncWaitingAssignment(...)`
   - websocket 通知已收窄为 notifier 接口，不再把 `WebSocketHub` 作为内部 concrete 依赖保存
-  - 旧 `services/SessionTransferService` 已删除
+  - 旧 `services/SessionTransferService` 已删除；残留的 `services/session_transfer_legacy_store.go`（DB 兼容读写孤儿，无生产调用方）也已删除
   - 结论：`routing / session transfer` 已完成主路径收口，并采用删除 legacy service 的策略收尾
 
 - `ai`
