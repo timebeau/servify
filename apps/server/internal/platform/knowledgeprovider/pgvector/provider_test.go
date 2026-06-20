@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pgvector/pgvector-go"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
@@ -602,7 +601,7 @@ func BenchmarkProvider_Search(b *testing.B) {
 			ProviderID:  "pgvector",
 			Title:       fmt.Sprintf("Document %d", i),
 			Content:     fmt.Sprintf("Content for document %d", i),
-			Embedding:   pgvector.NewVector([]float32{0.1, 0.2, 0.3}),
+			Embedding:   models.NewEmbedding([]float32{0.1, 0.2, 0.3}),
 		}
 		db.Create(&doc)
 	}

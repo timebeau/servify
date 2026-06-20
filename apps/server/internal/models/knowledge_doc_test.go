@@ -3,7 +3,6 @@ package models
 import (
 	"testing"
 
-	"github.com/pgvector/pgvector-go"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,7 +16,7 @@ func TestKnowledgeDoc_PgvectorFields(t *testing.T) {
 		Content:     "This is a test content for knowledge base.",
 		Category:    "technical",
 		IsPublic:    true,
-		Embedding:   pgvector.NewVector([]float32{0.1, 0.2, 0.3}),
+		Embedding:   NewEmbedding([]float32{0.1, 0.2, 0.3}),
 		ChunkIndex:  1,
 		DocChunkID:  "doc-123-chunk-1",
 	}
@@ -62,7 +61,7 @@ func TestKnowledgeDoc_Vector1536Dimensions(t *testing.T) {
 		ProviderID:  "pgvector",
 		ExternalID:  "doc-789",
 		Title:       "Document with full embedding",
-		Embedding:   pgvector.NewVector(vector),
+		Embedding:   NewEmbedding(vector),
 		ChunkIndex:  0,
 		DocChunkID:  "doc-789-chunk-0",
 	}

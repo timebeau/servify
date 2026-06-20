@@ -249,7 +249,7 @@ func (p *Provider) UpsertDocument(ctx context.Context, doc knowledgeprovider.Kno
 		}
 
 		// 设置向量
-		docModel.Embedding = pgvector.NewVector(vectors[i])
+		docModel.Embedding = models.NewEmbedding(vectors[i])
 
 		// 保存到数据库
 		if err := p.db.WithContext(ctx).Create(docModel).Error; err != nil {
